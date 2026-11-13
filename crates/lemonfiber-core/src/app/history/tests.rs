@@ -178,6 +178,25 @@ fn a_stuck_download_dropped_reads_as_its_title() {
     );
 }
 
+#[test]
+fn an_ask_sent_to_a_curator_reads_as_what_it_asked_for_and_whether_undoing_reaches_it() {
+    let asked = |whole| crate::journal::Kind::Asked {
+        unit: crate::collected::Unit::Music(crate::ports::service::MusicUnit::Album),
+        reference: "mbid-kind-of-blue".to_owned(),
+        kept: "music-1".to_owned(),
+        whole,
+    };
+    assert_eq!(
+        did(&asked(true)),
+        "asked for the album mbid-kind-of-blue, kept as music-1"
+    );
+    assert_eq!(
+        did(&asked(false)),
+        "asked for the album mbid-kind-of-blue, kept as music-1, the rest of what the house \
+         held in part, which undoing leaves as it is"
+    );
+}
+
 /// A key is named with its scope, minted, collected or revoked.
 #[test]
 fn a_key_reads_as_its_name_and_scope() {

@@ -345,6 +345,8 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             ("media.serve@1".to_owned(), "account"),
             ("media.serve@1".to_owned(), "listed_as"),
             ("media.serve@1".to_owned(), "events"),
+            ("music.curate@1".to_owned(), "remove"),
+            ("books.curate@1".to_owned(), "remove"),
             ("owner.claim@1".to_owned(), "claimed_by"),
         ]
     );
