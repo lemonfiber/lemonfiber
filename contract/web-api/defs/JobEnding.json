@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why work ended before it finished.",
+  "oneOf": [
+    {
+      "description": "Its name was released.",
+      "type": "string",
+      "const": "released"
+    },
+    {
+      "description": "Nothing asked about it for a whole lease, so it was let go.",
+      "type": "string",
+      "const": "let-go"
+    },
+    {
+      "description": "The services it followed stopped saying anything.",
+      "type": "string",
+      "const": "quiet"
+    }
+  ]
+}

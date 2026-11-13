@@ -97,6 +97,7 @@
     "device-key": "kinds/device-key.json",
     "device-keys": "kinds/device-keys.json",
     "doctor": "kinds/doctor.json",
+    "ended": "kinds/ended.json",
     "error": "kinds/error.json",
     "forms": "kinds/forms.json",
     "front-door": "kinds/front-door.json",
