@@ -184,12 +184,6 @@ impl Rendered {
         })
     }
 
-    /// What kind of event it is.
-    #[must_use]
-    pub const fn event(&self) -> EventKind {
-        self.event
-    }
-
     /// What the envelope calls itself.
     #[must_use]
     pub const fn kind(&self) -> Kind {

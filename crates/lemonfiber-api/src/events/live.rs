@@ -228,10 +228,11 @@ impl Listening {
     /// said — so a busy stream beats only when it has gone quiet. What is said to an
     /// audience this client is not part of is passed over.
     pub async fn next(&mut self) -> Option<String> {
-        while let Some(event) = self.missed.pop_front() {
-            if self.hearing.hears(event.audience()) {
-                return Some(event.framed());
-            }
+        let hearing = self.hearing;
+        if let Some(event) = std::iter::from_fn(|| self.missed.pop_front())
+            .find(|event| hearing.hears(event.audience()))
+        {
+            return Some(event.framed());
         }
         loop {
             tokio::select! {

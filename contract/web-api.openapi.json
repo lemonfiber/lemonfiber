@@ -3909,6 +3909,29 @@
         ],
         "type": "object"
       },
+      "Ended": {
+        "description": "Work that ended before it finished: its name, what it was, and why it ended.",
+        "properties": {
+          "action": {
+            "description": "The action that was asked for, as it was named.",
+            "type": "string"
+          },
+          "ended": {
+            "$ref": "#/components/schemas/JobEnding",
+            "description": "Why it ended."
+          },
+          "job": {
+            "description": "The name the work was answered with.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job",
+          "action",
+          "ended"
+        ],
+        "type": "object"
+      },
       "Ending": {
         "description": "How one service's update ended.",
         "oneOf": [
@@ -6327,6 +6350,26 @@
           "secret"
         ],
         "type": "object"
+      },
+      "JobEnding": {
+        "description": "Why work ended before it finished.",
+        "oneOf": [
+          {
+            "const": "released",
+            "description": "Its name was released.",
+            "type": "string"
+          },
+          {
+            "const": "let-go",
+            "description": "Nothing asked about it for a whole lease, so it was let go.",
+            "type": "string"
+          },
+          {
+            "const": "quiet",
+            "description": "The services it followed stopped saying anything.",
+            "type": "string"
+          }
+        ]
       },
       "Jump": {
         "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
@@ -21143,6 +21186,9 @@
             "$ref": "#/components/schemas/kind-doctor"
           },
           {
+            "$ref": "#/components/schemas/kind-ended"
+          },
+          {
             "$ref": "#/components/schemas/kind-error"
           },
           {
@@ -22282,6 +22328,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/DoctorReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-ended": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Ended",
             "description": "The payload."
           },
           "host": {

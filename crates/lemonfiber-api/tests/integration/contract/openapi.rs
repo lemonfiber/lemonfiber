@@ -1,4 +1,4 @@
-//! The OpenAPI document, rendered from the artefact and committed beside it.
+//! The `OpenAPI` document, rendered from the artefact and committed beside it.
 
 use serde_json::{json, Value};
 

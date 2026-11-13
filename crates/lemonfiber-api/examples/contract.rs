@@ -1,4 +1,4 @@
-//! Writes the machine-readable contract over the committed directory, its OpenAPI
+//! Writes the machine-readable contract over the committed directory, its `OpenAPI`
 //! rendering, and what it moved against the previous release's.
 //!
 //! `just contract` runs it. It writes beside the directory and swaps it in, so a run
