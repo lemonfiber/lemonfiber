@@ -11,7 +11,7 @@ use crate::receiving::{down, Mode};
 /// An indexer aggregator that answers the app-sync driver from a script.
 pub struct Applications {
     mode: Mode,
-    applications: Mutex<Vec<RegisteredApplication>>,
+    held: Mutex<Vec<RegisteredApplication>>,
     reads: Mutex<u32>,
     next_id: Mutex<u32>,
     /// Whether the key it stores is one the curator no longer answers to.
@@ -30,7 +30,7 @@ impl Applications {
     pub fn with(mode: Mode, applications: Vec<RegisteredApplication>) -> Self {
         Self {
             mode,
-            applications: Mutex::new(applications),
+            held: Mutex::new(applications),
             reads: Mutex::new(0),
             next_id: Mutex::new(100),
             stale: Mutex::new(false),
@@ -81,8 +81,7 @@ impl AppSync for Applications {
             }),
             Mode::Swallows => Ok(()),
             _ => {
-                if let (Ok(mut applications), Ok(mut id)) =
-                    (self.applications.lock(), self.next_id.lock())
+                if let (Ok(mut applications), Ok(mut id)) = (self.held.lock(), self.next_id.lock())
                 {
                     applications.push(RegisteredApplication {
                         id: id.to_string(),
@@ -140,7 +139,7 @@ impl AppSync for Applications {
             }),
             Mode::DropsAfterRegister if count >= 2 => Err(down("prowlarr")),
             _ => Ok(self
-                .applications
+                .held
                 .lock()
                 .map(|applications| applications.clone())
                 .unwrap_or_default()),
