@@ -1,0 +1,97 @@
+{
+  "post": {
+    "operationId": "sign_in_by_code",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "properties": {
+              "device": {
+                "description": "The port's `device`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "device"
+            ],
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "A code the outside service holding the source's accounts issued for one device to sign\nin by, which the member approves there.",
+              "properties": {
+                "approve_at": {
+                  "description": "Where the member approves the code.",
+                  "type": "string"
+                },
+                "code": {
+                  "description": "The code the member enters where they approve it.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "What [`Household::signed_by_code`] is asked with to learn whom the code proved.",
+                  "type": "string"
+                },
+                "lapses_at": {
+                  "description": "When the code lapses, as an RFC 3339 instant.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "approve_at",
+                "lapses_at"
+              ],
+              "title": "SignInCode",
+              "type": "object"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 1
+  }
+}

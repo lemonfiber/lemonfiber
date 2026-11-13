@@ -59,6 +59,7 @@ impl Filler {
             made: Vec::new(),
             hashed: Vec::new(),
             certificate: self.certificate.clone(),
+            claimed: false,
         }
     }
 
@@ -99,6 +100,27 @@ fn every_placeholder_is_filled_wherever_it_stands_and_only_credentials_are_kept_
             2
         )
     );
+}
+
+#[test]
+fn a_claimed_upstreams_missing_field_is_asked_with_a_credential_minted_for_the_case() {
+    let Some(filler) = Filler::new(Some(7)) else {
+        return;
+    };
+    let asks = json!({"name": "{upstream:username}", "code": "{upstream:code}"});
+    for upstream in [None, Some("{\"code\": \"4XQZ\"}")] {
+        if let Some(text) = upstream {
+            let _ = filler.held.hold(UPSTREAM_FILE, text);
+        }
+        let mut filling = Filling {
+            claimed: true,
+            ..filler.filling()
+        };
+        let filled = filling.filled(&asks).map(|filled| filled.value);
+        let code = if upstream.is_some() { "4XQZ" } else { MINTED };
+        assert_eq!(filled, Ok(json!({"name": MINTED, "code": code})));
+        assert_eq!(filling.made.len(), if upstream.is_some() { 1 } else { 2 });
+    }
 }
 
 #[test]

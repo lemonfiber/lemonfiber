@@ -67,7 +67,7 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
     );
     let read = recorded(&at, &engine(), &http, Some(7)).await;
     assert_eq!(failed_at(&read), Vec::new());
-    assert_eq!(read.recordings.len(), 21);
+    assert_eq!(read.recordings.len(), 23);
     assert_eq!(posted(&http, "/create_admin").len(), 1);
     assert_eq!(posted(&http, "/startup_completed").len(), 2);
     assert_eq!(
@@ -111,6 +111,53 @@ async fn an_adapter_speaking_identity_is_first_run_through_and_asked_with_what_i
     );
 }
 
+#[tokio::test]
+async fn a_source_claimed_over_owner_claim_is_claimed_not_first_run_and_asked_with_minted_credentials(
+) {
+    let manifest = identifying().replace(
+        "speaks      = [\"identity.source@1\"]",
+        "speaks      = [\"identity.source@1\", \"owner.claim@1\"]",
+    );
+    let at = source("fronted-identity-claimed", &manifest);
+    let json = |body: &str| Answer::served(200, "application/json", body);
+    let refused = || {
+        Answer::served(
+            500,
+            PROBLEM,
+            r#"{"type": "unsupported", "detail": "it is set up by claiming it"}"#,
+        )
+    };
+    let http = identity_and(
+        vec![json("false")],
+        vec![refused()],
+        vec![
+            ("/whoever", vec![refused()]),
+            ("/claim", vec![json("\"ours\"")]),
+            ("/owner", vec![json("\"ours\"")]),
+            ("/lemonfiber/owner.claim/v1/", vec![json("null")]),
+        ],
+    );
+    let read = recorded(&at, &engine(), &http, Some(7)).await;
+
+    assert_eq!(failed_at(&read), Vec::new());
+    assert_eq!(posted(&http, "/startup_completed").len(), 1);
+    assert_eq!(posted(&http, "/create_admin").len(), 1);
+    assert_eq!(posted(&http, "/owner.claim/v1/claim").len(), 1);
+    let asked = |fragment: &str| posted(&http, fragment).last().map(body);
+    assert_eq!(
+        asked("/create_admin"),
+        Some(json!({"name": MINTED, "password": MINTED}))
+    );
+    assert_eq!(
+        json_at(
+            &at,
+            "conformance/identity.source@1/create_admin-answers.json"
+        )
+        .pointer("/response/json/type"),
+        Some(&json!("unsupported"))
+    );
+}
+
 fn unavailable() -> Answer {
     Answer::served(
         503,
@@ -135,7 +182,7 @@ async fn a_first_run_waits_while_the_upstream_is_still_starting() {
     let read = recorded(&at, &engine(), &http, Some(7)).await;
 
     assert_eq!(failed_at(&read), Vec::new());
-    assert_eq!(read.recordings.len(), 21);
+    assert_eq!(read.recordings.len(), 23);
     assert_eq!(posted(&http, "/create_admin").len(), 3);
     assert_eq!(
         json_at(
