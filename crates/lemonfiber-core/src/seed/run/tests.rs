@@ -719,6 +719,7 @@ mod contracted_gate;
 mod cors;
 mod curating;
 mod decline;
+mod emby;
 mod enveloping;
 mod extraction;
 mod fronting;

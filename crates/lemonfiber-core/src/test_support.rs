@@ -56,6 +56,7 @@ mod conforming;
 mod contracting;
 mod declining;
 pub(crate) mod egress;
+pub(crate) mod embying;
 mod gating;
 pub(crate) mod plexing;
 pub(crate) mod syncing;
