@@ -12,7 +12,7 @@ use regex_syntax::hir::Look;
 use super::joined::joined;
 use super::{
     Addressee, Answers, BytePath, Declared, Held, LivePath, Locations, Presentation, Question,
-    Statuses, Token, BASE, ITEM, MAY, TOKEN,
+    Statuses, Token, BASE, ITEM, MAY, PLAY, TOKEN,
 };
 use crate::http::Method;
 
@@ -62,6 +62,9 @@ const PROBE_BASE: &str = "https://household.invalid:8920";
 /// What a probe puts where a template names the item.
 const PROBE_ITEM: &str = "0123456789abcdef0123456789abcdef";
 
+/// The play id a template is tried with.
+const PROBE_PLAY: &str = "fedcba9876543210fedcba9876543210";
+
 /// Why a declaration is refused at install.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Undeclarable {
@@ -78,8 +81,9 @@ pub enum Undeclarable {
         /// The byte path's pattern.
         pattern: String,
     },
-    /// A live-stream path does not say where the live stream's id sits.
-    #[error("its live-stream path {pattern} does not hold exactly one group named stream")]
+    /// A live-stream path does not say once where the live stream's id sits: in one group
+    /// named `stream` of its pattern, or in the parameter it names and no group.
+    #[error("its live-stream path {pattern} does not say once where its live stream sits")]
     Unstreamed {
         /// The live-stream path's pattern.
         pattern: String,
@@ -263,15 +267,18 @@ fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
     Ok(())
 }
 
-/// Whether a live-stream path says once where its live stream sits, and is anchored
-/// throughout.
+/// Whether a live-stream path says once where its live stream sits, in its pattern or in
+/// one plainly spelled parameter, and is anchored throughout.
 fn live_path(path: &LivePath) -> Result<(), Undeclarable> {
     let engine = path_pattern(&path.pattern)?;
     let streams = engine
         .capture_names()
         .filter(|name| *name == Some(STREAM_NAME))
         .count();
-    if streams != 1 {
+    if let Some(parameter) = &path.parameter {
+        plain(parameter)?;
+    }
+    if streams != usize::from(path.parameter.is_none()) {
         return Err(Undeclarable::Unstreamed {
             pattern: path.pattern.clone(),
         });
@@ -441,9 +448,16 @@ fn token(token: &Token) -> Result<(), Undeclarable> {
 }
 
 /// Whether every location is built on the household address, names the item, and holds
-/// no placeholder but the two a location may.
+/// no placeholder but those a location may: the play's id in a stream or playlist alone.
 fn located(locations: &Locations) -> Result<(), Undeclarable> {
-    for template in [&locations.stream, &locations.poster, &locations.backdrop] {
+    let played = [
+        (&locations.stream, true),
+        (&locations.poster, false),
+        (&locations.backdrop, false),
+    ]
+    .into_iter()
+    .chain(locations.playlist.iter().map(|playlist| (playlist, true)));
+    for (template, plays) in played {
         let elsewhere = || Undeclarable::Elsewhere {
             template: template.clone(),
         };
@@ -453,11 +467,14 @@ fn located(locations: &Locations) -> Result<(), Undeclarable> {
                 template: template.clone(),
             });
         }
-        let filled = rest.replace(ITEM, PROBE_ITEM);
+        let mut filled = rest.replace(ITEM, PROBE_ITEM);
+        if plays {
+            filled = filled.replace(PLAY, PROBE_PLAY);
+        }
         if filled.contains(['{', '}']) {
             return Err(elsewhere());
         }
-        Locations::located(template, PROBE_BASE, PROBE_ITEM).ok_or_else(elsewhere)?;
+        Locations::played(template, PROBE_BASE, PROBE_ITEM, PROBE_PLAY).ok_or_else(elsewhere)?;
     }
     Ok(())
 }

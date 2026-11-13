@@ -7,14 +7,15 @@
 //! the library holds something yet; how each series it holds is filed, and reading one
 //! item afresh; standing behind the front door, with the keys it holds for the stack's
 //! own services; what a guard in front of it enforces; the certificate its internal
-//! TLS port presents; and a library for each media type the stack files.
+//! TLS port presents; a library for each media type the stack files; and live TV, the
+//! channels one member may watch and a channel's live stream opened on their account.
 
 use lemonfiber_ports::media::{TitleKind, MEDIA};
 use lemonfiber_ports::service::{
-    AppKeys, Applied, Astray, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted, Furnished,
-    Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
-    OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Upkeep, PICTURE_MOST,
-    SERIES_MOST,
+    AppKeys, Applied, Astray, Channel, Dated, Declared, Declaring, Encrypting, FiledAt, Fronted,
+    Furnished, Furnishing, HowFar, Image, Item, ItemDetail, ItemProgress, Library, OutsideAccount,
+    OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Tuned, Tuning, Upkeep,
+    PICTURE_MOST, SERIES_MOST,
 };
 use serde_json::Value;
 
@@ -44,6 +45,9 @@ const POSITION: u64 = 60;
 
 /// A term no library holds anything for.
 const TERM: &str = "conformance";
+
+/// A live stream nothing opened, which the conformance cases close.
+const UNTUNED: &str = "conformance-live-stream";
 
 /// An origin a browser reads it from.
 const ORIGIN: &str = "https://watch.example";
@@ -175,6 +179,17 @@ crate::contract! {
             /// Send each happening to the core's address, pinning the certificate it presents
             /// there, with the key the core minted for it.
             fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()) };
+        }
+        impl Tuning {
+            /// The live TV channels one member's own account may watch, each with what is on it now.
+            fn channels(str member: &str) -> Vec<Channel> where since = 4, asks = Asked { member: member() };
+            /// Open one channel's live stream on one member's own account, where it may watch it.
+            fn tune(str member: &str, str channel: &str) -> Option<Tuned> where since = 4, asks = Asked {
+                member: member(),
+                channel: NOWHERE.to_owned(),
+            };
+            /// Close a live stream by the id it was opened under.
+            fn untune(str closes_by: &str) -> () where since = 4, asks = Asked { closes_by: UNTUNED.to_owned() };
         }
     }
 }

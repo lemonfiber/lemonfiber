@@ -29,6 +29,9 @@ pub const BASE: &str = "{base}";
 /// What a template names the item by.
 pub const ITEM: &str = "{item}";
 
+/// What a stream or playlist template names the fresh id of one play by.
+pub const PLAY: &str = "{play}";
+
 /// What a header template names the member's token by.
 pub const TOKEN: &str = "{token}";
 
@@ -87,8 +90,13 @@ pub struct InQuery {
 #[serde(deny_unknown_fields)]
 pub struct LivePath {
     /// The paths it covers, holding one group named `stream` where the live stream's id
-    /// sits, every match starting at the path's start.
+    /// sits, or none where [`Self::parameter`] holds it, every match starting at the
+    /// path's start.
     pub pattern: String,
+    /// The query parameter whose whole value, decoded once, is the live stream's id,
+    /// where the path does not hold it: carried once under this spelling.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameter: Option<String>,
     /// The shape a live stream's id has, matched against what the group holds.
     pub stream: String,
 }
@@ -285,6 +293,10 @@ pub struct Locations {
     pub poster: String,
     /// Its backdrop.
     pub backdrop: String,
+    /// The playlist a browser plays it from, at the front door's route to the guard,
+    /// where the upstream serves one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub playlist: Option<String>,
 }
 
 /// The ports the upstream listens on.

@@ -5,11 +5,11 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
-    EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
-    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, OutsideAccount,
-    OutsideServer, Picture, Playback, Ports, Presentation, Question, Recounting, Screening,
-    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
+    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared, Declaring,
+    Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds,
+    HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming,
+    OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation, Programme, Question,
+    Recounting, Screening, SeasonDetail, SeriesHeld, Statuses, Token, Tuned, Tuning, Upkeep,
 };
 
 use super::{crosses_alike, serve, Upstream};
@@ -221,6 +221,7 @@ pub(super) fn declared() -> Declared {
         }],
         live: vec![LivePath {
             pattern: "^/films/live/(?P<stream>[^/]+)/".to_owned(),
+            parameter: None,
             stream: "^[a-z]{6}$".to_owned(),
         }],
         refused: vec!["^/posters/by-name/.*$".to_owned()],
@@ -247,6 +248,7 @@ pub(super) fn declared() -> Declared {
             stream: "{base}/films/{item}/reel".to_owned(),
             poster: "{base}/films/{item}/poster".to_owned(),
             backdrop: "{base}/films/{item}/wide".to_owned(),
+            playlist: None,
         },
         ports: Ports {
             upstream: 8000,
@@ -288,6 +290,36 @@ impl Recounting for Upstream {
 }
 
 #[async_trait]
+impl Tuning for Upstream {
+    async fn channels(&self, member: &str) -> Result<Vec<Channel>, Failure> {
+        Ok(vec![Channel {
+            id: format!("{member}-news"),
+            name: "News".to_owned(),
+            number: Some("101".to_owned()),
+            now: Some(Programme {
+                title: "The evening news".to_owned(),
+                certificate: Some("PG".to_owned()),
+                ends: Some("2026-11-13T19:00:00Z".to_owned()),
+            }),
+        }])
+    }
+
+    async fn tune(&self, member: &str, channel: &str) -> Result<Option<Tuned>, Failure> {
+        self.tell(format!("tune {member} {channel}"));
+        Ok((channel != "barred").then(|| Tuned {
+            closes_by: "ls1".to_owned(),
+            direct: "/live/0123456789abcdef0123456789abcdef/stream.ts".to_owned(),
+            transcoded: format!("/videos/{channel}/live.m3u8?LiveStreamId=ls1"),
+        }))
+    }
+
+    async fn untune(&self, closes_by: &str) -> Result<(), Failure> {
+        self.tell(format!("untune {closes_by}"));
+        Ok(())
+    }
+}
+
+#[async_trait]
 impl Encrypting for Upstream {
     async fn serve_tls(&self, path: &str, pin: &str) -> Result<Applied, Failure> {
         self.tell(format!("serve_tls {path} {pin}"));
@@ -322,7 +354,7 @@ impl Furnishing for Upstream {
 
 /// Every operation of the capability, once, each answer written down.
 async fn script<
-    M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting + Furnishing,
+    M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting + Furnishing + Tuning,
 >(
     server: &M,
 ) -> Vec<String> {
@@ -362,6 +394,10 @@ async fn script<
         format!("{:?}", server.answers_to("gate-key").await),
         format!("{:?}", server.revoke("gate-key").await),
         format!("{:?}", server.declared().await),
+        format!("{:?}", server.channels("a7f3").await),
+        format!("{:?}", server.tune("a7f3", "news").await),
+        format!("{:?}", server.tune("a7f3", "barred").await),
+        format!("{:?}", server.untune("ls1").await),
         format!("{:?}", server.serve_tls(READ_AT_START, PIN).await),
         format!("{:?}", server.serve_tls("/config/tls.p12", PIN).await),
         format!(
@@ -397,6 +433,9 @@ async fn a_media_server_answers_and_is_told_through_its_contract_as_it_is_in_pro
             "restart",
             "answers",
             "revoke",
+            "tune",
+            "tune",
+            "untune",
             "serve_tls",
             "serve_tls",
             "furnish"
