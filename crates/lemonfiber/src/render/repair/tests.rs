@@ -619,6 +619,26 @@ fn a_dropped_stuck_download_is_said_to_be_grabbed_again_by_its_title() {
 }
 
 #[test]
+fn an_ask_taken_back_is_said_to_be_removed_from_the_curator() {
+    let undos = vec![Undo {
+        target: "lidarr".to_owned(),
+        action: Action::Unask {
+            unit: lemonfiber_core::collected::Unit::Music(
+                lemonfiber_core::ports::service::MusicUnit::Album,
+            ),
+            reference: "mbid-kind-of-blue".to_owned(),
+            kept: "music-1".to_owned(),
+            whole: true,
+        },
+    }];
+    let said = reversed(&putting_back(undos, Vec::new())).text();
+    assert!(
+        said.contains("the album mbid-kind-of-blue removed from the curator"),
+        "{said}"
+    );
+}
+
+#[test]
 fn a_part_started_or_stopped_again_is_said_by_its_service() {
     let undos = [true, false]
         .into_iter()

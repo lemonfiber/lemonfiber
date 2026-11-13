@@ -672,6 +672,30 @@ fn a_restart_goes_back_whole() {
     );
 }
 
+#[test]
+fn an_ask_goes_back_whole_only_where_the_house_held_none_of_it_before() {
+    let asked = |whole| Change {
+        at: "1".to_owned(),
+        operation: crate::collected::run::OPERATION.to_owned(),
+        target: "lidarr".to_owned(),
+        kind: Kind::Asked {
+            unit: crate::collected::Unit::Music(crate::ports::service::MusicUnit::Album),
+            reference: "mbid-kind-of-blue".to_owned(),
+            kept: "music-1".to_owned(),
+            whole,
+        },
+    };
+    assert_eq!(
+        standing(&asked(true), &[], &holding(&[]), &unread).reversal,
+        Reversal::Whole
+    );
+    assert!(standing(&asked(false), &[], &holding(&[]), &unread)
+        .refusal
+        .is_some_and(|refusal| refusal
+            .because
+            .contains("the ask music-1 was for the rest of what the house held in part")));
+}
+
 /// A starting file a replacement wrote goes back whole while it holds what was written or
 /// nothing at all, and is refused where it was written since.
 #[test]

@@ -76,7 +76,13 @@ fn engine() -> Reporting {
 }
 
 pub(super) fn ctx(transport: &Arc<Transport>, tag: &str) -> Ctx {
-    let ctx = ctx_engine(Arc::clone(transport), &format!("collect-{tag}"), engine());
+    let mut ctx = ctx_engine(Arc::clone(transport), &format!("collect-{tag}"), engine());
+    ctx.settings.stack_dir = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .and_then(std::path::Path::parent)
+        .map(|dir| dir.join("stack"));
     speaking(&ctx);
     ctx
 }
@@ -543,6 +549,15 @@ pub(super) fn journalled(ctx: &Ctx) -> Vec<crate::journal::Change> {
         .unwrap_or_default()
 }
 
+/// How many of `changes` undoing them put back, and what it could not reach; nothing
+/// where the stack has no manifest.
+async fn undone(ctx: &Ctx, changes: &[crate::journal::Change]) -> Option<(usize, Vec<String>)> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let undos: Vec<_> = changes.iter().map(crate::journal::Change::undo).collect();
+    let reached = crate::app::recover::reconfigured(ctx, &undos, &manifest).await;
+    Some((reached.put_back.len(), reached.unreached))
+}
+
 #[tokio::test]
 async fn an_album_sent_to_the_curator_is_journalled_as_undone_by_removing_it() {
     let transport = the_house(vec![
@@ -557,13 +572,7 @@ async fn an_album_sent_to_the_curator_is_journalled_as_undone_by_removing_it() {
 
     let _ = asked(&ctx, "Ada", ALBUM).await;
     let changes = journalled(&ctx);
-    let undone = match changes.as_slice() {
-        [change] => {
-            crate::collected::run::unasked(&ctx, &change.target, (ALBUM, KIND_OF_BLUE, "music-1"))
-                .await
-        }
-        _ => Err("nothing journalled".to_owned()),
-    };
+    let undone = undone(&ctx, &changes).await;
 
     assert_eq!(
         changes
@@ -581,7 +590,7 @@ async fn an_album_sent_to_the_curator_is_journalled_as_undone_by_removing_it() {
         changes.first().map(|change| change.operation.as_str()),
         Some(crate::collected::run::OPERATION)
     );
-    assert_eq!(undone, Ok(()));
+    assert_eq!(undone, Some((1, Vec::new())));
     assert_eq!(sent(&transport, "remove"), 1);
     assert!(kept(&ctx).is_empty());
 }
@@ -651,14 +660,13 @@ async fn an_ask_the_curator_will_not_remove_stays_on_the_list() {
     ]);
     let ctx = ctx(&transport, "unasked-refused");
     let _ = asked(&ctx, "Ada", ALBUM).await;
-    let target = journalled(&ctx)
-        .first()
-        .map(|change| change.target.clone())
-        .unwrap_or_default();
+    let changes = journalled(&ctx);
 
-    let undone =
-        crate::collected::run::unasked(&ctx, &target, (ALBUM, KIND_OF_BLUE, "music-1")).await;
+    let undone = undone(&ctx, &changes).await;
 
-    assert!(undone.is_err());
+    assert_eq!(
+        undone.map(|(put_back, unreached)| (put_back, unreached.len())),
+        Some((0, 1))
+    );
     assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
 }

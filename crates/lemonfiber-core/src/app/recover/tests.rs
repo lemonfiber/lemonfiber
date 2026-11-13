@@ -709,6 +709,12 @@ fn a_change_made_and_not_recorded_says_it_stands() {
 fn a_key_is_left_standing_and_named() {
     let env = scratch("key").join(".env");
     let name = || "ha".to_owned();
+    let unask = |whole| Action::Unask {
+        unit: crate::collected::Unit::Music(crate::ports::service::MusicUnit::Album),
+        reference: "mbid-kind-of-blue".to_owned(),
+        kept: "music-1".to_owned(),
+        whole,
+    };
     for (action, named) in [
         (Action::Revoke { name: name() }, "the key ha"),
         (Action::Reinstate { name: name() }, "the key ha"),
@@ -746,6 +752,11 @@ fn a_key_is_left_standing_and_named() {
                 release: "9f86d081".to_owned(),
             },
             "a stuck download dropped",
+        ),
+        (unask(true), "the ask music-1"),
+        (
+            unask(false),
+            "the ask music-1, for the rest of what the house held in part",
         ),
         (
             Action::Run {

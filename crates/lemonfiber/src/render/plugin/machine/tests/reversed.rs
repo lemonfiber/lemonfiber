@@ -557,6 +557,17 @@ fn a_device_key_put_back_is_said_by_its_name() {
         }),
         "grabbed the dropped release of tv title 9 again"
     );
+    assert_eq!(
+        undone(Action::Unask {
+            unit: lemonfiber_core::collected::Unit::Music(
+                lemonfiber_core::ports::service::MusicUnit::Album
+            ),
+            reference: "mbid-kind-of-blue".to_owned(),
+            kept: "music-1".to_owned(),
+            whole: true,
+        }),
+        "asked the curator to remove the album mbid-kind-of-blue"
+    );
     for (running, said) in [
         (true, "started prowlarr again"),
         (false, "stopped prowlarr again"),
