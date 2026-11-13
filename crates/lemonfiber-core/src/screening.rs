@@ -212,7 +212,10 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
         return Ok(PartWayReport {
             member: member.name,
             id: member.id,
-            findings: vec![UNREAD.to_owned()],
+            findings: vec![crate::error::household::Obstacle::new(
+                SERVER_SILENT,
+                UNREAD,
+            )],
             ..PartWayReport::default()
         });
     };

@@ -16,6 +16,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::error::household::Obstacle;
+use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::kind::Kind;
 use lemonfiber_core::model::{HeldReport, HouseholdReport, PlayingReport};
 use tokio::sync::Mutex;
@@ -39,13 +41,6 @@ pub const PLAYING_EVERY: Duration = Duration::from_secs(5);
 /// They move when somebody asks for something or something arrives, which is minutes
 /// rather than seconds, and the shelf is the largest of the three answers.
 pub const ROWS_EVERY: Duration = Duration::from_secs(60);
-
-/// The finding a reading carries where the stack itself could not be read.
-///
-/// Said in a sentence of its own rather than as the problem the command reported,
-/// because that problem is written for the operator and names what only the operator
-/// is shown.
-const UNREAD: &str = "the stack could not be read just now, so this could not be said";
 
 /// One member's stream: what to ask, for whom, and what was last said.
 pub struct Theirs {
@@ -130,14 +125,14 @@ impl Theirs {
         said
     }
 
-    /// One reading, narrowed to the member, as the event it is said as. Nothing where
-    /// the answer will not render.
+    /// One reading, narrowed to the member and worded for them, as the event it is said
+    /// as. Nothing where the answer will not render.
     async fn answered(&self, reading: Reading) -> Option<Rendered> {
         let outcome = match dispatch(reading.theirs(&self.member), &self.ctx).await {
             Ok(outcome) => outcome,
-            Err(_) => reading.unread(),
+            Err(problem) => reading.unread(&problem),
         };
-        Rendered::of(Nature::State, &outcome.envelope())
+        Rendered::of(Nature::State, &outcome.for_household().envelope())
     }
 }
 
@@ -163,9 +158,10 @@ impl Reading {
         }
     }
 
-    /// The reading where the stack could not be read, said as unread rather than empty.
-    fn unread(self) -> Outcome {
-        let findings = vec![UNREAD.to_owned()];
+    /// The reading where `problem` stopped it, said as unread by the problem's code
+    /// rather than as empty.
+    fn unread(self, problem: &Problem) -> Outcome {
+        let findings = vec![Obstacle::new(problem.code, problem.summary.clone())];
         match self {
             Self::Household => Outcome::Household(HouseholdReport {
                 findings,
@@ -183,10 +179,10 @@ impl Reading {
     }
 }
 
-/// What is playing where the stack could not be read, said as unread rather than as
+/// What is playing where `problem` stopped the reading, said as unread rather than as
 /// nothing playing.
-pub(super) fn playing_unread() -> Outcome {
-    Reading::Playing.unread()
+pub(super) fn playing_unread(problem: &Problem) -> Outcome {
+    Reading::Playing.unread(problem)
 }
 
 /// Whether a pace that last came round at `last` has come round again.

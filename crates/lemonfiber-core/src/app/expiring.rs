@@ -77,8 +77,8 @@ pub(crate) async fn expiring(
     // What this run did first and the reading under it, the way a decision is answered:
     // an operator who started a clock and came back to it is looking for what it closed,
     // and everything else on the reading is context for that.
-    said.append(&mut report.findings);
-    report.findings = said;
+    said.append(&mut report.noted);
+    report.noted = said;
     Ok(report)
 }
 
@@ -244,7 +244,7 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
     };
     let access = match household::reaching(ctx, &manifest).await {
         Ok(access) => access,
-        Err(reason) => return came_to.missed(&reason),
+        Err(reason) => return came_to.missed(&reason.said),
     };
     let Ok(asked) = access.requests.requests().await else {
         return came_to.missed(

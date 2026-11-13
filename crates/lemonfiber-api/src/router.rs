@@ -27,6 +27,7 @@ use crate::jobs::Jobs;
 use crate::read::kept::Kept;
 use crate::refusal::Refusal;
 use crate::serve::admitted;
+use crate::spoken::{for_audience, Audience};
 
 /// What every handler is given.
 ///
@@ -203,11 +204,12 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
                 .get(TOKEN_HEADER)
                 .and_then(|value| value.to_str().ok())
                 .map(|value| Presented(value.to_owned()));
+            let audience = caller.as_ref().map_or(Audience::Operator, Audience::of);
             if let (Some(caller), Some(presented)) = (caller, presented) {
                 request.extensions_mut().insert(caller);
                 request.extensions_mut().insert(presented);
             }
-            next.run(request).await
+            for_audience(audience, next.run(request).await)
         }
         Err(refusal) => refusal.answered(),
     }
@@ -223,7 +225,10 @@ async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -
 /// key would help with.
 pub(crate) fn refused(knocking: &Knocking) -> Option<Response> {
     match knocking {
-        Knocking::Unconfirmed => Some(Refusal::Unconfirmed.answered()),
+        Knocking::Unconfirmed => Some(for_audience(
+            Audience::Household,
+            Refusal::Unconfirmed.answered(),
+        )),
         Knocking::Held(left) => Some(crate::admission::waiting(left.as_secs().max(1))),
         Knocking::Exposed => Some(Refusal::KeyInTheClear.answered()),
         Knocking::Known(_) | Knocking::Nobody => None,

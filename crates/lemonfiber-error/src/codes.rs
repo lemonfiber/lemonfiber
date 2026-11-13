@@ -7,8 +7,10 @@
 //!
 //! A code is declared with everything said about it everywhere: how much it matters,
 //! the status the web API answers with, what a run ending on it leaves with, the
-//! version it appeared in, and what it means and what to do about it as a reader is
-//! told who meets it with no context. A [`crate::Problem`] reads its severity from
+//! version it appeared in, what it means and what to do about it as a reader is
+//! told who meets it with no context, and what a household member is told in its place:
+//! a sentence and a remedy of its own, or that it is a fault of the stack. Nothing
+//! declares a code without saying which. A [`crate::Problem`] reads its severity from
 //! here rather than being given one, so a raise site cannot disagree with what is
 //! published. `contract/codes.json` is written from [`every_declared`], and the
 //! reference beside it from that file.
@@ -58,7 +60,8 @@ macro_rules! codes {
             $(leaves: $leaves:ident,)?
             since: $since:literal,
             meaning: $meaning:literal,
-            remedy: $remedy:literal $(,)?
+            remedy: $remedy:literal,
+            household: $household:tt $(,)?
         }
     )*) => {
         use crate::Code;
@@ -76,7 +79,12 @@ macro_rules! codes {
             since: $since,
             meaning: $meaning,
             remedy: $remedy,
+            household: codes!(@household $household),
         },)*];
+    };
+    (@household fault) => { crate::codes::Household::Fault };
+    (@household { said: $said:literal, remedy: $remedy:literal $(,)? }) => {
+        crate::codes::Household::Said { said: $said, remedy: $remedy }
     };
     (@leaves) => { crate::codes::Leaves::Failure };
     (@leaves $leaves:ident) => { crate::codes::Leaves::$leaves };
@@ -160,6 +168,24 @@ families! {
     word => "WORD": "the glossary",
 }
 
+/// What a household member's session is told in place of a code's own wording.
+///
+/// Named for every code rather than inferred from its status, so a code added later is
+/// one somebody decided what the household hears about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Household {
+    /// Nothing the member did or can change: said as not working right now, with whoever
+    /// runs the house told.
+    Fault,
+    /// Said to the household in words of its own.
+    Said {
+        /// What happened, in the household's words.
+        said: &'static str,
+        /// What the member can do about it.
+        remedy: &'static str,
+    },
+}
+
 /// One family as it is declared: its prefix, what it covers and its codes.
 #[derive(Debug, Clone, Copy)]
 pub struct Family {
@@ -208,6 +234,7 @@ pub struct Declared {
     since: &'static str,
     meaning: &'static str,
     remedy: &'static str,
+    household: Household,
 }
 
 impl Declared {
@@ -263,6 +290,12 @@ impl Declared {
     #[must_use]
     pub const fn remedy(self) -> &'static str {
         self.remedy
+    }
+
+    /// What a household member's session is told in its place.
+    #[must_use]
+    pub const fn household(self) -> Household {
+        self.household
     }
 }
 

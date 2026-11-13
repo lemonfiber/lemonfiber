@@ -8,6 +8,7 @@ codes! {
             each service stands on is the container engine's answer, and it did not give one. \
             Nothing was changed.",
         remedy: "Start the container engine, then ask again.",
+        household: fault,
     }
     /// Raised when the service an update was narrowed to is not one the stack declares.
     NO_SUCH_SERVICE = "UPDATE-2" {
@@ -18,6 +19,7 @@ codes! {
             name matching nothing would otherwise read as a stack already up to date, so it is \
             refused instead. Nothing was changed.",
         remedy: "Name one of the services the stack declares; the message lists them.",
+        household: fault,
     }
     /// Raised when transfers are still in flight and the run was not asked to wait.
     STILL_TRANSFERRING = "UPDATE-3" {
@@ -30,6 +32,7 @@ codes! {
             Nothing was changed.",
         remedy: "Let them finish with lemonfiber update stack --confirm --wait, or wait and \
             ask again.",
+        household: fault,
     }
     /// Raised when the stack came down for the capture and the capture would not write.
     CAPTURE_LEFT_IT_DOWN = "UPDATE-4" {
@@ -42,6 +45,7 @@ codes! {
             because stopping it is what came first.",
         remedy: "Bring the stack back up with lemonfiber up, then fix what stopped the capture \
             and ask again.",
+        household: fault,
     }
     /// Raised where an update names an offer that is not the one a fresh look at the
     /// releases builds.
@@ -53,5 +57,6 @@ codes! {
             arrived, or one was withdrawn, since the update was rehearsed, so nothing was \
             updated.",
         remedy: "Rehearse the update again, and answer the offer it gives now.",
+        household: fault,
     }
 }

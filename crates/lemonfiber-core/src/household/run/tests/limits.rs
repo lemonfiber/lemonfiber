@@ -74,7 +74,7 @@ fn a_member_limited_on_one_service_and_not_the_other_is_named() {
     );
     assert!(
         report
-            .findings
+            .noted
             .iter()
             .any(|finding| finding.contains("can still fetch")),
         "the disagreement was not said in a sentence: {report:?}"
@@ -95,7 +95,7 @@ fn a_service_that_could_not_be_asked_raises_no_disagreement() {
         Some(Restriction::RatingLimited),
         "{report:?}"
     );
-    assert!(report.findings.is_empty(), "{report:?}");
+    assert!(report.noted.is_empty(), "{report:?}");
 }
 
 /// Where anybody carries a limit, the list says what a limit here is not.

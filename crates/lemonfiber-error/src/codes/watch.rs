@@ -6,6 +6,7 @@ codes! {
         since: "0.2.0",
         meaning: "No data location is configured, so there is nothing for a watch to guard.",
         remedy: "Run lemonfiber setup to choose a data location, then start the watch again.",
+        household: fault,
     }
     /// Raised when the data location is already gone when the watch is asked to
     /// start.
@@ -16,5 +17,6 @@ codes! {
         meaning: "The data location is already gone when the watch was asked to start. A watch \
             can only guard a location that is present when it begins.",
         remedy: "Connect the drive or mount holding the data location, then start the watch.",
+        household: fault,
     }
 }

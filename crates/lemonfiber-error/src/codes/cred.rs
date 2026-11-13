@@ -9,6 +9,7 @@ codes! {
             because the configuration was regenerated after the service last started.",
         remedy: "Restart the service so it reloads its configuration, then check again: \
             lemonfiber restart.",
+        household: fault,
     }
     /// Raised when the indexer answers and refuses the key it was given.
     INDEXER_REJECTED = "CRED-2" {
@@ -18,6 +19,7 @@ codes! {
         meaning: "The indexer answered and rejected the API key configured for it. The key is \
             wrong, expired, or for a different indexer — searches through it come back empty.",
         remedy: "Correct the indexer's API key in configuration, then check again.",
+        household: fault,
     }
     /// Raised when the indexer authenticates the key but cannot serve it right now.
     INDEXER_LIMITED = "CRED-3" {
@@ -27,6 +29,7 @@ codes! {
         meaning: "The indexer accepted the key and would not serve the request — usually a rate \
             or quota limit that lifts on its own. The key is not wrong.",
         remedy: "Leave it a while and check again.",
+        household: fault,
     }
     /// Raised where a replacement of the media server's internal certificate answers an
     /// offer that is not the one a fresh reading builds.
@@ -38,6 +41,7 @@ codes! {
             certificate in force, who is handed the new one, or the media server has changed \
             since it was read, so nothing was replaced.",
         remedy: "Read the replacement again, and answer the offer it gives now.",
+        household: fault,
     }
     /// Raised where the media server holds a key or account under one of the stack's
     /// services' names that lemonfiber did not make or no longer knows.
@@ -51,5 +55,6 @@ codes! {
             stays until somebody removes it. The message names the media server, what it holds \
             and where in the media server it is removed.",
         remedy: "If nobody here made it, remove it in the media server where the message says.",
+        household: fault,
     }
 }

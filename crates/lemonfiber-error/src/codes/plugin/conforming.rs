@@ -14,5 +14,6 @@ codes! {
         remedy: "Take it up with whoever published the plugin: each case named needs a \
             recording, taken against the upstream the plugin pins, that answers as its \
             contract declares. lemonfiber plugin conform shows every case.",
+        household: fault,
     }
 }

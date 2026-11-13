@@ -152,10 +152,7 @@ async fn an_account_removed_at_its_lapse_is_listed_as_expired_and_not_as_missing
     let read = read("removed", &[], Some(TakenBack::Removed)).await;
 
     assert_eq!(ana(read.report.as_ref()), Some(MemberStanding::Expired));
-    let findings = read
-        .report
-        .map(|report| report.findings)
-        .unwrap_or_default();
+    let findings = read.report.map(|report| report.noted).unwrap_or_default();
     assert!(
         !findings.iter().any(|finding| finding.contains("ana")),
         "{findings:?}"

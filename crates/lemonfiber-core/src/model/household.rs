@@ -240,8 +240,12 @@ pub struct HouseholdReport {
     /// empty, and keeps an unread record from being mistaken for an empty house — the
     /// same honesty a trace keeps about a silence it did not hear.
     pub available: bool,
-    /// What could not be read, and anything else worth the operator's attention.
-    pub findings: Vec<String>,
+    /// What could not be read, each by the code that names it.
+    pub findings: Vec<crate::error::household::Obstacle>,
+    /// What else is worth the operator's attention about the household: who has used
+    /// their limit, what is waiting on them, what nobody has claimed. Written for the
+    /// operator alone, so a member's own reading carries none.
+    pub noted: Vec<String>,
     /// What the limits on this household are and are not, where anybody carries one.
     ///
     /// Absent on a household nobody has limited, because there is no claim to be modest

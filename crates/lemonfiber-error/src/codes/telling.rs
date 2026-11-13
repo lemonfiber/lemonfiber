@@ -10,5 +10,6 @@ codes! {
             in.",
         remedy: "Bring what the household is told up to what lemonfiber now sends, by running \
             lemonfiber seed.",
+        household: fault,
     }
 }

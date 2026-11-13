@@ -26,7 +26,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{store, Resending};
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::error::Problem;
 use tokio::sync::{Mutex, SetOnce};
 use tokio::task::JoinHandle;
 
@@ -106,6 +106,8 @@ impl Asked {
 pub enum Answer {
     /// Carried out, at this status, with this envelope.
     Now(StatusCode, Option<String>),
+    /// Refused before it had an answer, at this status, with this problem.
+    Refused(StatusCode, Problem),
     /// Handed to the runtime under this name, for the action named.
     Later(Job, String),
 }
@@ -114,8 +116,7 @@ impl Answer {
     /// What an attempt whose work ended before it had an answer is answered with.
     fn unanswered() -> Self {
         let why = Refusal::Unanswered;
-        let body = Envelope::new(kind::ERROR, why.problem(why.said())).to_json();
-        Self::Now(why.status(), body)
+        Self::Refused(why.status(), why.problem(why.said()))
     }
 
     /// The reply this answer is, as the first send was given it.
@@ -123,6 +124,7 @@ impl Answer {
     pub fn reply(&self) -> Response {
         match self {
             Self::Now(status, body) => enveloped(*status, body.clone()),
+            Self::Refused(status, problem) => crate::spoken::refused(*status, problem.clone()),
             Self::Later(job, action) => accepted(job, action),
         }
     }

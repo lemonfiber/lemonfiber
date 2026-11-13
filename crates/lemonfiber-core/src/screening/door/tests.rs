@@ -1,8 +1,10 @@
 use super::{
     at_the_door, directory, ensured, household_port, located, served_at, upstream, Door, GUARDED,
-    NOT_MADE, NO_ADDRESS, REFUSED_DECLARATION, UNDECLARED, UNREADABLE,
+    NOT_DECLARED, NOT_MADE, NO_ADDRESS, NO_STACK, REFUSED_DECLARATION, UNREADABLE,
 };
 use crate::certificate::Unkept;
+use crate::error::codes::play::{DOOR_UNREADY, NO_HOUSEHOLD_ADDRESS, UNDECLARED};
+use crate::error::household::Obstacle;
 use crate::model::Located;
 use crate::ports::service::{Holds, Item, Medium};
 use lemonfiber_fixtures::declaring::{enforceable, Declares};
@@ -86,13 +88,13 @@ fn something_that_is_not_a_film_or_an_episode_does_not_stream() {
 fn a_door_nothing_is_known_about_locates_nothing_and_says_why() {
     let at = located(
         held(Medium::Film, EVERYTHING),
-        &Door::Unknown("why".to_owned()),
+        &Door::Unknown(Obstacle::new(UNDECLARED, "why")),
     )
     .at;
     assert_eq!(
         at,
         Located {
-            unlocated: Some("why".to_owned()),
+            unlocated: Some(Obstacle::new(UNDECLARED, "why")),
             ..Located::default()
         }
     );
@@ -120,17 +122,20 @@ fn the_door_is_https_on_its_own_port_only_with_an_address_and_a_certificate() {
             fingerprint.unwrap_or_default()
         ))
     );
-    assert_eq!(at_the_door(None, Ok(kept)), Err(NO_ADDRESS.to_owned()));
+    assert_eq!(
+        at_the_door(None, Ok(kept)),
+        Err(Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
+    );
     assert_eq!(
         at_the_door(Some("http://h:8920".to_owned()), Ok(None)),
-        Err(NOT_MADE.to_owned())
+        Err(Obstacle::new(DOOR_UNREADY, NOT_MADE))
     );
     assert_eq!(
         at_the_door(
             Some("http://h:8920".to_owned()),
             Err(Unkept::Unreadable("torn".to_owned()))
         ),
-        Err(format!("{UNREADABLE} torn"))
+        Err(Obstacle::new(DOOR_UNREADY, format!("{UNREADABLE} torn")))
     );
 }
 
@@ -198,7 +203,7 @@ async fn with_no_stack_directory_the_door_is_unknown_and_says_why() {
         .build();
     assert_eq!(
         super::standing(&ctx, &Declares::declaring(enforceable())).await,
-        Door::Unknown(super::NO_STACK.to_owned())
+        Door::Unknown(Obstacle::new(DOOR_UNREADY, NO_STACK))
     );
 }
 
@@ -236,11 +241,11 @@ async fn a_standing_door_locates_where_the_server_behind_it_declared() {
     );
     assert_eq!(
         super::standing(&addressed, &Declares::silent()).await,
-        Door::Unknown(UNDECLARED.to_owned())
+        Door::Unknown(Obstacle::new(UNDECLARED, NOT_DECLARED))
     );
     assert_eq!(
         super::standing(&standing_at(None), &Declares::declaring(enforceable())).await,
-        Door::Unknown(NO_ADDRESS.to_owned())
+        Door::Unknown(Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
     );
 }
 
@@ -256,7 +261,7 @@ async fn the_door_serves_where_the_media_server_declared_it_does() {
 async fn a_media_server_that_will_not_say_where_it_serves_locates_nothing() {
     assert_eq!(
         served_at(&Declares::silent()).await,
-        Err(UNDECLARED.to_owned())
+        Err(Obstacle::new(UNDECLARED, NOT_DECLARED))
     );
 }
 
@@ -268,7 +273,7 @@ async fn a_declaration_the_door_cannot_hold_a_server_to_locates_nothing() {
     assert!(
         refused
             .as_ref()
-            .is_err_and(|why| why.starts_with(REFUSED_DECLARATION)),
+            .is_err_and(|why| why.code == UNDECLARED && why.said.starts_with(REFUSED_DECLARATION)),
         "{refused:?}"
     );
 }
@@ -291,6 +296,10 @@ fn an_item_named_by_anything_but_an_item_id_is_not_located() {
         assert_eq!(at.poster, None, "{id}");
         assert_eq!(at.stream_from, None, "{id}");
         assert_eq!(at.door, None, "{id}");
-        assert!(at.unlocated.is_some(), "{id}");
+        assert_eq!(
+            at.unlocated.map(|why| why.code),
+            Some(crate::error::codes::play::MISNAMED),
+            "{id}"
+        );
     }
 }

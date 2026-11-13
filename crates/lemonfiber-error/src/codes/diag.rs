@@ -9,5 +9,6 @@ codes! {
             one. Answering with an empty report would read as nothing being wrong.",
         remedy: "Run the checks with lemonfiber doctor, and narrow to a name this stack \
             reports.",
+        household: fault,
     }
 }

@@ -9,6 +9,7 @@ codes! {
             holds a stack.toml describing its services.",
         remedy: "Point at a directory containing stack.toml, with lemonfiber --stack-dir \
             <path>.",
+        household: fault,
     }
     /// Raised when a manifest is readable and this build cannot use it.
     STACK_UNUSABLE = "STACK-2" {
@@ -18,6 +19,7 @@ codes! {
         meaning: "The manifest is readable and was written for a different version of \
             lemonfiber.",
         remedy: "Update lemonfiber, or point at a stack this version reads.",
+        household: fault,
     }
     /// Raised when lemonfiber has nowhere to write the stack.
     STACK_NOT_SET_UP = "STACK-4" {
@@ -26,6 +28,7 @@ codes! {
         since: "0.1.0",
         meaning: "There is nowhere to write the stack, because no location has been chosen.",
         remedy: "Run lemonfiber setup.",
+        household: fault,
     }
     /// Raised when the stack could not be written to disk.
     STACK_NOT_WRITTEN = "STACK-5" {
@@ -35,6 +38,7 @@ codes! {
         meaning: "The stack could not be written to disk, so nothing can start. Usually a \
             permission problem or a full disk.",
         remedy: "Check the location is writable and has space.",
+        household: fault,
     }
     /// Raised when a manifest parses and breaks the contract.
     STACK_INVALID = "STACK-6" {
@@ -45,6 +49,7 @@ codes! {
         meaning: "The manifest parses and contradicts itself: it says things about itself that \
             cannot all be true.",
         remedy: "Fix the faults listed under the message. All of them were found in one pass.",
+        household: fault,
     }
     /// Raised when a manifest is not TOML at all.
     STACK_MALFORMED = "STACK-7" {
@@ -55,6 +60,7 @@ codes! {
         meaning: "The file is not written in the format a stack.toml uses, so nothing in it \
             has been read. The message names the line the reader stopped on.",
         remedy: "Fix the file at the line the message names.",
+        household: fault,
     }
     /// Raised when a manifest declares names this build does not know.
     STACK_UNRECOGNISED = "STACK-8" {
@@ -67,6 +73,7 @@ codes! {
             something of its own added. Starting it would quietly leave out whatever was named.",
         remedy: "Update lemonfiber, or change the named declarations to ones it knows. Every one \
             of them is listed, found in a single pass.",
+        household: fault,
     }
     /// Raised when a stack names a newer lemonfiber than the one running.
     STACK_NEEDS_NEWER = "STACK-9" {
@@ -78,6 +85,7 @@ codes! {
             rather than started in part. The message names both versions.",
         remedy: "Update lemonfiber to the version named, with lemonfiber update self. Or point \
             at a stack this version runs, with lemonfiber --stack-dir <path>.",
+        household: fault,
     }
     /// Raised when a manifest's files are not laid out as the contract says.
     STACK_UNASSEMBLED = "STACK-10" {
@@ -91,6 +99,7 @@ codes! {
             started. A stack that keeps every service in stack.toml itself is refused this \
             way.",
         remedy: "Fix the files named under the message. All of them were found in one pass.",
+        household: fault,
     }
     /// Raised when a change would write over a generated project the operator has edited.
     PROJECT_EDITED = "STACK-11" {
@@ -103,6 +112,7 @@ codes! {
         remedy: "Move the edit into overlay.yml in lemonfiber's configuration directory, which \
             is merged over the project and kept, then run lemonfiber reset to put the project \
             back and make the change again.",
+        household: fault,
     }
     /// Raised when a service's state kept in a volume could not be copied into its mount
     /// tree before the service first starts from there.
@@ -116,6 +126,7 @@ codes! {
             would never be read again. The volume is as it was.",
         remedy: "Check the container engine is running and the project directory can be \
             written, then start again. The message names the volume and the directory.",
+        household: fault,
     }
     /// Raised where the offer a reset answers is not the one a reading of it makes now.
     RESET_MOVED = "STACK-13" {
@@ -127,6 +138,7 @@ codes! {
             would be agreeing to lose something nobody read, so nothing was reverted; the \
             message names what moved.",
         remedy: "Read what a reset would revert again, and answer the name it prints.",
+        household: fault,
     }
     /// Raised where the certificate a service declares could not be made or read before it
     /// starts.
@@ -141,6 +153,7 @@ codes! {
         remedy: "The message names the service and the file. Where only one of the two is \
             there, or either is not what it should be, move both aside and start again, and \
             lemonfiber makes a new pair.",
+        household: fault,
     }
     /// Raised where a start names a fenced service no fence can be written for.
     SERVICE_UNFENCED = "STACK-15" {
@@ -154,5 +167,6 @@ codes! {
         remedy: "The message names why. Where the engine's host was not asked its addresses, \
             check the container engine is running and the fence's image can be fetched, then \
             start again.",
+        household: fault,
     }
 }

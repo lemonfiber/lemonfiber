@@ -191,10 +191,7 @@ fn a_request_from_somebody_with_no_account_is_said_rather_than_dropped() {
     );
 
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.contains("gone")),
+        report.noted.iter().any(|finding| finding.contains("gone")),
         "a request belonging to nobody vanished without a word: {report:?}"
     );
 }
@@ -219,7 +216,7 @@ fn narrowing_does_not_turn_everybody_else_into_a_missing_account() {
     );
 
     assert!(
-        report.findings.is_empty(),
+        report.noted.is_empty(),
         "asking about one member reported everybody else's requests as orphans: {report:?}"
     );
 }
@@ -614,10 +611,7 @@ fn a_narrowed_read_names_nobody_else() {
         Some("id-alex"),
     );
     assert!(
-        report
-            .findings
-            .iter()
-            .all(|finding| !finding.contains("gone")),
+        report.noted.iter().all(|finding| !finding.contains("gone")),
         "a member was told who else asked for something: {report:?}"
     );
 }

@@ -11,6 +11,7 @@ codes! {
         remedy: "Publish it on this machine only, and apply the change. The message names the \
             address to use. Or, if you meant to expose it, say so once and say why, with \
             LEMONFIBER_EXPOSED=<service>=<why> in your settings.",
+        household: fault,
     }
     /// Raised where a published port is reached without the host's own firewall rules
     /// being consulted.
@@ -25,6 +26,7 @@ codes! {
         remedy: "Narrow what the household tier is published on, which is what does decide: \
             LAN_BIND in your settings, set to this machine's own address on your network. Or \
             leave it, if every device on this network is one you would let in anyway.",
+        household: fault,
     }
     /// Raised where an admin service answers off this machine and the operator has
     /// written down that they meant it to.
@@ -37,5 +39,6 @@ codes! {
             changed is whose decision it is. The message quotes your reason back.",
         remedy: "Nothing, if that is still true. Or take it out of the exposed list and publish \
             it on this machine only.",
+        household: fault,
     }
 }

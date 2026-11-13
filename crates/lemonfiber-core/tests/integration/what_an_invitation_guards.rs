@@ -520,7 +520,7 @@ async fn standings(
                 .into_iter()
                 .map(|member| (member.name, member.standing))
                 .collect(),
-            report.findings,
+            report.noted,
         ),
         _ => (Vec::new(), Vec::new()),
     }
@@ -631,20 +631,20 @@ async fn an_invitation_that_could_not_be_taken_back_is_said() {
 
     assert!(
         report
-            .findings
+            .noted
             .iter()
             .any(|finding| finding
                 .starts_with("bo's invitation ran out and could not be taken back")),
         "{:?}",
-        report.findings
+        report.noted
     );
     assert!(
         report
-            .findings
+            .noted
             .iter()
             .all(|finding| !finding.starts_with("cy's")),
         "{:?}",
-        report.findings
+        report.noted
     );
 }
 

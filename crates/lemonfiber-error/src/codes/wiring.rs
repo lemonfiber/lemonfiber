@@ -12,5 +12,6 @@ codes! {
         remedy: "Let lemonfiber bring it up to date with lemonfiber doctor --fix. To keep your \
             own value instead, adopt it with lemonfiber adopt; to discard it and restore \
             lemonfiber's, run lemonfiber reset and answer the offer it names.",
+        household: fault,
     }
 }

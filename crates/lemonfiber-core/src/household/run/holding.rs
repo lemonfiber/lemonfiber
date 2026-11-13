@@ -30,6 +30,8 @@
 use std::collections::BTreeMap;
 
 use crate::app::{record, targets, Ctx};
+use crate::error::codes::quota::{UNREACHABLE, UNRECORDED};
+use crate::error::household::Obstacle;
 use crate::ports::service::{Approving, Holding};
 
 use crate::config::paths::HELD_BACK as NAME;
@@ -66,7 +68,7 @@ pub(super) async fn as_the_disk_stands(
     members: &[&str],
     no_room: bool,
     dry_run: bool,
-) -> Vec<String> {
+) -> Vec<Obstacle> {
     if dry_run {
         return Vec::new();
     }
@@ -83,7 +85,7 @@ pub(super) async fn as_the_disk_stands(
         said.extend(
             record::keep(targets::beside_env(ctx, NAME).as_deref(), &now)
                 .err()
-                .map(|_| NOT_WRITTEN_DOWN.to_owned()),
+                .map(|_| Obstacle::new(UNRECORDED, NOT_WRITTEN_DOWN)),
         );
     }
     said
@@ -98,7 +100,7 @@ async fn taking_away(
     requests: &dyn Approving,
     members: &[&str],
     mut held: HeldBack,
-) -> (HeldBack, Vec<String>) {
+) -> (HeldBack, Vec<Obstacle>) {
     let mut said = Vec::new();
     for member in members {
         match requests.hold_requests(member).await {
@@ -110,7 +112,7 @@ async fn taking_away(
             // reading. Writing either down would be a line to give something back to
             // that was never taken.
             Ok(_) => {}
-            Err(_) => said.push(STILL_ASKING.to_owned()),
+            Err(_) => said.push(Obstacle::new(UNREACHABLE, STILL_ASKING)),
         }
     }
     said.dedup();
@@ -121,7 +123,7 @@ async fn taking_away(
 ///
 /// Whoever the service would not answer for keeps their line, so the next reading tries
 /// again rather than leaving somebody unable to ask for good.
-async fn giving_back(requests: &dyn Approving, held: HeldBack) -> (HeldBack, Vec<String>) {
+async fn giving_back(requests: &dyn Approving, held: HeldBack) -> (HeldBack, Vec<Obstacle>) {
     let mut still = HeldBack::new();
     let mut said = Vec::new();
     for (member, taken) in held {
@@ -131,7 +133,7 @@ async fn giving_back(requests: &dyn Approving, held: HeldBack) -> (HeldBack, Vec
             .is_err()
         {
             still.insert(member, taken);
-            said.push(STILL_HELD.to_owned());
+            said.push(Obstacle::new(UNREACHABLE, STILL_HELD));
         }
     }
     said.dedup();
