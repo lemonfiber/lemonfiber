@@ -42,6 +42,9 @@ fn a_quality(disposition: Disposition) -> QualityReport {
     }
 }
 
+/// What the upgrade below would take, in bytes.
+const UPGRADE_BYTES: u64 = 3_000_000_000;
+
 /// What an upgrade would cost, having triggered nothing.
 fn an_upgrade() -> UpgradeReport {
     UpgradeReport {
@@ -50,7 +53,7 @@ fn an_upgrade() -> UpgradeReport {
         media: vec![UpgradeMedia {
             media_type: "television".to_owned(),
             preset: Preset::Balanced.label().to_owned(),
-            total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
+            total: lemonfiber_core::model::Total::Bytes(UPGRADE_BYTES),
             outcome: None,
         }],
     }
@@ -112,7 +115,7 @@ fn what_an_upgrade_would_cost_is_read_before_it_is_agreed_to() {
         .unwrap_or_default();
     assert!(before.contains("television"), "{said}");
     assert!(
-        before.contains(Preset::Balanced.consequence().size_per_hour),
+        before.contains(&lemonfiber_core::bytes::humanize(UPGRADE_BYTES)),
         "{said}"
     );
     assert!(before.contains("Nothing has been changed"), "{said}");

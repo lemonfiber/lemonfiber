@@ -24,6 +24,12 @@ const BELOW: CutoffUnmet = CutoffUnmet {
 /// answering every curator's upgrade search with `searched` and what it holds below its
 /// cutoff with `below`.
 fn ctx(reached: bool, searched: Answer, below: Answer) -> Ctx {
+    ctx_of(&ALL, reached, searched, below)
+}
+
+/// A context as [`ctx`] builds it, naming `curators` rather than the curators of
+/// television, film and music.
+fn ctx_of(curators: &[adapted::Adapted], reached: bool, searched: Answer, below: Answer) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("upgrade-{nth}")).kept();
@@ -40,9 +46,9 @@ fn ctx(reached: bool, searched: Answer, below: Answer) -> Ctx {
     ]));
     context.settings.env_file = Some(dir.join(".env"));
     if reached {
-        return adapted::reaching(context, &ALL);
+        return adapted::reaching(context, curators);
     }
-    for curator in ALL {
+    for curator in curators {
         curator.recorded(&context);
     }
     context
@@ -85,6 +91,45 @@ async fn unconfirmed_states_each_kinds_bar_and_triggers_nothing() {
         assert_eq!(preset, expected, "{media_type}");
     }
     assert!(outcomes(&report).iter().all(Option::is_none));
+}
+
+#[tokio::test]
+async fn a_curator_of_books_is_left_out_having_no_quality_to_upgrade_to() {
+    let [music, film, television] = ALL;
+    let context = ctx_of(
+        &[
+            music,
+            film,
+            television,
+            crate::test_support::collecting::BOOKS,
+        ],
+        true,
+        taken(),
+        answered(&BELOW),
+    );
+    let manifest = context.stack.checked_manifest(context.today()).ok();
+    let mut kinds = Vec::new();
+    if let Some(manifest) = manifest {
+        for target in
+            super::curator_targets(&context, &super::fillers_here(&context, &manifest)).await
+        {
+            kinds.extend(target.kind);
+        }
+    }
+
+    let report = upgrade(&context, false).await.unwrap_or_default();
+
+    assert!(
+        kinds.contains(&crate::ports::media::TitleKind::Books),
+        "{kinds:?}"
+    );
+    let covered: Vec<&str> = report
+        .media
+        .iter()
+        .map(|media| media.media_type.as_str())
+        .collect();
+    assert_eq!(covered.len(), 3, "{covered:?}");
+    assert!(!covered.contains(&crate::ports::media::TitleKind::Books.media_type()));
 }
 
 #[tokio::test]
