@@ -154,6 +154,14 @@ const fn reads(named: &'static str) -> Asked {
     }
 }
 
+/// What stopping the stack as `teardown` asks disturbs.
+const fn stopping(teardown: &Teardown) -> Situation {
+    match teardown.wait {
+        Waiting::ForTheDownloads => Situation::StoppingAfterDownloads,
+        Waiting::Never => Situation::Stopping,
+    }
+}
+
 /// A command that reports what it would do and stops short of doing it, under these kinds.
 const fn reports(named: &'static str, answers: &'static [Kind]) -> Asked {
     Asked {
@@ -297,11 +305,7 @@ pub const fn asked(command: &Command) -> Asked {
         // understand why a four-in-the-morning start gave up when it did.
         Command::AtBoot => reports("up --at-boot", LIFECYCLE).disturbing(Situation::Starting),
         Command::Start { .. } => reports("start", LIFECYCLE).disturbing(Situation::Starting),
-        Command::Down(Teardown {
-            wait: Waiting::ForTheDownloads,
-            ..
-        }) => reports("down", LIFECYCLE).disturbing(Situation::StoppingAfterDownloads),
-        Command::Down(_) => reports("down", LIFECYCLE).disturbing(Situation::Stopping),
+        Command::Down(teardown) => reports("down", LIFECYCLE).disturbing(stopping(teardown)),
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
         Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
