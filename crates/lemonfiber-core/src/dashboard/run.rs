@@ -35,10 +35,12 @@ use crate::dashboard::{Hardlink, Reading, Snapshot};
 use crate::error::Diagnose;
 use crate::queue::run::Answered;
 
-use panels::{free, linking, observe, queues, transfers, vpn, waiting_on};
 #[cfg(test)]
-use waves::carried_link;
+use panels::{download_rate, egress, storage};
+use panels::{free, linking, observe, queues, transfers, vpn, waiting_on};
 use waves::{assembled, Answers, Asked, Wave};
+#[cfg(test)]
+use waves::{carried_link, downloaders};
 
 /// One gather, and what the next one carries forward from it.
 ///
@@ -167,71 +169,51 @@ pub async fn waves(
     let mut linked = pin!(maybe_done(hardlink(ctx, root, &due)));
     let mut forwarded = pin!(maybe_done(passed_on(ctx, due.is(Paced::Forwarded))));
 
-    let answered_at_once = tokio::time::timeout(FIRST_WAVE, async {
-        tokio::join!(
-            seen.as_mut(),
-            tunnel.as_mut(),
-            household.as_mut(),
-            named.as_mut(),
-            moving.as_mut(),
-            queued.as_mut(),
-            asked.as_mut(),
-            space.as_mut(),
-            config_space.as_mut(),
-            linked.as_mut(),
-            forwarded.as_mut(),
-        );
-    })
-    .await
-    .is_ok();
-
-    if !answered_at_once {
-        let so_far = Answers {
-            seen: peek(seen.as_mut()),
-            tunnel: peek(tunnel.as_mut()),
-            household: peek(household.as_mut()),
-            named: peek(named.as_mut()),
-            moving: peek(moving.as_mut()),
-            queued: peek(queued.as_mut()),
-            asked: peek(asked.as_mut()),
-            space: peek(space.as_mut()),
-            config_space: peek(config_space.as_mut()),
-            linked: peek(linked.as_mut()),
-            forwarded: Asked::Pending,
+    macro_rules! every {
+        () => {
+            tokio::join!(
+                seen.as_mut(),
+                tunnel.as_mut(),
+                household.as_mut(),
+                named.as_mut(),
+                moving.as_mut(),
+                queued.as_mut(),
+                asked.as_mut(),
+                space.as_mut(),
+                config_space.as_mut(),
+                linked.as_mut(),
+                forwarded.as_mut(),
+            )
         };
-        first(
-            assembled(ctx, previous, manifest, Wave::First, so_far)
-                .await
-                .snapshot,
-        );
-        tokio::join!(
-            seen.as_mut(),
-            tunnel.as_mut(),
-            household.as_mut(),
-            named.as_mut(),
-            moving.as_mut(),
-            queued.as_mut(),
-            asked.as_mut(),
-            space.as_mut(),
-            config_space.as_mut(),
-            linked.as_mut(),
-            forwarded.as_mut(),
-        );
+    }
+    macro_rules! answers {
+        ($read:ident) => {
+            Answers {
+                seen: $read(seen.as_mut()),
+                tunnel: $read(tunnel.as_mut()),
+                household: $read(household.as_mut()),
+                named: $read(named.as_mut()),
+                moving: $read(moving.as_mut()),
+                queued: $read(queued.as_mut()),
+                asked: $read(asked.as_mut()),
+                space: $read(space.as_mut()),
+                config_space: $read(config_space.as_mut()),
+                linked: $read(linked.as_mut()),
+                forwarded: $read(forwarded.as_mut()),
+            }
+        };
     }
 
-    let answers = Answers {
-        seen: taken(seen),
-        tunnel: taken(tunnel),
-        household: taken(household),
-        named: taken(named),
-        moving: taken(moving),
-        queued: taken(queued),
-        asked: taken(asked),
-        space: taken(space),
-        config_space: taken(config_space),
-        linked: taken(linked),
-        forwarded: taken(forwarded),
-    };
+    if tokio::time::timeout(FIRST_WAVE, async { every!() })
+        .await
+        .is_err()
+    {
+        let so_far = assembled(ctx, previous, manifest, Wave::First, answers!(peek)).await;
+        first(so_far.snapshot);
+        every!();
+    }
+
+    let answers = answers!(taken);
     let found = assembled(ctx, previous, manifest, Wave::Second, answers).await;
     Gathered {
         snapshot: found.snapshot,

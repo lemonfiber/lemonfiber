@@ -61,7 +61,7 @@ const fn filled(
 ) -> Option<&crate::model::FrontDoorReport> {
     match door {
         Panel::Ready(door) => Some(door),
-        Panel::Unavailable { .. } => None,
+        Panel::Unavailable { .. } | Panel::Pending => None,
     }
 }
 

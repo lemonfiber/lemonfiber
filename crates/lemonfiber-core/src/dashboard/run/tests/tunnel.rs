@@ -255,6 +255,7 @@ fn the_tunnel_panel_reads_across_to_the_summary_without_losing_the_middle_case()
         super::super::egress(Some(&vpn_panel_with(false))),
         Egress::Leaking
     );
+    assert_eq!(super::super::egress(Some(&Panel::Pending)), Egress::Awaited);
 }
 
 #[tokio::test]
