@@ -263,16 +263,14 @@ fn a_file_written_through_a_link_is_refused() {
 #[cfg(unix)]
 #[test]
 fn a_file_written_where_no_plain_file_can_be_is_refused() {
-    use std::os::unix::fs::OpenOptionsExt as _;
     let (_dir, owned, _) = owned();
     let _ = std::fs::create_dir_all(owned.join("folder.yml"));
     let pipe = owned.join("pipe.yml");
     let made = std::process::Command::new("mkfifo").arg(&pipe).status();
     assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
-    let reader = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK)
-        .open(&pipe);
+    let reader =
+        lemonfiber_platform::fs::unfollowed_unwaiting(std::fs::OpenOptions::new().read(true))
+            .open(&pipe);
     assert!(reader.is_ok(), "the pipe has a reader");
 
     let folder = Disk.written(&owned.join("folder.yml"), &owned, b"ours", Readable::Shared);
