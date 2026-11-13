@@ -19,7 +19,7 @@
 //! ones the images in this stack name, and the indexer is wherever the operator
 //! pointed it — with its query stripped, because an indexer authenticates by one.
 
-mod behalf;
+pub(crate) mod behalf;
 pub(crate) mod covers;
 mod ours;
 mod theirs;
@@ -207,6 +207,12 @@ pub struct OnBehalf {
     pub destination: String,
     /// Why it may be made.
     pub purpose: String,
+    /// Whether this machine's settings allow it.
+    pub allowed: bool,
+    /// The setting that refuses it: `plugin.<id>.reach.<host>`.
+    pub switch: String,
+    /// What stops working once it is refused.
+    pub cost: String,
 }
 
 /// Everything that leaves this machine: lemonfiber's own requests, those it makes on an
@@ -230,13 +236,14 @@ pub struct Leaving {
 ///
 /// Every installed plugin is read from its record: each of its services is part of the
 /// stack, and every destination its recipes declare outside it is lemonfiber's to send to
-/// on its behalf.
+/// on its behalf, allowed unless the setting `recorded` reads for it refuses it.
 #[must_use]
 pub fn leaving(
     settings: &Settings,
     services: &[Service],
     installed: &[crate::plugin::Installed],
     noted: &Noted,
+    recorded: &dyn Fn(&str) -> Option<String>,
 ) -> Leaving {
     let mut theirs = theirs::elsewhere(services);
     theirs.extend(theirs::brought(installed));
@@ -245,7 +252,7 @@ pub fn leaving(
             .iter()
             .map(|reach| ours::outbound(*reach, settings, services, installed, noted))
             .collect(),
-        on_behalf: behalf::declared(services, installed),
+        on_behalf: behalf::declared(services, installed, recorded),
         theirs,
     }
 }

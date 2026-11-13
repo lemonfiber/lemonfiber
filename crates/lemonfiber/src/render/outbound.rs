@@ -66,8 +66,18 @@ fn on_behalf(sent: &[OnBehalf]) -> Lines {
     }
     lines.spaced("What lemonfiber sends on behalf of installed plugins:");
     for one in sent {
-        lines.spaced(format!("  {} — for plugin {}", one.destination, one.plugin));
-        lines.put(format!("    {}", one.purpose));
+        lines.spaced(format!(
+            "  {} — for plugin {} — {}",
+            one.destination,
+            one.plugin,
+            if one.allowed { "on" } else { "off" }
+        ));
+        lines.put(format!("    for     {}", one.purpose));
+        lines.put(format!(
+            "    off by  lemonfiber settings set {}=off",
+            one.switch
+        ));
+        lines.put(format!("    costs   {}", one.cost));
     }
     lines
 }

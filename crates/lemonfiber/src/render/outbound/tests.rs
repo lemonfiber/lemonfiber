@@ -8,7 +8,7 @@ use super::leaving;
 /// which is every entry lemonfiber makes on its own account, and nothing of the
 /// stack's, since what the services reach is read from the services there are.
 fn shown(settings: &Settings) -> String {
-    leaving(&gathered(settings, &[], &[], &Noted::default())).text()
+    leaving(&gathered(settings, &[], &[], &Noted::default(), &|_| None)).text()
 }
 
 #[test]
@@ -111,6 +111,9 @@ fn what_lemonfiber_sends_for_a_plugin_names_the_plugin_apart_from_the_stacks_req
             plugin: "comics".to_owned(),
             destination: "metadata.example".to_owned(),
             purpose: "A destination this plugin's recipes declare.".to_owned(),
+            allowed: false,
+            switch: "plugin.comics.reach.metadata.example".to_owned(),
+            cost: "New series arrive undescribed. Not asked: Describe series (tell).".to_owned(),
         }],
         theirs: Vec::new(),
     })
@@ -120,7 +123,15 @@ fn what_lemonfiber_sends_for_a_plugin_names_the_plugin_apart_from_the_stacks_req
         "{said}"
     );
     assert!(
-        said.contains("metadata.example — for plugin comics"),
+        said.contains("metadata.example — for plugin comics — off"),
+        "{said}"
+    );
+    assert!(
+        said.contains("off by  lemonfiber settings set plugin.comics.reach.metadata.example=off"),
+        "{said}"
+    );
+    assert!(
+        said.contains("costs   New series arrive undescribed. Not asked: Describe series (tell)."),
         "{said}"
     );
     assert!(!said.contains("theirs"), "{said}");
@@ -151,7 +162,7 @@ fn a_service_that_reaches_nothing_says_nothing_leaves_rather_than_nowhere() {
 /// reaches renders nowhere however good the renderer under it is.
 #[test]
 fn the_printer_reaches_this_renderer_for_this_outcome() {
-    let report = gathered(&Settings::default(), &[], &[], &Noted::default());
+    let report = gathered(&Settings::default(), &[], &[], &Noted::default(), &|_| None);
     let drawn = crate::render::shaped(&lemonfiber_core::app::Outcome::Outbound(report)).text();
     assert!(drawn.contains("What lemonfiber sends"), "{drawn}");
     assert!(drawn.contains("registry"), "{drawn}");

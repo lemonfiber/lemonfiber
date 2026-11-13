@@ -100,6 +100,19 @@ pub(crate) fn readers(
             readers.add(&placed.service, &one.plugin, &placed.fields.env, recorded);
         }
     }
+    for switch in crate::outbound::behalf::switches(&manifest.services, installed) {
+        readers.settings.entry(switch.clone()).or_default();
+        readers.choices.entry(switch).or_insert_with(|| {
+            crate::outbound::behalf::CHOICES
+                .iter()
+                .map(|value| Choosable {
+                    value: (*value).to_owned(),
+                    needs: BTreeMap::new(),
+                    open: true,
+                })
+                .collect()
+        });
+    }
     for read in readers
         .settings
         .values_mut()
@@ -111,6 +124,11 @@ pub(crate) fn readers(
 }
 
 pub(crate) fn whose(name: &str) -> Owner {
+    if let Some((plugin, _)) = crate::outbound::behalf::switched(name) {
+        return Owner::Namespace {
+            namespace: plugin.to_owned(),
+        };
+    }
     name.split_once(NAMESPACED)
         .map_or(Owner::Core, |(namespace, _)| Owner::Namespace {
             namespace: namespace.to_owned(),

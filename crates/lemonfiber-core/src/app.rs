@@ -213,6 +213,7 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
             covers: crate::outbound::covers::recorded(ctx),
             backends: crate::notify::backends::destinations(ctx),
         },
+        &|name| crate::settings::recorded_value(ctx, name),
     )))
 }
 

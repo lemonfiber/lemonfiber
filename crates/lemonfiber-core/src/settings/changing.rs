@@ -215,6 +215,10 @@ fn consequence(ctx: &Ctx, setting: &str, value: Option<&str>) -> Option<String> 
     if setting == crate::plex_link::SETTING {
         return crate::plex_link::consequence(value);
     }
+    if crate::outbound::behalf::switched(setting).is_some() {
+        let register = crate::app::plugins::read(ctx).ok()?;
+        return crate::outbound::behalf::consequence(register.installed(), setting, value);
+    }
     let key = legacy::setting_key(setting)?;
     let held = ctx
         .settings

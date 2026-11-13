@@ -110,9 +110,11 @@ pub(crate) fn marked_stack_filed(path: &Path) -> Result<(), Failure> {
 
 pub(crate) fn forgotten(path: &Path, namespace: &str) -> Result<(), Failure> {
     super::kept::changed(path, &mut |settings: &mut Settings| {
-        settings
-            .values
-            .retain(|name, _| !super::in_namespace(name, namespace));
+        settings.values.retain(|name, _| {
+            !super::in_namespace(name, namespace)
+                && crate::outbound::behalf::switched(name)
+                    .is_none_or(|(plugin, _)| plugin != namespace)
+        });
         Ok(())
     })
 }

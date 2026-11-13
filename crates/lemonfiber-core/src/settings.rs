@@ -58,6 +58,7 @@ pub(crate) fn is_named(name: &str) -> bool {
 
 pub(crate) fn is_stored(name: &str) -> bool {
     is_named(name)
+        || crate::outbound::behalf::switched(name).is_some()
         || own::is_core(name)
         || lemonfiber_manifest::container::PUBLISHED.contains(&name)
 }

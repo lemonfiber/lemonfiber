@@ -15,6 +15,7 @@
 pub mod addressing;
 pub mod claiming;
 mod conforming;
+mod declining;
 mod error;
 pub mod extension;
 pub mod offering;
@@ -26,6 +27,7 @@ pub mod varying;
 pub mod vocabulary;
 
 pub use conforming::Violation;
+pub use declining::declined;
 pub use error::Failure;
 pub use refusing::{
     names_a_header_by_substitution, names_a_path_not_plain, outside, refusals, uninstallable,
@@ -33,8 +35,8 @@ pub use refusing::{
 pub use schema::{
     Ask, Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration,
     Declared, Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On,
-    Origin, Override, Pair, Plugin, Proof, Recipe, Request, Requires, Retry, Run, Secret, Service,
-    Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION, HEADER,
+    Origin, Override, Pair, Plugin, Proof, Reach, Recipe, Request, Requires, Retry, Run, Secret,
+    Service, Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION, HEADER,
     LARGEST_ANSWER, LONGEST_ARG, LONGEST_WAIT, MOST_ARGS, MOST_RETRIES, RUN, RUN_TIMEOUT,
 };
 

@@ -205,6 +205,9 @@ pub enum Came {
     Refused,
     /// It was not sent: a value it carries may not go where it was going.
     Withheld,
+    /// It was not sent: the operator refused its host, or one a step it depends on calls,
+    /// so nothing was asked.
+    Declined,
     /// It was answered with something other than what it expects.
     Unexpected,
     /// Its answer held nothing where a capture reads.

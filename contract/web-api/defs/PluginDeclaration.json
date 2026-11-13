@@ -45,6 +45,14 @@
         "$ref": "PluginSecret.json"
       }
     },
+    "stops": {
+      "description": "What refusing each of [`Self::reaches`] stops, in the same order.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginStopping.json"
+      }
+    },
     "upstream": {
       "description": "Where its source is published, as the plugin names it.",
       "type": "string",

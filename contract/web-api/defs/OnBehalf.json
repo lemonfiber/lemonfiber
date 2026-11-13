@@ -3,6 +3,14 @@
   "description": "A request lemonfiber makes on an installed plugin's behalf, attributed to it.",
   "type": "object",
   "properties": {
+    "allowed": {
+      "description": "Whether this machine's settings allow it.",
+      "type": "boolean"
+    },
+    "cost": {
+      "description": "What stops working once it is refused.",
+      "type": "string"
+    },
     "destination": {
       "description": "Where it goes, as the plugin declared it.",
       "type": "string"
@@ -14,11 +22,18 @@
     "purpose": {
       "description": "Why it may be made.",
       "type": "string"
+    },
+    "switch": {
+      "description": "The setting that refuses it: `plugin.<id>.reach.<host>`.",
+      "type": "string"
     }
   },
   "required": [
     "plugin",
     "destination",
-    "purpose"
+    "purpose",
+    "allowed",
+    "switch",
+    "cost"
   ]
 }

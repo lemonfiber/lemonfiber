@@ -67,6 +67,10 @@ pub struct Manifest {
     /// The ordered calls that configure what it installed.
     #[serde(default, rename = "recipe")]
     pub recipes: Vec<Recipe>,
+    /// What stops working where the operator refuses a host its recipes reach, in its
+    /// author's words.
+    #[serde(default, rename = "reach")]
+    pub reaches: Vec<Reach>,
     /// Every value it will hold.
     #[serde(default, rename = "secret")]
     pub secrets: Vec<Secret>,
@@ -422,6 +426,17 @@ impl Manifest {
             Some(named) => self.services.iter().find(|service| service.id == named),
         }
     }
+}
+
+/// What refusing one host a plugin's recipes reach stops, as its author says it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginReach")]
+pub struct Reach {
+    /// The host outside the stack, as a recipe's call or pair names it.
+    pub host: String,
+    /// What stops working where the operator refuses it, in one line.
+    pub stops: String,
 }
 
 /// A bundled thing the plugin will change.

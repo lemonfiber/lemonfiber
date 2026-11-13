@@ -21,6 +21,7 @@
         "reaches": [],
         "reviewed": false,
         "secrets": [],
+        "stops": [],
         "upstream": ""
       }
     },
