@@ -350,16 +350,6 @@ pub enum Command {
     /// is asking about all of them rather than about the one they can already name.
     Catalogue,
     /// Say what this stack wires to what, and how each link was settled.
-    ///
-    /// The read takes no arguments, over the manifest and the one setting that
-    /// records a choice: what reaches what is a property of the stack rather than of
-    /// the caller, and an operator asking it is asking about the whole of it.
-    ///
-    /// The one verb under it is the whole of substituting. There is no operation for
-    /// swapping two services, because there is nothing to swap: a link asks for a
-    /// capability, and which service answers is a setting. Refused where the named
-    /// service cannot do the thing, where nothing asks for it, or where it already
-    /// fills it — each a change that would record something and mean nothing.
     Wiring(Linking),
     /// Read every setting and secret the services read, or change one setting.
     Settings(Settling),
@@ -435,15 +425,6 @@ pub enum Command {
     /// the operator asked to be left alone is not on offer at any level of fullness.
     Space(Reclaiming),
     /// Ask the download client to let one completed download go, files and all.
-    ///
-    /// The one thing the account above names and leaves alone, taken on its own. It
-    /// is its own command rather than an argument to [`Command::Space`] because the
-    /// spec forbids bundling a torrent's removal with generic cleanup, and because
-    /// somebody agreeing to reclaim what costs nothing has not thereby agreed to lose
-    /// a ratio a private tracker keeps their account on.
-    ///
-    /// The agreement is the offer's own name and there is no blanket form of it, so
-    /// the only path to the removal runs through a run that stated the consequence.
     StopSeeding(LettingGo),
     /// Account for the line: what it carries, what the stack may take of it, and
     /// whether the clients are keeping to that.
@@ -481,16 +462,6 @@ pub enum Command {
         forms: Vec<String>,
     },
     /// Say what this machine keeps running for lemonfiber, or change it.
-    ///
-    /// The short command that decides what happens to the long ones. Asked nothing it reports what
-    /// stands between each of them and this machine — installed or not, running or not, and what to
-    /// do where this is a platform lemonfiber configures nothing on. Asked to install one, it hands
-    /// the operating system's own service manager the command that would otherwise have needed a
-    /// terminal held open; asked to remove it, it takes back everything installing made.
-    ///
-    /// Never reached from anywhere else. Installation is an act of its own,
-    /// because something that starts at every login is not a thing to acquire as
-    /// a side effect of an afternoon's guard.
     Hosting(Keeping),
     /// Add one thing end to end, saying each step as it happens.
     ///
