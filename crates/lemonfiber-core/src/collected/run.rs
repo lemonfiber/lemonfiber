@@ -52,7 +52,7 @@ pub(crate) async fn collector(ctx: &Ctx, medium: Medium) -> Option<Collector> {
 pub(crate) async fn named_collector(ctx: &Ctx, medium: Medium) -> Option<(String, Collector)> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let fillers = crate::app::targets::fillers_here(ctx, &manifest);
-    crate::app::targets::collector_named(ctx, &fillers, medium).await
+    crate::app::targets::collector(ctx, &fillers, medium).await
 }
 
 /// Journal that the curator `service` was asked for the `unit` `reference` names, kept as

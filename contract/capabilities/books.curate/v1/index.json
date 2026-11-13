@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "books.curate/v1/openapi.json",
-      "sha256": "1a3228f08e1ae5e927b317a297916264aa399a94251b25d942c888399ed2ecf0"
+      "sha256": "79a5032cfb4865b0688790576fff2ea846e112370c01b558804f5f8a01e12217"
     },
     {
       "path": "books.curate/v1/operations/lookup.json",
@@ -22,12 +22,16 @@
       "sha256": "45090b07f0efe218028379d5f4806e52a5131e3e28794e3b5ee05bed4730beb7"
     },
     {
+      "path": "books.curate/v1/operations/remove.json",
+      "sha256": "5690952c252f073c11cea558755643ae1ea1aa35822082e74cc7c1e79228d489"
+    },
+    {
       "path": "books.curate/v1/holds.json",
       "sha256": "36f310576558040ad3065f2d6e65a2f835c285d02c39153a7e3b35c63fb866db"
     },
     {
       "path": "books.curate/v1/conformance.json",
-      "sha256": "fab941505044de0eada1cf6afbaca3179fa3d9b045ca0120152bcc80373f7c7a"
+      "sha256": "829e72285a5195e1751869e6bc079041a8e7506d5d020128451c86523fc29b6a"
     }
   ],
   "major": 1

@@ -233,13 +233,13 @@ pub trait MusicCurating: Send + Sync {
     async fn profiles(&self) -> Result<AskedWith, Failure>;
 
     /// Remove the `unit` `reference` names with its files, excluding nothing from a later
-    /// import: an album alone, or an artist with every album it holds, and whoever `request` added only to hold it where nothing
-    /// else of theirs is held.
+    /// import: an album alone, or an artist with every album it holds, and whoever
+    /// `request` added only to hold it where nothing else of theirs is held.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure::Refused`] where it holds no such album or artist, and [`Failure`] when
-    /// the curator is unreachable.
+    /// Returns [`Failure::Refused`] where it holds no such album or artist, and [`Failure`]
+    /// when the curator is unreachable.
     async fn remove(&self, unit: MusicUnit, reference: &str) -> Result<(), Failure>;
 }
 
@@ -287,13 +287,13 @@ pub trait BookCurating: Send + Sync {
     async fn profiles(&self) -> Result<AskedWith, Failure>;
 
     /// Remove the `unit` `reference` names with its files, excluding nothing from a later
-    /// import: a book alone, or an author or a series with every book it holds, and whoever `request` added only to hold it where nothing
-    /// else of theirs is held.
+    /// import: a book alone, or an author or a series with every book it holds, and
+    /// whoever `request` added only to hold it where nothing else of theirs is held.
     ///
     /// # Errors
     ///
-    /// Returns [`Failure::Refused`] where it holds no such book, author or series, and [`Failure`] when
-    /// the curator is unreachable.
+    /// Returns [`Failure::Refused`] where it holds no such book, author or series, and
+    /// [`Failure`] when the curator is unreachable.
     async fn remove(&self, unit: BookUnit, reference: &str) -> Result<(), Failure>;
 }
 

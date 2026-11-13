@@ -1,0 +1,22 @@
+{
+  "fields": {
+    "medium": {
+      "type": [
+        "const:\"books\"",
+        "const:\"music\""
+      ],
+      "required": true
+    },
+    "unit": {
+      "type": [
+        "ref:BookUnit",
+        "ref:MusicUnit"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"books\"",
+    "\"music\""
+  ]
+}
