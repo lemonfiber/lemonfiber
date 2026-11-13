@@ -242,7 +242,7 @@ impl Watching {
     /// first live-stream path covering it places in it, where it has that path's shape.
     #[must_use]
     pub fn stream(&self, path: &str, query: &str) -> Option<String> {
-        let pairs = pairs(query);
+        let pairs = pairs(query)?;
         self.live
             .iter()
             .find(|live| live.covers(path, &pairs))?
@@ -265,7 +265,7 @@ impl Watching {
         if forwarded.contains('#') || !normal(path) {
             return None;
         }
-        let pairs = pairs(query);
+        let pairs = pairs(query)?;
         let mut carried = pairs
             .iter()
             .filter(|(name, _)| name.eq_ignore_ascii_case(PARAMETER));
@@ -314,8 +314,9 @@ fn grouped(pattern: &str, group: &str) -> Result<regex::Regex, String> {
 }
 
 /// The pairs of `query`, each name with its value where it has one, empty pairs left
-/// out.
-fn pairs(query: &str) -> Vec<(&str, Option<&str>)> {
+/// out; nothing where a name holds anything but ASCII letters, digits, `_`, `-` and `.`,
+/// so no name reads as another once the upstream decodes it.
+fn pairs(query: &str) -> Option<Vec<(&str, Option<&str>)>> {
     query
         .split('&')
         .filter(|pair| !pair.is_empty())
@@ -323,7 +324,16 @@ fn pairs(query: &str) -> Vec<(&str, Option<&str>)> {
             Some((name, value)) => (name, Some(value)),
             None => (pair, None),
         })
+        .map(|(name, value)| plain(name).then_some((name, value)))
         .collect()
+}
+
+/// Whether `name` is spelled in ASCII letters, digits, `_`, `-` and `.` alone.
+fn plain(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
 }
 
 /// Whether `path` is one the upstream reads only as written: starting at `/`, with no

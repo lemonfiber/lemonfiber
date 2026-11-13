@@ -279,3 +279,26 @@ fn an_item_pass_is_confirmed_with_its_session_on_its_items_routes_alone() {
         assert_eq!(confirmed(&refused, NOW), None, "{refused}");
     }
 }
+
+#[test]
+fn a_query_naming_a_parameter_in_any_but_plain_letters_is_refused() {
+    let live = key().issue(TRANSCODED, "member-1", NOW);
+    let item = sealed(ITEM);
+    let at = format!("/videos/{ITEM}/live.m3u8");
+    for refused in [
+        format!("{at}?LiveStreamId={TRANSCODED}&LiveStream%49d=zzzz_bbbb_cccc&lfpass={live}"),
+        format!("{at}?LiveStreamId={TRANSCODED}&lf%70ass={live}&lfpass={live}"),
+        format!("{at}?LiveStreamId={TRANSCODED}&Live+StreamId=x&lfpass={live}"),
+        format!("/videos/{ITEM}/master.m3u8?Live%53treamId={TRANSCODED}&lfpass={item}"),
+    ] {
+        assert_eq!(
+            everything().confirms(&key(), &refused, NOW, &Renewals::none()),
+            None,
+            "{refused}"
+        );
+    }
+    assert_eq!(
+        everything().stream(&at, &format!("LiveStreamId={TRANSCODED}&x%41=1")),
+        None
+    );
+}
