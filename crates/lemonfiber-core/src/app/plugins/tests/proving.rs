@@ -71,6 +71,28 @@ async fn a_plugin_none_of_whose_forms_run_is_stopped_once_installed_and_awaits_t
     assert!(!runner.ran("rm"), "and left on the machine");
 }
 
+/// A plugin that would not stop once installed stays recorded and is said to await nothing,
+/// since nothing was stopped for its forms to start again.
+#[tokio::test]
+async fn a_plugin_that_will_not_stop_once_installed_awaits_nothing() {
+    let runner = Keyed::answering(
+        vec![("stop", Ok(engine_refused("no such container")))],
+        Ok(spoke("")),
+    );
+    let ctx = proving("awaits-unstopped", runner.clone(), answering(200));
+
+    let install = report(installing(&ctx, &source("awaits-unstopped", PROVING)).await)
+        .and_then(|one| one.install);
+
+    assert_eq!(
+        install
+            .as_ref()
+            .map(|one| (one.recorded, one.awaits.clone())),
+        Some((true, Vec::new()))
+    );
+    assert!(runner.ran("stop"));
+}
+
 impl LostToTheInstall {
     /// One of them, before anything has started.
     pub(super) fn losing(once_up: &'static str) -> Arc<Self> {
