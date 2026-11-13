@@ -4,13 +4,16 @@
 //! here is the wire: the stream from the engine, the file an export lands in, and
 //! the periodic ask about what each service is doing.
 
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Duration;
 
 use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::bundle::Marks;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine, LogQuery};
 use tokio::sync::mpsc::Receiver;
+use tokio::task::{JoinHandle, JoinSet};
 
 use super::screen::{drawing, read_keyboard, Screen};
 use crate::exit::complain;
@@ -64,6 +67,9 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
         viewer = viewer.without_explanations();
     }
     let mut looking = tokio::time::interval(LOOKING);
+    let shared = Arc::new(ctx.clone());
+    let mut asking: Option<JoinHandle<Option<Vec<(String, Lifecycle)>>>> = None;
+    let mut exports: JoinSet<String> = JoinSet::new();
     let mut written = 0_usize;
     // The stream ending is not the screen ending. A stopped service has plenty
     // worth reading in what it said on the way down, and closing the view at that
@@ -78,7 +84,10 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                 Some(press) => match viewer.pressed(press) {
                     Asked::Export => {
                         written += 1;
-                        export(&mut viewer, ctx, written).await;
+                        if let Some((path, text)) = export(&mut viewer, ctx, written) {
+                            let ctx = Arc::clone(&shared);
+                            exports.spawn(async move { kept(&ctx, &path, &text).await });
+                        }
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Asked::Learned => {
@@ -99,34 +108,46 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                 }
                 None => ended = true,
             },
-            // Awaited here rather than on a task of its own, unlike the dashboard's
-            // gather: this is one call to the local engine socket, not a dozen to
-            // services over the network, and spawning it would buy microseconds at
-            // the cost of a second moving part.
             _ = looking.tick() => {
-                if let Some(now) = states(ctx).await {
+                if asking.is_none() {
+                    let ctx = Arc::clone(&shared);
+                    asking = Some(tokio::spawn(async move { states(&ctx).await }));
+                }
+            },
+            now = super::finished(&mut asking) => {
+                asking = None;
+                if let Some(Some(now)) = now {
                     viewer.doing(&now);
+                }
+            },
+            Some(said) = exports.join_next(), if !exports.is_empty() => {
+                if let Ok(said) = said {
+                    viewer.remarked(&said);
                 }
             },
         }
     }
+    if let Some(asked) = asking {
+        asked.abort();
+    }
+    while exports.join_next().await.is_some() {}
     drop(arriving);
     let _ = reader.join();
     ExitCode::SUCCESS
 }
 
-/// Write the view out and say where it went.
+/// The view as an export writes it, and the file it goes into.
 ///
 /// The redacting is [`Viewer::exported`]'s, where it can be tested; what is here is
-/// only the randomness the stand-ins need and the file they go into.
+/// only the randomness the stand-ins need and the name of the file.
 ///
 /// A stand-in an operator can predict is a way back to the value it stands for, so an
 /// export cannot proceed without real randomness. Saying so beats writing a file whose
 /// redaction is only as good as a fixed salt.
-async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
+fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) -> Option<(PathBuf, String)> {
     let Some(marks) = Marks::new(ctx.seams.random.as_ref()) else {
         viewer.remarked("this machine would not provide the randomness an export needs");
-        return;
+        return None;
     };
     // Stamped from the clock port rather than a date, so two runs on the same day
     // cannot write over each other's export.
@@ -137,27 +158,31 @@ async fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs())
         .unwrap_or_default();
-    let path = std::path::PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
-    let text = match viewer.exported(&marks) {
-        Ok(text) => text,
+    let path = PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
+    match viewer.exported(&marks) {
+        Ok(text) => Some((path, text)),
         Err(found) => {
             viewer.remarked(&format!(
                 "not written: line {} still reads like a credential after redaction",
                 found.line
             ));
-            return;
+            None
         }
-    };
-    ctx.seams.filesystem.write(&path, &text).await;
+    }
+}
+
+/// Write an export, and say where it went.
+async fn kept(ctx: &Ctx, path: &Path, text: &str) -> String {
+    ctx.seams.filesystem.write(path, text).await;
 
     // Writing is best effort and says nothing about whether it worked, so the file is
     // read back before the screen claims it is there. An operator told their export
     // landed, on a directory they cannot write to, would find out when they went
     // looking for it — which is the moment they were relying on it.
-    if ctx.seams.filesystem.read(&path).await.is_some() {
-        viewer.remarked(&format!("written to {}", path.display()));
+    if ctx.seams.filesystem.read(path).await.is_some() {
+        format!("written to {}", path.display())
     } else {
-        viewer.remarked(&format!("could not write {}", path.display()));
+        format!("could not write {}", path.display())
     }
 }
 

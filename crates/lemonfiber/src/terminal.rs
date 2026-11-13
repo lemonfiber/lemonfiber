@@ -80,3 +80,14 @@ pub(crate) async fn configured(ctx: Ctx, bare: Bare) -> ExitCode {
 fn learned(showing: &str, screen: Rect, rehearsing: bool) {
     crate::context::remember(&crate::pane::taught_on(showing, screen), rehearsing);
 }
+
+/// What a task came back with, or nothing at all where there is none.
+///
+/// A pending future where there is no task, so a loop with nothing outstanding waits on
+/// its other branches rather than spinning on a branch that is always ready.
+async fn finished<T>(task: &mut Option<tokio::task::JoinHandle<T>>) -> Option<T> {
+    match task {
+        Some(handle) => (&mut *handle).await.ok(),
+        None => std::future::pending().await,
+    }
+}

@@ -1,6 +1,7 @@
 use lemonfiber_core::companion::{Material, Pairing, Replacement};
 
 use super::{certificate, pairing};
+use crate::render::fixtures::drawn_under;
 
 /// Material as a phone would be handed it, from a machine answering to its own name.
 fn made(caution: Option<&str>) -> Pairing {
@@ -28,6 +29,14 @@ fn pairing_leads_with_the_code_and_repeats_it_as_a_line_to_type() {
     let code = said.find('\u{2588}').or_else(|| said.find("##"));
     let typed = said.find(&report.written);
     assert!(code.is_some() && code < typed, "{said}");
+    assert!(
+        drawn_under(
+            &said,
+            "Point the phone's camera at this, or type the line under it where it has none:",
+            &report.written
+        ),
+        "{said}"
+    );
     for part in [
         "https://den.local:8443",
         report.material.fingerprint.as_str(),
