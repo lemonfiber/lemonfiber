@@ -360,6 +360,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         manifest: String::new(),
         tree: String::new(),
         installed_at: String::new(),
+        forms: Vec::new(),
     };
     lemonfiber_core::plugin::Installs {
         demand: None,
@@ -413,6 +414,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
             asks: Vec::new(),
             contests: Vec::new(),
             recipes_ran: Vec::new(),
+            awaits: Vec::new(),
             taking: Vec::new(),
             granting: Vec::new(),
             sharing: Vec::new(),
@@ -762,6 +764,7 @@ pub(super) fn plan() -> Plan {
         filtered: Vec::new(),
         footprint: lemonfiber_core::stack::closure::Footprint::default(),
         running: lemonfiber_core::stack::closure::Running::Unasked,
+        vanished: Vec::new(),
     }
 }
 

@@ -47,6 +47,30 @@ async fn a_plugin_whose_proof_holds_is_started_asked_and_then_recorded() {
     );
 }
 
+/// A plugin waits for its forms: none of them running here, its service is started to prove
+/// it, then stopped once it is installed.
+#[tokio::test]
+async fn a_plugin_none_of_whose_forms_run_is_stopped_once_installed_and_awaits_them() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("awaits", runner.clone(), answering(200));
+
+    let install =
+        report(installing(&ctx, &source("awaits", PROVING)).await).and_then(|one| one.install);
+
+    assert_eq!(
+        install
+            .as_ref()
+            .map(|one| (one.recorded, one.awaits.clone())),
+        Some((true, vec!["library".to_owned()]))
+    );
+    assert!(runner.ran("up"), "its own service was started to prove it");
+    assert!(
+        runner.ran("stop"),
+        "and stopped again once it was installed"
+    );
+    assert!(!runner.ran("rm"), "and left on the machine");
+}
+
 impl LostToTheInstall {
     /// One of them, before anything has started.
     pub(super) fn losing(once_up: &'static str) -> Arc<Self> {

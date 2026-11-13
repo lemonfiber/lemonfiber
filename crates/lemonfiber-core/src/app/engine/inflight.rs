@@ -112,6 +112,7 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
         let Ok(plan) = resolved else {
             return Vec::new();
         };
+        let plan = crate::stack::closure::joined(plan, &manifest, &joining(ctx));
         let profiles: Vec<String> = plan.profiles.into_iter().collect();
         let mut stopping = manifest;
         stopping
@@ -154,19 +155,26 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
 }
 
 /// Every installed plugin whose services sit in one of `profiles`, and so stop with them:
-/// one the bundle installs, in the stack profile its bundle entry names.
-/// Any other plugin's services sit in a profile of its own that no form names.
+/// a first-party one in the stack profile its bundle entry names, and any other in its
+/// own, which joins the closure of each form it names.
 fn stopped_beside(ctx: &Ctx, profiles: &[String]) -> Vec<crate::plugin::Installed> {
+    installed(ctx)
+        .into_iter()
+        .filter(|one| profiles.contains(&crate::plugin::profile_of(one)))
+        .collect()
+}
+
+/// Every installed plugin, or none where the register cannot be read.
+fn installed(ctx: &Ctx) -> Vec<crate::plugin::Installed> {
     crate::app::plugins::read(ctx)
-        .map(|register| {
-            register
-                .installed()
-                .iter()
-                .filter(|one| profiles.contains(&crate::plugin::profile_of(one)))
-                .cloned()
-                .collect()
-        })
+        .map(|register| register.installed().to_vec())
         .unwrap_or_default()
+}
+
+/// Every installed plugin whose services sit in a profile of its own, with the forms it
+/// joins.
+fn joining(ctx: &Ctx) -> Vec<crate::stack::closure::Joining> {
+    crate::plugin::joining(&installed(ctx))
 }
 
 /// Whether a download is still coming down.

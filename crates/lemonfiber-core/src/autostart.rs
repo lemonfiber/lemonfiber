@@ -206,6 +206,12 @@ impl Returning {
         self.halted
     }
 
+    /// The forms the last start named, where naming none is every form.
+    #[must_use]
+    pub fn last_run(&self) -> &[String] {
+        &self.last_run
+    }
+
     /// Record that these forms were started.
     ///
     /// Which also un-stops the record: a start is the operator saying they want it

@@ -550,3 +550,4 @@ fn a_plan_says_what_is_running_only_where_it_was_asked() {
 }
 
 mod beside;
+mod joining;

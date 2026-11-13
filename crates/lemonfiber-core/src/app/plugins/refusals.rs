@@ -15,15 +15,15 @@ use crate::error::codes::plugin::{
     NOTHING_TO_REMOVE, NOTHING_TO_RUN, NOTHING_TO_UPDATE, NOT_AS_REVIEWED, NOT_CATALOGUED, NOWHERE,
     NO_GRANT, NO_REVISION, OCCUPIED, PATH_NOT_PLAIN, REFUSED, SCHEME_REFUSED, SIGNATURE_UNVERIFIED,
     SOURCE_OFF, SPELLED_ALIKE, STEP_FAILED, STRANGER_REPLACING, STUCK, TWO_SOURCES,
-    UNAIMED_CROSSING, UNAPPROVED, UNCONFORMING, UNFETCHED, UNPROVED, UNREADABLE, UNRECORDABLE,
-    UNWRITABLE, VALUE_WITHHELD,
+    UNAIMED_CROSSING, UNAPPROVED, UNCONFORMING, UNDECLARED_FORM, UNFETCHED, UNPROVED, UNREADABLE,
+    UNRECORDABLE, UNWRITABLE, VALUE_WITHHELD,
 };
 use crate::error::Code;
 
 /// Every plugin code an install, an update, a removal, a proving or a revoked grant is
 /// refused with, apart
 /// from the record that cannot be read and the offer that moved.
-pub const REFUSALS: [Code; 44] = [
+pub const REFUSALS: [Code; 45] = [
     UNREADABLE,
     REFUSED,
     ALREADY,
@@ -68,6 +68,7 @@ pub const REFUSALS: [Code; 44] = [
     NO_GRANT,
     EARLIER_TAKEN,
     UNCONFORMING,
+    UNDECLARED_FORM,
 ];
 
 #[cfg(test)]

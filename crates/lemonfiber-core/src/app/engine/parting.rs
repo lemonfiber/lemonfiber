@@ -41,6 +41,7 @@ pub(crate) async fn ran(
         filtered: Vec::new(),
         footprint: Footprint::default(),
         running: Running::Unasked,
+        vanished: Vec::new(),
     };
     super::before(ctx, &action, &named).map_err(|refused| refused.summary.clone())?;
     let command = build(&plan, &ctx.settings, stack, &action, ctx.environment);

@@ -496,6 +496,7 @@ fn the_report_says_what_is_installed_and_what_this_run_did() {
                 asks: Vec::new(),
                 contests: Vec::new(),
                 recipes_ran: Vec::new(),
+                awaits: Vec::new(),
                 taking: Vec::new(),
                 granting: Vec::new(),
                 sharing: Vec::new(),

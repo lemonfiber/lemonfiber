@@ -297,6 +297,7 @@ fn leaving(manifest: &Manifest, stopping: &[String]) -> Plan {
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
+        vanished: Vec::new(),
     }
 }
 

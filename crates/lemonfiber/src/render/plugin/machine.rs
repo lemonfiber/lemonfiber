@@ -75,6 +75,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
         lines.extend(answering::granting(&install.would, acted));
         lines.extend(container(&install.would));
         lines.extend(crate::render::waiting::waiting(&install.waiting));
+        lines.extend(awaiting(&install.awaits));
         if let Some(put_back) = &install.reversed {
             lines.extend(reversal(put_back));
         }
@@ -250,6 +251,19 @@ fn came_to(verdict: &Verdict) -> String {
             super::as_declared(declared)
         ),
     }
+}
+
+/// The forms a plugin waits for, none of them running once it was installed.
+pub(super) fn awaiting(forms: &[String]) -> Lines {
+    let mut lines = Lines::default();
+    if !forms.is_empty() {
+        lines.put(format!(
+            "None of its forms is running, so its services were stopped again; they start \
+             with {}.",
+            forms.join(" or ")
+        ));
+    }
+    lines
 }
 
 /// What asking the egress guard among its services to hold its control credential came

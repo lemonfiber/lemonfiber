@@ -372,6 +372,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLUGIN-48` | `EARLIER_TAKEN` | error | 1 | 400 | 0.18.0 | Raised when a plugin's setting or secret names, as the variable an earlier release kept its value under, one another installed plugin's setting or secret names. |
 | `PLUGIN-49` | `ANOTHER_SOURCE` | error | 1 | 403 | 0.18.0 | Raised when a plugin carrying the id of a part this build pins comes from anywhere but that pin. |
 | `PLUGIN-50` | `UNCONFORMING` | error | 1 | 400 | 0.18.0 | Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it. |
+| `PLUGIN-51` | `UNDECLARED_FORM` | error | 1 | 400 | 0.18.0 | Raised when a plugin's manifest names a form the stack does not declare. |
 
 ## `PROC` — the program underneath
 

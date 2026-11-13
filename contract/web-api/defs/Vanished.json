@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A plugin naming forms the stack does not declare.",
+  "type": "object",
+  "properties": {
+    "forms": {
+      "description": "The forms it names that the stack does not declare, in the order it names them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plugin": {
+      "description": "The plugin, by its id.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plugin",
+    "forms"
+  ]
+}

@@ -63,6 +63,7 @@ pub(super) fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
         manifest: String::new(),
         tree: String::new(),
         installed_at: String::new(),
+        forms: Vec::new(),
     }
 }
 
@@ -83,6 +84,7 @@ fn install(would: Installed, recorded: bool) -> Install {
         asks: Vec::new(),
         contests: Vec::new(),
         recipes_ran: Vec::new(),
+        awaits: Vec::new(),
         taking: Vec::new(),
         granting: Vec::new(),
         sharing: Vec::new(),
@@ -211,6 +213,31 @@ fn an_adapter_writing_its_upstreams_files_is_said_to() {
             .contains("files of another service"),
         "nothing is said where nothing is shared"
     );
+}
+
+/// The forms a plugin waits for are said on an install and an update alike, and nothing
+/// where it waits for none.
+#[test]
+fn the_forms_a_plugin_waits_for_are_said() {
+    let line = "None of its forms is running, so its services were stopped again; they start \
+                with books or full.";
+    let awaits = vec!["books".to_owned(), "full".to_owned()];
+    let mut installed = moving(true, None, None);
+    installed.update = None;
+    installed.install = Some(Box::new(Install {
+        awaits: awaits.clone(),
+        ..install(recorded("komga", None), true)
+    }));
+    let mut updated = moving(true, None, None);
+    if let Some(update) = updated.update.as_mut() {
+        update.install.awaits.clone_from(&awaits);
+    }
+    for said in [installs(&installed).text(), installs(&updated).text()] {
+        assert!(said.contains(line), "{said}");
+    }
+    assert!(!installs(&moving(true, None, None))
+        .text()
+        .contains("None of its forms"));
 }
 
 /// What asking the egress guard to hold its control credential came to is said on an
