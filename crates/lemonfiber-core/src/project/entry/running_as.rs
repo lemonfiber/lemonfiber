@@ -26,11 +26,11 @@ pub(crate) fn operated_ids(
 ) -> OperatedIds {
     let (uid, gid) = owner.unwrap_or((OPERATOR_FALLBACK, OPERATOR_FALLBACK));
     let set = |key: &str| operator(key).and_then(|value| value.trim().parse::<u32>().ok());
-    let (puid, pgid) = (set(PUID_KEY), set(PGID_KEY));
+    let (user, group) = (set(PUID_KEY), set(PGID_KEY));
     OperatedIds {
-        uid: puid.unwrap_or(uid),
-        gid: pgid.unwrap_or(gid),
-        uid_set: puid.is_some(),
-        gid_set: pgid.is_some(),
+        uid: user.unwrap_or(uid),
+        gid: group.unwrap_or(gid),
+        uid_set: user.is_some(),
+        gid_set: group.is_some(),
     }
 }
