@@ -180,6 +180,7 @@ fn generated_reading(operator: &dyn Fn(&str) -> Option<String>) -> serde_norway:
             operator,
             fence: lemonfiber_bundled::FENCE,
             host: &HOST,
+            nftables: true,
             ..lemonfiber_core::project::Reading::bare()
         },
     );
