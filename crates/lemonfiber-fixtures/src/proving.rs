@@ -14,8 +14,11 @@ pub struct Proving {
 }
 
 impl Proving {
-    /// A run that exited with `exit`, having written `stdout`.
-    #[must_use]
+    /// A run that exited with `exit`, having written `stdout`, as an engine answers it.
+    ///
+    /// # Errors
+    ///
+    /// Never: the run it answers was made and exited.
     pub fn exited(exit: i64, stdout: &str) -> Result<Ran, Unran> {
         Ok(Ran {
             ended: Ended::Exited(exit),
