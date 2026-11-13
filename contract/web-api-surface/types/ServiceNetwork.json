@@ -1,5 +1,11 @@
 {
   "fields": {
+    "egress_for": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "fenced": {
       "type": [
         "boolean"

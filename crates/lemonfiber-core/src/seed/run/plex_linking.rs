@@ -140,9 +140,12 @@ async fn signing(
     server: &MediaServer,
 ) -> State {
     match crate::plex_link::mode(ctx) {
-        Some(Mode::Owner) => signed(requests, None, ctx.dry_run).await,
+        Some(Mode::Owner) => signed(requests, Mode::Owner, None, ctx.dry_run).await,
         Some(Mode::Managed) => match held_key(ctx, fillers, server).await {
-            Some(key) => signed(requests, Some(Credential::ApiKey(key)), ctx.dry_run).await,
+            Some(key) => {
+                let key = Some(Credential::ApiKey(key));
+                signed(requests, Mode::Managed, key, ctx.dry_run).await
+            }
             None => skipped(UNHELD),
         },
         Some(Mode::Fronted) => fronted(ctx, fillers, requests, server)
@@ -178,7 +181,7 @@ async fn fronted(
         });
     }
     if !admitted.is_empty() {
-        return Ok(signed(requests, None, ctx.dry_run).await);
+        return Ok(signed(requests, Mode::Fronted, None, ctx.dry_run).await);
     }
     let unwritten = |reason: String| failed(&Kept::unwritten(&reason));
     let random = ctx.seams.random.as_ref();
@@ -189,7 +192,13 @@ async fn fronted(
         token: token.clone(),
     }];
     let beside = kept.beside(&presented).await.map_err(unwritten)?;
-    let state = signed(requests, Some(Credential::ApiKey(token)), false).await;
+    let state = signed(
+        requests,
+        Mode::Fronted,
+        Some(Credential::ApiKey(token)),
+        false,
+    )
+    .await;
     let took = matches!(state, State::Wired | State::AlreadyWired);
     let handed = if took {
         kept.only(&beside, &presented, &[true]).await
@@ -200,9 +209,11 @@ async fn fronted(
     Ok(state)
 }
 
-/// The request service signed in with `credential`, or none.
+/// The request service signed in with `credential`, or none, its page offering members
+/// Plex sign-in as `mode` has it.
 async fn signed(
     requests: &dyn Requests,
+    mode: Mode,
     credential: Option<Credential>,
     rehearsing: bool,
 ) -> State {
@@ -210,6 +221,7 @@ async fn signed(
         at: url(),
         protocol: Protocol(crate::plex_link::API.to_owned()),
         credential,
+        members_sign_in: mode.members_sign_in(),
     };
     crate::seed::wire_request_source(requests, &source, rehearsing)
         .await

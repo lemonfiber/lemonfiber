@@ -57,7 +57,10 @@
             "properties": {
               "member": {
                 "description": "The port's `member`.",
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "wish": {
                 "$ref": "#/$defs/Wish",
@@ -65,7 +68,6 @@
               }
             },
             "required": [
-              "member",
               "wish"
             ],
             "title": "Asked",

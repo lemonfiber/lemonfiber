@@ -29,4 +29,9 @@ requirement = [
   { id = "D1-R25", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/owning.rs", "crates/lemonfiber-core/src/seed/run/tests/owning.rs::a_part_somebody_else_holds_is_refused_naming_the_secret_lemonfiber_holds", "crates/lemonfiber-core/src/seed/run/tests/owning.rs::a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account"] },
   { id = "D1-R26", state = "done", evidence = ["crates/lemonfiber-core/src/doctor/owned.rs", "crates/lemonfiber-core/src/app/engine/diagnosis/deferring.rs"] },
   { id = "D1-R27", state = "done", evidence = ["crates/lemonfiber-core/src/seed/run/plex_linking.rs", "crates/lemonfiber-core/src/doctor/plex_link.rs", "crates/lemonfiber-core/src/app/engine/diagnosis/deferring.rs", "crates/lemonfiber-core/src/seed/run/tests/plex/signing.rs::managed_signs_the_owner_in_with_the_managed_accounts_token_at_the_plex_route", "crates/lemonfiber-core/src/doctor/plex_link/tests.rs::owner_is_a_standing_notice_of_what_holding_the_operators_token_costs"] },
+  # D1-R28: a member the request service holds no account for asks as its owner, counted
+  # as theirs; one whose asks wait for approval and who holds no account is refused, so
+  # an approval-first household in `managed` cannot ask. The page's Plex sign-in is
+  # set by the filler from `members_sign_in` (plugin-seerr).
+  { id = "D1-R28", state = "partial", evidence = ["crates/lemonfiber-core/src/wishing/ask.rs", "crates/lemonfiber-core/src/household/run/as_owner.rs", "crates/lemonfiber-core/src/plex_link.rs", "crates/lemonfiber-core/src/wishing/ask/tests.rs::a_member_the_request_service_holds_no_account_for_is_asked_for_as_its_owner_and_kept", "crates/lemonfiber-core/src/wishing/ask/tests.rs::a_member_with_no_account_whose_asks_wait_is_told_asks_go_through_the_house", "crates/lemonfiber-core/src/seed/run/tests/plex/signing.rs::the_request_services_page_offers_members_plex_sign_in_in_owner_and_fronted_alone"] },
 ]

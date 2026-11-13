@@ -139,7 +139,8 @@ pub enum Posture {
     Confined,
 }
 
-/// The network a service runs inside instead of its own: its filler's, or a fence's.
+/// The network a service runs inside instead of its own, its filler's or a fence's, or the
+/// sibling it carries out of the machine.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "ServiceNetwork")]
@@ -151,6 +152,10 @@ pub struct Network {
     /// refuses every private address.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fenced: bool,
+    /// The service of its own plugin it carries out of the machine, holding nothing, where
+    /// it is that service's egress.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress_for: Option<String>,
 }
 
 impl Network {
@@ -158,6 +163,12 @@ impl Network {
     #[must_use]
     pub fn via(&self) -> Option<&str> {
         self.via.as_deref()
+    }
+
+    /// The service of its own plugin it carries out of the machine, where it is one's egress.
+    #[must_use]
+    pub fn egress_for(&self) -> Option<&str> {
+        self.egress_for.as_deref()
     }
 }
 
@@ -488,11 +499,16 @@ impl Container<'_> {
         let Some(network) = self.network else {
             return;
         };
+        if let Some(sibling) = network.egress_for() {
+            self.carrying(network, sibling, found);
+            return;
+        }
         let Some(via) = network.via() else {
             if !network.fenced {
                 found.push((
                     self.at("network"),
-                    "says neither via nor fenced, and a network is one or the other".to_owned(),
+                    "says none of via, fenced and egress_for, and a network is one of them"
+                        .to_owned(),
                 ));
             }
             return;
@@ -515,6 +531,49 @@ impl Container<'_> {
                 format!("names {via}, which the service provides itself"),
             ));
         }
+    }
+
+    /// What an egress service carrying `sibling` out of the machine, under `network`, holds
+    /// that it may not: anything worth taking, any way in, or another network.
+    fn carrying(&self, network: &Network, sibling: &str, found: &mut Vec<(String, String)>) {
+        let held = [
+            (sibling == self.id, "names the service itself"),
+            (network.via().is_some(), "takes via beside it"),
+            (network.fenced, "is fenced beside it"),
+            (self.posture != Posture::Confined, "is not confined"),
+            (!self.secrets.is_empty(), "declares a secret"),
+            (
+                self.config_path.is_some(),
+                "declares a configuration directory",
+            ),
+            (
+                !self.mounts.is_empty() || self.shares_config.is_some(),
+                "declares a mount",
+            ),
+            (self.takes_data, "takes the data mount"),
+            (
+                self.port.is_some() || !self.publish.is_empty(),
+                "publishes a port",
+            ),
+            (self.speaks, "speaks a contract"),
+            (!self.provides.is_empty(), "provides a capability"),
+            (
+                self.env
+                    .values()
+                    .any(|value| matches!(value, Value::Url(_))),
+                "asks the address of a capability",
+            ),
+        ];
+        found.extend(
+            held.into_iter()
+                .filter(|(breaks, _)| *breaks)
+                .map(|(_, what)| {
+                    (
+                self.at("network.egress_for"),
+                format!("{what}, and a service carrying another out of the machine holds nothing"),
+            )
+                }),
+        );
     }
 }
 

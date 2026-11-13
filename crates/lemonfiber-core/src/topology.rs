@@ -72,6 +72,8 @@ pub struct Member<'a> {
     pub inside: Option<&'a str>,
     /// The upstream it fronts, where it is an adapter.
     pub fronts: Option<&'a str>,
+    /// The service of its own plugin it carries out of the machine, where it is its egress.
+    pub egress_for: Option<&'a str>,
 }
 
 /// One settled ask: who asks, for what, and which service it reaches.
@@ -179,18 +181,24 @@ pub fn derived(
             .insert(network.to_owned(), address);
     };
     for member in members.iter().filter(|member| member.inside.is_none()) {
-        if member.publishes || !member.confined {
+        if member.publishes || !member.confined || member.egress_for.is_some() {
             let name = named(&["own", member.id]);
             networks.insert(
                 name.clone(),
                 Network {
                     internal: false,
-                    masquerade: !member.confined,
+                    masquerade: !member.confined || member.egress_for.is_some(),
                     fixed: None,
                     subnet: None,
                 },
             );
             join(&name, member.id, None);
+        }
+        if let Some(carried) = member.egress_for {
+            let name = named(&["egress", &host(carried), member.id]);
+            networks.insert(name.clone(), internal(None));
+            join(&name, member.id, None);
+            join(&name, &host(carried), None);
         }
         if let Some(upstream) = member.fronts {
             let name = named(&["front", member.id]);

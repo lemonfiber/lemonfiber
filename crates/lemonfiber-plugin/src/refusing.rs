@@ -32,6 +32,7 @@ pub mod carried;
 mod choosing;
 mod colliding;
 mod earlier;
+mod egress;
 mod evidence;
 mod failing;
 mod fronting;
@@ -205,6 +206,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
         fronting::native(service, &manifest.services, found);
         fronting::outside(service, found);
         fronting::filed(service, &manifest.services, found);
+        egress::carried(manifest, service, found);
         replacing::replaced(service, found);
         starting::started(service, found);
         minting::handed(manifest, service, found);

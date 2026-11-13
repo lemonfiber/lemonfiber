@@ -703,6 +703,7 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. |
 | `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. |
 | `WISH-13` | `NO_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title a member may ask for has no picture to show them. |
+| `WISH-14` | `THROUGH_THE_HOUSE` | error | 1 | 409 | 0.18.0 | Said where a member whose asks wait for approval has no account of their own on what files the household's asks, so nothing could wait for anybody's yes. |
 
 ## `WORD` — the glossary
 

@@ -355,6 +355,7 @@ pub async fn wire_request_identity(
             username: ADMIN.to_owned(),
             password: password.to_owned(),
         }),
+        members_sign_in: true,
     };
     wire_request_source(requests, &source, rehearsing).await
 }

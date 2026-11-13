@@ -71,7 +71,8 @@ pub(crate) async fn remove(
     }
 
     let asking = super::targets::household_requests(ctx, &manifest).await;
-    let mut cost = what_it_costs(asking.as_ref(), &member).await;
+    let kept = crate::household::run::as_owner::kept(ctx);
+    let mut cost = what_it_costs(asking.as_ref(), &member, &kept).await;
     let standing = offer(&member, &cost);
 
     let Some(answered) = agreement else {
@@ -176,7 +177,11 @@ const fn watch_history(revoked: Revoked) -> &'static str {
 }
 
 /// Read what removing them takes, touching nothing.
-async fn what_it_costs(asking: Option<&super::targets::HouseholdAccess>, member: &Member) -> Cost {
+async fn what_it_costs(
+    asking: Option<&super::targets::HouseholdAccess>,
+    member: &Member,
+    kept: &crate::household::run::as_owner::Kept,
+) -> Cost {
     let mut findings = Vec::new();
     let held = match asking {
         Some(access) => their_account(access, member).await,
@@ -190,7 +195,7 @@ async fn what_it_costs(asking: Option<&super::targets::HouseholdAccess>, member:
         );
     }
     let requests = match asking {
-        Some(access) => theirs(access, member).await,
+        Some(access) => theirs(access, member, kept).await,
         None => 0,
     };
     Cost {
@@ -256,16 +261,21 @@ async fn their_account(access: &super::targets::HouseholdAccess, member: &Member
     }
 }
 
-/// How many requests this member has made, as the request service records them.
+/// How many requests this member has made, as the request service records them, those
+/// `kept` names as filed for them as the owner counted as theirs.
 ///
 /// Counted by the media server's id wherever a record carries one, because the name the
 /// request service shows is the requester's own to change; a record carrying none is
 /// counted by name, matched without regard to case for the same reason the account was.
-async fn theirs(access: &super::targets::HouseholdAccess, member: &Member) -> usize {
+async fn theirs(
+    access: &super::targets::HouseholdAccess,
+    member: &Member,
+    kept: &crate::household::run::as_owner::Kept,
+) -> usize {
     let id = member.id.to_lowercase();
     let name = member.name.to_lowercase();
     access.requests.requests().await.map_or(0, |requests| {
-        requests
+        kept.attributed(requests)
             .iter()
             .filter(|request| {
                 request.member_id.as_ref().map_or_else(

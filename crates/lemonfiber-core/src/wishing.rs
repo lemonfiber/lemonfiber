@@ -32,6 +32,7 @@ use crate::app::{Ctx, Outcome, Wishing};
 use crate::error::codes::wish::{
     ALREADY_HERE, CANNOT_FETCH, NOBODY_ASKING, NOTHING_LEFT, NOT_ASKABLE, NOT_A_MEMBER,
     NOT_A_PLACE, NOT_A_SEARCH, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_PICTURE, NO_ROOM,
+    THROUGH_THE_HOUSE,
 };
 use crate::error::{Code, Problem, Remedy, State};
 use crate::ports::docker::Lifecycle;
@@ -47,7 +48,7 @@ pub use poster::poster;
 
 /// Every refusal a member's search, ask or poster answers with, which a client names by
 /// its code.
-pub const REFUSALS: [Code; 13] = [
+pub const REFUSALS: [Code; 14] = [
     NOT_A_SEARCH,
     NOT_A_PLACE,
     NOT_ASKABLE,
@@ -61,6 +62,7 @@ pub const REFUSALS: [Code; 13] = [
     NOBODY_ASKING,
     NOT_A_MEMBER,
     NO_PICTURE,
+    THROUGH_THE_HOUSE,
 ];
 
 /// What a member's search or ask comes to.
@@ -96,6 +98,25 @@ pub(crate) async fn wished(ctx: &Ctx, wishing: Wishing) -> Result<Outcome, Box<P
             .await
             .map(Outcome::Asked),
     }
+}
+
+/// What the member `reached` names may ask for, each request filed for them as the request
+/// service's owner counted as theirs.
+///
+/// # Errors
+///
+/// The failure of whichever question the request service did not answer.
+async fn allowance(
+    ctx: &Ctx,
+    reached: &Reached,
+) -> Result<crate::household::run::OwnAllowance, crate::ports::service::Failure> {
+    crate::household::run::allowance_of(
+        reached.requests.as_ref(),
+        &reached.member,
+        ctx.seams.clock.now(),
+        &crate::household::run::as_owner::kept(ctx),
+    )
+    .await
 }
 
 /// Everything one member's search or ask is answered from.

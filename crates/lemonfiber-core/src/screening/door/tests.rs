@@ -146,6 +146,7 @@ fn the_doors_upstream_address_is_the_one_the_projects_networks_fix_for_it() {
                 publishes: true,
                 inside: None,
                 fronts: None,
+                egress_for: None,
             },
             crate::topology::Member {
                 id: "jellyfin",
@@ -153,6 +154,7 @@ fn the_doors_upstream_address_is_the_one_the_projects_networks_fix_for_it() {
                 publishes: true,
                 inside: None,
                 fronts: None,
+                egress_for: None,
             },
         ],
         &[crate::topology::Settled {

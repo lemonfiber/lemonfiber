@@ -117,8 +117,8 @@ pub(crate) struct OwnAllowance {
 }
 
 /// What one member may ask for, as the request service holds it: their own account's
-/// standing where it holds one, and the household's own setting, with nothing yet
-/// counted, where it does not.
+/// standing where it holds one, and the household's own setting where it does not, with
+/// what the requests `kept` names as filed for them as the owner use of it counted.
 ///
 /// # Errors
 ///
@@ -127,28 +127,30 @@ pub(crate) async fn allowance_of(
     requests: &dyn lemonfiber_contract::capabilities::request::intake::Fills,
     account: &Member,
     now: SystemTime,
+    kept: &super::as_owner::Kept,
 ) -> Result<OwnAllowance, Failure> {
+    let asked = kept.attributed(requests.requests().await?);
     let (id, approves_own, headroom) =
         if let Some(requesting) = requests.requesting(&account.id).await? {
             let headroom = requests.left(&requesting.id).await?;
             (Some(requesting.id), requesting.approves_own, headroom)
         } else {
             let household = requests.asking().await?;
-            let left = Left {
+            let days = household.quota.map(|quota| quota.days);
+            let left = |kind| Left {
                 limit: household.quota.map(|quota| quota.requests),
-                used: 0,
-                days: household.quota.map(|quota| quota.days),
+                used: kept.used(&asked, &account.id, kind, days, now),
+                days,
             };
             (
                 None,
                 household.approves_own,
                 Headroom {
-                    films: left,
-                    television: left,
+                    films: left(Kind::Movies),
+                    television: left(Kind::Tv),
                 },
             )
         };
-    let asked = requests.requests().await?;
     let made: Vec<&str> = asked
         .iter()
         .filter(|request| made_by(request, account))
