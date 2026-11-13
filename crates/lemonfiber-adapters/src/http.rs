@@ -28,6 +28,10 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// connection but never sends a reply cannot hang a seed run without end.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Why a request whose deadline asked for a client of its own was not sent.
+const UNBUILT: &str =
+    "no client could be built to connect within its deadline, so nothing was asked";
+
 /// Where a request is allowed to end up: at the address it was sent to, and
 /// nowhere else.
 ///
@@ -174,12 +178,7 @@ impl Web {
         }
         builder(&self.cookies, connect)
             .and_then(|built| built.build().ok())
-            .ok_or_else(|| {
-                Unreachable::once(
-                    &without_credentials(&request.url),
-                    "no client could be built to connect within its deadline, so nothing was asked",
-                )
-            })
+            .ok_or_else(|| Unreachable::once(&without_credentials(&request.url), UNBUILT))
     }
 }
 

@@ -80,12 +80,8 @@ impl Web {
         if connect >= CONNECT_TIMEOUT {
             return Ok(self.client.clone());
         }
-        client(self.sessions.as_ref(), self.within, connect).map_err(|why| {
-            Unreachable::once(
-                &withheld(&request.url, query_of(&request.url)),
-                &format!("no client could be built to connect within its deadline: {why}"),
-            )
-        })
+        client(self.sessions.as_ref(), self.within, connect)
+            .map_err(|why| unanswered(request, false, why))
     }
 }
 
@@ -176,13 +172,7 @@ async fn sent(
     request: &Request,
     most: usize,
 ) -> Result<Fetched, Unreachable> {
-    let query = query_of(&request.url);
-    let unreached = |why: reqwest::Error| Unreachable {
-        url: withheld(&request.url, query),
-        connected: !why.is_connect(),
-        reason: withheld(&why.without_url().to_string(), query),
-        attempts: 1,
-    };
+    let unreached = |why: reqwest::Error| unanswered(request, !why.is_connect(), why);
     let mut built = client.request(method(request.method), &request.url);
     for (name, value) in &request.headers {
         built = built.header(name, value);
@@ -219,6 +209,17 @@ async fn sent(
         headers,
         bytes: within.then_some(bytes),
     })
+}
+
+/// `request` unanswered for `why`, connected or not, with its query withheld.
+fn unanswered(request: &Request, connected: bool, why: reqwest::Error) -> Unreachable {
+    let query = query_of(&request.url);
+    Unreachable {
+        url: withheld(&request.url, query),
+        connected,
+        reason: withheld(&why.without_url().to_string(), query),
+        attempts: 1,
+    }
 }
 
 /// The whole of a URL's query, where it carries one: an upstream may take its key there,
