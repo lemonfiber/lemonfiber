@@ -71,6 +71,7 @@ async fn each_filler_is_asked_how_often_to_look_and_the_report_says_how_it_hears
     };
     let (looking, looked) = polled(r#"{"hearing":"poll","every":60}"#, "recounting-poll");
     let (pushing, pushed) = polled(r#"{"hearing":"push"}"#, "recounting-push");
+    let (unsaid, said) = polled(r#"{"hearing":"poll"}"#, "recounting-poll-unsaid");
 
     let by_looking = told(
         &contracted_ctx(&looking, SERVICE, true, looked.clone()),
@@ -80,6 +81,11 @@ async fn each_filler_is_asked_how_often_to_look_and_the_report_says_how_it_hears
     let by_telling = told(
         &contracted_ctx(&pushing, SERVICE, true, pushed),
         &stack(&pushing),
+    )
+    .await;
+    let by_looking_unsaid = told(
+        &contracted_ctx(&unsaid, SERVICE, true, said),
+        &stack(&unsaid),
     )
     .await;
 
@@ -100,6 +106,12 @@ async fn each_filler_is_asked_how_often_to_look_and_the_report_says_how_it_hears
             .iter()
             .any(|one| one.ends_with("telling the core what happened, as it is told")),
         "{by_telling:?}"
+    );
+    assert!(
+        named(&by_looking_unsaid)
+            .iter()
+            .any(|one| one.ends_with("telling the core what happened, by looking for it")),
+        "{by_looking_unsaid:?}"
     );
     let body = looked
         .requests()

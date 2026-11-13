@@ -346,6 +346,30 @@ async fn an_upstream_that_cannot_be_read_on_a_first_ask_keeps_nothing() {
 }
 
 #[tokio::test]
+async fn a_cursor_that_cannot_be_kept_or_dropped_refuses_the_ask_and_runs_nothing() {
+    let dir = Scratch::new("recounter-unkeepable");
+    let file = dir.path().join("a-file");
+    assert!(std::fs::write(&file, "not a directory").is_ok());
+    let history = Script::holding(&[Some("Old")]);
+    let Some((served, posts)) = core(StatusCode::ACCEPTED) else {
+        return;
+    };
+    let recounter = recounter(&file, &history);
+    let refused = |answer: Result<Option<Heard>, Failure>, what: &str| matches!(answer, Err(Failure::Refused { service, detail }) if service == SERVICE && detail.contains(what));
+    assert!(refused(
+        asked(&recounter, &served, KEY, None).await,
+        "the cursor could not be kept"
+    ));
+    assert!(refused(
+        recounter.events(None, None, None, None).await,
+        "the cursor could not be dropped"
+    ));
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(history.reads(), 0);
+    assert!(names(&posts).is_empty());
+}
+
+#[tokio::test]
 async fn an_upstream_that_pushes_is_pointed_at_a_secret_path_and_heard_by_push() {
     let dir = Scratch::new("recounter-pushed");
     let history = Script::holding(&[Some("Old")]);
@@ -478,6 +502,31 @@ async fn a_restart_takes_up_what_was_kept_and_sends_what_happened_while_down() {
     recounter(dir.path(), &history).resumed().await;
     assert!(settled(|| cursor_is(dir.path(), "3")).await);
     assert_eq!(names(&posts), ["Dune", "Arrival"]);
+}
+
+#[tokio::test]
+async fn a_kit_served_with_a_recounter_takes_up_what_was_kept_before_it_answers() {
+    let dir = Scratch::new("recounter-served");
+    let history = Script::holding(&[Some("Old"), Some("Dune")]);
+    let Some((served, posts)) = core(StatusCode::ACCEPTED) else {
+        return;
+    };
+    let mut kept = kept_ask(&served);
+    kept.cursor = "1".to_owned();
+    assert!(kept::write(dir.path(), &kept).is_ok());
+    let _ = std::fs::write(dir.path().join(EVENTS_KEY_FILE), KEY);
+    let Ok(listener) = tokio::net::TcpListener::bind("127.0.0.1:0").await else {
+        unreachable!("a loopback port is always free to bind");
+    };
+    let kit = crate::tests::kit().recounted_by(recounter(dir.path(), &history));
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let server = tokio::spawn(crate::serving(kit, listener, async {
+        let _ = stopped.await;
+    }));
+    assert!(settled(|| cursor_is(dir.path(), "2")).await);
+    assert_eq!(names(&posts), ["Dune"]);
+    let _ = stop.send(());
+    assert!(matches!(server.await, Ok(Ok(()))));
 }
 
 #[tokio::test]

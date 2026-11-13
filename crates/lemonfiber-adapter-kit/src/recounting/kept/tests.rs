@@ -101,3 +101,12 @@ fn it_answers_push_without_an_interval_and_poll_with_one() {
         }
     );
 }
+
+#[test]
+fn a_configuration_that_is_no_directory_is_an_error_to_read_and_to_drop() {
+    let dir = Scratch::new("kept-no-directory");
+    let file = dir.path().join("a-file");
+    assert!(std::fs::write(&file, "not a directory").is_ok());
+    assert!(read(&file).is_err_and(|why| why.kind() != std::io::ErrorKind::NotFound));
+    assert!(dropped(&file).is_err());
+}

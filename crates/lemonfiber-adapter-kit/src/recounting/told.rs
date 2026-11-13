@@ -35,9 +35,6 @@ impl Told {
 
     /// Whether the core answered `event` with a success.
     pub(crate) async fn sent(&self, event: &Event) -> bool {
-        let Ok(body) = serde_json::to_vec(event) else {
-            return false;
-        };
         self.client
             .post(self.address.as_url().clone())
             .bearer_auth(&self.key)
@@ -45,7 +42,7 @@ impl Told {
                 CONTENT_TYPE,
                 HeaderValue::from_static(lemonfiber_contract::wire::JSON),
             )
-            .body(body)
+            .json(event)
             .send()
             .await
             .is_ok_and(|answer| answer.status().is_success())

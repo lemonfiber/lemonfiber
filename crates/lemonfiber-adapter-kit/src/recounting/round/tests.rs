@@ -12,7 +12,8 @@ use lemonfiber_fixtures::heard::Heard;
 use super::super::tests::{kept_in, names, recounter, recounter_heard, Script};
 use super::super::told::tests::{address, core, KEY};
 use super::super::told::Told;
-use super::{round, Waiting};
+use super::super::Entry;
+use super::{moved, round, sent, Waiting};
 
 fn kept(address: String, pin: String, cursor: &str) -> Kept {
     Kept {
@@ -126,4 +127,78 @@ async fn a_cursor_that_cannot_be_kept_ends_the_round_after_the_send() {
     };
     assert!(!finished);
     assert_eq!(names(&posts), ["Dune"]);
+}
+
+#[tokio::test]
+async fn a_send_the_core_refuses_or_after_a_stop_moves_no_cursor() {
+    let dir = Scratch::new("round-unsent");
+    let history = Script::holding(&[Some("Dune")]);
+    let Some((refusing, refused)) = core(StatusCode::INTERNAL_SERVER_ERROR) else {
+        return;
+    };
+    let recounter = recounter(dir.path(), &history);
+    let entry = Entry {
+        position: "1".to_owned(),
+        event: Some(super::super::told::tests::added("Dune")),
+    };
+    let Some(told) = Told::new(&address(&refusing), &refusing.pin, KEY) else {
+        unreachable!("a fake core's address and pin will do");
+    };
+    assert!(!sent(&recounter.shared, &told, entry.clone()).await);
+    assert!(names(&refused).is_empty());
+
+    recounter.shared.running.lock().await.kept =
+        Some(kept(address(&refusing), refusing.pin.clone(), "0"));
+    assert!(!sent(&recounter.shared, &told, entry).await);
+    assert_eq!(names(&refused), ["Dune"]);
+    assert_eq!(
+        recounter
+            .shared
+            .running
+            .lock()
+            .await
+            .kept
+            .as_ref()
+            .map(|kept| kept.cursor.clone())
+            .as_deref(),
+        Some("0")
+    );
+    assert!(kept_in(dir.path()).is_none());
+}
+
+#[tokio::test]
+async fn a_gone_cursor_is_left_where_the_history_cannot_be_read_or_it_moved_meanwhile() {
+    let dir = Scratch::new("round-gone-unmoved");
+    let history = Script::holding(&[Some("Dune"), Some("Arrival")]);
+    let heard = Arc::new(Heard::default());
+    let recounter = recounter_heard(dir.path(), &history, &heard);
+
+    assert!(!moved(&recounter.shared, "1").await);
+
+    recounter.shared.running.lock().await.kept = Some(kept(String::new(), String::new(), "2"));
+    assert!(!moved(&recounter.shared, "1").await);
+    assert_eq!(
+        recounter
+            .shared
+            .running
+            .lock()
+            .await
+            .kept
+            .as_ref()
+            .map(|kept| kept.cursor.clone())
+            .as_deref(),
+        Some("2")
+    );
+
+    history.fails();
+    assert!(!moved(&recounter.shared, "2").await);
+    assert!(kept_in(dir.path()).is_none());
+    assert!(heard
+        .said()
+        .iter()
+        .any(|said| said.contains("its history could not be read")));
+    assert!(!heard
+        .said()
+        .iter()
+        .any(|said| said.contains("no longer holds")));
 }
