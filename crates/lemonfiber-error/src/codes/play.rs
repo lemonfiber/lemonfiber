@@ -80,4 +80,31 @@ codes! {
             at most two megabytes, so there is nothing to show.",
         remedy: "Draw the title by its name where it has no picture.",
     }
+    /// Said where the member's own account may not watch live TV, or the server has none.
+    NO_LIVE_TV = "PLAY-10" {
+        severity: Error,
+        status: 404,
+        since: "0.19.0",
+        meaning: "There is no live TV for this member. Either their account may not watch it, \
+            or the media server has none, so no channel was opened.",
+        remedy: "Ask whoever looks after the household to let this member watch live TV.",
+    }
+    /// Said where the live stream named is not one the core opened for this member.
+    NOT_THEIR_STREAM = "PLAY-11" {
+        severity: Error,
+        status: 404,
+        since: "0.19.0",
+        meaning: "That live stream is not one opened for this member, or it has already \
+            closed, so there is nothing to renew or stop.",
+        remedy: "Choose the channel again to open it anew.",
+    }
+    /// Said where the pass handed back does not open for this member and title.
+    NOT_THEIR_PASS = "PLAY-12" {
+        severity: Error,
+        status: 403,
+        since: "0.19.0",
+        meaning: "That pass is not this member's for this title, so no new one was made \
+            from it.",
+        remedy: "Choose the title again to start playing it anew.",
+    }
 }

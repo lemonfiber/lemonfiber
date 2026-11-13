@@ -45,8 +45,8 @@
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 39,
-      "sha256": "a390dbbe9e2dcdcb7da4fb3a0f63205f1d71b418d580c12ae22c7ebf99c8f78f"
+      "operations": 38,
+      "sha256": "33d5554781850fbc59f118419456a55304f6998daa033a2109109314934b11a9"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "3bcedd73b8553524c58e9c9e25598d9c57b70eb50fa65ebb6d4173c609790c14"
+      "sha256": "8ee74c4dfc4919c9c9595be68f7e6c43cdaa0daaf12a1e9f7e5f5949be88b6e9"
     },
     {
       "capability": "indexer.pull",
@@ -69,8 +69,8 @@
         1
       ],
       "openapi": "indexer.pull/v1/openapi.json",
-      "operations": 3,
-      "sha256": "66e36dbe3d3409cfe1d47e0c0f3ddaa8b24de1380c243842aaee510ae659f621"
+      "operations": 2,
+      "sha256": "2e4ebc22c7332ee5d9260374cf6cf14c9c9a342b92e760ce0c34e2ae72c8b7ec"
     },
     {
       "capability": "indexer.proxy",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 32,
-      "sha256": "abb67b51328aeceb83affd9a775b3513ce566ce668b1921e9481f8467f9665f7"
+      "sha256": "492f3aa2d5a786aef5034fffdfda839f82a9c24511f9f050800cfee5897edba9"
     },
     {
       "capability": "identity.source",
@@ -117,8 +117,8 @@
         1
       ],
       "openapi": "identity.source/v1/openapi.json",
-      "operations": 21,
-      "sha256": "7b5e1a2e341d71ebf9a405908a827c31bf81c621d114e1328bf57460b7588cd2"
+      "operations": 19,
+      "sha256": "7e2885c8a3fa915ebdd587ae529a4217863d4a0cb27c4205ab08fe249cc10248"
     },
     {
       "capability": "media.serve",
@@ -129,8 +129,8 @@
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 32,
-      "sha256": "eae41879e38a49eebbd6331f9f25578c5aa14a38df5ef8f56a057e2af9666b58"
+      "operations": 33,
+      "sha256": "79b90b5dc5475c494c411b617b87341c7313bf66c2ddaeccd9a7c4190ed3a6bc"
     },
     {
       "capability": "proxy.front",

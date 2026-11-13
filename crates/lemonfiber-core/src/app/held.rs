@@ -17,7 +17,7 @@
 //! the member's side without reading any member's.
 
 use super::targets::media;
-use super::{Ctx, Whom};
+use super::{Asker, Ctx, Whom};
 
 use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
@@ -31,7 +31,12 @@ use crate::screening::door::{located, Door};
 /// answers them; an operator types a name, so it is the second that answers an operator.
 /// One resolution for both rather than two paths that could come to disagree about who
 /// was meant.
-pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldReport, Box<Problem>> {
+pub(crate) async fn held(
+    ctx: &Ctx,
+    whose: &Whom,
+    most: u32,
+    asker: Asker,
+) -> Result<HeldReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -45,13 +50,13 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         ));
     };
 
-    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
+    let door = crate::screening::door::standing(ctx, server.serve.as_ref(), asker).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
             server.serve.holdings(None, most).await,
             String::new(),
             String::new(),
-            &door,
+            (&door, ctx.seams.random.as_ref()),
         ));
     };
 
@@ -75,7 +80,7 @@ pub(crate) async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldRepor
         server.serve.holdings(Some(&account.id), most).await,
         account.name.clone(),
         account.id.clone(),
-        &door,
+        (&door, ctx.seams.random.as_ref()),
     ))
 }
 
@@ -86,7 +91,7 @@ fn shelved(
     answered: Result<Vec<Item>, Failure>,
     member: String,
     id: String,
-    door: &Door,
+    (door, random): (&Door, &dyn crate::ports::random::Random),
 ) -> HeldReport {
     let Ok(holdings) = answered else {
         return HeldReport {
@@ -106,7 +111,7 @@ fn shelved(
         id,
         holdings: holdings
             .into_iter()
-            .map(|item| located(item, door))
+            .map(|item| located(item, door, random))
             .collect(),
         available: true,
         findings: Vec::new(),

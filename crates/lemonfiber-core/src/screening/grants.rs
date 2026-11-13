@@ -117,7 +117,7 @@ pub(crate) async fn ended(ctx: &Ctx, server: &Media) {
 }
 
 /// Sign out every device `member` played on through a grant; whether all of them went.
-async fn signed_out(server: &Media, member: &str) -> bool {
+pub(crate) async fn signed_out(server: &Media, member: &str) -> bool {
     let Ok(sessions) = server.identity.sessions(member).await else {
         return false;
     };

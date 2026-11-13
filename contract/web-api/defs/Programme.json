@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A programme on a channel.",
+  "type": "object",
+  "properties": {
+    "certificate": {
+      "description": "Its certificate, as the server holds it, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ends": {
+      "description": "When it ends, in RFC 3339, where the server knows.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "What it is called.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "title"
+  ]
+}

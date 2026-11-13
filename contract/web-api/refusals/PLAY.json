@@ -4,6 +4,21 @@
     "status": 400,
     "description": "Said where the title named is not something the media server could hold."
   },
+  "PLAY-10": {
+    "name": "NO_LIVE_TV",
+    "status": 404,
+    "description": "Said where the member's own account may not watch live TV, or the server has none."
+  },
+  "PLAY-11": {
+    "name": "NOT_THEIR_STREAM",
+    "status": 404,
+    "description": "Said where the live stream named is not one the core opened for this member."
+  },
+  "PLAY-12": {
+    "name": "NOT_THEIR_PASS",
+    "status": 403,
+    "description": "Said where the pass handed back does not open for this member and title."
+  },
   "PLAY-2": {
     "name": "NOT_ON_THEIR_SHELF",
     "status": 404,

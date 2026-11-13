@@ -26,6 +26,10 @@ use serde::Serialize;
 
 pub use crate::ports::service::Certificate;
 
+mod limits;
+
+pub(crate) use limits::Limits;
+
 /// What one age limit comes to, in the certificates named for it.
 ///
 /// Both sides, because either alone misleads. What is allowed without what is held

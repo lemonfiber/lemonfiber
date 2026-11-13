@@ -82,6 +82,7 @@ pub(crate) async fn remove(
         return Err(Box::new(offer_moved(&member.name, &moved, &standing)));
     }
 
+    crate::screening::leaving(ctx, &manifest, &member.id).await;
     if server.withdraw(&member.id).await.is_err() {
         return Err(Box::new(would_not_remove(&member.name)));
     }

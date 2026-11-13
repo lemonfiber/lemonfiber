@@ -138,7 +138,7 @@ impl std::fmt::Debug for GrantReport {
         f.debug_struct("GrantReport")
             .field("member", &self.member)
             .field("granted", &self.granted)
-            .field("token", &self.token.as_ref().map(|_| "<withheld>"))
+            .field("token", &withheld(self.token.as_ref()))
             .field("lasts_until", &self.lasts_until)
             .field("rehearsed", &self.rehearsed)
             .finish()
@@ -157,3 +157,110 @@ pub struct WatchedReport {
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
+
+/// The live TV channels one member may watch, each with the programme on it now.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct ChannelsReport {
+    /// The member this was asked for, by the name they are known by.
+    pub member: String,
+    /// The identifier the media server files them under.
+    pub id: String,
+    /// Each channel their own account may watch whose programme now is within their
+    /// limits. Empty where their account may not watch live TV.
+    pub channels: Vec<crate::ports::service::Channel>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    pub rehearsed: bool,
+}
+
+/// A channel's live stream opened for a member, where its bytes are served at the
+/// guarded front door, each on a pass for that live stream and that member.
+#[derive(Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct TunedReport {
+    /// The channel, by the identifier the channels list gives it.
+    pub channel: String,
+    /// The member it is opened for, by the name they are known by.
+    pub member: String,
+    /// The live stream a renewal or a stop names.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<String>,
+    /// Where the tuner's own stream is served, carrying its pass.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direct: Option<String>,
+    /// Where a transcoded playlist of it is served, carrying its pass.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcoded: Option<String>,
+    /// SHA-256 over the certificate the door presents, lower-case hex, which a client
+    /// pins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+    /// When the passes lapse, in whole seconds since the Unix epoch. A client asks for
+    /// new ones before then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lapses: Option<u64>,
+    /// Why nothing is located, where nothing is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unlocated: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    pub rehearsed: bool,
+}
+
+/// Written by hand so no pass is ever in what is debugged or logged.
+impl std::fmt::Debug for TunedReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TunedReport")
+            .field("channel", &self.channel)
+            .field("member", &self.member)
+            .field("stream", &self.stream)
+            .field("direct", &withheld(self.direct.as_ref()))
+            .field("transcoded", &withheld(self.transcoded.as_ref()))
+            .field("fingerprint", &self.fingerprint)
+            .field("lapses", &self.lapses)
+            .field("unlocated", &self.unlocated)
+            .field("rehearsed", &self.rehearsed)
+            .finish()
+    }
+}
+
+/// Where one title plays from in a member's browser, at the stack's front door, on a
+/// pass sealing a session on their own account.
+#[derive(Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct PlayReport {
+    /// The title or episode, by the identifier the shelf lists it under.
+    pub id: String,
+    /// The member it plays as, by the name they are known by.
+    pub member: String,
+    /// The playlist it plays from at the front door, carrying its pass.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_from: Option<String>,
+    /// When the pass lapses, in whole seconds since the Unix epoch. A browser hands it
+    /// back for a new one before then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lapses: Option<u64>,
+    /// Why nothing is located, where nothing is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unlocated: Option<String>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    pub rehearsed: bool,
+}
+
+/// Written by hand so no pass is ever in what is debugged or logged.
+impl std::fmt::Debug for PlayReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlayReport")
+            .field("id", &self.id)
+            .field("member", &self.member)
+            .field("stream_from", &withheld(self.stream_from.as_ref()))
+            .field("lapses", &self.lapses)
+            .field("unlocated", &self.unlocated)
+            .field("rehearsed", &self.rehearsed)
+            .finish()
+    }
+}
+
+/// What a secret is written as where it is debugged: that one is there, and nothing of it.
+fn withheld(secret: Option<&String>) -> Option<&'static str> {
+    secret.map(|_| WITHHELD)
+}
+
+/// What stands for a secret where it is debugged.
+pub const WITHHELD: &str = "<withheld>";

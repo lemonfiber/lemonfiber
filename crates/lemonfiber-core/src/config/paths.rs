@@ -119,6 +119,8 @@ pub(crate) const HELD_BACK: &str = "held-back.json";
 pub(crate) const REPAIRS: &str = "repairs.json";
 /// The last day each member's client spoke to the media server.
 pub(crate) const GRANTS: &str = "grants.json";
+/// Each live stream the core opened for a member, until it is closed.
+pub(crate) const TUNED: &str = "tuned.json";
 /// What is wrong, and since when.
 pub(crate) const CONDITIONS: &str = "conditions.json";
 

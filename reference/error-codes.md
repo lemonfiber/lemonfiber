@@ -317,6 +317,9 @@ what to do about it, is in `contract/codes.json` and written for operators at
 | `PLAY-7` | `NOT_IN_THE_HOUSEHOLD` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. |
 | `PLAY-8` | `SIGNS_NO_DEVICE_IN` | error | 1 | 503 | 0.18.0 | Said where the media server will not sign a device in by code. |
 | `PLAY-9` | `NO_SUCH_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title on the member's shelf has no picture of the kind asked for. |
+| `PLAY-10` | `NO_LIVE_TV` | error | 1 | 404 | 0.19.0 | Said where the member's own account may not watch live TV, or the server has none. |
+| `PLAY-11` | `NOT_THEIR_STREAM` | error | 1 | 404 | 0.19.0 | Said where the live stream named is not one the core opened for this member. |
+| `PLAY-12` | `NOT_THEIR_PASS` | error | 1 | 403 | 0.19.0 | Said where the pass handed back does not open for this member and title. |
 
 ## `PLUGIN` — installing and running plugins
 

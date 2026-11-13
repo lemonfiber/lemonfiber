@@ -1,0 +1,43 @@
+{
+  "action": "play",
+  "arguments": [
+    {
+      "name": "device",
+      "type": {
+        "default": null,
+        "description": "The id a player keeps for the device it plays on, which a grant opens a session\nfor.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "id",
+      "type": {
+        "default": null,
+        "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "pass",
+      "type": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Handed"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The pass a browser holds, handed back for a new one around the same session."
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

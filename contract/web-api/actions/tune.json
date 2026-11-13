@@ -1,0 +1,40 @@
+{
+  "action": "tune",
+  "arguments": [
+    {
+      "name": "id",
+      "type": {
+        "default": null,
+        "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "stream",
+      "type": {
+        "default": null,
+        "description": "The live stream a renewal or a stop names, as a channel opened for the member\nanswered it.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    {
+      "name": "stop",
+      "type": {
+        "default": null,
+        "description": "Whether to close the live stream named rather than renew its passes.",
+        "type": [
+          "boolean",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}
