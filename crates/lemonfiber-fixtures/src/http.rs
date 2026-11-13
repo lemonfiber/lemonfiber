@@ -13,6 +13,8 @@
 //! `200` would hide it.
 
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -50,6 +52,8 @@ pub enum Answer {
     },
     /// Nothing at all — the service is not there.
     Silent,
+    /// No answer, ever: the request is still waiting when whoever sent it gives up.
+    Hanging,
 }
 
 impl Answer {
@@ -83,7 +87,16 @@ enum Script {
     /// By what was asked for: the first route whose fragment the URL contains,
     /// and whose method matches where one was given.
     ByRoute(Vec<Route>),
+    /// Handed to a test's own function, for a transport that carries a request somewhere
+    /// in process rather than answering from a table.
+    Handed(Handler),
 }
+
+/// What a transport handed to a test's own function answers with.
+pub type Handled = Pin<Box<dyn Future<Output = Result<Response, Unreachable>> + Send>>;
+
+/// A test's own function answering each request.
+type Handler = Box<dyn Fn(Request) -> Handled + Send + Sync>;
 
 /// One route of a fake answering by what was asked for.
 struct Route {
@@ -158,6 +171,18 @@ impl Fake {
     #[must_use]
     pub fn silent() -> Arc<Self> {
         Self::always(Answer::Silent)
+    }
+
+    /// No answer to anything, ever.
+    #[must_use]
+    pub fn hanging() -> Arc<Self> {
+        Self::always(Answer::Hanging)
+    }
+
+    /// Each request handed to `handler`, which answers it.
+    #[must_use]
+    pub fn handing(handler: impl Fn(Request) -> Handled + Send + Sync + 'static) -> Arc<Self> {
+        Self::new(Script::Handed(Box::new(handler)))
     }
 
     /// Each answer in turn.
@@ -295,7 +320,7 @@ impl Fake {
         })
     }
 
-    /// What this script says to this request.
+    /// What this script says to this request, where a table says it.
     fn answer(&self, request: &Request) -> Answer {
         match &self.script {
             Script::Always(answer) => answer.clone(),
@@ -308,6 +333,7 @@ impl Fake {
                 .iter()
                 .find(|route| route.answers(request))
                 .map_or(Answer::Silent, |route| route.replies.answer()),
+            Script::Handed(_) => Answer::Silent,
         }
     }
 }
@@ -316,7 +342,13 @@ impl Fake {
 impl Http for Fake {
     async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
         crate::noted(&self.seen, request.clone());
-        answered(self.answer(request), request)
+        if let Script::Handed(handler) = &self.script {
+            return handler(request.clone()).await;
+        }
+        match self.answer(request) {
+            Answer::Hanging => std::future::pending().await,
+            answer => answered(answer, request),
+        }
     }
 }
 
@@ -346,7 +378,7 @@ fn answered(answer: Answer, request: &Request) -> Result<Response, Unreachable> 
             headers,
             body,
         }),
-        Answer::Silent => Err(Unreachable {
+        Answer::Silent | Answer::Hanging => Err(Unreachable {
             url: request.url.clone(),
             reason: "connection refused".to_owned(),
             attempts: 1,
