@@ -413,6 +413,12 @@ fn undone(undo: &Undo) -> String {
             "grabbed the dropped release of {} title {title} again",
             kind.media_type()
         ),
+        Action::Unask {
+            unit, reference, ..
+        } => format!(
+            "asked the curator to remove the {} {reference}",
+            unit.noun()
+        ),
         Action::Run {
             service,
             running: true,

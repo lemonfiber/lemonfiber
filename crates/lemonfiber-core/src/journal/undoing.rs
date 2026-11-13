@@ -46,6 +46,18 @@ impl Action {
         }
     }
 
+    /// Ask a curator to remove the `unit` it holds as `reference`, and take the ask kept as
+    /// `kept` off the household list; nothing where it held some of it before, `whole`
+    /// saying it held none.
+    fn unask(unit: crate::collected::Unit, reference: &str, kept: &str, whole: bool) -> Self {
+        Self::Unask {
+            unit,
+            reference: reference.to_owned(),
+            kept: kept.to_owned(),
+            whole,
+        }
+    }
+
     /// Put `field` of the service's `resource` `id` back to `value`.
     fn reconfigure(resource: &str, id: &str, field: &str, value: Option<&str>) -> Self {
         Self::Reconfigure {
@@ -228,12 +240,7 @@ impl Change {
                 reference,
                 kept,
                 whole,
-            } => Action::Unask {
-                unit: *unit,
-                reference: reference.clone(),
-                kept: kept.clone(),
-                whole: *whole,
-            },
+            } => Action::unask(*unit, reference, kept, *whole),
         }
     }
 }

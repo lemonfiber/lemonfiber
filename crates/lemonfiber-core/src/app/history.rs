@@ -200,16 +200,22 @@ fn did(kind: &Kind) -> String {
             reference,
             kept,
             whole,
-        } => format!(
-            "asked for the {} {reference}, kept as {kept}{}",
-            unit.noun(),
-            if *whole {
-                ""
-            } else {
-                ", the rest of what the house held in part, which undoing leaves as it is"
-            }
-        ),
+        } => asked(*unit, reference, kept, *whole),
     }
+}
+
+/// An ask sent to a curator for the `unit` it holds as `reference`, kept as `kept`;
+/// `whole` where the house held none of it before.
+fn asked(unit: crate::collected::Unit, reference: &str, kept: &str, whole: bool) -> String {
+    let rest = if whole {
+        ""
+    } else {
+        ", the rest of what the house held in part, which undoing leaves as it is"
+    };
+    format!(
+        "asked for the {} {reference}, kept as {kept}{rest}",
+        unit.noun()
+    )
 }
 
 #[cfg(test)]
