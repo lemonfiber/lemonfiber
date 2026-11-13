@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use schemars::Schema;
 use serde_json::{json, Value};
 
-use lemonfiber_api::contract::{Contract, INDEX};
+use lemonfiber_api::contract::{Contract, Events, Said, INDEX};
+use lemonfiber_api::events::wire::{Audience, Nature};
 
 /// A contract holding only the kinds given, each as the schema given.
 fn holding(kinds: &[(&str, Value)]) -> Contract {
@@ -13,6 +14,10 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
         api_version: 7,
         actions: Vec::new(),
         bodies: BTreeMap::new(),
+        events: Events {
+            heartbeat_seconds: 15,
+            kinds: BTreeMap::new(),
+        },
         key_callable: Vec::new(),
         kinds: kinds
             .iter()
@@ -250,4 +255,65 @@ fn a_body_is_filed_under_its_route_with_its_definitions_shared() {
         Some(&json!("../defs/Choice.json"))
     );
     assert!(files.contains_key("defs/Choice.json"));
+}
+
+/// `contract` saying one kind of event, in the envelope `schema` describes.
+fn saying(mut contract: Contract, kind: &str, schema: Value) -> Contract {
+    let Ok(schema) = Schema::try_from(schema) else {
+        unreachable!("every schema here is an object");
+    };
+    contract.events.kinds.insert(
+        kind.to_owned(),
+        Said {
+            nature: Nature::Record,
+            audience: Audience::Operator,
+            schema,
+        },
+    );
+    contract
+}
+
+#[test]
+fn an_event_is_listed_in_the_index_at_the_file_its_kind_is_described_in() {
+    let contract = saying(
+        holding(&[("alert", carrying_remedy())]),
+        "alert",
+        carrying_remedy(),
+    );
+    let Ok(files) = contract.files() else {
+        unreachable!("an event its kind describes alike is the ordinary case");
+    };
+    assert_eq!(
+        file(&files, INDEX).pointer("/events"),
+        Some(&json!({
+            "heartbeat_seconds": 15,
+            "kinds": {
+                "alert": { "schema": "kinds/alert.json", "nature": "record", "audience": "operator" }
+            }
+        }))
+    );
+}
+
+#[test]
+fn an_event_no_kind_describes_cannot_be_written() {
+    let contract = saying(holding(&[]), "alert", carrying_remedy());
+    let faults = contract.files().err().unwrap_or_default();
+    assert_eq!(
+        only(&faults),
+        "the stream says alert, and no kind describes the envelope it is said in"
+    );
+}
+
+#[test]
+fn an_event_its_kind_describes_otherwise_cannot_be_written() {
+    let contract = saying(
+        holding(&[("alert", carrying_remedy())]),
+        "alert",
+        json!({ "$schema": DIALECT, "type": "string" }),
+    );
+    let faults = contract.files().err().unwrap_or_default();
+    assert_eq!(
+        only(&faults),
+        "the stream says alert, and no kind describes the envelope it is said in"
+    );
 }

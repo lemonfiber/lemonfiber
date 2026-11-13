@@ -22,7 +22,7 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use super::live::Gathers;
-use super::wire::{Nature, Rendered};
+use super::wire::{EventKind, Rendered};
 use crate::admission::Caller;
 use crate::entitled::{their_household, their_playing, their_shelf};
 use crate::read::table::A_SHELF;
@@ -137,7 +137,8 @@ impl Theirs {
             Ok(outcome) => outcome,
             Err(_) => reading.unread(),
         };
-        Rendered::of(Nature::State, &outcome.envelope())
+        let event = reading.event();
+        Rendered::of(event, &outcome).filter(|_| outcome.kind() == event.kind())
     }
 }
 
@@ -153,6 +154,15 @@ enum Reading {
 }
 
 impl Reading {
+    /// The kind of event the reading is said as.
+    const fn event(self) -> EventKind {
+        match self {
+            Self::Household => EventKind::Household,
+            Self::Held => EventKind::Held,
+            Self::Playing => EventKind::Playing,
+        }
+    }
+
     /// The command narrowed to `member`, by the same functions that narrow it when the
     /// member asks for it themselves.
     fn theirs(self, member: &str) -> Command {

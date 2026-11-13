@@ -19,6 +19,7 @@ fn the_committed_documents_are_what_the_types_generate() {
     }
     let mut committed: Vec<String> = Vec::new();
     collect(&root, &root, &mut committed);
+    committed.retain(|path| path != crate::released::RELEASED);
     committed.sort();
     let mut expected: Vec<String> = generated.into_iter().map(|(path, _)| path).collect();
     expected.sort();

@@ -21,12 +21,11 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::walkthrough::{Line, Narrator};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use super::live::Live;
-use super::wire::{Nature, Rendered};
+use super::wire::{EventKind, Rendered};
 
 /// A walk, speaking onto the one stream this run keeps.
 pub struct Stepping(UnboundedSender<Line>);
@@ -97,10 +96,7 @@ impl Carrying {
             // client that missed one has a hole in the walk rather than an
             // out-of-date figure. The newest step does not describe the ones before
             // it, which is exactly what a wait's own narration does describe.
-            let said = Rendered::of(
-                Nature::Record,
-                &Envelope::new(kind::STEP, &line).said_by(self.job.as_deref()),
-            );
+            let said = Rendered::said_by(EventKind::Step, &line, self.job.as_deref());
             self.live.say_if_rendered(said).await;
         }
     }

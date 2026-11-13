@@ -15,6 +15,7 @@ use serde_json::Value;
 use super::layout::{rendered, Files};
 use super::path::INDEX;
 use super::Contract;
+use crate::events::wire::{Audience, Nature};
 
 /// Where the kinds are, inside the contract's directory.
 const KINDS: &str = "kinds";
@@ -43,6 +44,26 @@ const REFUSALS: &str = "refusals";
 /// The one reference form `schemars` writes: a definition carried beside the schema.
 const LOCAL: &str = "#/$defs/";
 
+/// One kind of event, as the index lists it.
+#[derive(Debug, Serialize)]
+struct Event {
+    /// The file holding the schema of the envelope it is said in.
+    schema: String,
+    /// Whether a newer event of this kind replaces an older one.
+    nature: Nature,
+    /// Who on the shared stream hears it.
+    audience: Audience,
+}
+
+/// The event stream, as the index describes it.
+#[derive(Debug, Serialize)]
+struct Events {
+    /// The longest the stream says nothing before it says it is still there, in seconds.
+    heartbeat_seconds: u64,
+    /// Each kind of event, to what it is.
+    kinds: BTreeMap<String, Event>,
+}
+
 /// What the index says: the wire version, and where everything else is.
 #[derive(Debug, Serialize)]
 struct Index {
@@ -52,6 +73,8 @@ struct Index {
     actions: BTreeMap<String, String>,
     /// Each route that takes a body, to the file describing that body.
     bodies: BTreeMap<String, String>,
+    /// The event stream.
+    events: Events,
     /// The file listing every action a key may call.
     key_callable: &'static str,
     /// `kind` to the file holding the schema of the envelope carrying it.
@@ -123,6 +146,7 @@ impl Contract {
             api_version: self.api_version,
             actions,
             bodies,
+            events: self.events_listed(&kinds, &mut faults),
             key_callable: KEY_CALLABLE,
             kinds,
             reads: READS,
@@ -138,7 +162,35 @@ impl Contract {
     }
 }
 
-/// One file into the set.
+impl Contract {
+    /// The event stream as the index lists it, each kind pointed at the file its kind is
+    /// described in; a kind of event no kind describes, or describes otherwise, is a fault.
+    fn events_listed(&self, kinds: &BTreeMap<String, String>, faults: &mut Vec<String>) -> Events {
+        let mut listed = BTreeMap::new();
+        for (kind, said) in &self.events.kinds {
+            match (self.kinds.get(kind), kinds.get(kind)) {
+                (Some(described), Some(path)) if *described == said.schema => {
+                    listed.insert(
+                        kind.clone(),
+                        Event {
+                            schema: path.clone(),
+                            nature: said.nature,
+                            audience: said.audience,
+                        },
+                    );
+                }
+                _ => faults.push(format!(
+                    "the stream says {kind}, and no kind describes the envelope it is said in"
+                )),
+            }
+        }
+        Events {
+            heartbeat_seconds: self.events.heartbeat_seconds,
+            kinds: listed,
+        }
+    }
+}
+
 /// `refusals` by the code family each belongs to, the part of its code before the dash.
 fn by_family<T>(refusals: &BTreeMap<String, T>) -> BTreeMap<&str, BTreeMap<&str, &T>> {
     let mut families: BTreeMap<&str, BTreeMap<&str, &T>> = BTreeMap::new();
@@ -204,6 +256,7 @@ impl Held<'_> {
     }
 }
 
+/// One file into the set.
 fn put<T: Serialize + ?Sized>(files: &mut Files, path: &str, value: &T) {
     files.insert(path.to_owned(), rendered(value));
 }

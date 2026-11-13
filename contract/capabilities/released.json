@@ -1,0 +1,291 @@
+{
+  "capabilities": {
+    "archive.extract": {
+      "1": [
+        "watch",
+        "working"
+      ]
+    },
+    "books.curate": {
+      "1": [
+        "candidate",
+        "lookup",
+        "profiles",
+        "request"
+      ]
+    },
+    "dashboard.show": {
+      "1": [
+        "apply",
+        "panels"
+      ]
+    },
+    "download.torrent": {
+      "1": [
+        "file_under",
+        "filed",
+        "moved",
+        "moving",
+        "peer_port",
+        "pulling",
+        "restrain",
+        "resume",
+        "seeding",
+        "set_peer_port",
+        "stop",
+        "stop_seeding",
+        "throttled",
+        "transfers"
+      ]
+    },
+    "download.usenet": {
+      "1": [
+        "accounts",
+        "file_under",
+        "filed",
+        "moved",
+        "moving",
+        "pulling",
+        "restrain",
+        "resume",
+        "stop",
+        "throttled",
+        "transfers"
+      ]
+    },
+    "identity.source": {
+      "1": [
+        "allow",
+        "claim",
+        "claimable",
+        "country",
+        "create_admin",
+        "household",
+        "invite",
+        "libraries",
+        "ratings",
+        "replace_admin_password",
+        "sessions",
+        "signs_devices_in",
+        "standing",
+        "startup_completed",
+        "suspend",
+        "unclaim",
+        "when_invited",
+        "whoever",
+        "withdraw"
+      ]
+    },
+    "indexer.proxy": {
+      "1": [
+        "answers",
+        "solve"
+      ]
+    },
+    "indexer.pull": {
+      "1": [
+        "add_aggregator",
+        "aggregators"
+      ]
+    },
+    "indexer.search": {
+      "1": [
+        "add_aggregator",
+        "aggregators",
+        "applications",
+        "indexers",
+        "register_application",
+        "rekey_application",
+        "test_application"
+      ]
+    },
+    "invite.decline": {
+      "1": [
+        "apply_invitations",
+        "held",
+        "hold",
+        "lapses",
+        "page",
+        "refusals"
+      ]
+    },
+    "library.curate": {
+      "1": [
+        "add",
+        "add_plan",
+        "apply_music_format",
+        "carry",
+        "catalogued",
+        "download_clients",
+        "downloading",
+        "events",
+        "find_items",
+        "grab",
+        "hardlinks",
+        "held_title",
+        "identity",
+        "indexer_count",
+        "item_history",
+        "item_parts",
+        "item_queue",
+        "library",
+        "lookup",
+        "probe_releases",
+        "quality_profiles",
+        "queue",
+        "records",
+        "register_download_client",
+        "register_root_folder",
+        "remove",
+        "request",
+        "root_folders",
+        "search",
+        "search_upgrades",
+        "set_client_field",
+        "set_hardlinks",
+        "stuck_items",
+        "test_download_clients",
+        "titles",
+        "unqueue",
+        "update_download_client",
+        "wanting"
+      ]
+    },
+    "media.serve": {
+      "1": [
+        "account",
+        "allow_only",
+        "allowed_origins",
+        "answers_to",
+        "astray",
+        "dated",
+        "declared",
+        "events",
+        "filed_as",
+        "furnish",
+        "has_item",
+        "holdings",
+        "known_proxies",
+        "listed_as",
+        "mint",
+        "part_way",
+        "picture",
+        "playing",
+        "progressed",
+        "refresh",
+        "rescan",
+        "restart",
+        "revoke",
+        "series_held",
+        "serve_tls",
+        "sign_out",
+        "signed_in",
+        "title",
+        "trust_only"
+      ]
+    },
+    "music.curate": {
+      "1": [
+        "candidate",
+        "lookup",
+        "profiles",
+        "request"
+      ]
+    },
+    "network.egress-guard": {
+      "1": [
+        "forwarded",
+        "secure",
+        "up"
+      ]
+    },
+    "owner.claim": {
+      "1": [
+        "claim",
+        "claimed_by",
+        "owner"
+      ]
+    },
+    "proxy.front": {
+      "1": [
+        "apply",
+        "reload",
+        "routing"
+      ]
+    },
+    "quality.sync": {
+      "1": [
+        "applied",
+        "apply",
+        "edited",
+        "reapply"
+      ]
+    },
+    "request.gate": {
+      "1": [
+        "admit",
+        "admit_tokens",
+        "admitted",
+        "record"
+      ]
+    },
+    "request.intake": {
+      "1": [
+        "add_fulfilment_target",
+        "answers",
+        "approval_first",
+        "approves_own",
+        "ask",
+        "asking",
+        "configure_identity",
+        "decide",
+        "detail",
+        "establish",
+        "fulfilment_targets",
+        "hold_requests",
+        "initialized",
+        "left",
+        "link_media_server",
+        "link_members",
+        "media_server_link",
+        "member_for",
+        "minted_as",
+        "move_fulfilment_target",
+        "reachable",
+        "release_requests",
+        "remove_member",
+        "requesting",
+        "requests",
+        "search",
+        "set_asking",
+        "set_notices",
+        "set_quota",
+        "tell",
+        "telling",
+        "test_fulfilment_target"
+      ]
+    },
+    "status.watch": {
+      "1": [
+        "check_in",
+        "monitors",
+        "provision",
+        "reachable",
+        "retire"
+      ]
+    },
+    "stream.guard": {
+      "1": [
+        "certificate",
+        "guard",
+        "guarding"
+      ]
+    },
+    "subtitles.fetch": {
+      "1": [
+        "watch",
+        "watching"
+      ]
+    }
+  }
+}

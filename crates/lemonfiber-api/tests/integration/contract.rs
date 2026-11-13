@@ -5,8 +5,10 @@
 //! consumer relies on never loses anything under an unchanged wire version.
 
 mod definitions;
+mod openapi;
 mod reads;
 mod refusals;
+mod released;
 mod samples;
 mod split;
 mod surface;
@@ -17,6 +19,7 @@ use serde_json::Value;
 
 use lemonfiber_api::contract::layout::{self, Files};
 use lemonfiber_api::contract::{Contract, CONTRACT_DIR};
+use lemonfiber_api::events::wire::{EventKind, BEAT};
 use lemonfiber_core::app::Outcome;
 
 use samples::samples;
@@ -201,6 +204,40 @@ fn every_file_is_reached_from_the_index() {
         .filter(|path| !reached.contains(*path))
         .collect();
     assert!(unreached.is_empty(), "nothing reaches these: {unreached:?}");
+}
+
+#[test]
+fn the_index_describes_every_kind_of_event_the_stream_says_and_its_heartbeat() {
+    let files = fresh();
+    let index: Value = files
+        .get(lemonfiber_api::contract::INDEX)
+        .and_then(|text| serde_json::from_str(text).ok())
+        .unwrap_or_default();
+    let listed: Vec<&str> = index
+        .pointer("/events/kinds")
+        .and_then(Value::as_object)
+        .map(|kinds| kinds.keys().map(String::as_str).collect())
+        .unwrap_or_default();
+    let mut said: Vec<&str> = EventKind::ALL
+        .iter()
+        .map(|event| event.kind().as_str())
+        .collect();
+    said.sort_unstable();
+    assert_eq!(listed, said);
+    assert_eq!(
+        index
+            .pointer("/events/heartbeat_seconds")
+            .and_then(Value::as_u64),
+        Some(BEAT.as_secs())
+    );
+    assert_eq!(
+        index.pointer("/events/kinds/settings/audience"),
+        Some(&Value::from("operator"))
+    );
+    assert_eq!(
+        index.pointer("/events/kinds/alert/nature"),
+        Some(&Value::from("record"))
+    );
 }
 
 /// The contract and the emitters must name the same set of kinds.

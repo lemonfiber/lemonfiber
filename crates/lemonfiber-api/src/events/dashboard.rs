@@ -29,7 +29,6 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
 use lemonfiber_core::dashboard::run::{paced, Gathered};
 use lemonfiber_core::dashboard::{Panel, Snapshot};
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::news::{Newest, News};
 use tokio::sync::Mutex;
 
@@ -38,7 +37,7 @@ use tokio::time::Instant;
 
 use super::live::Gathers;
 use super::theirs::{due, playing_unread, PLAYING_EVERY};
-use super::wire::{Nature, Rendered};
+use super::wire::{EventKind, Rendered};
 
 /// The dashboard's gather, as the stream's source.
 pub struct Dashboard {
@@ -96,10 +95,9 @@ async fn gathered(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
     let mut last = dashboard.last.lock().await;
     let gathered = paced(&dashboard.ctx, last.as_ref()).await;
     let snapshot = &gathered.snapshot;
-    let mut said: Vec<Rendered> =
-        Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, snapshot))
-            .into_iter()
-            .collect();
+    let mut said: Vec<Rendered> = Rendered::of(EventKind::Dashboard, snapshot)
+        .into_iter()
+        .collect();
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
     dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
@@ -134,7 +132,7 @@ async fn alerted(dashboard: &Dashboard, alerts: &[Alert]) -> Vec<Rendered> {
                     .as_ref()
                     .is_some_and(|id| !before.contains(&(id.clone(), alert.moment)))
             })
-            .filter_map(|alert| Rendered::of(Nature::Record, &Envelope::new(kind::ALERT, alert)))
+            .filter_map(|alert| Rendered::of(EventKind::Alert, alert))
             .collect()
     });
     *alerted = Some(carried);
@@ -156,7 +154,8 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
     let outcome = dispatch(Command::Playing { member: None }, &dashboard.ctx)
         .await
         .unwrap_or_else(|_| playing_unread());
-    let rendered = Rendered::of(Nature::State, &outcome.envelope())?;
+    let rendered = Rendered::of(EventKind::Playing, &outcome)
+        .filter(|_| outcome.kind() == EventKind::Playing.kind())?;
     let previous = heard.1.replace(rendered.said().to_owned());
     (joined || previous.as_deref() != Some(rendered.said())).then_some(rendered)
 }
@@ -181,7 +180,7 @@ async fn newly(dashboard: &Dashboard, snapshot: &Snapshot, joined: bool) -> Opti
     if !joined && told.as_ref() == Some(&newest) {
         return None;
     }
-    let rendered = Rendered::of(Nature::State, &Envelope::new(kind::NEWS, &newest));
+    let rendered = Rendered::of(EventKind::News, &newest);
     *told = Some(newest);
     rendered
 }
