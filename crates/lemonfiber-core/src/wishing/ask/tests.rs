@@ -667,3 +667,33 @@ fn a_film_counts_one_and_a_series_one_for_each_season_or_one_asked_whole() {
     assert_eq!(counted(Kind::Tv, &[1, 2, 3]), 3);
     assert_eq!(counted(Kind::Tv, &[]), 1);
 }
+
+/// Every sentence an ask can come to names no service, size, address or state of the
+/// house, whatever it came to, whether it was rehearsed and whatever room it leaves.
+#[test]
+fn every_sentence_an_ask_comes_to_is_in_the_households_words() {
+    let leaves = [
+        LeftAfter::default(),
+        LeftAfter {
+            films: Some(0),
+            television: Some(1),
+            music: Some(2),
+            books: Some(3),
+        },
+    ];
+    for outcome in [Became::Asked, Became::Waiting, Became::OnItsWay] {
+        for released in [false, true] {
+            for rehearsed in [false, true] {
+                for left in &leaves {
+                    let sentence = said(outcome, released, left, rehearsed);
+                    assert_eq!(
+                        crate::error::household::unhoused(&sentence),
+                        None,
+                        "{sentence}"
+                    );
+                }
+            }
+        }
+    }
+    assert_eq!(crate::error::household::unhoused(super::ON_ITS_WAY), None);
+}

@@ -25,9 +25,8 @@ use axum::body::Body;
 use axum::http::{Response, StatusCode};
 use lemonfiber_core::error::codes::{admit, ask, read, serve};
 use lemonfiber_core::error::{Code, Problem, Remedy};
-use lemonfiber_core::model::{kind, Envelope};
 
-use crate::read::{answered_with, enveloped};
+use crate::read::answered_with;
 
 /// Why a request was not answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -447,7 +446,7 @@ impl Refusal {
     /// A problem this refusal raised, answered at this refusal's status.
     #[must_use]
     pub fn answer(self, problem: Problem) -> Response<Body> {
-        enveloped(self.status(), Envelope::new(kind::ERROR, problem).to_json())
+        crate::spoken::refused(self.status(), problem)
     }
 }
 

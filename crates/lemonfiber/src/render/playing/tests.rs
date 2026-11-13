@@ -84,7 +84,10 @@ fn nobody_watching_and_an_unread_server_read_differently() {
     assert!(quiet.contains("Nothing is playing"), "{quiet}");
 
     let unread = shown(&PlayingReport {
-        findings: vec!["the media server would not say".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "the media server would not say",
+        )],
         ..PlayingReport::default()
     });
     assert!(!unread.contains("Nothing is playing"), "{unread}");

@@ -42,6 +42,8 @@ use axum::routing::post;
 use axum::{Json, Router};
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
 use lemonfiber_core::app::{Command, Ctx, Restoring, Setting, Waiting};
+use lemonfiber_core::notify::configuring::Asked as Notifying;
+use lemonfiber_core::push::run::Asked as Pushing;
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
@@ -51,6 +53,7 @@ use crate::jobs::Job;
 use crate::read::rendered;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::spoken::Audience;
 use again::{Answer, Asked, Claim, Key};
 
 pub use asked::{
@@ -117,6 +120,8 @@ pub const fn answering(command: &Command) -> Answering {
         // A member's ask is a few questions to the request service, answered to the
         // member, who could not redeem a job's name.
         | Command::Wish(_)
+        | Command::Notify(Notifying::Choose { .. })
+        | Command::PushEndpoints(Pushing::Woken { .. })
         | Command::Restore(Restoring {
             consent: RestoreConsent::List,
             ..
@@ -194,6 +199,7 @@ async fn taken(
         command,
         ctx,
         job,
+        audience: Audience::of(&caller),
     };
     let Some(key) = key else {
         return carrying.out(&serving).await.reply();
@@ -226,6 +232,8 @@ struct Carrying {
     ctx: Arc<Ctx>,
     /// The name the work runs under, where it is answered with one.
     job: Option<Job>,
+    /// Who the answer is worded for.
+    audience: Audience,
 }
 
 impl Carrying {
@@ -233,7 +241,7 @@ impl Carrying {
     async fn out(self, serving: &Serving) -> Answer {
         match self.job {
             None => {
-                let (status, body) = rendered(&self.ctx, self.command).await;
+                let (status, body) = rendered(&self.ctx, self.command, self.audience).await;
                 Answer::Now(status, body)
             }
             Some(job) => {

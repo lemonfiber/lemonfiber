@@ -8,6 +8,7 @@ codes! {
             only knowable by doing it, so a rehearsal would be a report with nothing in it. \
             Nothing was done. The message says which command and why.",
         remedy: "Run the command without --dry-run when you mean it.",
+        household: fault,
     }
     /// The flag is not honoured by this command yet.
     NOT_YET = "REHEARSE-2" {
@@ -18,5 +19,6 @@ codes! {
             change, so it refuses the flag rather than accepting it and going ahead. Nothing was \
             done.",
         remedy: "Run the command without --dry-run when you mean it, or wait for it.",
+        household: fault,
     }
 }

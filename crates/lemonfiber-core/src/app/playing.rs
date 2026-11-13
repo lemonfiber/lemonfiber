@@ -9,6 +9,8 @@
 
 use super::targets::media;
 use super::{Ctx, Outcome};
+use crate::error::codes::play::{NOTHING_TO_PLAY_FROM, NOT_IN_THE_HOUSEHOLD, SERVER_SILENT};
+use crate::error::household::Obstacle;
 use crate::error::{Diagnose, Problem};
 use crate::model::{Playback, PlayingReport};
 use crate::ports::service::{Failure, Member, Playback as Session};
@@ -31,6 +33,7 @@ pub(crate) async fn playing(
     let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             member,
+            NOTHING_TO_PLAY_FROM,
             "there is no media server to ask what is playing, or it cannot be asked over \
              its contracts",
         ));
@@ -43,6 +46,7 @@ pub(crate) async fn playing(
     let Ok(accounts) = server.identity.household().await else {
         return Ok(unread(
             Some(member),
+            SERVER_SILENT,
             "the media server would not say who holds an account, so whose sessions these \
              are could not be established",
         ));
@@ -51,6 +55,7 @@ pub(crate) async fn playing(
     let Some(account) = account(&accounts, member) else {
         return Ok(unread(
             Some(member),
+            NOT_IN_THE_HOUSEHOLD,
             "nobody in this household is known by that, so there is nobody to say is \
              watching — which is not the same as somebody watching nothing",
         ));
@@ -79,11 +84,11 @@ fn answered(answered: Result<Vec<Session>, Failure>, member: String) -> PlayingR
     let Ok(sessions) = answered else {
         return PlayingReport {
             member,
-            findings: vec![
+            findings: vec![Obstacle::new(
+                SERVER_SILENT,
                 "the media server would not say what it is playing, so this is reported as \
-                 unread rather than as nobody watching"
-                    .to_owned(),
-            ],
+                 unread rather than as nobody watching",
+            )],
             ..PlayingReport::default()
         };
     };
@@ -105,10 +110,10 @@ fn account<'a>(accounts: &'a [Member], named: &str) -> Option<&'a Member> {
 }
 
 /// A reading that could not be made, said as that rather than as nobody watching.
-fn unread(member: Option<&str>, why: &str) -> PlayingReport {
+fn unread(member: Option<&str>, code: crate::error::Code, why: &str) -> PlayingReport {
     PlayingReport {
         member: member.unwrap_or_default().to_owned(),
-        findings: vec![why.to_owned()],
+        findings: vec![Obstacle::new(code, why)],
         ..PlayingReport::default()
     }
 }

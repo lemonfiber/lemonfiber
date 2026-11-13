@@ -8,6 +8,7 @@ codes! {
             Usually something else on this machine is already listening there.",
         remedy: "Ask for a different port with lemonfiber ui --port 7171, or name no port at \
             all and be given a free one.",
+        household: fault,
     }
     /// Raised when this machine will not supply the randomness a token is made of.
     NO_TOKEN = "SERVE-2" {
@@ -19,6 +20,7 @@ codes! {
             unpredictable bytes it is made of.",
         remedy: "Run it again. If it happens twice, the operating system's own random source is \
             at fault.",
+        household: fault,
     }
     /// Raised when the network was asked for and nothing here can say who is knocking.
     NO_PASSWORD = "SERVE-3" {
@@ -31,6 +33,7 @@ codes! {
             that.",
         remedy: "Set a password and ask again, with lemonfiber ui --set-password --lan. Or \
             leave it as it is, and reach it from this machine.",
+        household: fault,
     }
     /// Raised when serving encrypted was asked for with no port that stays the same.
     UNSETTLED_PORT = "SERVE-4" {
@@ -41,6 +44,7 @@ codes! {
             paired phone, and a phone keeps the address it was given, so a port chosen afresh on \
             every run is one it would stop reaching the next time this started.",
         remedy: "Name the port, as in lemonfiber ui --tls --port <port>.",
+        household: fault,
     }
     /// Raised when the certificate to serve encrypted with cannot be read or made.
     NO_CERTIFICATE = "SERVE-5" {
@@ -52,6 +56,7 @@ codes! {
             which.",
         remedy: "Replace the certificate with lemonfiber companion certificate --confirm, \
             knowing every paired phone will need pairing again.",
+        household: fault,
     }
     /// Raised when an answer could not be rendered.
     UNRENDERABLE = "SERVE-6" {
@@ -63,6 +68,7 @@ codes! {
             request was wrong.",
         remedy: "Ask again. If it keeps happening, send a support bundle, made with lemonfiber \
             support.",
+        household: fault,
     }
     /// Raised when this machine will not supply the randomness a job is named with.
     NO_JOB_NAME = "SERVE-7" {
@@ -74,6 +80,7 @@ codes! {
             nothing could ever be told about, so it was not begun, and nothing was changed.",
         remedy: "Ask again. If it keeps happening, send a support bundle, made with lemonfiber \
             support.",
+        household: fault,
     }
     /// Raised when an action's work ended before it had an answer to give.
     UNANSWERED = "SERVE-8" {
@@ -84,5 +91,6 @@ codes! {
             something before it stopped, and sending it again runs it again.",
         remedy: "Ask again. If it keeps happening, send a support bundle, made with lemonfiber \
             support.",
+        household: fault,
     }
 }

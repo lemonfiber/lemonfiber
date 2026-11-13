@@ -200,6 +200,7 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
             members: Vec::new(),
             available: true,
             findings: Vec::new(),
+            noted: Vec::new(),
             filtering: None,
             policy: None,
             allows: None,

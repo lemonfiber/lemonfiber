@@ -23,7 +23,12 @@ use common::household::{answering, context, table, watched};
 /// What one run of the arrangement, or of the clock, came to say.
 async fn said(ctx: &Ctx, arranged: Arranged) -> String {
     match dispatch(Command::Expiring(arranged), ctx).await {
-        Ok(Outcome::Household(report)) => report.findings.join("\n"),
+        Ok(Outcome::Household(report)) => report
+            .noted
+            .into_iter()
+            .chain(report.findings.into_iter().map(|finding| finding.said))
+            .collect::<Vec<_>>()
+            .join("\n"),
         Ok(other) => format!("the wrong outcome: {other:?}"),
         Err(problem) => format!("refused: {} {}", problem.code, problem.summary),
     }

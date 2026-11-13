@@ -9,5 +9,6 @@ codes! {
             server's own records of the series have come apart from its seasons.",
         remedy: "Have the media server read the series afresh, by running \
             lemonfiber doctor --fix.",
+        household: fault,
     }
 }

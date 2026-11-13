@@ -73,9 +73,13 @@ pub(super) fn household(report: &HouseholdReport) -> Lines {
     if let Some(filtering) = &report.filtering {
         lines.put(format!("  {filtering}"));
     }
-    // What could not be read, said rather than left to look like an empty household.
+    // What could not be read, said rather than left to look like an empty household,
+    // and then what else is worth the operator's attention.
     for finding in &report.findings {
         lines.put(format!("  ! {finding}"));
+    }
+    for note in &report.noted {
+        lines.put(format!("  ! {note}"));
     }
     // Last, because it is the one part of this screen meant to leave it: everything
     // above is about the list, and a block to copy out reads worst with the list's own

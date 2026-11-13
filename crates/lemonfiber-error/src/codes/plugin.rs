@@ -19,6 +19,7 @@ codes! {
             plugin, and each fault found.",
         remedy: "Follow the remedies the plugin declared, in order. Where it declared none, the \
             message says to ask the plugin's author.",
+        household: fault,
     }
     /// The source names no plugin this build can read.
     UNREADABLE = "PLUGIN-2" {
@@ -28,6 +29,7 @@ codes! {
         meaning: "What was named is not a plugin lemonfiber can read. Nothing was installed or \
             written.",
         remedy: "Point at the plugin's directory, or at the plugin.toml inside it.",
+        household: fault,
     }
     /// The manifest is read and this build refuses what it declares.
     REFUSED = "PLUGIN-3" {
@@ -37,6 +39,7 @@ codes! {
         meaning: "The plugin declares things lemonfiber will not install. The manifest is \
             refused whole — nothing was written — and the message lists every violation at once.",
         remedy: "Read what each one says, and take it up with whoever published the plugin.",
+        household: fault,
     }
     /// The record of what is installed cannot be read.
     UNRECORDED = "PLUGIN-4" {
@@ -46,6 +49,7 @@ codes! {
         meaning: "The record of what is installed could not be read, so lemonfiber will not say \
             that nothing is installed. The message names the file.",
         remedy: "Restore the file from a backup, or move it aside if nothing is installed.",
+        household: fault,
     }
     /// The plugin is installed already.
     ALREADY = "PLUGIN-5" {
@@ -56,6 +60,7 @@ codes! {
             install is not one. Nothing was changed; the message names the version installed.",
         remedy: "Update it with lemonfiber plugin update on the new source, or remove it \
             first.",
+        household: fault,
     }
     /// There is no stack on this machine to put a plugin's container in.
     NOWHERE = "PLUGIN-6" {
@@ -64,6 +69,7 @@ codes! {
         since: "0.16.0",
         meaning: "There is nowhere to install the plugin to: no stack directory has been set up.",
         remedy: "Run lemonfiber setup first, then install the plugin.",
+        household: fault,
     }
     /// A directory or a document the install decided on would not land.
     UNWRITABLE = "PLUGIN-7" {
@@ -74,6 +80,7 @@ codes! {
             was, and what it had written is on the change record.",
         remedy: "Check the permissions on the stack directory, then install it again. \
             lemonfiber history shows what was written.",
+        household: fault,
     }
     /// The wiring went down and the record of what is installed did not.
     UNRECORDABLE = "PLUGIN-8" {
@@ -83,6 +90,7 @@ codes! {
         meaning: "The plugin held every proof and could not be recorded as installed, so the \
             install was put back.",
         remedy: "Check the permissions on the configuration directory, then install it again.",
+        household: fault,
     }
     /// The plugin's own service would not start, so nothing about it could be proved.
     UNPROVED = "PLUGIN-9" {
@@ -93,6 +101,7 @@ codes! {
             the install was put back.",
         remedy: "Check that the stack is set up and the container engine is running, then \
             install it again.",
+        household: fault,
     }
     /// Nothing by that name is installed on this machine.
     NOTHING_TO_REMOVE = "PLUGIN-10" {
@@ -103,6 +112,7 @@ codes! {
             lists what is installed.",
         remedy: "See what is on this machine with lemonfiber plugin installed, and remove it \
             by that id.",
+        household: fault,
     }
     /// Nothing by that id is installed, so there is no version to replace.
     NOTHING_TO_UPDATE = "PLUGIN-11" {
@@ -112,6 +122,7 @@ codes! {
         meaning: "The plugin is not installed, so there is nothing to update. Nothing was \
             changed.",
         remedy: "Install it instead, with lemonfiber plugin install on the same source.",
+        household: fault,
     }
     /// The version installed would not come off, so nothing else was touched.
     STUCK = "PLUGIN-12" {
@@ -121,6 +132,7 @@ codes! {
         meaning: "The installed version would not stop, so it was not updated. It is still \
             installed, and nothing else changed.",
         remedy: "Check the container engine is running, then try the update again.",
+        household: fault,
     }
     /// Raised when a plugin's service would answer on a label another plugin's already does.
     ANSWERED = "PLUGIN-13" {
@@ -132,6 +144,7 @@ codes! {
             down every route it serves.",
         remedy: "Give the plugin's service another hostname in its manifest, or remove the other \
             plugin first.",
+        household: fault,
     }
     /// Raised when a plugin is installed from a source other than the one its name is
     /// already installed from.
@@ -145,6 +158,7 @@ codes! {
             the message names both sources.",
         remedy: "To run the new source in its place, run lemonfiber plugin update on it. To \
             keep the one installed, nothing needs doing.",
+        household: fault,
     }
     /// Raised when a plugin is named from a git source and fetching from one is
     /// switched off.
@@ -156,6 +170,7 @@ codes! {
             source was not asked. Nothing was fetched or installed.",
         remedy: "Install it from a directory instead, or allow it with lemonfiber config set \
             LEMONFIBER_REACH_PLUGIN_SOURCE on.",
+        household: fault,
     }
     /// Raised when a git source could not be reached or would not hand over a revision.
     UNFETCHED = "PLUGIN-16" {
@@ -166,6 +181,7 @@ codes! {
             the revision asked for. Nothing was installed, and the message carries what went \
             wrong.",
         remedy: "Check the address, and that this machine can reach it, then install it again.",
+        household: fault,
     }
     /// Raised when a git source holds no branch, tag or commit by the name given.
     NO_REVISION = "PLUGIN-17" {
@@ -176,6 +192,7 @@ codes! {
             fetched or installed.",
         remedy: "Name a branch, a tag or a whole commit after the last \"@\", or leave it off for \
             what the source serves by default.",
+        household: fault,
     }
     /// Raised when a plugin is installed by name and asking the catalogue is switched
     /// off.
@@ -187,6 +204,7 @@ codes! {
             switched off on this machine. Nothing was fetched or installed.",
         remedy: "Install it from a git source or a directory you name instead, or allow it with \
             lemonfiber config set LEMONFIBER_REACH_CATALOGUE on.",
+        household: fault,
     }
     /// Raised when the catalogue's index or its signature could not be fetched.
     CATALOGUE_UNREACHABLE = "PLUGIN-19" {
@@ -198,6 +216,7 @@ codes! {
             or a directory does not ask the catalogue.",
         remedy: "Check this machine can reach github.com and install it again, or install it \
             from its git source.",
+        household: fault,
     }
     /// Raised when the catalogue's index has no signature, one that does not verify,
     /// or none this build carries a key to check.
@@ -211,6 +230,7 @@ codes! {
             evidence that anybody reviewed anything.",
         remedy: "Install it from its git source, where it is installed as unreviewed, or install \
             a lemonfiber that carries the catalogue's key.",
+        household: fault,
     }
     /// Raised when the catalogue's index verified and is not one this build reads.
     CATALOGUE_UNREADABLE = "PLUGIN-21" {
@@ -221,6 +241,7 @@ codes! {
             resolved through it, and nothing was installed.",
         remedy: "Update lemonfiber, whose newer releases read newer indexes, or install it from \
             its git source.",
+        household: fault,
     }
     /// Raised when the catalogue holds no plugin by the name given.
     NOT_CATALOGUED = "PLUGIN-22" {
@@ -229,6 +250,7 @@ codes! {
         since: "0.17.0",
         meaning: "The catalogue holds no plugin by that name. Nothing was fetched or installed.",
         remedy: "Check the name, or write ./<name> to install the directory of that name.",
+        household: fault,
     }
     /// Raised when what the catalogue's origin served is not what the catalogue
     /// reviewed.
@@ -241,6 +263,7 @@ codes! {
             Nothing was installed.",
         remedy: "Install it from its git source if you mean to run it unreviewed, and tell the \
             catalogue's maintainers.",
+        household: fault,
     }
     /// Raised when a plugin's service would be named, where lemonfiber keeps what a
     /// service holds, as another installed plugin's service already is.
@@ -255,6 +278,7 @@ codes! {
             was written; the message names both services.",
         remedy: "Remove the other plugin first, or install a version of this one whose service \
             is named otherwise.",
+        household: fault,
     }
     /// Raised when an install, an update or a removal answers an offer that was read
     /// against a plugin, a stack or a record that has since moved.
@@ -267,6 +291,7 @@ codes! {
             it now would be agreeing to something nobody saw, so nothing was changed; the \
             message names what moved.",
         remedy: "Read it again, and answer the name it prints.",
+        household: fault,
     }
     /// Raised when a value a recipe would carry to a destination, or the egress guard's
     /// shape a service would take, was not approved as itself, or an approval names
@@ -281,6 +306,7 @@ codes! {
             nothing was changed.",
         remedy: "Approve each one the reading lists, by name, with --approve, and nothing \
             else.",
+        household: fault,
     }
     /// Raised when the source an update names holds a different plugin from the one
     /// it was asked to update.
@@ -293,6 +319,7 @@ codes! {
             nothing was changed.",
         remedy: "Name a source that holds the plugin being updated, or install the other one on \
             its own.",
+        household: fault,
     }
     /// Raised when a plugin's service would take a name, a port or a label something
     /// already on this machine holds: a service of the stack or of the operator's
@@ -307,6 +334,7 @@ codes! {
             names each clash.",
         remedy: "Rename or move what holds them, or install a version of the plugin that \
             declares others.",
+        household: fault,
     }
     /// Raised when the catalogue's index verifies and is older than the newest one
     /// this machine has verified.
@@ -320,6 +348,7 @@ codes! {
             installed.",
         remedy: "Try again later, when the catalogue serves its newest release, or install it \
             from its git source.",
+        household: fault,
     }
     /// Raised when the record of the newest catalogue index this machine verified
     /// cannot be read or written.
@@ -333,6 +362,7 @@ codes! {
             nothing was resolved through it and nothing was installed.",
         remedy: "Check catalogue.json in the configuration directory, or install it from its \
             git source.",
+        household: fault,
     }
     /// Raised when a git source is named over a transport other than https, before
     /// anything is asked of it.
@@ -344,6 +374,7 @@ codes! {
             asked of it and nothing was installed. A source fetched over anything else can be \
             read or rewritten on its way here.",
         remedy: "Name the same repository by its https address.",
+        household: fault,
     }
     /// Raised when a git source's host is, or stands for, an address on this machine
     /// or on a network of its own: loopback, private, link-local or unspecified.
@@ -356,6 +387,7 @@ codes! {
             fetched only from somewhere every machine could reach, so nothing was fetched and \
             nothing was installed.",
         remedy: "Install it from a directory on this machine, or from a public https address.",
+        household: fault,
     }
     /// Raised when a recipe substitutes a value into a header's name, which is a fixed
     /// identifier of the protocol and written out; the manifest's every other fault is
@@ -369,6 +401,7 @@ codes! {
             nothing was installed or written — and the message lists every other violation \
             beside it.",
         remedy: "Read what each one says, and take it up with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a recipe of the act asks the operator for a value that was not
     /// given, or a value was given that no recipe of the act asks for.
@@ -380,6 +413,7 @@ codes! {
             value was given that no recipe of it asks for. Nothing was installed and nothing was \
             written, and the message names each input.",
         remedy: "Give each input the plugin's recipes ask for, by name, and nothing else.",
+        household: fault,
     }
     /// Raised when a recipe's call was not sent because its host stands for an address
     /// not out on the internet; the install or update was put back.
@@ -391,6 +425,7 @@ codes! {
             internet, so it was not sent. The install or update was put back, and the message \
             names the steps that had run before it.",
         remedy: "Read what the message says, and take it up with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a recipe's step failed any other way — nothing answered, the answer
     /// was not the one it expects, a capture found nothing, or the answer was larger
@@ -405,6 +440,7 @@ codes! {
             run before it.",
         remedy: "Check the service the recipe calls is running, then try again. If it keeps \
             failing, take it up with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a recipe's call path is not a plain absolute path; the manifest's
     /// every other fault is listed beside it.
@@ -416,6 +452,7 @@ codes! {
             whole — nothing was installed or written — and the message lists every other \
             violation beside it.",
         remedy: "Read what each one says, and take it up with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a recipe's call was not sent because a value it carries may not go
     /// where it was going: not where its pairs say, not back to the service a
@@ -430,6 +467,7 @@ codes! {
             without the operator's approval. It was not sent, and the install or update was put \
             back.",
         remedy: "Read what the message says, and take it up with whoever published the plugin.",
+        household: fault,
     }
     /// Nothing by that id is installed, so there is nothing to prove again.
     NOTHING_TO_PROVE = "PLUGIN-39" {
@@ -440,6 +478,7 @@ codes! {
             message lists what is installed.",
         remedy: "See what is on this machine with lemonfiber plugin installed, and prove it by \
             that id.",
+        household: fault,
     }
     /// Raised when a proof an installed plugin declares, run as the image's own program,
     /// does not hold in the doctor.
@@ -452,6 +491,7 @@ codes! {
             message names the proof, the plugin and each fault.",
         remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
             with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a proof an installed plugin declares, asked of its service, does not
     /// hold in the doctor.
@@ -464,6 +504,7 @@ codes! {
             and each fault.",
         remedy: "Prove the plugin again with lemonfiber plugin prove, and take what it says up \
             with whoever published the plugin.",
+        household: fault,
     }
     /// Raised when a part this build installs as a plugin still runs as the stack's own
     /// service, so moving it in place is on offer.
@@ -477,6 +518,7 @@ codes! {
             is.",
         remedy: "Read the move with lemonfiber plugin install and the part's name, and answer \
             the name it prints.",
+        household: fault,
     }
     /// Raised when a run names a plugin that is not installed, or a demand recipe the
     /// plugin does not declare.
@@ -488,6 +530,7 @@ codes! {
             name that runs on demand, so nothing was run. The message lists what there is.",
         remedy: "See what is installed with lemonfiber plugin installed, and each plugin's \
             demand recipes on its reading, and run one by those names.",
+        household: fault,
     }
     /// Raised when the manifest kept for an installed plugin is missing or is not the one
     /// that was installed, so its demand recipes cannot be read.
@@ -500,6 +543,7 @@ codes! {
             names, so nothing was run.",
         remedy: "Update the plugin from its source with lemonfiber plugin update, which keeps \
             its manifest again, then run the recipe.",
+        household: fault,
     }
     /// Raised when a third-party plugin declares a secret of another service that names no
     /// capability of its own it is for.
@@ -512,6 +556,7 @@ codes! {
             Nothing was written.",
         remedy: "Take it up with whoever published the plugin: each secret of another service \
             names the capability of the plugin's own it is for.",
+        household: fault,
     }
     /// Raised when a grant asked to be revoked is not one the plugin holds.
     NO_GRANT = "PLUGIN-47" {
@@ -522,6 +567,7 @@ codes! {
             message names the grants it holds.",
         remedy: "See every grant on lemonfiber credentials, and revoke one by the plugin and the \
             credential it names.",
+        household: fault,
     }
     /// Raised when a plugin's setting or secret names, as the variable an earlier release
     /// kept its value under, one another installed plugin's setting or secret names.
@@ -535,5 +581,6 @@ codes! {
             the message names both.",
         remedy: "Remove the other plugin first, or install a version of this one whose was \
             names the variable its own setting was kept under.",
+        household: fault,
     }
 }

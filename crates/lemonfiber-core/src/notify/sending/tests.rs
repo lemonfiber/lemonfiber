@@ -375,3 +375,29 @@ fn every_kind_is_tagged_and_an_id_is_read_however_written() {
     assert_eq!(said(&serde_json::json!("m7")), "m7");
     assert_eq!(said(&serde_json::json!(42)), "42");
 }
+
+/// What a member is sent is titled as the house and said in the household's words, and
+/// what the operator is sent keeps the product's name, through every kind that titles.
+#[tokio::test]
+async fn a_member_is_sent_the_house_and_the_operator_the_product() {
+    use super::{HOUSEHOLD_TITLE, TITLE};
+    let ready = Message {
+        kind: Notification::Ready,
+        summary: crate::notify::fanning::READY.to_owned(),
+        urgent: false,
+        at: 7,
+    };
+    for (sent, title) in [(&ready, HOUSEHOLD_TITLE), (&message(false), TITLE)] {
+        let (ctx, http) = faked(Answer::reply(200, "{\"id\":\"a\"}"));
+        let _ = send(&ctx, &backend(BackendKind::Ntfy), &held(None, None), sent).await;
+        assert_eq!(header(&http, "Title").as_deref(), Some(title));
+        for kind in [BackendKind::Gotify, BackendKind::Apprise] {
+            let (ctx, http) = faked(Answer::reply(200, "{\"id\":3}"));
+            let _ = send(&ctx, &backend(kind), &held(Some("tk"), None), sent).await;
+            assert_eq!(field(&http, "title"), title, "{kind:?}");
+        }
+    }
+    for said in [HOUSEHOLD_TITLE, crate::notify::fanning::READY] {
+        assert_eq!(crate::error::household::unhoused(said), None, "{said}");
+    }
+}

@@ -106,8 +106,8 @@ pub struct PartWayReport {
     /// Whether it could be read at all. An empty list and an unread one are different
     /// answers, and what could not be read is said in `findings`.
     pub available: bool,
-    /// What is worth saying about this read, in the words its reader would use.
-    pub findings: Vec<String>,
+    /// What stood in the way of this read, each by the code that names it.
+    pub findings: Vec<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }

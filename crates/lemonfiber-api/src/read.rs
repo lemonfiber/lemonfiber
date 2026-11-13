@@ -42,6 +42,7 @@ use crate::read::table::{named, wanted, Wanted, OFFERED, TITLE};
 use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
 use crate::serve::{answered, carrying, JSON};
+use crate::spoken::Audience;
 
 /// The status a read that this machine could not answer is refused with.
 ///
@@ -131,7 +132,10 @@ async fn answering(serving: &Serving, caller: &Caller, read: &str, given: Wanted
                 Some(id) => serving.kept.read(&serving.ctx, id, command).await,
                 None => carried_out(&serving.ctx, command).await,
             },
-            Ok(command) => carried_out(&serving.ctx, command).await,
+            Ok(command) => {
+                let (status, body) = rendered(&serving.ctx, command, Audience::of(caller)).await;
+                enveloped(status, body)
+            }
             Err(refused) => *refused,
         },
         Err(why) => why.answered(),
@@ -143,15 +147,23 @@ async fn answering(serving: &Serving, caller: &Caller, read: &str, given: Wanted
 /// The three calls a machine-readable command line makes, in the order it makes
 /// them, so the bytes a caller reads here are the bytes it would have piped.
 pub async fn carried_out(ctx: &Ctx, command: Command) -> Response {
-    let (status, body) = rendered(ctx, command).await;
+    let (status, body) = rendered(ctx, command, Audience::Operator).await;
     enveloped(status, body)
 }
 
-/// Carry out a command, and the status and envelope it is answered with.
-pub(crate) async fn rendered(ctx: &Ctx, command: Command) -> (StatusCode, Option<String>) {
+/// Carry out a command, and the status and envelope it is answered with, worded for
+/// `audience`.
+pub(crate) async fn rendered(
+    ctx: &Ctx,
+    command: Command,
+    audience: Audience,
+) -> (StatusCode, Option<String>) {
     match dispatch(command, ctx).await {
-        Ok(outcome) => (StatusCode::OK, outcome.envelope().to_json()),
-        Err(problem) => failed(&problem),
+        Ok(outcome) => (
+            StatusCode::OK,
+            audience.outcome(outcome).envelope().to_json(),
+        ),
+        Err(problem) => failed(&audience.problem(&problem)),
     }
 }
 
@@ -166,8 +178,7 @@ fn failed(problem: &Problem) -> (StatusCode, Option<String>) {
 /// The failure a command reported, in the envelope machine-readable output gives
 /// it, at the status the refusal warrants.
 pub(crate) fn went_wrong(problem: &Problem) -> Response {
-    let (status, body) = failed(problem);
-    enveloped(status, body)
+    crate::spoken::refused(refusing(problem), problem.clone())
 }
 
 /// The status a refusal warrants.

@@ -8,6 +8,7 @@ codes! {
             else, so something changed between reading the offer and answering it. Nothing was \
             carried out.",
         remedy: "Ask what could be put right again, and read what it says now.",
+        household: fault,
     }
     /// Raised when a run cannot say where lemonfiber's own files are.
     NOWHERE_TO_LOOK = "REPAIR-2" {
@@ -18,6 +19,7 @@ codes! {
             repair changed is recorded in lemonfiber's own directory, and this machine would not \
             say where that is. Nothing was put back.",
         remedy: "Set a home directory for this user, then ask again.",
+        household: fault,
     }
     /// Raised when a run that may not act was asked for the checks that disturb.
     OFFER_CANNOT_DISTURB = "REPAIR-3" {
@@ -32,5 +34,6 @@ codes! {
         remedy: "Ask for the diagnosis with those checks in it, with lemonfiber doctor \
             --disruptive. Or agree to the repairs first, and the checks that disturb run with \
             them.",
+        household: fault,
     }
 }

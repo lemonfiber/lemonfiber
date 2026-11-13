@@ -34,7 +34,6 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lemonfiber_core::app::{dispatch, Command, SetupAction};
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::wizard::{Answer, Choice};
 use serde::Deserialize;
 
@@ -147,9 +146,6 @@ async fn walked(serving: &Serving, caller: &Caller, action: SetupAction) -> Resp
     };
     match dispatch(command, &serving.ctx).await {
         Ok(outcome) => enveloped(StatusCode::OK, outcome.envelope().to_json()),
-        Err(problem) => enveloped(
-            refusing(&problem),
-            Envelope::new(kind::ERROR, &*problem).to_json(),
-        ),
+        Err(problem) => crate::spoken::refused(refusing(&problem), *problem),
     }
 }

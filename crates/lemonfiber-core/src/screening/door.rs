@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 
 use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
+use crate::error::codes::play::{DOOR_UNREADY, MISNAMED, NO_HOUSEHOLD_ADDRESS, UNDECLARED};
+use crate::error::household::Obstacle;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
 use crate::ports::service::{Declaring, Item, ItemDetail, ItemProgress, Locations, Medium};
 
@@ -65,7 +67,7 @@ pub(crate) enum Door {
         locations: Locations,
     },
     /// Why nothing can be located at the door.
-    Unknown(String),
+    Unknown(Obstacle),
 }
 
 /// The directory the door's certificate is kept in, beneath `project`.
@@ -110,7 +112,7 @@ pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
-        return Door::Unknown(NO_STACK.to_owned());
+        return Door::Unknown(Obstacle::new(DOOR_UNREADY, NO_STACK));
     };
     let at = crate::app::invite::household_address(ctx, GUARDED).await;
     let (base, fingerprint) = match at_the_door(
@@ -135,27 +137,30 @@ pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
 fn at_the_door(
     url: Option<String>,
     kept: Result<Option<Kept>, Unkept>,
-) -> Result<(String, String), String> {
+) -> Result<(String, String), Obstacle> {
     let fingerprint = match kept {
         Ok(Some(kept)) => kept.fingerprint,
-        Ok(None) => return Err(NOT_MADE.to_owned()),
-        Err(why) => return Err(format!("{UNREADABLE} {why}")),
+        Ok(None) => return Err(Obstacle::new(DOOR_UNREADY, NOT_MADE)),
+        Err(why) => return Err(Obstacle::new(DOOR_UNREADY, format!("{UNREADABLE} {why}"))),
     };
     url.map(|url| (url.replacen("http://", "https://", 1), fingerprint))
-        .ok_or_else(|| NO_ADDRESS.to_owned())
+        .ok_or_else(|| Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
 }
 
 /// Where `server` serves each item, from its declaration once that is checked.
-async fn served_at(server: &dyn Declaring) -> Result<Locations, String> {
-    let declared = server.declared().await.map_err(|_| UNDECLARED.to_owned())?;
+async fn served_at(server: &dyn Declaring) -> Result<Locations, Obstacle> {
+    let declared = server
+        .declared()
+        .await
+        .map_err(|_| Obstacle::new(UNDECLARED, NOT_DECLARED))?;
     declared
         .checked()
         .map(|declared| declared.locations)
-        .map_err(|why| format!("{REFUSED_DECLARATION} {why}"))
+        .map_err(|why| Obstacle::new(UNDECLARED, format!("{REFUSED_DECLARATION} {why}")))
 }
 
 /// Said where the media server would not say where it serves each item.
-const UNDECLARED: &str = "The media server would not say where it serves each title, so \
+const NOT_DECLARED: &str = "The media server would not say where it serves each title, so \
                           nothing can be located at the front door.";
 
 /// Said before the reason the media server's declaration was refused.
@@ -181,7 +186,7 @@ const NO_ADDRESS: &str = "This machine's household address is not known, so noth
                           it at, and every title says where it is served.";
 
 /// Why an item the media server named by something other than an item id is not located.
-const NOT_AN_ITEM: &str = "the media server named this item by something that is not an item id";
+const NOT_AN_ITEM: &str = "The media server named this item by something that is not an item id.";
 
 /// The same item, located at the door: its pictures where it has them, and where it
 /// streams from where it plays.
@@ -189,7 +194,7 @@ const NOT_AN_ITEM: &str = "the media server named this item by something that is
 pub(crate) fn located(item: Item, door: &Door) -> Held {
     let at = match door {
         _ if !super::an_item(&item.id) => Located {
-            unlocated: Some(NOT_AN_ITEM.to_owned()),
+            unlocated: Some(Obstacle::new(MISNAMED, NOT_AN_ITEM)),
             ..Located::default()
         },
         Door::Unknown(why) => Located {

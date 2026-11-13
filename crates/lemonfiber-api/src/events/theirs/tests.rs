@@ -6,7 +6,7 @@ use lemonfiber_core::keys::Scope;
 use lemonfiber_core::model::kind;
 use tokio::time::Instant;
 
-use super::{due, Reading, Theirs, PLAYING_EVERY, ROWS_EVERY, UNREAD};
+use super::{due, Reading, Theirs, PLAYING_EVERY, ROWS_EVERY};
 use crate::admission::{Caller, Keyed};
 use crate::events::live::Gathers;
 
@@ -131,21 +131,28 @@ fn a_pace_comes_round_once_its_interval_has_passed() {
     ));
 }
 
-/// A reading the stack could not make is said as unread with a sentence of its own,
-/// never as an empty household, an empty shelf or a quiet house — and never with the
-/// operator's problem, which names what only the operator is shown.
+/// A reading the stack could not make is said as unread by the code that stopped it,
+/// never as an empty household, an empty shelf or a quiet house.
 #[test]
-fn an_unmade_reading_is_unread_in_a_sentence_of_its_own() {
+fn an_unmade_reading_is_unread_by_the_code_that_stopped_it() {
     use lemonfiber_core::app::Outcome;
-    let unread = vec![UNREAD.to_owned()];
+    use lemonfiber_core::error::codes::play::SERVER_SILENT;
+    use lemonfiber_core::error::household::Obstacle;
+    use lemonfiber_core::error::{Problem, Remedy};
+    let problem = Problem::new(SERVER_SILENT, "silent", "silent", Remedy::new("wait"));
+    let unread = vec![Obstacle::new(SERVER_SILENT, "silent")];
     assert!(
-        matches!(Reading::Household.unread(), Outcome::Household(report)
+        matches!(Reading::Household.unread(&problem), Outcome::Household(report)
         if !report.available && report.findings == unread)
     );
-    assert!(matches!(Reading::Held.unread(), Outcome::Held(report)
-        if !report.available && report.findings == unread));
-    assert!(matches!(Reading::Playing.unread(), Outcome::Playing(report)
-        if !report.available && report.findings == unread));
+    assert!(
+        matches!(Reading::Held.unread(&problem), Outcome::Held(report)
+        if !report.available && report.findings == unread)
+    );
+    assert!(
+        matches!(Reading::Playing.unread(&problem), Outcome::Playing(report)
+        if !report.available && report.findings == unread)
+    );
 }
 
 /// A stack that cannot be read is said as each of the three unread, rather than as an
@@ -160,8 +167,9 @@ async fn a_stack_that_cannot_be_read_is_said_as_each_reading_unread() {
     };
     let said = theirs.gather(true).await;
     assert_eq!(said.len(), 3);
+    let fault = lemonfiber_core::error::household::FAULT;
     assert!(
-        said.iter().all(|one| one.said().contains(UNREAD)),
-        "{said:?}"
+        said.iter().all(|one| one.said().contains(fault)),
+        "a member was told something other than the household's words for a fault: {said:?}"
     );
 }

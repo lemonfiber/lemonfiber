@@ -8,5 +8,6 @@ codes! {
             only meaningful against something the tool is currently saying.",
         remedy: "Answer one of the warnings this run raised — the message lists them. If it \
             raised none, run the checks first.",
+        household: fault,
     }
 }

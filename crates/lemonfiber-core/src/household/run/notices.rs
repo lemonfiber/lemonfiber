@@ -70,7 +70,7 @@ pub(super) async fn put_where_they_ask(
     no_room: bool,
     limited: bool,
     dry_run: bool,
-) -> Option<String> {
+) -> Option<crate::error::household::Obstacle> {
     if dry_run {
         return None;
     }
@@ -79,12 +79,14 @@ pub(super) async fn put_where_they_ask(
         .await
         .err()
         .map(|_| {
-            "the request service would not carry what the household is told before they \
-             ask, so how a limit frees up and whether the disk has room are shown here and \
-             not where they ask"
-                .to_owned()
+            crate::error::household::Obstacle::new(
+                crate::error::codes::quota::UNREACHABLE,
+                "the request service would not carry what the household is told before \
+                 they ask, so how a limit frees up and whether the disk has room are shown \
+                 here and not where they ask",
+            )
         })
 }
 
 #[cfg(test)]
-pub(super) mod tests;
+mod tests;

@@ -9,6 +9,7 @@
 use std::fmt::Write as _;
 
 use lemonfiber_core::error::codes::{every_declared, families, RETIRED};
+use lemonfiber_core::error::household::Words;
 use serde_json::{json, Value};
 
 /// Where the published registry is kept, relative to the workspace root.
@@ -27,9 +28,15 @@ declared in. Run `just codes` to rewrite both.
 Every code lemonfiber can raise, and nothing else. A code is a family and a number,
 it is never recycled, and it is the token to search for. What each one means, and
 what to do about it, is in `contract/codes.json` and written for operators at
-<https://docs.lemonfiber.app/fixing/every-error-by-code/>.
+<https://docs.lemonfiber.app/fixing/every-error-by-code/>. The last column is what a
+household member's session is told in its place: a sentence and a remedy of its own, or
+that it is a fault of the stack.
 
 ";
+
+/// What the reference says for a code a member is told is a fault of the stack.
+const STACK_FAULT: &str = "A fault of the stack: not working right now, with whoever runs the \
+                           house told.";
 
 /// The registry as `contract/codes.json` holds it.
 #[must_use]
@@ -42,6 +49,7 @@ pub fn render_json() -> String {
         .into_iter()
         .map(|declared| {
             let code = declared.code().as_str();
+            let household = Words::of(declared.code());
             json!({
                 "code": code,
                 "family": code.rsplit_once('-').map_or(code, |(family, _)| family),
@@ -52,6 +60,9 @@ pub fn render_json() -> String {
                 "summary": declared.description(),
                 "meaning": declared.meaning(),
                 "remedy": declared.remedy(),
+                "household": household.said,
+                "household_remedy": household.remedy,
+                "stack_fault": household.fault,
                 "since": declared.since(),
             })
         })
@@ -95,6 +106,7 @@ pub fn render_reference(published: &str) -> Result<String, String> {
         match value.get(key) {
             Some(Value::String(text)) => Ok(text.clone()),
             Some(Value::Number(number)) => Ok(number.to_string()),
+            Some(Value::Bool(fault)) => Ok(fault.to_string()),
             _ => Err(format!("an entry has no {key}")),
         }
     };
@@ -109,15 +121,28 @@ pub fn render_reference(published: &str) -> Result<String, String> {
     for family in listed("families")? {
         let prefix = field(family, "prefix")?;
         let _ = write!(out, "## `{prefix}` — {}\n\n", field(family, "covers")?);
-        out.push_str("| Code | Name | Severity | Exit | Status | Since | Summary |\n");
-        out.push_str("| ---- | ---- | -------- | ---- | ------ | ----- | ------- |\n");
+        out.push_str(
+            "| Code | Name | Severity | Exit | Status | Since | Summary | For the household |\n",
+        );
+        out.push_str(
+            "| ---- | ---- | -------- | ---- | ------ | ----- | ------- | ----------------- |\n",
+        );
         for code in listed("codes")? {
             if field(code, "family")? != prefix {
                 continue;
             }
+            let household = if field(code, "stack_fault")? == "true" {
+                STACK_FAULT.to_owned()
+            } else {
+                format!(
+                    "{} {}",
+                    field(code, "household")?,
+                    field(code, "household_remedy")?
+                )
+            };
             let _ = writeln!(
                 out,
-                "| `{}` | `{}` | {} | {} | {} | {} | {} |",
+                "| `{}` | `{}` | {} | {} | {} | {} | {} | {household} |",
                 field(code, "code")?,
                 field(code, "name")?,
                 field(code, "severity")?,

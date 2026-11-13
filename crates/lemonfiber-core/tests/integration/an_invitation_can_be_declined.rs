@@ -271,7 +271,7 @@ async fn ana_stands_in(
         .into_iter()
         .find(|member| member.name == "ana")
         .map(|member| member.standing);
-    (standing, report.findings, http.requests())
+    (standing, report.noted, http.requests())
 }
 
 /// An invitation the person declined reads as declined, apart from one that lapsed, and

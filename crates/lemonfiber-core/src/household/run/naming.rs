@@ -31,27 +31,27 @@ use super::allowance;
 /// household already recognises — so each says so rather than quietly reading as absent.
 pub(super) async fn named_by_the_server(
     server: &dyn crate::ports::service::Household,
-    findings: &mut Vec<String>,
+    findings: &mut Vec<crate::error::household::Obstacle>,
 ) -> (BTreeMap<String, String>, Vec<Certificate>) {
     let libraries = if let Ok(held) = server.libraries().await {
         held.into_iter()
             .map(|library| (library.id, library.name))
             .collect()
     } else {
-        findings.push(
+        findings.push(crate::error::household::Obstacle::new(
+            crate::error::codes::play::SERVER_SILENT,
             "the media server's libraries could not be read, so access limited to \
-             some of them names them by the server's own identifiers"
-                .to_owned(),
-        );
+             some of them names them by the server's own identifiers",
+        ));
         BTreeMap::new()
     };
     let certificates = server.ratings().await.unwrap_or_default();
     if certificates.is_empty() {
-        findings.push(
+        findings.push(crate::error::household::Obstacle::new(
+            crate::error::codes::play::SERVER_SILENT,
             "the media server's own ratings could not be read, so an age limit is named \
-             from lemonfiber's own mapping rather than from this household's certificates"
-                .to_owned(),
-        );
+             from lemonfiber's own mapping rather than from this household's certificates",
+        ));
     }
     (libraries, certificates)
 }

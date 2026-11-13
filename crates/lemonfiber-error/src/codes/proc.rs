@@ -8,6 +8,7 @@ codes! {
         meaning: "The program lemonfiber drives the engine through is not installed, so nothing \
             can be started or stopped.",
         remedy: "Install Docker Desktop, or Docker Engine on Linux.",
+        household: fault,
     }
     /// Raised when a program exists but will not start.
     UNUSABLE_PROGRAM = "PROC-2" {
@@ -17,5 +18,6 @@ codes! {
         meaning: "The program is installed and would not start. Usually a permission or daemon \
             problem rather than a missing install.",
         remedy: "Check the container engine is running, then try again.",
+        household: fault,
     }
 }

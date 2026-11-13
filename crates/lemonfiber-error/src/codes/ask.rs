@@ -7,6 +7,10 @@ codes! {
         meaning: "There is no action by that name. An action here is a command the command line \
             offers, and this surface offers nothing else. The message names what was asked for.",
         remedy: "Ask for one of the actions the contract names.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an action was not given an argument it needs.
     MISSING_ARGUMENT = "ASK-2" {
@@ -16,6 +20,10 @@ codes! {
         meaning: "An action was not given an argument it needs, so it was not carried out. The \
             message names the action and the argument.",
         remedy: "Ask again with the arguments the action takes.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an argument was given a value that names nothing.
     UNRECOGNISED_ARGUMENT = "ASK-3" {
@@ -25,6 +33,10 @@ codes! {
         meaning: "An argument was given a value that names nothing this stack knows. The message \
             names the argument, what it said, and what it could have said instead.",
         remedy: "Ask again with the arguments the action takes.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an action was given an argument its command has nowhere to put.
     UNWANTED_ARGUMENT = "ASK-4" {
@@ -35,6 +47,10 @@ codes! {
             rather than dropped, because dropping it would carry out a different request from \
             the one asked for.",
         remedy: "Ask again with the arguments the action takes.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where two arguments that each name a different request arrived together.
     ARGUMENTS_TOGETHER = "ASK-5" {
@@ -45,6 +61,10 @@ codes! {
             carrying both would have to pick one of them and answer something nobody asked for. \
             The message names the two.",
         remedy: "Ask again with the arguments the action takes, choosing one of the two.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where the body of an action is not arguments it can read.
     NOT_ARGUMENTS = "ASK-6" {
@@ -55,6 +75,10 @@ codes! {
             could not take from it — a field it did not know, or where the text stopped being \
             JSON — is given as the detail.",
         remedy: "Ask again with the arguments the action takes.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where a job was asked about that this run did not start.
     NO_SUCH_JOB = "ASK-7" {
@@ -64,6 +88,10 @@ codes! {
         meaning: "No work in this run goes by that name. Jobs are named by the run that starts \
             them, and work from an earlier run is not tracked here.",
         remedy: "Ask about a job this run started.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where the body of a setup step is not an answer it can read.
     NOT_AN_ANSWER = "ASK-8" {
@@ -74,6 +102,10 @@ codes! {
             interrupted apply, so setup did not move. What arrived is not repeated back, because \
             an answer can carry a credential.",
         remedy: "Answer the question setup is asking.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where a path under the endpoints is one no endpoint answers.
     NO_ENDPOINT = "ASK-9" {
@@ -83,6 +115,10 @@ codes! {
         meaning: "No endpoint answers this path. Every endpoint this surface answers is named in \
             the contract, and this path is not one of them.",
         remedy: "Ask for one of the endpoints the contract names.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an endpoint was asked with a method it does not answer.
     WRONG_METHOD = "ASK-10" {
@@ -92,6 +128,10 @@ codes! {
         meaning: "The path is one this surface answers, asked with a method it does not answer \
             it with, and nothing was done.",
         remedy: "Ask again with the method the contract names.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where the body of a mint is not a key's name, scope, purpose and the
     /// password, or the body of a collection is not a claim alone.
@@ -104,6 +144,10 @@ codes! {
             so no key was minted or collected.",
         remedy: "Send a mint the name, scope, purpose and password, and a collection the claim \
             alone.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an action's `Idempotency-Key` is not one to 255 visible
     /// characters, or is given more than once.
@@ -115,6 +159,10 @@ codes! {
             given more than once. The action was not carried out, and nothing was changed: a key \
             that cannot be read is one a second send could not be recognised by.",
         remedy: "Send the key once, as up to 255 visible characters with no spaces.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
     /// Raised where an `Idempotency-Key` already sent with one action and its
     /// arguments is sent with another.
@@ -127,5 +175,9 @@ codes! {
             asked for something else, and that is what it was answered with.",
         remedy: "Send a new key with each new attempt, and the same key only with the same \
             action sent again.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
     }
 }

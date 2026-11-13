@@ -264,9 +264,11 @@ async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked()
 
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert!(
-        refused.body.contains("media server"),
-        "somebody was refused without being told the media server is what could not \
-         be asked: {}",
+        refused
+            .body
+            .contains("Your library isn't working right now"),
+        "a member was refused without being told their library is what could not be \
+         asked: {}",
         refused.body
     );
     assert!(
@@ -307,7 +309,15 @@ async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
     let refused = asked(router, "GET", "/api/events", &carried, "").await;
 
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
-    assert!(refused.body.contains("media server"), "{}", refused.body);
+    assert!(refused.body.contains("ADMIT-7"), "{}", refused.body);
+    assert!(
+        refused
+            .body
+            .contains("Your library isn't working right now")
+            && !refused.body.contains("media server"),
+        "a member was not told in the household's words: {}",
+        refused.body
+    );
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
@@ -388,7 +398,15 @@ async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
     let refused = asked(router, "GET", "/api/requests", &carried, "").await;
 
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
-    assert!(refused.body.contains("media server"), "{}", refused.body);
+    assert!(refused.body.contains("ADMIT-7"), "{}", refused.body);
+    assert!(
+        refused
+            .body
+            .contains("Your library isn't working right now")
+            && !refused.body.contains("media server"),
+        "a member was not told in the household's words: {}",
+        refused.body
+    );
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
@@ -464,7 +482,15 @@ async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
     let refused = asked(stream_alone(&admitting), "GET", "/api/events", &carried, "").await;
 
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
-    assert!(refused.body.contains("media server"), "{}", refused.body);
+    assert!(refused.body.contains("ADMIT-7"), "{}", refused.body);
+    assert!(
+        refused
+            .body
+            .contains("Your library isn't working right now")
+            && !refused.body.contains("media server"),
+        "a member was not told in the household's words: {}",
+        refused.body
+    );
     let _ = fs::remove_dir_all(a_directory(named));
 }
 
@@ -661,4 +687,26 @@ fn a_members_viewing_is_answered_at_once() {
         device: "a-phone-0123".to_owned(),
     });
     assert_eq!(answering(&grant), Answering::Now);
+}
+
+/// A member's choice of how to be told, and a phone's confirming a wake, are answered in
+/// the reply to their own request, refusal included: a job's name is redeemed by the
+/// operator alone, so behind one a member would never read why their choice was refused.
+#[test]
+fn a_members_choice_of_how_to_be_told_is_answered_at_once() {
+    use lemonfiber_api::actions::{answering, Answering};
+    use lemonfiber_core::app::Command;
+    use lemonfiber_core::notify::configuring::Asked as Notifying;
+    use lemonfiber_core::push::run::Asked as Pushing;
+    let choose = Command::Notify(Notifying::Choose {
+        member: MEMBER.to_owned(),
+        backends: Vec::new(),
+    });
+    let woken = Command::PushEndpoints(Pushing::Woken {
+        name: "pixel".to_owned(),
+        id: "1".to_owned(),
+        owner: Some(MEMBER.to_owned()),
+    });
+    assert_eq!(answering(&choose), Answering::Now);
+    assert_eq!(answering(&woken), Answering::Now);
 }

@@ -112,10 +112,20 @@ fn nobody_of_that_name_is_nobody() {
 /// what it must never do is come back looking like a household that owns nothing.
 #[test]
 fn a_shelf_that_could_not_be_read_says_so_rather_than_reading_as_empty() {
-    let report = unread(&named("Ada"), "the server would not say");
+    let report = unread(
+        &named("Ada"),
+        crate::error::codes::play::SERVER_SILENT,
+        "the server would not say",
+    );
     assert!(!report.available);
     assert!(report.holdings.is_empty());
-    assert_eq!(report.findings, vec!["the server would not say".to_owned()]);
+    assert_eq!(
+        report.findings,
+        vec![crate::error::household::Obstacle::new(
+            crate::error::codes::play::SERVER_SILENT,
+            "the server would not say"
+        )]
+    );
 }
 
 /// The whole read, as the server answers it.
@@ -182,7 +192,7 @@ async fn a_household_the_server_will_not_name_leaves_the_shelf_unread() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("who holds an account")),
+            .any(|finding| finding.said.contains("who holds an account")),
         "{report:?}"
     );
 }
@@ -207,7 +217,7 @@ async fn nobody_of_that_name_has_no_shelf_rather_than_an_empty_one() {
         report
             .findings
             .iter()
-            .any(|finding| finding.contains("nobody in this household")),
+            .any(|finding| finding.said.contains("nobody in this household")),
         "{report:?}"
     );
 }
@@ -234,10 +244,9 @@ async fn a_shelf_the_server_will_not_answer_is_unread_and_still_says_whose() {
     assert_eq!(report.member, "Ada");
     assert_eq!(report.id, "a7f3");
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.contains("reported as unread rather than as empty")),
+        report.findings.iter().any(|finding| finding
+            .said
+            .contains("reported as unread rather than as empty")),
         "{report:?}"
     );
 }
@@ -316,10 +325,9 @@ async fn a_defaults_shelf_the_server_will_not_answer_is_unread() {
     assert!(!report.available, "{report:?}");
     assert_eq!(report.member, "");
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.contains("reported as unread rather than as empty")),
+        report.findings.iter().any(|finding| finding
+            .said
+            .contains("reported as unread rather than as empty")),
         "{report:?}"
     );
 }

@@ -9,6 +9,7 @@ codes! {
             that still looks like a key is treated as one — even where it turns out not to be.",
         remedy: "Report which file the message names, so the value it holds can be added to what \
             a bundle knows how to replace.",
+        household: fault,
     }
     /// Raised when there is not enough room to write a bundle.
     BUNDLE_NO_ROOM = "BUNDLE-2" {
@@ -18,6 +19,7 @@ codes! {
         meaning: "There is not enough room to write the bundle where it was to be written, with \
             space left over for the machine to keep working in.",
         remedy: "Free some space, or write the bundle somewhere with more room using --out.",
+        household: fault,
     }
     /// Raised when the archive could not be written.
     BUNDLE_UNWRITTEN = "BUNDLE-3" {
@@ -27,6 +29,7 @@ codes! {
         meaning: "The archive could not be written. Nothing was left behind: a bundle is written \
             whole or not at all, so there is no half-file to mistake for one.",
         remedy: "Check the path is writable, then ask for the bundle again.",
+        household: fault,
     }
     /// Raised when a setting was asked to be shown as it is without that being confirmed.
     BUNDLE_UNCONFIRMED = "BUNDLE-4" {
@@ -37,6 +40,7 @@ codes! {
             same run. Showing one puts the real value in a file people post in public, so it \
             takes saying twice.",
         remedy: "Run it again with --confirm if you meant it.",
+        household: fault,
     }
     /// Raised when the machine can offer no randomness to derive stand-ins from.
     BUNDLE_NO_MARKS = "BUNDLE-5" {
@@ -48,6 +52,7 @@ codes! {
             for.",
         remedy: "Report this. A machine that cannot produce random bytes is a fault in its own \
             right.",
+        household: fault,
     }
     /// Raised when this run has nowhere it knows to keep a bundle.
     NOWHERE_TO_KEEP = "BUNDLE-6" {
@@ -59,6 +64,7 @@ codes! {
             say where its own files go leaves behind. A bundle asked for at a named path is \
             refused here too, and nothing was written.",
         remedy: "Set a home directory for this user, then ask for the bundle again.",
+        household: fault,
     }
     /// Raised when this run has nowhere it knows to look for a bundle it kept.
     NOWHERE_HELD = "BUNDLE-7" {
@@ -69,6 +75,7 @@ codes! {
             are kept with lemonfiber's own files, and this machine would not say where those \
             are, so there is nowhere to read one back from.",
         remedy: "Set a home directory for this user, then ask for the bundle again.",
+        household: fault,
     }
     /// Raised when a name does not name one of the bundles this run kept.
     BUNDLE_NOT_HELD = "BUNDLE-8" {
@@ -79,5 +86,6 @@ codes! {
             name is one of the files this run wrote into lemonfiber's own directory; a name \
             holding a path, or climbing out of that directory, is refused rather than followed.",
         remedy: "Ask for a bundle by the name the run that produced it reported.",
+        household: fault,
     }
 }
