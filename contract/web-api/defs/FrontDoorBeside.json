@@ -15,21 +15,33 @@
       ]
     },
     "because": {
-      "description": "Why it is not somewhere to begin.",
+      "description": "Why it is not somewhere to begin, or for a household member what it is to them.",
       "type": "string"
     },
     "facing": {
       "description": "What it is to the household.",
       "$ref": "Facing.json"
     },
+    "reaches": {
+      "description": "Whether the address answers from where the asking came from.",
+      "$ref": "FrontDoorReaches.json"
+    },
     "service": {
       "description": "The service, by the name it shows itself under.",
       "type": "string"
+    },
+    "unaddressed": {
+      "description": "Why there is no address, where there is none.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
     "service",
     "facing",
-    "because"
+    "because",
+    "reaches"
   ]
 }

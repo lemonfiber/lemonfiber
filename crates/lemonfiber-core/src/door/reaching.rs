@@ -34,7 +34,7 @@ pub(crate) enum Whence {
 /// The network a request from `from` came from; none is this machine.
 #[must_use]
 pub(crate) fn whence(from: Option<IpAddr>) -> Whence {
-    match from.map(IpAddr::to_canonical) {
+    match from.as_ref().map(IpAddr::to_canonical) {
         None => Whence::Home,
         Some(IpAddr::V4(v4)) if shared_carrier(v4) => Whence::Unknown,
         Some(IpAddr::V4(v4)) if v4.is_loopback() || v4.is_private() || v4.is_link_local() => {

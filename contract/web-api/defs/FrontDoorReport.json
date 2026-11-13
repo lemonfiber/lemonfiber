@@ -22,8 +22,15 @@
       }
     },
     "chosen": {
-      "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.",
-      "$ref": "Chosen.json"
+      "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.\n\nAbsent for a household member.",
+      "anyOf": [
+        {
+          "$ref": "Chosen.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "facing": {
       "description": "What that service is to them. Absent for the same reason.",
@@ -37,8 +44,12 @@
       ]
     },
     "meaning": {
-      "description": "What this comes to, in the words an operator would say it in — including,\nwhere there is no door, that there is none.",
+      "description": "What this comes to, in the words an operator would say it in, or a household\nmember's for one — including, where there is no door, that there is none.",
       "type": "string"
+    },
+    "reaches": {
+      "description": "Whether the address answers from where the asking came from.",
+      "$ref": "FrontDoorReaches.json"
     },
     "service": {
       "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
@@ -50,11 +61,18 @@
     "standing": {
       "description": "Where the front door stands.",
       "$ref": "FrontDoorStanding.json"
+    },
+    "unaddressed": {
+      "description": "Why there is no address, where there is a door and none.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
     "standing",
-    "chosen",
+    "reaches",
     "meaning",
     "beside"
   ]

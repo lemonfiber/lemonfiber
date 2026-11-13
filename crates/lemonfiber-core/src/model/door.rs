@@ -50,7 +50,7 @@ pub struct Beside {
     pub service: String,
     /// What it is to the household.
     pub facing: Facing,
-    /// Why it is not somewhere to begin.
+    /// Why it is not somewhere to begin, or for a household member what it is to them.
     pub because: String,
     /// The address to hand somebody for this service, read from this machine at the
     /// moment of asking rather than remembered.
@@ -103,8 +103,8 @@ pub struct FrontDoorReport {
     pub unaddressed: Option<String>,
     /// What that service is to them. Absent for the same reason.
     pub facing: Option<Facing>,
-    /// What this comes to, in the words an operator would say it in — including,
-    /// where there is no door, that there is none.
+    /// What this comes to, in the words an operator would say it in, or a household
+    /// member's for one — including, where there is no door, that there is none.
     pub meaning: String,
     /// Everything else the household can reach, and why none of it is the door.
     pub beside: Vec<Beside>,

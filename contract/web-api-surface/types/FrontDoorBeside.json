@@ -18,11 +18,23 @@
       ],
       "required": true
     },
+    "reaches": {
+      "type": [
+        "ref:FrontDoorReaches"
+      ],
+      "required": true
+    },
     "service": {
       "type": [
         "string"
       ],
       "required": true
+    },
+    "unaddressed": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

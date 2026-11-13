@@ -4,7 +4,14 @@
   "type": "object",
   "properties": {
     "member": {
-      "description": "The household member this session is for, where it is a member's.\n\n**Absent is the operator**, which is the whole of the discriminator. A second\nfield naming which kind of person this is could disagree with this one, and\nthe day they disagreed a client would have to choose which to believe.\n\nThe id and nothing else. What that member is called, what they may watch and\nwhat they have left are read from the household report, which already carries\nall of it per member — so there is one fact here and no second copy of\nanything that could go stale against the read.",
+      "description": "The household member this session is for, where it is a member's.\n\n**Absent is the operator**, which is the whole of the discriminator. A second\nfield naming which kind of person this is could disagree with this one, and\nthe day they disagreed a client would have to choose which to believe.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "The member's display name as the media server holds it, where it is a member's.",
       "type": [
         "string",
         "null"

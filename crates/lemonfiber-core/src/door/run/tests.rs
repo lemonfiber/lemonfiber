@@ -521,7 +521,7 @@ async fn the_door_the_operator_named_is_the_one_that_is_given() {
         Some("Jellyfin".to_owned())
     );
     assert_eq!(
-        report.as_ref().map(|report| report.chosen.clone()),
+        report.as_ref().and_then(|report| report.chosen.clone()),
         Some(Chosen::Named("door".to_owned()))
     );
     assert_eq!(
@@ -555,7 +555,7 @@ async fn a_named_door_the_household_tier_does_not_publish_is_refused_and_said() 
         .await
         .ok();
 
-    let refused = report.as_ref().map(|report| report.chosen.clone());
+    let refused = report.as_ref().and_then(|report| report.chosen.clone());
     assert!(
         matches!(refused, Some(Chosen::Refused(Refusal { ref named, .. })) if named == "sonarr"),
         "{refused:?}"
