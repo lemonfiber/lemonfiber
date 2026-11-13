@@ -21,6 +21,101 @@ async fn a_choice_for_the_household_answers_with_the_household() {
     assert!(said.starts_with("the household"), "{said}");
 }
 
+/// A member whose own account holds another arrangement is named as keeping it, with the
+/// command that changes theirs; one already under the choice is not named.
+#[tokio::test]
+async fn a_member_keeping_their_own_is_named_with_how_to_change_theirs() {
+    let choose = |policy, quota| Chosen {
+        member: None,
+        policy: Some(policy),
+        quota,
+    };
+
+    let unlimited = allowing(&a_household("keeps"), &choose(Policy::Trusted, None))
+        .await
+        .unwrap_or_default();
+    let matching = allowing(
+        &a_household("matches"),
+        &choose(Policy::WithinALimit, Some(FIVE_A_WEEK)),
+    )
+    .await
+    .unwrap_or_default();
+
+    assert_eq!(
+        unlimited.findings.get(1),
+        Some(&kept_line("Alex")),
+        "{:?}",
+        unlimited.findings
+    );
+    assert!(
+        kept_line("Alex").ends_with("lemonfiber household allow --member Alex changes theirs"),
+        "{}",
+        kept_line("Alex")
+    );
+    assert!(
+        !matching.findings.contains(&kept_line("Alex")),
+        "{:?}",
+        matching.findings
+    );
+}
+
+/// Nobody is named as keeping their own where no media server says who is here.
+#[tokio::test]
+async fn nobody_is_named_where_no_media_server_says_who_is_here() {
+    let household = a_household("unserved");
+    let bare = a_context().build();
+    let (Ok(served), Ok(unserved)) = (household.stack.manifest(), bare.stack.manifest()) else {
+        unreachable!("the shipped stack does not read");
+    };
+    let Ok(access) = crate::household::run::reaching(&household, &served).await else {
+        unreachable!("the household's request service was not reached");
+    };
+    let wanted = holding(true, None);
+
+    assert_eq!(
+        kept_as_they_were(&household, &access, &served, &wanted).await,
+        vec![kept_line("Alex")]
+    );
+    assert_eq!(
+        kept_as_they_were(&bare, &access, &unserved, &wanted).await,
+        Vec::<String>::new()
+    );
+}
+
+/// A household or a member's arrangement that will not read names nobody, and the choice
+/// is still written.
+#[tokio::test]
+async fn an_unread_arrangement_names_nobody_and_the_choice_is_written() {
+    let broken = [
+        (
+            "unlisted",
+            crate::test_support::media::identity("household"),
+        ),
+        ("unheld", request_service::intake("requesting")),
+    ];
+
+    for (tag, rule) in broken {
+        let report = allowing(
+            &refusing(tag, vec![rule]),
+            &Chosen {
+                member: None,
+                policy: Some(Policy::Trusted),
+                quota: None,
+            },
+        )
+        .await
+        .unwrap_or_default();
+
+        let first = report.findings.first().cloned().unwrap_or_default();
+        assert!(first.starts_with("the household"), "{tag}: {first}");
+        assert!(
+            !report.findings.contains(&kept_line("Alex")),
+            "{tag}: {:?}",
+            report.findings
+        );
+    }
+}
+
 /// A choice for one person names them, and leaves the household's own alone.
 #[tokio::test]
 async fn a_choice_for_one_person_names_them() {
@@ -116,6 +211,11 @@ async fn a_rehearsal_says_what_it_would_do_and_writes_nothing() {
     .await
     .unwrap_or_default();
 
+    assert!(
+        report.findings.contains(&kept_line("Alex")),
+        "{:?}",
+        report.findings
+    );
     for said in [report, one_person] {
         let first = said.findings.first().cloned().unwrap_or_default();
         assert!(first.contains("rehearsed"), "{first}");
@@ -302,6 +402,12 @@ fn each_arrangement_reads_back_as_its_own_line() {
         "may ask for 5 requests a week without anybody seeing it first"
     );
     assert!(now_reads(&holding(false, Some(FIVE_A_WEEK))).starts_with("waits for you"));
-    assert!(now_reads(&holding(true, None)).contains("everything anybody asks for"));
-    assert!(now_reads(&holding(false, None)).contains("until you have said yes"));
+    assert_eq!(
+        now_reads(&holding(true, None)),
+        "is set so that everything anybody asks for arrives, however much of it"
+    );
+    assert_eq!(
+        now_reads(&holding(false, None)),
+        "is set so that nothing arrives until you have said yes to it"
+    );
 }

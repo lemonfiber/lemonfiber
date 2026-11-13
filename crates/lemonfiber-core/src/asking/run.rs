@@ -46,12 +46,12 @@ pub(crate) async fn allowing(ctx: &Ctx, chosen: &Chosen) -> Result<HouseholdRepo
     // limit onto somebody who had one of their own, which is the opposite of leaving
     // alone what nobody named.
     let said = match chosen.member.as_deref() {
-        Some(name) => one_person(ctx, &access, &manifest, name, chosen).await?,
-        None => everybody(ctx, &access, chosen).await?,
+        Some(name) => vec![one_person(ctx, &access, &manifest, name, chosen).await?],
+        None => everybody(ctx, &access, &manifest, chosen).await?,
     };
 
     let mut report = crate::household::run::household(ctx, None).await?;
-    report.findings.insert(0, said);
+    report.findings.splice(0..0, said);
     Ok(report)
 }
 
@@ -95,12 +95,18 @@ fn settled(chosen: &Chosen, held: &Asking) -> Result<Asking, Box<Problem>> {
 }
 
 /// Write the choice against the household, so it holds for everybody nobody chose
-/// otherwise for.
+/// otherwise for; and name each member it leaves as they were.
+///
+/// **A member the request service already holds an account for keeps their own.** The
+/// household's setting is what an account is made with, so the choice reaches nobody
+/// already there; each one whose arrangement differs is named with the command that
+/// changes theirs, rather than the operator reading that everybody is under it.
 async fn everybody(
     ctx: &Ctx,
     access: &HouseholdAccess,
+    manifest: &lemonfiber_manifest::Manifest,
     chosen: &Chosen,
-) -> Result<String, Box<Problem>> {
+) -> Result<Vec<String>, Box<Problem>> {
     let held = access
         .requests
         .asking()
@@ -108,15 +114,64 @@ async fn everybody(
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
     let wanted = settled(chosen, &held)?;
     let said = format!("the household {}", now_reads(&wanted));
+    let kept = kept_as_they_were(ctx, access, manifest, &wanted).await;
     if ctx.dry_run {
-        return Ok(format!("{said} — rehearsed, and nothing was written"));
+        let mut rehearsed = vec![format!("{said} — rehearsed, and nothing was written")];
+        rehearsed.extend(kept);
+        return Ok(rehearsed);
     }
     access
         .requests
         .set_asking(&wanted)
         .await
         .map_err(|_| Box::new(crate::asking::unreachable(NOTHING_SET)))?;
-    Ok(said)
+    let mut written = vec![said];
+    written.extend(kept);
+    Ok(written)
+}
+
+/// Each member who is not an administrator and whose own account holds an arrangement
+/// other than `wanted`, as the line naming them and the command that changes theirs.
+///
+/// Nobody where the household cannot be read: the choice is still written, and a
+/// member who could not be asked about is not one shown to be left out.
+async fn kept_as_they_were(
+    ctx: &Ctx,
+    access: &HouseholdAccess,
+    manifest: &lemonfiber_manifest::Manifest,
+    wanted: &Asking,
+) -> Vec<String> {
+    let Some(server) = identity(ctx, manifest).await else {
+        return Vec::new();
+    };
+    let Ok(accounts) = server.household().await else {
+        return Vec::new();
+    };
+    let mut kept = Vec::new();
+    for account in accounts
+        .iter()
+        .filter(|account| !account.access.administrator)
+    {
+        let Ok(Some(held)) = access.requests.requesting(&account.id).await else {
+            continue;
+        };
+        let Ok(headroom) = access.requests.left(&held.id).await else {
+            continue;
+        };
+        if theirs(held.approves_own, headroom) != *wanted {
+            kept.push(kept_line(&account.name));
+        }
+    }
+    kept
+}
+
+/// The line naming `name` as keeping their own arrangement, with the command that
+/// changes theirs.
+fn kept_line(name: &str) -> String {
+    format!(
+        "{name} keeps an arrangement of their own, which this does not change; \
+         lemonfiber household allow --member {name} changes theirs"
+    )
 }
 
 /// Write the choice against one person, leaving the household's own where it is.
@@ -238,7 +293,7 @@ fn now_reads(wanted: &Asking) -> String {
             "waits for you, and is counted against {}",
             crate::asking::limit(quota)
         ),
-        None => format!("now {}", policy.means()),
+        None => format!("is set so that {}", policy.means()),
     }
 }
 
