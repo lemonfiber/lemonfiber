@@ -82,8 +82,7 @@ pub(crate) async fn held(ctx: &Ctx, server: &dyn crate::ports::service::Househol
     let cutoff = ctx.hours_ago(HOURS_TO_CLAIM);
     let since = ctx.hours_ago(HOURS_OF_RECORD);
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
-    let (Ok(household), Ok(records)) =
-        (server.household().await, server.when_invited(&since).await)
+    let (Ok(household), Ok(records)) = (server.household().await, server.when_invited(since).await)
     else {
         return Held {
             household: Vec::new(),

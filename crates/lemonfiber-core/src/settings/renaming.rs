@@ -186,7 +186,7 @@ fn regranted(ctx: &Ctx, env: &std::path::Path, pairs: &[(String, String)]) -> Re
             Some(previous),
             &text,
             super::OPERATION,
-            &ctx.stamp(),
+            ctx.stamp(),
         )],
     )?;
     store::write(&at, &text)

@@ -176,7 +176,11 @@ fn only_a_standing_fault_with_a_repair_is_reported_as_beyond_one() {
         "incoming connections are not reaching the client",
         "move it",
     );
-    conditions.observe("vpn.port-forward-client", Some(&fault), "1000");
+    conditions.observe(
+        "vpn.port-forward-client",
+        Some(&fault),
+        crate::instant::Instant::from_seconds(1000),
+    );
     for _ in 0..ATTEMPTS {
         conditions.attempted("vpn.port-forward-client");
     }
@@ -196,7 +200,11 @@ fn only_a_standing_fault_with_a_repair_is_reported_as_beyond_one() {
     assert!(named(beyond(&conditions.all(), &[])).is_empty());
 
     // And once it clears, it is not something that outlasted its repairs any more.
-    conditions.observe("vpn.port-forward-client", None, "2000");
+    conditions.observe(
+        "vpn.port-forward-client",
+        None,
+        crate::instant::Instant::from_seconds(2000),
+    );
     assert!(named(beyond(
         &conditions.all(),
         &[repair("vpn.port-forward-client")]

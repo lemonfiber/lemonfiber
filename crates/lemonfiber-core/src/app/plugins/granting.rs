@@ -7,6 +7,7 @@ use super::following::diagnosed;
 use crate::credential::{Granted, Revoked};
 use crate::error::codes::plugin::{NO_GRANT, UNAIMED_CROSSING};
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::{holds, FirstParty};
 use crate::plugin::{Grant, Installed, Register};
@@ -95,7 +96,7 @@ pub(crate) fn asked(
                 credential,
                 of: secret.of.clone(),
                 serves,
-                at: String::new(),
+                at: Instant::EPOCH,
             });
         }
     }
@@ -103,11 +104,11 @@ pub(crate) fn asked(
 }
 
 /// Each of `grants` stamped as approved at `stamp`.
-pub(crate) fn approved(grants: &[Grant], stamp: &str) -> Vec<Grant> {
+pub(crate) fn approved(grants: &[Grant], stamp: Instant) -> Vec<Grant> {
     grants
         .iter()
         .map(|grant| Grant {
-            at: stamp.to_owned(),
+            at: stamp,
             ..grant.clone()
         })
         .collect()
@@ -124,7 +125,7 @@ pub(crate) fn journalled(
     plugin: &str,
     was: &[Grant],
     now: &[Grant],
-    stamp: &str,
+    stamp: Instant,
 ) -> Result<(), Box<Problem>> {
     let ended = was
         .iter()
@@ -148,7 +149,7 @@ pub(crate) fn journalled(
 }
 
 /// The journalled change of `plugin` being given `grant`, or of the grant ending.
-fn change(plugin: &str, grant: &Grant, given: bool, stamp: &str) -> Change {
+fn change(plugin: &str, grant: &Grant, given: bool, stamp: Instant) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: crate::plugin::owner(plugin),

@@ -247,7 +247,7 @@ pub struct Finding {
     /// move it. Absent where the finding says nothing is wrong, and where the checks
     /// ran for something other than a diagnosis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub onset: Option<String>,
+    pub onset: Option<crate::instant::Instant>,
     /// What checking it disturbs, where the read left it unverified because checking it
     /// disturbs something, and how a diagnosis is asked to run it.
     #[serde(default, skip_serializing_if = "Option::is_none")]

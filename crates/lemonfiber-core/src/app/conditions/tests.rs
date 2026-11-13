@@ -17,7 +17,7 @@ fn stalled() -> Conditions {
             "nothing is arriving for them",
             "check the indexer is answering",
         )),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     conditions
 }
@@ -167,7 +167,11 @@ fn a_finding_in_trouble_carries_when_the_stack_first_saw_it_wrong() {
 fn a_check_that_came_right_and_went_wrong_again_carries_the_later_time() {
     let ctx = ctx_at("dated-again");
     let mut conditions = full_since("1000");
-    conditions.observe("storage.space", None, "1500");
+    conditions.observe(
+        "storage.space",
+        None,
+        crate::instant::Instant::from_seconds(1500),
+    );
     save(&ctx, &conditions);
 
     let found = dated(&ctx, vec![found(Verdict::Fail(full()))]);
@@ -229,7 +233,7 @@ fn a_save_leaves_what_another_run_wrote_meanwhile() {
             "nothing is arriving for them",
             "check the indexer is answering",
         )),
-        "2000",
+        crate::instant::Instant::from_seconds(2000),
     );
     save(&ctx, &held);
 

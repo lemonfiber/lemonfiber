@@ -8,6 +8,7 @@ use crate::config::paths::SETTINGS;
 use crate::device_keys::run::apps_changed;
 use crate::error::codes::setting::{ALREADY_HOLDS, OWNER_SET_UP, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::model::{SettingChange, SettingMove, SettingsReport, Waiting};
 
@@ -197,7 +198,7 @@ fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>
     fences::settings_takes(setting, readers.settings.contains_key(setting))
 }
 
-fn journalled(one: &SettingMove, stamp: &str) -> Change {
+fn journalled(one: &SettingMove, stamp: Instant) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),

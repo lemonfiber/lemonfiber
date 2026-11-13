@@ -18,7 +18,7 @@ pub struct Registered {
     /// The app that made it, as `LEMONFIBER_DEVICE_KEY_APPS` spells an identity.
     pub app: String,
     /// When it was registered.
-    pub registered: String,
+    pub registered: crate::instant::Instant,
 }
 
 /// One device key as the listing shows it.
@@ -34,11 +34,11 @@ pub struct Listed {
     /// The app that made it.
     pub app: String,
     /// When it was registered.
-    pub registered: String,
+    pub registered: crate::instant::Instant,
     /// When it last proved a mint, where it has.
-    pub used: Option<String>,
+    pub used: Option<crate::instant::Instant>,
     /// When it was revoked, where it has been.
-    pub revoked: Option<String>,
+    pub revoked: Option<crate::instant::Instant>,
 }
 
 /// Every device key this machine has registered, and what became of a revoke.
@@ -60,7 +60,7 @@ pub struct Challenged {
     /// The challenge, in base64url, signed as it is written here.
     pub challenge: String,
     /// When it stops standing, one minute after it was issued.
-    pub expires: String,
+    pub expires: crate::instant::Instant,
 }
 
 /// What is said of a challenge: when it lapses, and not the challenge.
@@ -79,9 +79,9 @@ impl From<&Record> for Listed {
             fingerprint: record.fingerprint.clone(),
             backing: record.backing,
             app: record.app.clone(),
-            registered: record.registered.clone(),
-            used: record.used.clone(),
-            revoked: record.revoked.clone(),
+            registered: record.registered,
+            used: record.used,
+            revoked: record.revoked,
         }
     }
 }
@@ -93,7 +93,7 @@ impl From<&Record> for Registered {
             fingerprint: record.fingerprint.clone(),
             backing: record.backing,
             app: record.app.clone(),
-            registered: record.registered.clone(),
+            registered: record.registered,
         }
     }
 }

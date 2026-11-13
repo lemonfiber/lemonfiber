@@ -106,15 +106,16 @@ pub struct Record {
     /// The app that made it, as the setting spells an identity.
     pub app: String,
     /// When it was registered.
-    pub registered: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub registered: crate::instant::Instant,
     /// The fingerprint of the password it was registered under.
     pub under: String,
     /// When it last proved a mint, where it has.
-    #[serde(default)]
-    pub used: Option<String>,
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub used: Option<crate::instant::Instant>,
     /// When it was revoked, where it has been.
-    #[serde(default)]
-    pub revoked: Option<String>,
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub revoked: Option<crate::instant::Instant>,
 }
 
 impl Record {

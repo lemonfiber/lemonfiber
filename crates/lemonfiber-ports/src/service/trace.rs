@@ -6,6 +6,8 @@ use async_trait::async_trait;
 
 use super::Failure;
 
+use crate::instant::Instant;
+
 /// One library item a trace could follow: its id, the title it was found by, and
 /// whether the service is monitoring it — the entry point for "where is my show?".
 #[derive(
@@ -35,8 +37,12 @@ pub struct FoundItem {
 pub struct TraceEvent {
     /// What happened.
     pub outcome: crate::service::stage::Outcome,
-    /// When it happened, as the service reported it.
-    pub at: String,
+    /// When it happened, where the service reported it.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub at: Option<Instant>,
     /// The part of the item it happened to — an episode — where the service files its
     /// history that way. A film's history names no part.
     pub part: Option<i64>,

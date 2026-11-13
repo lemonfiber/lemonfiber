@@ -39,7 +39,7 @@ impl Household for Upstream {
                 administrator: false,
                 disabled: false,
             },
-            last_seen: Some("2026-10-09T08:00:00Z".to_owned()),
+            last_seen: Some(lemonfiber_ports::Instant::from_seconds(1_791_532_800)),
         }])
     }
     async fn whoever(
@@ -74,10 +74,13 @@ impl Household for Upstream {
         self.tell(format!("withdraw {id}"));
         Ok(())
     }
-    async fn when_invited(&self, since: &str) -> Result<Vec<Invited>, Failure> {
+    async fn when_invited(
+        &self,
+        since: lemonfiber_ports::Instant,
+    ) -> Result<Vec<Invited>, Failure> {
         Ok(vec![Invited {
             member: "a7f3".to_owned(),
-            at: since.to_owned(),
+            at: Some(since),
         }])
     }
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {

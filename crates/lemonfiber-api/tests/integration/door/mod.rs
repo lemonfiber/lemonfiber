@@ -486,7 +486,10 @@ impl Household for AHousehold {
     async fn withdraw(&self, _: &str) -> Result<(), Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
-    async fn when_invited(&self, _: &str) -> Result<Vec<Invited>, Failure> {
+    async fn when_invited(
+        &self,
+        _: lemonfiber_core::instant::Instant,
+    ) -> Result<Vec<Invited>, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
     async fn libraries(&self) -> Result<Vec<NamedLibrary>, Failure> {

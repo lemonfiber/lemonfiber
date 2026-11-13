@@ -64,7 +64,7 @@ pub struct HandedSession {
     /// The app it signed in with.
     pub client: String,
     /// When the media server last heard from it, where it says.
-    pub last_seen: Option<String>,
+    pub last_seen: Option<crate::instant::Instant>,
 }
 
 /// One app a device can be pointed at the stack with, and the code that points it.
@@ -110,8 +110,8 @@ pub struct Handoff {
     /// What is worth knowing about that address, where anything is: most often that it
     /// answers only on the home network.
     pub caution: Option<String>,
-    /// When a code was first issued for them, as an instant. Absent until one is.
-    pub issued: Option<String>,
+    /// When a code was first issued for them. Absent until one is.
+    pub issued: Option<crate::instant::Instant>,
     /// Whether the media server offers the sign-in by short code, where one account already
     /// signed in approves another device.
     pub quick_connect: bool,

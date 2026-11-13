@@ -16,7 +16,7 @@ pub struct TraceStage {
     pub service: String,
     /// When it happened, as the service reported it — absent for a stage inferred
     /// rather than timed, such as being monitored.
-    pub at: Option<String>,
+    pub at: Option<crate::instant::Instant>,
 }
 
 /// One moment in a traced item's history: what happened and when. Where [`TraceStage`]
@@ -27,8 +27,8 @@ pub struct TraceStage {
 pub struct TraceMoment {
     /// What happened.
     pub outcome: crate::trace::Outcome,
-    /// When the service reported it.
-    pub at: String,
+    /// When it happened, where the service reported it.
+    pub at: Option<crate::instant::Instant>,
 }
 
 /// What a search that could tell this trace's stall apart would spend, and what it covers.

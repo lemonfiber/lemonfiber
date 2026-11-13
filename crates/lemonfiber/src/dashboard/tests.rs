@@ -25,7 +25,11 @@ pub(crate) fn a_transfer() -> Transfer {
 pub(crate) fn a_snapshot() -> Snapshot {
     Snapshot {
         telemetry: Telemetry::Live,
-        health: Summary::of(Reach::Running, &[], "1000"),
+        health: Summary::of(
+            Reach::Running,
+            &[],
+            lemonfiber_core::instant::Instant::from_seconds(1000),
+        ),
         vpn: None,
         transfers: Panel::Ready(vec![a_transfer()]),
         queue: Panel::Ready(Vec::new()),

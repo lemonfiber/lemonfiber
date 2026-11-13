@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::instant::Instant;
 use crate::ports::service::{Invited, Member};
 
 /// How long an invitation stands before it is withdrawn.
@@ -51,10 +52,12 @@ pub(crate) type Offers = BTreeMap<String, Offer>;
 /// One offer, as this program recorded making it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Offer {
-    /// When it was offered, written the way the server writes a moment.
-    pub(crate) offered: String,
+    /// When it was offered.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub(crate) offered: Instant,
     /// When it runs out.
-    pub(crate) lapses: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub(crate) lapses: Instant,
     /// The hash of the token its decline address carries, where the stack runs the
     /// decline service. The token itself went out on the invitation and is kept
     /// nowhere, so a copy of this record declines nobody.
@@ -72,7 +75,7 @@ pub struct Offered {
     /// The account it is about.
     pub member: Member,
     /// When it was offered, absent where nothing records it.
-    pub at: Option<String>,
+    pub at: Option<Instant>,
 }
 
 /// The invitations among a household: the accounts somebody could still claim.
@@ -96,9 +99,8 @@ pub(crate) fn offered(
             let at = invited
                 .iter()
                 .filter(|record| record.member == member.id)
-                .map(|record| record.at.clone())
-                .chain(offers.get(&member.id).map(|offer| offer.offered.clone()))
-                .filter(|at| comparable(at))
+                .filter_map(|record| record.at)
+                .chain(offers.get(&member.id).map(|offer| offer.offered))
                 .max();
             Offered { member, at }
         })
@@ -123,14 +125,12 @@ impl Spent {
 
 /// The invitations that have run out: offered before `cutoff`, or never dated at all.
 ///
-/// `cutoff` and each date are compared as text, which sorts correctly because each is an
-/// ISO-8601 instant ending in `Z`. A date that is not one was dropped by [`offered`], so an
-/// invitation carrying none here is one nothing could date.
+/// An invitation carrying no date here is one nothing could date.
 #[must_use]
-pub(crate) fn run_out(offered: &[Offered], cutoff: &str) -> Spent {
+pub(crate) fn run_out(offered: &[Offered], cutoff: Instant) -> Spent {
     let mut spent = Spent::default();
     for invitation in offered {
-        if invitation.at.as_deref().is_some_and(|at| at >= cutoff) {
+        if invitation.at.is_some_and(|at| at >= cutoff) {
             continue;
         }
         if invitation.member.last_seen.is_some() {
@@ -151,7 +151,7 @@ pub(crate) fn run_out(offered: &[Offered], cutoff: &str) -> Spent {
 /// was invited.
 #[must_use]
 pub(crate) fn recorded(offers: Offers, household: &[Member], member: &str, offer: Offer) -> Offers {
-    let mut offers = closed(offers, household, &offer.offered);
+    let mut offers = closed(offers, household, offer.offered);
     offers.insert(member.to_owned(), offer);
     offers
 }
@@ -161,7 +161,7 @@ pub(crate) fn recorded(offers: Offers, household: &[Member], member: &str, offer
 /// An offer is no longer out where its account is gone, or was claimed before the offer
 /// ran out. One claimed and run out stays: see [`recorded`].
 #[must_use]
-pub(crate) fn closed(mut offers: Offers, household: &[Member], now: &str) -> Offers {
+pub(crate) fn closed(mut offers: Offers, household: &[Member], now: Instant) -> Offers {
     offers.retain(|id, offer| {
         household
             .iter()
@@ -177,25 +177,13 @@ pub(crate) fn closed(mut offers: Offers, household: &[Member], now: &str) -> Off
 /// it, which is every member who was not invited by this program or whose offer was seen
 /// taken up.
 #[must_use]
-pub(crate) fn lapsed_unseen(offers: &Offers, id: &str, now: &str) -> bool {
+pub(crate) fn lapsed_unseen(offers: &Offers, id: &str, now: Instant) -> bool {
     offers.get(id).is_some_and(|offer| lapsed(offer, now))
 }
 
 /// Whether an offer has run out at `now`.
-///
-/// One whose end cannot be read has, for the reason an undated invitation has: what is at
-/// stake is an account nobody was seen to claim.
-fn lapsed(offer: &Offer, now: &str) -> bool {
-    !comparable(&offer.lapses) || offer.lapses.as_str() <= now
-}
-
-/// Whether a recorded moment is one this can order against another.
-///
-/// The server writes an ISO-8601 instant ending in `Z`, and so does this program. Anything
-/// else — a local time, an empty string, a shape a later version invents — is not
-/// something to compare as text.
-fn comparable(moment: &str) -> bool {
-    moment.ends_with('Z') && moment.len() >= "2026-08-29T00:00:00Z".len()
+fn lapsed(offer: &Offer, now: Instant) -> bool {
+    offer.lapses <= now
 }
 
 #[cfg(test)]

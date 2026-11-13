@@ -415,7 +415,7 @@ fn an_archive(scope: Scope, sensitive: bool, members: Vec<Member>) -> crate::bac
     crate::backup::Manifest {
         schema: SCHEMA,
         product_version: CURRENT.to_owned(),
-        created_at: "2026-07-30T00:00:00Z".to_owned(),
+        created_at: crate::instant::Instant::from_seconds(1_785_369_600),
         data_root: "/srv/media".to_owned(),
         scope,
         sensitive,
@@ -620,7 +620,7 @@ fn holding_a_device_key(named: &str, root: &str, vault: &Arc<FakeArchive>) -> (C
             fingerprint: "ab".repeat(32),
             backing: Backing::Tee,
             app: app.clone(),
-            registered: "2026-10-12T06:00:00Z".to_owned(),
+            registered: crate::instant::Instant::from_seconds(1_791_784_800),
             under: credential.fingerprint(),
             used: None,
             revoked: None,

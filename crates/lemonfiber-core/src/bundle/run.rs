@@ -196,7 +196,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         taken: Taken {
             lemonfiber: lemonfiber.to_owned(),
             stack,
-            at: instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+            at: ctx.stamp(),
         },
         terms,
     })

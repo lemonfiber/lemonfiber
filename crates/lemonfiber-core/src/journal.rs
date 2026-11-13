@@ -22,6 +22,8 @@ mod undoing;
 
 use serde::{Deserialize, Serialize};
 
+use crate::instant::Instant;
+
 pub use acting::{Action, Undo};
 pub use keeping::{horizon, kept, runs, RUNS_KEPT};
 pub use sealing::{is_sealed, Seal, KEY_FILE};
@@ -54,8 +56,9 @@ pub const OPERATIONS: [&str; 11] = [
 /// before and after.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Change {
-    /// When it was made. Opaque here; the surface stamps it from the clock.
-    pub at: String,
+    /// When it was made.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub at: Instant,
     /// The operation that made it — a seed, a reconfigure, an applied fix — so a
     /// browsable history reads as what happened rather than as bare diffs.
     pub operation: String,

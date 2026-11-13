@@ -426,7 +426,7 @@ fn observed(ctx: &Ctx, fault: Option<&Fault>) {
         return;
     }
     let mut conditions = super::conditions::load(ctx);
-    conditions.observe(CHECK, fault, &ctx.stamp());
+    conditions.observe(CHECK, fault, ctx.stamp());
     super::conditions::save(ctx, &conditions);
 }
 

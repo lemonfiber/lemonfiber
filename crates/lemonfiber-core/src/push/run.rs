@@ -126,7 +126,7 @@ pub fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
                 endpoint,
                 p256dh,
                 auth,
-                registered: crate::instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+                registered: ctx.stamp(),
                 owed: 0,
                 owner,
                 wakes: Vec::new(),
@@ -161,7 +161,7 @@ fn register(ctx: &Ctx, record: &Record) -> Result<Registered, Box<Problem>> {
     let answer = Registered {
         name: record.name.clone(),
         endpoint: record.endpoint.clone(),
-        registered: record.registered.clone(),
+        registered: record.registered,
         rehearsed: ctx.dry_run,
     };
     let mut refused = None;

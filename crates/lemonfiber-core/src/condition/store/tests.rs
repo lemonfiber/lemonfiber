@@ -19,7 +19,7 @@ fn stalled() -> Conditions {
     conditions.observe(
         "queue.stalled",
         Some(&wrong(Severity::Warning, "two downloads have not moved")),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
     conditions
 }
@@ -32,7 +32,7 @@ fn attempts_count_repairs_that_left_the_fault_standing() {
     conditions.observe(
         "vpn.port-forward-client",
         Some(&wrong(Severity::Warning, "it is on the wrong port")),
-        "1000",
+        crate::instant::Instant::from_seconds(1000),
     );
 
     conditions.attempted("vpn.port-forward-client");
@@ -76,7 +76,7 @@ fn a_standing_fault_seen_again_is_the_same_condition() {
     conditions.observe(
         "queue.stalled",
         Some(&wrong(Severity::Error, "and now the disk is full")),
-        "2000",
+        crate::instant::Instant::from_seconds(2000),
     );
     assert_eq!(conditions.raised().len(), 1, "one problem, not two");
     let condition = conditions.get("queue.stalled");
@@ -92,7 +92,11 @@ fn a_check_that_finds_nothing_clears_what_it_raised() {
     // The self-resolving stall: it went away on its own, and that is recorded
     // rather than silently forgotten.
     let mut conditions = stalled();
-    conditions.observe("queue.stalled", None, "1500");
+    conditions.observe(
+        "queue.stalled",
+        None,
+        crate::instant::Instant::from_seconds(1500),
+    );
     assert!(conditions.raised().is_empty());
     let cleared = conditions
         .get("queue.stalled")
@@ -105,7 +109,11 @@ fn a_healthy_check_that_never_failed_writes_nothing() {
     // Inventing a cleared condition for every passing check would fill the
     // store with things that never happened.
     let mut conditions = Conditions::new();
-    conditions.observe("vpn.egress-match", None, "1000");
+    conditions.observe(
+        "vpn.egress-match",
+        None,
+        crate::instant::Instant::from_seconds(1000),
+    );
     assert!(conditions.is_empty());
 }
 
@@ -118,7 +126,11 @@ fn what_is_wrong_is_listed_worst_first_and_stably_within_a_severity() {
         ("a.warn", Severity::Warning),
         ("c.error", Severity::Error),
     ] {
-        conditions.observe(check, Some(&wrong(severity, "wrong")), "1000");
+        conditions.observe(
+            check,
+            Some(&wrong(severity, "wrong")),
+            crate::instant::Instant::from_seconds(1000),
+        );
     }
     let order: Vec<&str> = conditions
         .raised()
@@ -172,14 +184,18 @@ fn the_store_round_trips_through_its_serialised_form() {
 fn a_copy_lays_only_what_it_changed_over_the_store_as_it_stands() {
     let read = stalled();
     let mut copy = read.clone();
-    copy.observe("queue.stalled", None, "2000");
+    copy.observe(
+        "queue.stalled",
+        None,
+        crate::instant::Instant::from_seconds(2000),
+    );
     copy.forget("never.there");
 
     let mut meanwhile = read;
     meanwhile.observe(
         "storage.space",
         Some(&wrong(Severity::Error, "the volume is full")),
-        "1500",
+        crate::instant::Instant::from_seconds(1500),
     );
     let written = copy.over(meanwhile);
 

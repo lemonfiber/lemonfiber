@@ -15,7 +15,7 @@ fn raised(check: &str, cause: Option<&str>) -> Condition {
         "start it",
     );
     fault.caused_by = cause.map(str::to_owned);
-    Condition::raised(check, &fault, "1000")
+    Condition::raised(check, &fault, crate::instant::Instant::from_seconds(1000))
 }
 
 /// A repair answering `check` and nothing else.
@@ -214,7 +214,7 @@ fn a_repair_is_offered_while_it_is_wanted_and_might_still_work() {
     assert!(exhausted(&condition), "it has had its chances");
     condition.attempts = 0;
 
-    condition.clear("2000");
+    condition.clear(crate::instant::Instant::from_seconds(2000));
     assert!(!offerable(&condition), "nothing to put right");
 }
 
@@ -225,7 +225,7 @@ fn a_fault_that_comes_back_is_worth_trying_again() {
     let mut condition = raised("service.sonarr", None);
     condition.attempts = ATTEMPTS;
     condition.declined = true;
-    condition.clear("2000");
+    condition.clear(crate::instant::Instant::from_seconds(2000));
 
     let fault = Fault::new(
         "service.stopped",
@@ -234,7 +234,7 @@ fn a_fault_that_comes_back_is_worth_trying_again() {
         "nothing that needs it is working",
         "start it",
     );
-    condition.raise(&fault, "3000");
+    condition.raise(&fault, crate::instant::Instant::from_seconds(3000));
 
     assert_eq!(condition.attempts, 0);
     assert!(!condition.declined);

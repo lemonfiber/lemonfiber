@@ -77,7 +77,7 @@ fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) 
         .map_or((None, None), |why| (Some(why.because), why.instead));
 
     ChangeReport {
-        at: stamped(&change.at),
+        at: change.at,
         operation: change.operation.clone(),
         target: change.target.clone(),
         did: did(&change.kind),
@@ -85,21 +85,6 @@ fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) 
         because,
         instead,
         alongside,
-    }
-}
-
-/// A change's stamp as the report promises it: whole seconds since the epoch.
-///
-/// Every stamp this build writes is already that. A journal outlives the build that
-/// wrote it, though, and an earlier one wrote an empty stamp where its clock would not
-/// answer — so anything that is not digits is read as the epoch, which is how this
-/// build writes a clock that would not answer, rather than passed on as a promise the
-/// report does not keep.
-fn stamped(at: &str) -> String {
-    if !at.is_empty() && at.bytes().all(|byte| byte.is_ascii_digit()) {
-        at.to_owned()
-    } else {
-        "0".to_owned()
     }
 }
 

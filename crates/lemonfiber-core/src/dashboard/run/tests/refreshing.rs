@@ -107,7 +107,11 @@ fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() 
     // refreshes; one that has only just appeared has nothing to carry.
     let before = crate::dashboard::Snapshot {
         telemetry: Telemetry::Live,
-        health: crate::health::Summary::of(crate::health::Reach::Running, &[], "1000"),
+        health: crate::health::Summary::of(
+            crate::health::Reach::Running,
+            &[],
+            crate::instant::Instant::from_seconds(1000),
+        ),
         vpn: None,
         transfers: Panel::Ready(vec![a_transfer(Reading::Known(4096))]),
         queue: Panel::Ready(Vec::new()),

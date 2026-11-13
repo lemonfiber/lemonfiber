@@ -156,11 +156,9 @@ async fn challenged(
         .challenges
         .issued(ctx.seams.random.as_ref(), &token, &name, now)
         .await;
-    let challenged = issued.and_then(|issued| {
-        Some(Challenged {
-            challenge: issued.challenge,
-            expires: lemonfiber_core::instant::written(issued.expires)?,
-        })
+    let challenged = issued.map(|issued| Challenged {
+        challenge: issued.challenge,
+        expires: lemonfiber_core::instant::Instant::of(issued.expires),
     });
     match challenged {
         Some(challenged) => enveloped(

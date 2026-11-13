@@ -130,7 +130,9 @@ pub fn with(name: &str, broken: Vec<(&'static str, Answer)>) -> Ctx {
 pub fn the_request() -> HouseholdRequest {
     HouseholdRequest {
         id: 7,
-        made: Some("2026-08-17T21:04:09.000Z".to_owned()),
+        made: Some(lemonfiber_core::instant::Instant::from_seconds(
+            1_787_000_649,
+        )),
         member: "Alex".to_owned(),
         member_id: None,
         kind: Some(Kind::Movies),

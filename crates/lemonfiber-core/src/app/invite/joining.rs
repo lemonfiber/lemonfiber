@@ -9,6 +9,7 @@ use lemonfiber_sidecar::TokenHash;
 use crate::app::Ctx;
 use crate::companion::Material;
 use crate::error::Problem;
+use crate::instant::Instant;
 use crate::invitation::{Offers, HOURS_TO_CLAIM, RECORD};
 use crate::model::InvitationStanding;
 use crate::ports::service::Member;
@@ -35,7 +36,7 @@ pub(super) async fn joining(ctx: &Ctx, member: &Member, standing: InvitationStan
         Err(problem) => return unjoinable(&problem),
     };
     let ready = if standing == InvitationStanding::Joined {
-        super::declining::seconds(&ctx.hours_ago(-HOURS_TO_CLAIM)).map(|expires| (expires, None))
+        Some((ctx.hours_ago(-HOURS_TO_CLAIM), None))
     } else {
         claimed(ctx, &member.id)
     };
@@ -53,11 +54,10 @@ pub(super) async fn joining(ctx: &Ctx, member: &Member, standing: InvitationStan
 
 /// Mint a claim token for the offer recorded on `member`, record its hash, and say when
 /// the offer lapses; nothing where any step could not be taken.
-fn claimed(ctx: &Ctx, member: &str) -> Option<(u64, Option<String>)> {
+fn claimed(ctx: &Ctx, member: &str) -> Option<(Instant, Option<String>)> {
     let token = super::declining::minted(ctx)?;
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
-    let (offers, lapses) = with_claim(offers, member, &token)?;
-    let expires = super::declining::seconds(&lapses)?;
+    let (offers, expires) = with_claim(offers, member, &token)?;
     crate::app::record::keep(
         crate::app::targets::beside_env(ctx, RECORD).as_deref(),
         &offers,
@@ -68,16 +68,16 @@ fn claimed(ctx: &Ctx, member: &str) -> Option<(u64, Option<String>)> {
 
 /// The offers with `token`'s hash on `member`'s, which must already be recorded, and when
 /// that offer lapses.
-fn with_claim(mut offers: Offers, member: &str, token: &str) -> Option<(Offers, String)> {
+fn with_claim(mut offers: Offers, member: &str, token: &str) -> Option<(Offers, Instant)> {
     let offer = offers.get_mut(member)?;
     offer.claim = Some(TokenHash::of(token));
-    let lapses = offer.lapses.clone();
+    let lapses = offer.lapses;
     Some((offers, lapses))
 }
 
 /// The link itself: [`JOIN`] and its parameters, in a fixed order, each percent-encoded.
 #[must_use]
-fn written(material: &Material, expires: u64, name: &str, claim: Option<&str>) -> String {
+fn written(material: &Material, expires: Instant, name: &str, claim: Option<&str>) -> String {
     let mut rest = vec![("name", name)];
     if let Some(claim) = claim {
         rest.push(("claim", claim));

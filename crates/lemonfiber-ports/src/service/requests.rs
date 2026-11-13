@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use async_trait::async_trait;
 
 use super::{Credential, Endpoint, Failure, FulfilmentTarget, Protocol, RegisteredTarget};
+use crate::instant::Instant;
 use crate::media::Kind;
 
 /// One thing a household member asked for, as the request service records it.
@@ -24,9 +25,13 @@ pub struct HouseholdRequest {
     /// The number the request service files this request under, which is how one is
     /// named to it again when somebody rules on it.
     pub id: i64,
-    /// When it was asked for, as the service timestamps it — what a request waiting
+    /// When it was asked for, where the service says — what a request waiting
     /// on somebody is measured against, and what a counting period runs from.
-    pub made: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub made: Option<Instant>,
     /// The member who asked, by the name the request service shows them under.
     ///
     /// A name for saying, not for telling people apart: the request service lets
@@ -48,9 +53,13 @@ pub struct HouseholdRequest {
     /// curator has been told about — so the item cannot be named from the library, and
     /// is not claimed to be.
     pub item: Option<i64>,
-    /// When the media it asked for arrived on the media server, as the request service
-    /// timestamps it, or nothing until it is there.
-    pub arrived: Option<String>,
+    /// When the media it asked for arrived on the media server, or nothing until it is
+    /// there.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub arrived: Option<Instant>,
     /// The identifier the media server holds that media under, as the request service
     /// records it, or nothing until it is there.
     pub shelf_id: Option<String>,

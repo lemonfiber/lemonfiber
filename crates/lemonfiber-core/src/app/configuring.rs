@@ -222,7 +222,7 @@ async fn applying(
         let journal = path.with_file_name(crate::config::paths::JOURNAL);
         let entering = crate::settings::legacy::Entering {
             operation: crate::settings::OPERATION,
-            stamp: &ctx.stamp(),
+            stamp: ctx.stamp(),
             at: ctx.seconds(),
             random: ctx.seams.random.as_ref(),
         };

@@ -40,17 +40,9 @@ pub(super) async fn mint(
         .map_err(|problem| Box::new(unlinkable(&problem)))?
         .material;
     let claim = Claim::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
-    let now = ctx.seams.clock.now();
-    let lapsing = now
-        .checked_add(std::time::Duration::from_secs(
-            u64::try_from(MINUTES_TO_COLLECT * 60).unwrap_or_default(),
-        ))
-        .unwrap_or(now);
-    let lapses = crate::instant::written(lapsing).unwrap_or_default();
-    let expires = lapsing
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs());
-    let minted = crate::instant::written(now).unwrap_or_default();
+    let minted = ctx.stamp();
+    let lapses = minted
+        .later(u64::try_from(MINUTES_TO_COLLECT).unwrap_or_default() * crate::instant::MINUTE);
     let record = Record::claimed(name, scope, purpose, &claim, lapses, minted, by.clone())
         .proved_by(proved_by);
     let mut opened = Opened::at(ctx, &path).await?;
@@ -59,12 +51,8 @@ pub(super) async fn mint(
     made?;
     heard(ctx, &record, Heard::Minted).await;
     Ok(Claimed {
-        link: crate::companion::linked(KEY_LINK, &material, expires, &[("claim", claim.as_str())]),
-        lapses: record
-            .pending
-            .as_ref()
-            .map(|pending| pending.lapses.clone())
-            .unwrap_or_default(),
+        link: crate::companion::linked(KEY_LINK, &material, lapses, &[("claim", claim.as_str())]),
+        lapses,
         name: record.name,
         scope: record.scope.written(),
         purpose,
@@ -115,7 +103,7 @@ fn collected(
     kept: &mut Kept,
     offered: &str,
 ) -> Result<(Record, Secret), Box<Problem>> {
-    let now = ctx.seams.clock.now();
+    let now = ctx.stamp();
     let found = kept.awaiting(offered).filter(|&at| {
         kept.keys
             .get(at)
@@ -152,7 +140,7 @@ pub(super) fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<Vec<Recor
     if ctx.dry_run {
         return Ok(Vec::new());
     }
-    let now = ctx.seams.clock.now();
+    let now = ctx.stamp();
     let lapsed: Vec<Record> = kept
         .keys
         .iter()
@@ -168,7 +156,6 @@ pub(super) fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<Vec<Recor
     if lapsed.is_empty() {
         return Ok(lapsed);
     }
-    let written = crate::instant::written(now).unwrap_or_default();
     for record in &lapsed {
         journalled(
             ctx,
@@ -183,7 +170,7 @@ pub(super) fn lapse(ctx: &Ctx, path: &Path, kept: &mut Kept) -> Result<Vec<Recor
             .iter_mut()
             .filter(|kept| kept.name == record.name && kept.is_waiting())
         {
-            kept.revoked = Some(written.clone());
+            kept.revoked = Some(now);
         }
     }
     kept.keep(path).map_err(|why| Box::new(unkept(why)))?;

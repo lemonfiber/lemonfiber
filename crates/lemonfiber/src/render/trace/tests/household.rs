@@ -62,7 +62,9 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                 every_library: true,
                 ..MemberAccess::default()
             },
-            last_seen: Some("2026-08-30T10:00:00.0000000Z".to_owned()),
+            last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_788_084_000,
+            )),
             claimed: true,
             standing: lemonfiber_core::model::MemberStanding::Active,
             asking: None,
@@ -453,7 +455,9 @@ fn the_account_that_runs_the_server_says_so() {
                 administrator: true,
                 ..MemberAccess::default()
             },
-            last_seen: Some("2026-09-01T09:14:02.1230000Z".to_owned()),
+            last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_788_254_042,
+            )),
             claimed: true,
             ..HouseholdMember::default()
         }],

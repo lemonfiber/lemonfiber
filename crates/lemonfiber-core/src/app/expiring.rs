@@ -32,6 +32,7 @@ use std::time::{Duration, SystemTime};
 use crate::asking::Expiry;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::HouseholdReport;
 use crate::ports::service::HouseholdRequest;
 
@@ -93,7 +94,7 @@ fn agreeing(ctx: &Ctx, arranged: Arranged) -> Result<Expiry, Box<Problem>> {
             if Expiry::too_soon(days) {
                 return Err(Box::new(crate::asking::sooner_than_the_reminder(days)));
             }
-            let agreed = Expiry::agreed_to(days, crate::instant::written(ctx.seams.clock.now()));
+            let agreed = Expiry::agreed_to(days, Some(ctx.stamp()));
             if !ctx.dry_run {
                 arrangement::keep(ctx, &agreed)?;
             }
@@ -251,7 +252,7 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
             "the request service's own record could not be read, so nothing was looked at",
         );
     };
-    for request in overdue(&asked, after, ctx.seams.clock.now()) {
+    for request in overdue(&asked, after, ctx.stamp()) {
         close(ctx, &access, request, after, &asked, came_to).await;
     }
 }
@@ -263,17 +264,16 @@ async fn swept(ctx: &Ctx, after: u32, came_to: &mut CameTo) {
 /// same request, or the reminder is about a different arithmetic from the thing it warns
 /// about.
 ///
-/// A request whose date this cannot read is never closed. It has not been shown to have
+/// A request with no date is never closed. It has not been shown to have
 /// waited at all, and closing one on no evidence is the opposite of what a period is for.
-fn overdue(asked: &[HouseholdRequest], after: u32, now: SystemTime) -> Vec<&HouseholdRequest> {
+fn overdue(asked: &[HouseholdRequest], after: u32, now: Instant) -> Vec<&HouseholdRequest> {
     asked
         .iter()
         .filter(|held| {
             State::of(held.request_status, held.media_status) == Some(State::WaitingForApproval)
         })
         .filter(|held| {
-            crate::asking::waiting_for(held.made.as_deref(), now)
-                .is_some_and(|days| days >= u64::from(after))
+            crate::asking::waiting_for(held.made, now).is_some_and(|days| days >= u64::from(after))
         })
         .collect()
 }

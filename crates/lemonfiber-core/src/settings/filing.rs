@@ -8,6 +8,7 @@ use crate::config::paths::{JOURNAL, SECRETS, SETTINGS};
 use crate::config::storage::{self, Storage};
 use crate::config::store::{self, Failure};
 use crate::config::{DATA_ROOT_KEY, NAS_EXPORT_KEY, NAS_HOST_KEY};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::{holds, EMBEDDED};
 use crate::plugin::Installed;
@@ -203,7 +204,12 @@ fn candidates(env: &Path, file: &EnvFile, installed: &[Installed]) -> Vec<Filing
         .collect()
 }
 
-fn change(one: &Keeping<'_>, current: Option<String>, filings: &[Filing], stamp: &str) -> Change {
+fn change(
+    one: &Keeping<'_>,
+    current: Option<String>,
+    filings: &[Filing],
+    stamp: Instant,
+) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),
@@ -442,7 +448,7 @@ fn filed_secret(
     one: &Keeping<'_>,
     current: Option<String>,
     key: Option<String>,
-    stamp: &str,
+    stamp: Instant,
 ) -> Change {
     Change {
         at: stamp.to_owned(),
@@ -458,7 +464,7 @@ fn filed_secret(
     }
 }
 
-fn filed_setting(name: &str, value: &str, key: Option<String>, stamp: &str) -> Change {
+fn filed_setting(name: &str, value: &str, key: Option<String>, stamp: Instant) -> Change {
     Change {
         at: stamp.to_owned(),
         operation: super::OPERATION.to_owned(),

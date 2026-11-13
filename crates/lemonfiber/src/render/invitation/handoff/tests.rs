@@ -12,7 +12,9 @@ fn issued() -> Handoff {
         remedy: None,
         address: Some(ADDRESS.to_owned()),
         caution: None,
-        issued: Some("2026-09-29T10:00:00Z".to_owned()),
+        issued: Some(lemonfiber_core::instant::Instant::from_seconds(
+            1_790_676_000,
+        )),
         quick_connect: true,
         steps: vec!["Open the app.".to_owned(), "Sign in as ana.".to_owned()],
         clients: vec![HandedClient {
@@ -76,7 +78,9 @@ fn a_device_signed_in_is_named_and_no_code_is_drawn() {
         sessions: vec![HandedSession {
             device: "Pixel 8".to_owned(),
             client: "Jellyfin Android".to_owned(),
-            last_seen: Some("2026-09-29T10:05:00Z".to_owned()),
+            last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_790_676_300,
+            )),
         }],
         ..issued()
     })

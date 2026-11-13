@@ -94,8 +94,8 @@ pub struct Arguments {
     pub media_type: Option<String>,
     /// The backup to restore from, by the name it was written under.
     pub archive: Option<String>,
-    /// The stamp of the run to put back, as the history writes it.
-    pub at: Option<String>,
+    /// When the run to put back was made, as the history writes it.
+    pub at: Option<lemonfiber_core::instant::Instant>,
     /// Whether re-pointing to this machine's data root was accepted.
     pub repoint: bool,
     /// Whether to produce the bundle, rather than say what one would hold.

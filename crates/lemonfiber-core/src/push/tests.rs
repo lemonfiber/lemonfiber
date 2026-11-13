@@ -8,7 +8,7 @@ fn a_listing_holds_no_key() {
         endpoint: "https://push.example/abc".to_owned(),
         p256dh: "the-public-key".to_owned(),
         auth: "the-secret".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: crate::instant::Instant::from_seconds(1_794_009_600),
         owed: 0,
         owner: None,
         wakes: Vec::new(),

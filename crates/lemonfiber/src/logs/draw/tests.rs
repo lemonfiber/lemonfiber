@@ -11,7 +11,7 @@ fn line(service: &str, said: &str) -> LogLine {
     LogLine {
         service: service.to_owned(),
         stream: Stream::Stdout,
-        at: None,
+        stamped: None,
         line: said.to_owned(),
     }
 }

@@ -32,7 +32,7 @@ fn a_key(name: &str, state: State, member_minted: bool) -> Listed {
         scope: "act".to_owned(),
         purpose: Purpose::Other,
         state,
-        minted: "2026-10-05T06:00:00".to_owned(),
+        minted: lemonfiber_core::instant::Instant::from_seconds(1_791_180_000),
         used: None,
         revoked: (state == State::Revoked).then(|| "2026-10-05T07:00:00".to_owned()),
         member_minted,
@@ -153,7 +153,7 @@ fn a_claim_is_shown_once_as_a_link_and_a_code_with_when_it_lapses() {
         scope: "read".to_owned(),
         purpose: Purpose::Other,
         link: link.clone(),
-        lapses: "2026-10-05T06:10:00".to_owned(),
+        lapses: lemonfiber_core::instant::Instant::from_seconds(1_791_180_600),
     })
     .text();
     assert!(
@@ -189,7 +189,7 @@ fn a_device(revoked: bool) -> lemonfiber_core::device_keys::Listed {
         fingerprint: "ab".repeat(32),
         backing: lemonfiber_core::device_keys::Backing::Strongbox,
         app: "ios:ABCDE12345.app.lemon".to_owned(),
-        registered: "2026-10-13T00:00:00Z".to_owned(),
+        registered: lemonfiber_core::instant::Instant::from_seconds(1_791_849_600),
         used: (!revoked).then(|| "2026-10-13T01:00:00Z".to_owned()),
         revoked: revoked.then(|| "2026-10-13T02:00:00Z".to_owned()),
     }
@@ -202,7 +202,7 @@ fn a_device_key_registered_names_its_backing_app_and_fingerprint() {
         fingerprint: "ab".repeat(32),
         backing: lemonfiber_core::device_keys::Backing::Tee,
         app: "ios:ABCDE12345.app.lemon".to_owned(),
-        registered: "2026-10-13T00:00:00Z".to_owned(),
+        registered: lemonfiber_core::instant::Instant::from_seconds(1_791_849_600),
     })
     .text();
     assert!(
@@ -243,7 +243,7 @@ fn a_push_endpoint() -> lemonfiber_core::push::Listed {
     lemonfiber_core::push::Listed {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/abc".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: lemonfiber_core::instant::Instant::from_seconds(1_794_009_600),
     }
 }
 
@@ -252,7 +252,7 @@ fn a_push_endpoint_registered_says_it_is_woken_or_would_be() {
     let mut report = lemonfiber_core::push::Registered {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/abc".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: lemonfiber_core::instant::Instant::from_seconds(1_794_009_600),
         rehearsed: false,
     };
     let said = super::pushed(&report).text();

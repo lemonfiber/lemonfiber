@@ -22,7 +22,7 @@ pub(super) fn remark(service: &str, said: &str) -> LogLine {
     LogLine {
         service: service.to_owned(),
         stream: Stream::Stdout,
-        at: None,
+        stamped: None,
         line: format!("--- {said} ---"),
     }
 }

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::{Reach, Standing};
 use crate::condition::Condition;
 use crate::error::Severity;
+use crate::instant::Instant;
 
 /// How long a fault must have been gone before the summary calls it gone, in
 /// seconds.
@@ -49,7 +50,8 @@ pub struct Affected {
     ///
     /// The condition's own stamp, kept between runs, so every surface that reports
     /// the check names the same moment and a restart does not make an old fault new.
-    pub onset: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub onset: Instant,
     /// How bad it is.
     pub severity: Severity,
     /// What is wrong, in one line.
@@ -87,7 +89,7 @@ impl Summary {
     /// also counted is folded into its root, so the number is of problems rather
     /// than of symptoms.
     #[must_use]
-    pub fn of(reach: Reach, known: &[&Condition], now: &str) -> Self {
+    pub fn of(reach: Reach, known: &[&Condition], now: Instant) -> Self {
         let affected = Self::affected(known, now);
         let worst = affected.first().map(|first| first.severity);
         let standing = Self::standing(reach, worst);
@@ -105,7 +107,7 @@ impl Summary {
     /// stack got, and a reader that wants only the items — what is new among them,
     /// say — should not have to claim a reach it never read.
     #[must_use]
-    pub fn affected(known: &[&Condition], now: &str) -> Vec<Affected> {
+    pub fn affected(known: &[&Condition], now: Instant) -> Vec<Affected> {
         let steady: Vec<&&Condition> = known
             .iter()
             .filter(|condition| Self::counts(condition, now))
@@ -122,7 +124,7 @@ impl Summary {
             .filter(|condition| !Self::is_folded(condition, &roots, &steady))
             .map(|condition| Affected {
                 check: condition.check.clone(),
-                onset: condition.since.clone(),
+                onset: condition.since,
                 severity: condition.severity,
                 summary: condition.summary.clone(),
                 meaning: condition.meaning.clone(),
@@ -144,10 +146,7 @@ impl Summary {
     /// before: a service bouncing every few seconds is one continuous problem, and
     /// declaring it fixed in the gaps is exactly the flapping to be avoided. A fault
     /// that cleared and has stayed clear is done.
-    ///
-    /// A stamp that cannot be read counts as settled, so a clock problem cannot pin
-    /// a resolved fault to the summary forever.
-    fn counts(condition: &Condition, now: &str) -> bool {
+    fn counts(condition: &Condition, now: Instant) -> bool {
         condition.is_raised()
             || (condition.recurrences > 0
                 && condition

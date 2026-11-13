@@ -104,7 +104,7 @@ pub(crate) fn dated(ctx: &Ctx, found: Vec<Finding>) -> Vec<Finding> {
         .map(|finding| {
             let onset = wrong(&finding)
                 .and(conditions.get(&finding.check))
-                .map(|condition| condition.since.clone());
+                .map(|condition| condition.since);
             Finding { onset, ..finding }
         })
         .collect()

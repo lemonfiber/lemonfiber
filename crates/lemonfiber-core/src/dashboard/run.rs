@@ -198,7 +198,7 @@ pub async fn paced(ctx: &Ctx, previous: Option<&Gathered>) -> Gathered {
         &downloading(&transfers),
         &mut conditions,
         Thresholds::conservative(),
-        &ctx.stamp(),
+        ctx.stamp(),
     );
 
     let alerts = told(ctx, reach, &mut conditions, &found).await;
@@ -247,7 +247,7 @@ fn observe_passed(
     passed: &Asked<Option<forwarding::Pass>>,
 ) {
     if let Asked::Read(Some(pass)) = passed {
-        forwarding::observe(conditions, pass, &ctx.stamp());
+        forwarding::observe(conditions, pass, ctx.stamp());
     }
 }
 
