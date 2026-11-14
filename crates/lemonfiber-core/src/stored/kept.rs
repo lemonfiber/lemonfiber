@@ -464,6 +464,16 @@ pub const EVERY: &[Entry] = &[
         at: Paths::grants,
     },
     Entry {
+        accessor: "tuned",
+        what: "the live streams opened for members",
+        why: "Each live stream the media server opened for a member, with whom it was opened \
+              for, the channel and what closes it, so one whose pass lapsed unrenewed, or a \
+              removed member's, is closed. No pass is kept, and a stream is forgotten once it \
+              is closed.",
+        secret: false,
+        at: Paths::tuned,
+    },
+    Entry {
         accessor: "acknowledged",
         what: "the words you have gone and looked up",
         why: "So a report names a word you already know instead of explaining it again. What \

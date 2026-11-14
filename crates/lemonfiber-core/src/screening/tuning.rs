@@ -259,7 +259,6 @@ async fn ready(ctx: &Ctx, server: &Media, asker: Asker) -> Result<Ready, String>
         .map_err(|why| told(asker, why))?;
     let watching = Watching::of(&crate::pass::told(&declared))
         .map_err(|_| told(asker, UNDECLARED.to_owned()))?;
-    tuned::place(ctx).ok_or_else(|| told(asker, NOWHERE.to_owned()))?;
     Ok(Ready {
         base,
         fingerprint,
@@ -355,10 +354,6 @@ const UNCOVERED: &str = "The media server answered paths for the live stream tha
 const UNRENEWED: &str = "The pass service could not be told the passes are held for longer, \
                          so they lapse when they were issued to. Check the project directory \
                          can be written.";
-
-/// Said where there is nowhere to keep what closes a live stream.
-const NOWHERE: &str = "There is no configuration directory to keep what closes a live stream \
-                       in, so none is opened.";
 
 #[cfg(test)]
 mod tests;

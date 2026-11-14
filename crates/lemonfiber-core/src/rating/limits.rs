@@ -96,10 +96,14 @@ impl Limits {
         &self.country
     }
 
-    /// Whether a title certified `certification` may be offered: a rated one at or under
-    /// the member's limit, an unrated one where their policy lets it through, and never
-    /// one certified in words the table does not name.
+    /// Whether a title certified `certification` may be offered: any where nothing holds
+    /// the member back, and otherwise a rated one at or under their limit, an unrated one
+    /// where their policy lets it through, and never one certified in words the table does
+    /// not name.
     pub(crate) fn admits(&self, certification: Option<&str>) -> bool {
+        if !self.restricted() {
+            return true;
+        }
         let Some(certified) = certification else {
             return self.unrated == Unrated::LetThrough;
         };
