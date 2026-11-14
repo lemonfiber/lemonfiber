@@ -28,7 +28,7 @@ pub(in crate::plugin) const ASKS_NO_ONE_THING: &str =
 /// A probe is reported against the capability it demonstrates and is not here. These
 /// two are, because neither belongs to a capability: one gates the install of this
 /// plugin and the other is a row in a register that runs every day afterwards.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Assertion {
     /// What must hold before this plugin is installed.
@@ -38,7 +38,7 @@ pub enum Assertion {
 }
 
 /// One assertion that is not a probe, and what its recording came to.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Asserted {
     /// Which of the two it is.
     pub kind: Assertion,

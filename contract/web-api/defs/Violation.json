@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a manifest got wrong, and where.",
+  "type": "object",
+  "properties": {
+    "location": {
+      "description": "Which declaration it is about, in the manifest's own terms.",
+      "type": "string"
+    },
+    "message": {
+      "description": "What is wrong with it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "location",
+    "message"
+  ]
+}

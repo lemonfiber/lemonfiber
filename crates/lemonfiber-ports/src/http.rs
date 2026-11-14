@@ -244,6 +244,16 @@ pub trait Http: Send + Sync {
     }
 }
 
+/// Where a transport that has carried nothing yet comes from.
+///
+/// A port beside [`Http`] because one transport keeps the cookies a login set, and a
+/// run that asks several services in turn must not hand one service's session to the
+/// next.
+pub trait Sessions: Send + Sync {
+    /// A transport holding no session.
+    fn opened(&self) -> std::sync::Arc<dyn Http>;
+}
+
 /// A shared handle to a transport is a transport.
 ///
 /// Needed wherever something wraps what is already being shared — a decorator that

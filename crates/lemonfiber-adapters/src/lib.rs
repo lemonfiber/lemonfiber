@@ -94,6 +94,7 @@ pub fn live_reaching(target: &lemonfiber_ports::docker::Target) -> Seams {
         // reported. Applied here rather than at each caller: a retry policy written into
         // fifteen call sites is fifteen policies.
         http: Arc::new(Retrying::around(Web::new())),
+        sessions: Arc::new(http::Fresh),
         registry: Arc::new(registry::Oci::new(Arc::new(Web::new()))),
         images: Arc::new(Daemon::reaching(target.clone())),
         networks: Arc::new(Daemon::reaching(target.clone())),

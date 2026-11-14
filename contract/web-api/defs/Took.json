@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What taking one recording came to.",
+  "oneOf": [
+    {
+      "description": "The recording was written.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "written"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "The recording was written with an empty note, which its author has to write.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unnoted"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "The recording already held what was taken, byte for byte.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "reproduced"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "The recording holds another result for the same image and arguments, so it is\nrefused and left as it was.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unreproduced"
+        },
+        "why": {
+          "description": "What differs.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "why"
+      ]
+    },
+    {
+      "description": "The run was still going at its limit, so there is nothing to record.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "overran"
+        },
+        "seconds": {
+          "description": "The limit, in seconds.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "outcome",
+        "seconds"
+      ]
+    },
+    {
+      "description": "Nothing was taken, or there is nowhere to write what was.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unrecorded"
+        },
+        "why": {
+          "description": "Why.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome",
+        "why"
+      ]
+    },
+    {
+      "description": "The recording answers no case that was asked, so it was removed.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "removed"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "The recording answers no case that was asked, and is left as it was because the\nrun writes nothing.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "const": "unasked"
+        }
+      },
+      "required": [
+        "outcome"
+      ]
+    },
+    {
+      "description": "The recording is of a case reaching a host outside the stack, which a run holding\nrecordings to what it takes again leaves as recorded rather than reaching.",
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "The host the case reaches.",
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "left"
+        }
+      },
+      "required": [
+        "outcome",
+        "host"
+      ]
+    }
+  ]
+}

@@ -159,6 +159,14 @@ kinds! {
     PAIRING = "pairing",
     /// What pausing or resuming every download client came to, client by client.
     PAUSING = "pausing",
+    /// What a plugin's source claims, held to what this build publishes.
+    PLUGIN_CLAIMS = "plugin-claims",
+    /// What a plugin's conformance recordings come to against the contracts it speaks.
+    PLUGIN_CONFORMANCE = "plugin-conformance",
+    /// What anybody has said about the images a plugin pins.
+    PLUGIN_PROVENANCE = "plugin-provenance",
+    /// Each run proof of a plugin, run and recorded.
+    PLUGIN_RECORDING = "plugin-recording",
     /// Every plugin installed on this machine, and what installing one came to.
     PLUGINS = "plugins",
     /// What starting or stopping would do, before it is done.

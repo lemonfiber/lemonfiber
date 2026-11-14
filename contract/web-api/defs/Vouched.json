@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every image a plugin pins, and what anybody has said about each.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The plugin's id.",
+      "type": "string"
+    },
+    "images": {
+      "description": "One answer per image it pins.",
+      "type": "array",
+      "items": {
+        "$ref": "Vouch.json"
+      }
+    },
+    "installable": {
+      "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "images",
+    "installable"
+  ]
+}

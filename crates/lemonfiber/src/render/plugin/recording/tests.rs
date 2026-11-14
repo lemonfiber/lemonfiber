@@ -1,6 +1,6 @@
 use lemonfiber_core::plugin::{Failed, Recorded, Taken, Took};
 
-use super::recorded;
+use super::said;
 
 fn read(recordings: Vec<Taken>, holds: bool) -> Recorded {
     Recorded {
@@ -21,9 +21,7 @@ fn taken(took: Took) -> Taken {
 }
 
 fn shown(read: &Recorded) -> String {
-    recorded(read, false)
-        .map(|lines| lines.text())
-        .unwrap_or_default()
+    said(read).text()
 }
 
 #[test]
@@ -85,15 +83,19 @@ fn a_plugin_recording_everything_or_nothing_says_so() {
 }
 
 #[test]
-fn the_machine_form_is_the_report_as_a_document() {
-    let said = recorded(
-        &read(vec![taken(Took::Overran { seconds: 5 })], false),
+fn the_machine_form_is_the_report_in_an_envelope() {
+    let said = crate::render::answer(
+        &lemonfiber_core::app::Outcome::PluginRecording(read(
+            vec![taken(Took::Overran { seconds: 5 })],
+            false,
+        )),
         true,
     )
-    .map(|lines| lines.text())
-    .unwrap_or_default();
-    assert!(said.contains("\"outcome\": \"overran\""), "{said}");
-    assert!(said.contains("\"seconds\": 5"), "{said}");
+    .text();
+    assert!(said.contains(r#""kind":"plugin-recording""#), "{said}");
+    assert!(said.contains(r#""api_version""#), "{said}");
+    assert!(said.contains(r#""outcome":"overran""#), "{said}");
+    assert!(said.contains(r#""seconds":5"#), "{said}");
 }
 
 #[test]

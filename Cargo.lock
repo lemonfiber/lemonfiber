@@ -1677,6 +1677,7 @@ dependencies = [
  "async-trait",
  "lemonfiber-contract",
  "lemonfiber-ports",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",

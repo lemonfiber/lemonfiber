@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one of a plugin's images is vouched for.",
+  "type": "object",
+  "properties": {
+    "digest": {
+      "description": "The digest that fixes what runs.",
+      "type": "string"
+    },
+    "image": {
+      "description": "The registry path, as the manifest declares it.",
+      "type": "string"
+    },
+    "service": {
+      "description": "The service the image runs as.",
+      "type": "string"
+    }
+  },
+  "oneOf": [
+    {
+      "description": "A signature over a payload naming this digest verified against a held key.",
+      "type": "object",
+      "properties": {
+        "by": {
+          "description": "Which key it verified against, so the answer names what was trusted.",
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string",
+          "const": "signed"
+        }
+      },
+      "required": [
+        "provenance",
+        "by"
+      ]
+    },
+    {
+      "description": "Nothing was established, and nothing follows from it either way.",
+      "type": "object",
+      "properties": {
+        "provenance": {
+          "type": "string",
+          "const": "unproven"
+        },
+        "why": {
+          "description": "What stopped it being established.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "why"
+      ]
+    },
+    {
+      "description": "A signature is offered and it does not hold.",
+      "type": "object",
+      "properties": {
+        "provenance": {
+          "type": "string",
+          "const": "refused"
+        },
+        "why": {
+          "description": "Every way it does not.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "why"
+      ]
+    }
+  ],
+  "required": [
+    "service",
+    "image",
+    "digest"
+  ]
+}

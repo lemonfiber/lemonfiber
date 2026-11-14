@@ -14,7 +14,6 @@ use crate::autostart::run as autostart;
 use crate::backup::run as backup;
 use crate::bandwidth::run as bandwidth;
 use crate::bundle::run as bundle;
-use crate::doctor::Narrowing;
 use crate::door::run as door;
 use crate::error::codes::life::{
     ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
@@ -42,6 +41,7 @@ pub mod appetite;
 pub mod apply;
 pub mod archives;
 pub(crate) mod arrangement;
+pub mod authoring;
 pub(crate) mod beside;
 pub(crate) mod boot;
 pub(crate) mod bounded;
@@ -222,14 +222,9 @@ fn outbound(ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
 /// Named apart for the reason [`lifecycle`] is: the run happens first and what it found
 /// is then read against what was accepted, which is two steps rather than a
 /// pass-along.
-async fn diagnosed(
-    ctx: &Ctx,
-    narrowing: Narrowing,
-    disruptive: bool,
-    accept: Option<String>,
-) -> Result<Outcome, Box<Problem>> {
-    let report = engine::diagnose(ctx, &narrowing, disruptive).await?;
-    let mut report = accepted::acknowledge(ctx, accept.as_deref(), report)?;
+async fn diagnosed(ctx: &Ctx, asked: &Diagnosing) -> Result<Outcome, Box<Problem>> {
+    let report = engine::diagnose(ctx, &asked.narrowing, asked.disruptive).await?;
+    let mut report = accepted::acknowledge(ctx, asked.accept.as_deref(), report)?;
     // Dated after an acceptance is applied, so a warning the operator has just
     // accepted is not remembered as wrong.
     report.findings = conditions::dated(ctx, report.findings);
@@ -313,24 +308,13 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
-    // What a failed restart left, said before the answer to whatever was actually
-    // asked for — and once, however many commands follow it. A boot that failed at
-    // four in the morning has nobody to tell, so the only moment it can reach the
-    // operator is the next one they are present at, and that is any command at all
-    // rather than a particular one. The run a login starts is excluded: it is the
-    // thing being reported on, not somebody arriving to be told.
-    if !matches!(command, Command::AtBoot) {
-        boot::reported(ctx).await;
+    if !matches!(command, Command::Authoring(_)) {
+        stack_first(&command, ctx).await;
+        // Last, so that the sentence nearest the acting is the one about what acting
+        // costs: what a failed restart left is news from a run nobody saw; this is
+        // about the run the operator is in the middle of asking for.
+        disturbance::said(&command, ctx).await;
     }
-    // Last, so that the sentence nearest the acting is the one about what acting
-    // costs. The line above is news from a run nobody saw; this one is about the
-    // run the operator is in the middle of asking for.
-    disturbance::said(&command, ctx).await;
-    crate::settings::filing::everything(ctx).await;
-    // Before anything signs in with a credential lemonfiber minted: a rotation that
-    // stopped part-way left its replacement beside it, and which of the two the
-    // service takes is settled here so every command after it signs in with that one.
-    credentials::pending::settled(ctx).await;
     Box::pin(routed(rehearsal::carried(command, ctx), ctx))
         .await
         .map(|outcome| {
@@ -340,6 +324,24 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
                 outcome
             }
         })
+}
+
+/// What every command that reaches a stack settles before it is routed.
+async fn stack_first(command: &Command, ctx: &Ctx) {
+    // What a failed restart left, said before the answer to whatever was actually
+    // asked for — and once, however many commands follow it. A boot that failed at
+    // four in the morning has nobody to tell, so the only moment it can reach the
+    // operator is the next one they are present at, and that is any command at all
+    // rather than a particular one. The run a login starts is excluded: it is the
+    // thing being reported on, not somebody arriving to be told.
+    if !matches!(command, Command::AtBoot) {
+        boot::reported(ctx).await;
+    }
+    crate::settings::filing::everything(ctx).await;
+    // Before anything signs in with a credential lemonfiber minted: a rotation that
+    // stopped part-way left its replacement beside it, and which of the two the
+    // service takes is settled here so every command after it signs in with that one.
+    credentials::pending::settled(ctx).await;
 }
 
 /// What this product's own vocabulary answers: one word, or all of them.
@@ -441,11 +443,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Provenance => engine::provenance(ctx).map(Outcome::Provenance),
         Command::QualityUpgrade { confirm } => upgraded(ctx, confirm).await,
         Command::Status { forms } => engine::status(ctx, &forms).await.map(Outcome::Status),
-        Command::Doctor(Diagnosing {
-            narrowing,
-            disruptive,
-            accept,
-        }) => diagnosed(ctx, narrowing, disruptive, accept).await,
+        Command::Doctor(asked) => diagnosed(ctx, &asked).await,
         Command::Repair {
             consent,
             disruptive,
@@ -454,6 +452,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Credentials(asked) => inventoried(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),
+        Command::Authoring(asked) => authoring::answered(ctx, asked).await,
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.

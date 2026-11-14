@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One row a plugin adds to a register lemonfiber already runs.",
+  "type": "object",
+  "properties": {
+    "at": {
+      "description": "The point it is made at.",
+      "type": "string"
+    },
+    "for": {
+      "description": "The check a remedy is for, where this is one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "id": {
+      "description": "The identity it holds, namespaced with the plugin's id.",
+      "type": "string"
+    },
+    "says": {
+      "description": "What it says, in one line.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "at",
+    "id",
+    "says"
+  ]
+}

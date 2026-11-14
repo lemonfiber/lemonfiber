@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a plugin's recordings say about the contracts its adapters speak.",
+  "type": "object",
+  "properties": {
+    "cases": {
+      "description": "Every case of every contract an adapter speaks, as its recording answered it.",
+      "type": "array",
+      "items": {
+        "$ref": "Judged.json"
+      }
+    },
+    "conforms": {
+      "description": "Whether nothing is refused and every case passed.",
+      "type": "boolean"
+    },
+    "id": {
+      "description": "The plugin's id.",
+      "type": "string"
+    },
+    "refusals": {
+      "description": "Everything the manifest is refused for, which no recording can make up for.",
+      "type": "array",
+      "items": {
+        "$ref": "Violation.json"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "refusals",
+    "cases",
+    "conforms"
+  ]
+}

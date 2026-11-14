@@ -514,23 +514,68 @@ fn a_value_for_a_recipe_is_carried_by_name_and_a_malformed_one_refused() {
     ));
 }
 
-/// And the five that are documents this build generated go the other way,
-/// because there is no stack to ask and nothing to decide.
+/// The three documents this build generated are published rather than dispatched.
 #[test]
 fn the_documents_an_author_reads_are_not_dispatched() {
     for read in [
         Authoring::Capabilities,
         Authoring::ExtensionPoints,
         Authoring::Schema,
-        Authoring::Claims {
-            path: std::path::PathBuf::from("/srv/komga"),
-        },
-        Authoring::Provenance {
-            path: std::path::PathBuf::from("/srv/komga"),
-            keys: Vec::new(),
-        },
     ] {
         assert_eq!(door(lemonfiber::cli::PluginCommand::Authoring(read)), None);
+    }
+}
+
+/// What an author asks of a plugin's own source is dispatched, carrying the path, the
+/// keys and how a recording keeps what it takes.
+#[test]
+fn what_an_author_asks_of_a_source_is_dispatched() {
+    use lemonfiber_core::app::authoring::Asked;
+    use lemonfiber_core::plugin::Retaking;
+
+    let path = std::path::PathBuf::from("/srv/komga");
+    let key = std::path::PathBuf::from("/srv/signing.pem");
+    let asked = [
+        (
+            Authoring::Claims { path: path.clone() },
+            Asked::Claims { path: path.clone() },
+        ),
+        (
+            Authoring::Conform { path: path.clone() },
+            Asked::Conform { path: path.clone() },
+        ),
+        (
+            Authoring::Provenance {
+                path: path.clone(),
+                keys: vec![key.clone()],
+            },
+            Asked::Provenance {
+                path: path.clone(),
+                keys: vec![key],
+            },
+        ),
+        (
+            Authoring::Record {
+                path: path.clone(),
+                check: true,
+                adapter: Some("plugin-sonarr:pr".to_owned()),
+                built: Some("first-party-live-built".to_owned()),
+            },
+            Asked::Record {
+                path,
+                taking: Retaking {
+                    check: true,
+                    adapter: Some("plugin-sonarr:pr".to_owned()),
+                    built: Some("first-party-live-built".to_owned()),
+                },
+            },
+        ),
+    ];
+    for (read, asked) in asked {
+        assert_eq!(
+            door(lemonfiber::cli::PluginCommand::Authoring(read)),
+            Some(Command::Authoring(asked))
+        );
     }
 }
 

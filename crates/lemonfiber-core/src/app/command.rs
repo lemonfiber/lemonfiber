@@ -8,7 +8,7 @@
 
 use crate::audio::Format;
 
-use super::{plugins, repair, setup::SetupAction, update, Waiting};
+use super::{authoring, plugins, repair, setup::SetupAction, update, Waiting};
 
 mod alerts;
 mod allowance;
@@ -390,6 +390,8 @@ pub enum Command {
     Stored,
     /// Install a plugin, or say what is installed already.
     Plugins(plugins::Asked),
+    /// Read a plugin's own source as its author would, with no stack.
+    Authoring(authoring::Asked),
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The whole of it: every location the layout names sits under one of two

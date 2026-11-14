@@ -209,6 +209,11 @@
     "status": 400,
     "description": "Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it."
   },
+  "PLUGIN-51": {
+    "name": "KEY_UNREADABLE",
+    "status": 400,
+    "description": "Raised when a key an author names to verify a plugin's images against cannot be read, or is not a PEM public key on the P-256 curve."
+  },
   "PLUGIN-6": {
     "name": "NOWHERE",
     "status": 500,

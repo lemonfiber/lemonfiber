@@ -1,0 +1,31 @@
+{
+  "fields": {
+    "faults": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "outcome": {
+      "type": [
+        "const:\"failed\"",
+        "const:\"passed\"",
+        "const:\"unproven\"",
+        "const:\"unrecorded\""
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"failed\"",
+    "\"passed\"",
+    "\"unproven\"",
+    "\"unrecorded\""
+  ]
+}

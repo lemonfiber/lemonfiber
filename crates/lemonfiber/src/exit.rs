@@ -93,6 +93,10 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // what this stack wires to what is asking exactly that. It is the operator's
         // own configuration to fix, which is the code that says so.
         Outcome::Plugins(report) => installing(report),
+        Outcome::PluginClaims(read) => held(read.installable),
+        Outcome::PluginConformance(read) => held(read.conforms),
+        Outcome::PluginProvenance(read) => held(read.installable),
+        Outcome::PluginRecording(read) => held(read.holds),
         Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
         Outcome::Wiring(_) => ExitCode::from(VALIDATION),
         Outcome::Settings(report) => restarted(report),
@@ -269,6 +273,15 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Watch(_)
         | Outcome::Archives(_)
         | Outcome::Bundle(_) => ExitCode::SUCCESS,
+    }
+}
+
+/// Success where what an author's checks hold to held, and a failure where it did not.
+fn held(holds: bool) -> ExitCode {
+    if holds {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(FAILURE)
     }
 }
 

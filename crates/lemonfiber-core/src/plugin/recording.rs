@@ -82,7 +82,7 @@ pub struct Recorder<'a> {
 }
 
 /// What taking one recording came to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "outcome", rename_all = "kebab-case")]
 pub enum Took {
     /// The recording was written.
@@ -121,7 +121,8 @@ pub enum Took {
 }
 
 /// One recording a manifest names, and what taking it came to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[schemars(rename = "RecordingTaken")]
 pub struct Taken {
     /// What names it: a proof, a claim's probe or a contributed check.
     pub named: String,
@@ -132,7 +133,7 @@ pub struct Taken {
 }
 
 /// A service none of whose recordings was written, and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Failed {
     /// The service.
     pub service: String,
@@ -145,7 +146,7 @@ pub struct Failed {
 }
 
 /// Every recording a plugin's manifest names, taken again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Recorded {
     /// The plugin's id.
     pub id: String,

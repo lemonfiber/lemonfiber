@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How far a claim has been shown.\n\nThe four the vocabulary's own states name. `Claimed` is not a weaker\n`Demonstrated`: it is what a declaration is before anything has asked the service,\nwhich is a fact about this moment rather than about the service.",
+  "oneOf": [
+    {
+      "description": "A service declares it, and nothing has asked the service yet.",
+      "type": "string",
+      "const": "claimed"
+    },
+    {
+      "description": "The probes ran and passed against the evidence the report names.\n\nWhich is not the same claim in each case, and the report is where the two are\ntold apart: a recording that answers is evidence about a moment somebody wrote\ndown, and a service that answers is evidence about the service. This word alone\ndoes not distinguish them and must not be read as though it did.",
+      "type": "string",
+      "const": "demonstrated"
+    },
+    {
+      "description": "The probes could not be run. The claim stands unverified and is not met.",
+      "type": "string",
+      "const": "unproven"
+    },
+    {
+      "description": "The probes ran and failed. The claim is false.",
+      "type": "string",
+      "const": "refuted"
+    }
+  ]
+}

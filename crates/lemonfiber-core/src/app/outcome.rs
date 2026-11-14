@@ -212,6 +212,14 @@ outcomes! {
     Outbound(crate::outbound::Leaving) => OUTBOUND,
     /// Every plugin installed on this machine, and what installing one came to.
     Plugins(crate::plugin::Installs) => PLUGINS [rehearsed],
+    /// What a plugin's source claims, held to what this build publishes.
+    PluginClaims(crate::plugin::Claimed) => PLUGIN_CLAIMS,
+    /// What a plugin's conformance recordings come to against the contracts it speaks.
+    PluginConformance(crate::plugin::Conformed) => PLUGIN_CONFORMANCE,
+    /// What anybody has said about the images a plugin pins.
+    PluginProvenance(crate::plugin::Vouched) => PLUGIN_PROVENANCE,
+    /// Each run proof of a plugin, run and recorded.
+    PluginRecording(crate::plugin::Recorded) => PLUGIN_RECORDING,
     /// Where every service in this stack comes from, and under what licence.
     Provenance(crate::model::ProvenanceReport) => PROVENANCE,
     /// Every credential this stack holds, and what became of acting on one.

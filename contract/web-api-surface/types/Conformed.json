@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "cases": {
+      "type": [
+        "array[ref:Judged]"
+      ],
+      "required": true
+    },
+    "conforms": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "refusals": {
+      "type": [
+        "array[ref:Violation]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

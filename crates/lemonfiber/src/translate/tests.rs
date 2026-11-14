@@ -3,15 +3,16 @@ use lemonfiber_core::app::{Allowance, Command, Filling, Linking, QualityAction, 
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::quality::Preset;
 
-use super::{alerts, diagnosing, moving, named, narrowed, Authoring};
+use super::{alerts, diagnosing, moving, named, narrowed};
 use super::{
     bundling, configuration, credentials, hosting, household, invitation, letting, quality, queue,
     restarting, sharing, traced, Destination, Hostable, Keeping, Queueing, Wanted,
 };
 use crate::exit::USAGE;
 use lemonfiber::cli::{
-    AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, Kept, QualityCommand,
-    QueueCommand, RawAllowance, RawBandwidth, RawCredentials, RawUnrated, UpdateCommand,
+    AlertCommand, Asked, Authoring, ConfigAction, HostingCommand, HouseholdCommand, Kept,
+    QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCredentials, RawUnrated,
+    UpdateCommand,
 };
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::Asking;

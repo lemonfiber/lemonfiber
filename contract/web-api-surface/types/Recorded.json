@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "failed": {
+      "type": [
+        "array[ref:Failed]"
+      ],
+      "required": true
+    },
+    "holds": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "recordings": {
+      "type": [
+        "array[ref:RecordingTaken]"
+      ],
+      "required": true
+    },
+    "refusals": {
+      "type": [
+        "array[ref:Violation]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

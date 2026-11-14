@@ -13,7 +13,7 @@ use super::claimed::{sourced, Unreadable};
 use crate::doctor::BUNDLED_CHECKS;
 
 /// What a plugin's recordings say about the contracts its adapters speak.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Conformed {
     /// The plugin's id.
     pub id: String,

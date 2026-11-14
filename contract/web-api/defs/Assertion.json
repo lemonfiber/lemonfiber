@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which kind of assertion a verdict is about.\n\nA probe is reported against the capability it demonstrates and is not here. These\ntwo are, because neither belongs to a capability: one gates the install of this\nplugin and the other is a row in a register that runs every day afterwards.",
+  "oneOf": [
+    {
+      "description": "What must hold before this plugin is installed.",
+      "type": "string",
+      "const": "proof"
+    },
+    {
+      "description": "A check this plugin adds to the doctor's register.",
+      "type": "string",
+      "const": "check"
+    }
+  ]
+}

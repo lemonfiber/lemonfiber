@@ -1,6 +1,8 @@
+pub mod authoring;
 pub mod conforming;
 pub mod pinned;
 
+pub use authoring::*;
 pub use conforming::*;
 pub use pinned::*;
 
