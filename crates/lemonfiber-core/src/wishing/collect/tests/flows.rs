@@ -670,3 +670,29 @@ async fn an_ask_the_curator_will_not_remove_stays_on_the_list() {
     );
     assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
 }
+
+#[tokio::test]
+async fn an_ask_removed_where_the_list_cannot_record_it_is_said_to_be_unreached() {
+    let transport = the_house(vec![
+        call("requesting", account(true)),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::MayAsk))),
+        ),
+        curator("remove", crate::test_support::adapted::taken()),
+    ]);
+    let ctx = ctx(&transport, "unasked-unrecorded");
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+    let changes = journalled(&ctx);
+    let unreadable = crate::collected::run::kept_at(&ctx)
+        .is_ok_and(|path| std::fs::write(path, "{ not json").is_ok());
+
+    let undone = undone(&ctx, &changes).await;
+
+    assert!(unreadable);
+    assert_eq!(
+        undone.map(|(put_back, unreached)| (put_back, unreached.len())),
+        Some((0, 1))
+    );
+    assert_eq!(sent(&transport, "remove"), 1);
+}
