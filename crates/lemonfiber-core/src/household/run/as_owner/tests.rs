@@ -134,7 +134,10 @@ fn what_a_member_used_counts_their_requests_still_held_not_turned_down_and_insid
         made(1, 9, RequestStatus::Approved),
         made(2, 9, RequestStatus::Declined),
         made(3, 1, RequestStatus::Approved),
-        made(4, 9, RequestStatus::Approved),
+        HouseholdRequest {
+            kind: Some(Kind::Tv),
+            ..made(4, 9, RequestStatus::Approved)
+        },
         made(5, 9, RequestStatus::Approved),
     ];
 

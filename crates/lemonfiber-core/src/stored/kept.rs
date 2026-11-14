@@ -240,6 +240,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::asks,
     },
     Entry {
+        accessor: "asked_as_owner",
+        what: "which member each request asked as the request service's owner was for",
+        why: "Where members ask as the request service's owner, the request service records \
+              each of those requests as the owner's, so lemonfiber keeps whose each one is: it \
+              counts toward that member's allowance and is listed as theirs.",
+        secret: false,
+        at: Paths::asked_as_owner,
+    },
+    Entry {
         accessor: "cover_hosts",
         what: "where music and book covers were fetched from",
         why: "A cover is fetched from wherever the curator says it is, so lemonfiber notes \
