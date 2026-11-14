@@ -50,7 +50,7 @@ pub(crate) use shape::{Narrows, Needed, Question, Wants};
 use lemonfiber_api::read::table::{
     named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
     FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
-    QUEUE, REQUESTS, STACK, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
+    QUEUE, REQUESTS, SETTLED, STACK, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -200,6 +200,13 @@ static AFTER: &[Question] = &[
         about: "which stack this is, where its project is, and the plain Compose words that \
                 start it",
         read: STACK,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what setup settled",
+        about: "the data root, the ways of downloading and the user the services run as, and \
+                whether this stack is set up",
+        read: SETTLED,
         needs: Needed::Nothing,
     },
     Question {

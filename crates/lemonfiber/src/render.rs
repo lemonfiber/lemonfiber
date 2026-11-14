@@ -47,6 +47,7 @@ mod removal;
 pub(crate) mod repair;
 mod seed;
 mod self_update;
+mod settled;
 mod space;
 pub(crate) mod stack;
 mod stored;
@@ -243,6 +244,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Hosting(report) => hosting::hosting(report),
         Outcome::FrontDoor(report) => door::front_door(report),
         Outcome::Stack(report) => hosting::underneath(report),
+        Outcome::Settled(report) => settled::settled(report),
         Outcome::News(report) => news::news(report),
         Outcome::Stuck(report) => trace::stuck(report),
         Outcome::Boot(report) => booted::booted(report),

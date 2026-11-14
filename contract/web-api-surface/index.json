@@ -71,6 +71,7 @@
     "seed": "ref:SeedReport",
     "self-update": "ref:UpdateReport",
     "settings": "ref:SettingsReport",
+    "settled": "ref:SettledReport",
     "setup": "ref:SetupReport",
     "space": "ref:Reckoning",
     "stack": "ref:StackReport",

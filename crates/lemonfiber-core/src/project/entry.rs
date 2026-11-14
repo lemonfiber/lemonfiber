@@ -15,11 +15,14 @@ use lemonfiber_manifest::container::{
 use serde::Serialize;
 
 use crate::config::storage::Export;
-use crate::config::{DATA_ROOT_KEY, DEFAULT_ZONE, LAN_BIND_KEY, PGID_KEY, PUID_KEY, ZONE_KEY};
+use crate::config::{DATA_ROOT_KEY, DEFAULT_ZONE, LAN_BIND_KEY, ZONE_KEY};
 use crate::topology::Placed;
 use joined::Joined;
 
 mod joined;
+mod running_as;
+
+pub(crate) use running_as::{operated_ids, OperatedIds};
 
 /// Where the library is kept while the operator's environment file names nowhere.
 pub(crate) const LIBRARY: &str = "./data";
@@ -398,16 +401,15 @@ fn environment(unit: &Unit<'_>, values: &Values<'_>) -> BTreeMap<String, String>
 /// a contract, and for any other the operator's `PUID` and `PGID`, each falling back to
 /// that owner; the fallback user's where the owner cannot be read.
 fn ids(unit: &Unit<'_>, values: &Values<'_>) -> (String, String) {
-    let (uid, gid) = values
-        .owner
-        .unwrap_or((OPERATOR_FALLBACK, OPERATOR_FALLBACK));
-    if unit.contract.is_some() {
-        return (uid.to_string(), gid.to_string());
-    }
-    (
-        operated(values, PUID_KEY, &uid.to_string()),
-        operated(values, PGID_KEY, &gid.to_string()),
-    )
+    let (uid, gid) = if unit.contract.is_some() {
+        values
+            .owner
+            .unwrap_or((OPERATOR_FALLBACK, OPERATOR_FALLBACK))
+    } else {
+        let operated = operated_ids(values.operator, values.owner);
+        (operated.uid, operated.gid)
+    };
+    (literal(&uid.to_string()), literal(&gid.to_string()))
 }
 
 /// The operator's value for `key`, or `fallback` while their environment file names

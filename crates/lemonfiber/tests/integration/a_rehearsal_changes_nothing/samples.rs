@@ -131,6 +131,7 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
         ),
         ("watch", Command::Watch { forms: Vec::new() }),
         ("stack", Command::Stack),
+        ("settled", Command::Settled),
         (
             "hosting",
             Command::Hosting(Keeping::Install {

@@ -28,6 +28,7 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Hosting(Keeping::Read), kind::HOSTING),
         (Command::FrontDoor, kind::FRONT_DOOR),
         (Command::Stack, kind::STACK),
+        (Command::Settled, kind::SETTLED),
         (
             Command::Notify(crate::notify::configuring::Asked::List),
             kind::NOTIFY,

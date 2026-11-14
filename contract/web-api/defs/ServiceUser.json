@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The user and group the stack's services run as.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "description": "Where the two come from.",
+      "$ref": "UserFrom.json"
+    },
+    "gid": {
+      "description": "The group id.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "uid": {
+      "description": "The user id.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "uid",
+    "gid",
+    "from"
+  ]
+}

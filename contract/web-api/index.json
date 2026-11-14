@@ -143,6 +143,7 @@
     "seed": "kinds/seed.json",
     "self-update": "kinds/self-update.json",
     "settings": "kinds/settings.json",
+    "settled": "kinds/settled.json",
     "setup": "kinds/setup.json",
     "space": "kinds/space.json",
     "stack": "kinds/stack.json",

@@ -154,6 +154,8 @@ outcomes! {
     FrontDoor(FrontDoorReport) => FRONT_DOOR,
     /// How the stack runs without lemonfiber.
     Stack(crate::model::StackReport) => STACK,
+    /// What setup settled, and whether this stack is set up.
+    Settled(crate::model::SettledReport) => SETTLED,
     /// What a surface can mark as new.
     News(crate::news::News) => NEWS_ITEMS,
     /// The items whose downloads are stuck, each linkable to its trace.

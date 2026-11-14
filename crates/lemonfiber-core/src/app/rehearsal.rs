@@ -243,6 +243,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Queue(queueing) => queued(*queueing),
         Command::FrontDoor => reads("front-door"),
         Command::Stack => reads("stack"),
+        Command::Settled => reads("settled"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),
         Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),

@@ -173,6 +173,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/stack",
     },
     Reach {
+        request: "settled",
+        through: "/api/settled",
+    },
+    Reach {
         request: "news",
         through: "/api/news",
     },

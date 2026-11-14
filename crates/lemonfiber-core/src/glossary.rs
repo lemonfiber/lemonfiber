@@ -276,6 +276,24 @@ pub const TERMS: &[Term] = &[
              refuses anything else by name rather than reading the end of it as a key and \
              reporting that nothing matched.",
     ),
+    Term::new(
+        "PUID",
+        "The number of the user the stack's services run as, which decides who owns \
+                the files they write. You can set it in the stack's environment file.",
+    )
+    .explained(
+        "Where it is not set, the services run as whoever owns the stack's directory, so \
+             the files they write stay yours.",
+    ),
+    Term::new(
+        "PGID",
+        "The number of the group the stack's services run as, beside PUID. You can set it \
+                in the stack's environment file.",
+    )
+    .explained(
+        "Where it is not set, the services run in the group of whoever owns the stack's \
+             directory.",
+    ),
 ];
 
 /// Every word this product explains, for somebody who asked what there is to ask

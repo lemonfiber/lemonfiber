@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What setup settled, read from the configuration as it stands, and whether this stack\nis set up.",
+  "type": "object",
+  "properties": {
+    "data_root": {
+      "description": "Where the library is kept, a path on this machine or an NFS export as `DATA_ROOT`\nnames it, or nothing where no data root is configured.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "protocols": {
+      "description": "Which ways of downloading are configured.",
+      "$ref": "Protocols.json"
+    },
+    "service_user": {
+      "description": "The user and group the stack's services run as.",
+      "$ref": "ServiceUser.json"
+    },
+    "setup": {
+      "description": "Whether this stack is set up.",
+      "$ref": "SetUp.json"
+    }
+  },
+  "required": [
+    "setup",
+    "protocols",
+    "service_user"
+  ]
+}
