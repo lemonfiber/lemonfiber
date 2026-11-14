@@ -128,7 +128,7 @@ families! {
     notify => "NOTIFY": "where alerts are delivered",
     pair => "PAIR": "pairing a phone with the stack",
     play => "PLAY": "playing what the household holds",
-    plugin => "PLUGIN": "installing and running plugins" [pinned, conforming],
+    plugin => "PLUGIN": "installing and running plugins" [pinned, conforming, authoring],
     proc => "PROC": "the program underneath",
     provider => "PROVIDER": "accounts and indexers",
     push => "PUSH": "waking a phone that asked to be woken",

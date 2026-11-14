@@ -6,10 +6,14 @@
 //! author's editor and CI read the published file itself. What an author asks of a
 //! plugin's own source is a command, and goes through the dispatcher.
 
+use lemonfiber::cli::Authoring;
+use lemonfiber_core::app::authoring::Asked;
+use lemonfiber_core::app::Command;
 use lemonfiber_core::plugin::{Capabilities, Ungenerated};
 
 use crate::exit::FAILURE;
 use crate::render;
+use crate::translate::Under;
 
 /// One of the documents this build publishes for a plugin author.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +104,33 @@ fn vocabulary(published: &Result<Capabilities, Ungenerated>, json: bool) -> Answ
         Ok(published) => Answered::shown(render::plugin::capabilities(published)),
         Err(problem) => Answered::faulted(problem.to_string()),
     }
+}
+
+/// Which door a word an author asks goes through: a document is published, and a read
+/// of the author's own source is a command.
+pub(crate) fn authored(read: Authoring) -> Under {
+    let asked = match read {
+        Authoring::Schema => return Under::Published(Document::Schema),
+        Authoring::ExtensionPoints => return Under::Published(Document::ExtensionPoints),
+        Authoring::Capabilities => return Under::Published(Document::Capabilities),
+        Authoring::Claims { path } => Asked::Claims { path },
+        Authoring::Conform { path } => Asked::Conform { path },
+        Authoring::Provenance { path, keys } => Asked::Provenance { path, keys },
+        Authoring::Record {
+            path,
+            check,
+            adapter,
+            built,
+        } => Asked::Record {
+            path,
+            taking: lemonfiber_core::plugin::Retaking {
+                check,
+                adapter,
+                built,
+            },
+        },
+    };
+    Under::Dispatched(Command::Authoring(asked))
 }
 
 #[cfg(test)]

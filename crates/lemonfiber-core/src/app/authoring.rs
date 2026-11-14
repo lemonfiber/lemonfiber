@@ -3,10 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::codes::plugin::KEY_UNREADABLE;
-use crate::error::{Problem, Remedy, State};
+use crate::error::{Code, Problem, Remedy, State};
 use crate::plugin::{Key, Recorder, Retaking};
 
 use super::{Ctx, Outcome};
+
+/// Every code what an author asks is refused with.
+pub const REFUSALS: [Code; 1] = [KEY_UNREADABLE];
 
 /// What an author asks of the plugin whose source is at `path`.
 #[derive(Debug, Clone, PartialEq, Eq)]
