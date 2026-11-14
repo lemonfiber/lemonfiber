@@ -226,7 +226,7 @@ const MINTED_BY: (&str, &str) = ("Random", ".bytes(");
 
 /// The one adapter allowed to reach the operating system's randomness, and the call
 /// it reaches it with.
-const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-adapters/src/random.rs", "getrandom");
+const OS_RANDOMNESS: (&str, &str) = ("crates/lemonfiber-random/src/lib.rs", "getrandom");
 
 /// The text inside double quotes on one line.
 fn quoted(line: &str) -> impl Iterator<Item = &str> {

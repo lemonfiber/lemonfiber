@@ -9,7 +9,7 @@
 use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed,
+    Credential, CuratedTitle, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed, Heard,
     Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile,
     QualityReleases, Queue, QueueItem, Queues, Record, Recounting, RegisteredClient,
     RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
@@ -18,7 +18,7 @@ use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
 use serde_json::Value;
 
-use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_PINNED, TOLD_WITH};
+use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
@@ -329,8 +329,9 @@ crate::contract! {
         }
         impl Recounting {
             /// Send each happening to the core's address, pinning the certificate it presents
-            /// there, with the key the core minted for it.
-            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>) -> () where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()) };
+            /// there, with the key the core minted for it, polling every so many seconds where
+            /// it polls; answers how it hears, or nothing where it stopped.
+            fn events(opt_str address: Option<&str>, opt_str pin: Option<&str>, opt_str key: Option<&str>, value every: Option<u32>) -> Option<Heard> where since = 3, asks = Asked { address: Some(TOLD_AT.to_owned()), pin: Some(TOLD_PINNED.to_owned()), key: Some(TOLD_WITH.to_owned()), every: Some(TOLD_EVERY) };
         }
     }
 }

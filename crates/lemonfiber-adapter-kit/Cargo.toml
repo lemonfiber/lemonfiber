@@ -12,16 +12,19 @@ publish = false
 [dependencies]
 lemonfiber-contract = { workspace = true }
 lemonfiber-error = { workspace = true }
+lemonfiber-pinned = { workspace = true }
 lemonfiber-ports = { workspace = true }
+lemonfiber-random = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 form_urlencoded = { workspace = true }
+futures-util = { workspace = true }
 reqwest = { workspace = true }
 rustix = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["net", "rt"] }
+tokio = { workspace = true, features = ["net", "rt", "sync", "time"] }
 webpki-roots = { workspace = true }
 
 [dev-dependencies]

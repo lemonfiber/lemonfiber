@@ -40,6 +40,15 @@ pub fn sha256(der: &[u8]) -> String {
         })
 }
 
+/// Whether `text` is written as a pin is: a SHA-256 in lower-case hexadecimal.
+#[must_use]
+pub fn is_pin(text: &str) -> bool {
+    text.len() == DIGITS
+        && text
+            .bytes()
+            .all(|digit| digit.is_ascii_digit() || (b'a'..=b'f').contains(&digit))
+}
+
 /// A verifier accepting only a certificate among `pins`, and checking every signature the
 /// handshake makes with it with the provider's own algorithms.
 #[derive(Debug)]

@@ -24,41 +24,7 @@ pub(crate) struct Keyed {
     pub keys: BTreeMap<String, String>,
 }
 
-/// What happened, as a service tells it.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "NotifyEvent")]
-pub struct Event {
-    /// Which of the four happenings it is.
-    pub event: Happened,
-    /// The title it is about, by the service's own reference, where it is about one.
-    #[serde(default)]
-    pub reference: Option<String>,
-    /// The title's name, or the service's own words for a problem about itself.
-    pub name: String,
-    /// What the service said went wrong, where something did.
-    #[serde(default)]
-    pub reason: Option<String>,
-    /// Whether a problem the service raised about itself is cleared.
-    #[serde(default)]
-    pub cleared: bool,
-}
-
-/// One of the four happenings a service tells the core.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "NotifyHappened")]
-pub enum Happened {
-    /// A title a curator fetched is imported into the library.
-    Imported,
-    /// A grab or an import failed.
-    Failed,
-    /// The service raised a problem about itself, or cleared one.
-    Health,
-    /// A title was added to a library of the media server.
-    Added,
-}
-
+pub use crate::ports::service::{Event, Happened};
 pub(crate) use reached::{address, Told};
 pub use reached::{HOST, PATH};
 

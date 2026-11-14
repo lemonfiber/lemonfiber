@@ -111,7 +111,7 @@ pub use providers::{
 };
 pub use proxying::{Proxying, Route, Routing, Tls};
 pub use quality::{MusicQuality, QualityReleases, ReleaseProbe};
-pub use recounting::Recounting;
+pub use recounting::{Event, Happened, Heard, Hearing, Recounting, EVERY, EVERY_DEFAULT};
 pub use requests::{
     HouseholdRequest, IdentitySource, MediaServerLink, MediaStatus, Occasion, RequestStatus,
     Requesting, Requests, Telling,

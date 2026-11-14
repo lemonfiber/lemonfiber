@@ -119,7 +119,7 @@
     },
     {
       "path": "media.serve/v1/operations/events.json",
-      "sha256": "b428edb8e4ec21efd9e5170ef745d3a21fd68adc42809d5cbb85f6d6f24172e9"
+      "sha256": "8dd27eb40fa75b77596290bfb1a80851283dc629772b250587d47d32f5084ae6"
     },
     {
       "path": "media.serve/v1/holds.json",
@@ -127,7 +127,7 @@
     },
     {
       "path": "media.serve/v1/conformance.json",
-      "sha256": "66ddb5fbf4f4a59f8fc04e7c1f93750f496c3774c71ddeeba64a5411337ec871"
+      "sha256": "948e9e2ae381dd77882717f2c62bc785ea1d306c6b4f36de6b3f3a03490a5a04"
     }
   ],
   "major": 1

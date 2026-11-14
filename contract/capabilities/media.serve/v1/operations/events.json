@@ -16,6 +16,15 @@
                   "null"
                 ]
               },
+              "every": {
+                "description": "The port's `every`.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "key": {
                 "description": "The port's `key`.",
                 "type": [
@@ -43,9 +52,56 @@
         "content": {
           "application/json": {
             "schema": {
+              "$defs": {
+                "Heard": {
+                  "additionalProperties": false,
+                  "description": "How an adapter asked to tell the core what happened hears its upstream.",
+                  "properties": {
+                    "every": {
+                      "description": "Where it polls, every how many seconds.",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "hearing": {
+                      "$ref": "#/$defs/Hearing",
+                      "description": "Push or poll."
+                    }
+                  },
+                  "required": [
+                    "hearing"
+                  ],
+                  "type": "object"
+                },
+                "Hearing": {
+                  "description": "The way an adapter hears what its upstream did.",
+                  "oneOf": [
+                    {
+                      "const": "push",
+                      "description": "The upstream's own notification connection tells it.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "poll",
+                      "description": "It reads the upstream's own history or activity, every so often.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
               "$schema": "https://json-schema.org/draft/2020-12/schema",
-              "title": "null",
-              "type": "null"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Heard"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nullable_Heard"
             }
           }
         },

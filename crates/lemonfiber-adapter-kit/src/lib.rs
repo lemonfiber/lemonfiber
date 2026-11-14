@@ -5,13 +5,16 @@
 //! contract's path, `about` and `ready`, and every one of them only under the plugin's
 //! key, which the core wrote to the adapter's configuration directory before it started,
 //! save the guard's question about an item, which carries the member's token alone, and
-//! the operations a curator answers the request gate, which its own keys open too.
+//! the operations a curator answers the request gate, which its own keys open too. An
+//! adapter telling the core what happened is also pushed to by its upstream, at a path
+//! carrying the secret it made for that alone.
 
 pub mod credential;
 pub mod endpoint;
 mod gate;
 pub mod members;
 pub mod picture;
+pub mod recounting;
 pub mod settings;
 pub mod shared;
 pub mod web;
@@ -45,6 +48,7 @@ pub struct Kit {
     served: Vec<Served>,
     members: Option<members::Members>,
     gate: Option<PathBuf>,
+    recounter: Option<recounting::Recounter>,
 }
 
 impl Kit {
@@ -59,6 +63,7 @@ impl Kit {
             served: Vec::new(),
             members: None,
             gate: None,
+            recounter: None,
         }
     }
 
@@ -81,6 +86,14 @@ impl Kit {
     #[must_use]
     pub fn asked_by_the_gate(mut self, configuration: impl Into<PathBuf>) -> Self {
         self.gate = Some(configuration.into());
+        self
+    }
+
+    /// The same adapter, woken by its upstream's pushes at the secret path `recounter`
+    /// keeps, and taking up what it kept when it starts serving.
+    #[must_use]
+    pub fn recounted_by(mut self, recounter: recounting::Recounter) -> Self {
+        self.recounter = Some(recounter);
         self
     }
 
@@ -108,6 +121,7 @@ impl Kit {
                 "/lemonfiber/{capability}/{major}/{operation}",
                 post(operation),
             )
+            .route(&format!("{}/{{secret}}", recounting::PUSHED), post(pushed))
             .with_state(Arc::new(self))
     }
 }
@@ -181,6 +195,10 @@ pub async fn serving(
     listener: TcpListener,
     stopped: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
+    futures_util::future::OptionFuture::from(
+        kit.recounter.as_ref().map(recounting::Recounter::resumed),
+    )
+    .await;
     axum::serve(listener, kit.router())
         .with_graceful_shutdown(stopped)
         .await
@@ -202,6 +220,21 @@ async fn ready(State(kit): State<Arc<Kit>>, headers: HeaderMap) -> Response {
         gate::Caller::Gate => refused(&gate::disallowed("ready")),
         gate::Caller::Nobody => unkeyed(),
     }
+}
+
+/// A push from the upstream, taken only at the secret path, waking the recounter to read
+/// its history; anywhere else, nothing is there.
+async fn pushed(State(kit): State<Arc<Kit>>, Segments(secret): Segments<String>) -> Response {
+    let woken = kit
+        .recounter
+        .as_ref()
+        .is_some_and(|recounter| recounter.woken_by(&secret));
+    let status = if woken {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::NOT_FOUND
+    };
+    answered(status, None, Vec::new())
 }
 
 /// One operation of one capability, served from what fills it.

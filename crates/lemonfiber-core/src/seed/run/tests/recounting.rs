@@ -63,6 +63,66 @@ async fn with_no_address_known_no_service_is_asked_and_each_says_why() {
 }
 
 #[tokio::test]
+async fn each_filler_is_asked_how_often_to_look_and_the_report_says_how_it_hears() {
+    let polled = |answer: &'static str, tag: &str| {
+        let project = lemonfiber_fixtures::scratch::Scratch::new(tag);
+        let http = Fake::by_path(vec![(EVENTS, Answer::reply(200, answer))]);
+        (project, http)
+    };
+    let (looking, looked) = polled(r#"{"hearing":"poll","every":60}"#, "recounting-poll");
+    let (pushing, pushed) = polled(r#"{"hearing":"push"}"#, "recounting-push");
+    let (unsaid, said) = polled(r#"{"hearing":"poll"}"#, "recounting-poll-unsaid");
+
+    let by_looking = told(
+        &contracted_ctx(&looking, SERVICE, true, looked.clone()),
+        &stack(&looking),
+    )
+    .await;
+    let by_telling = told(
+        &contracted_ctx(&pushing, SERVICE, true, pushed),
+        &stack(&pushing),
+    )
+    .await;
+    let by_looking_unsaid = told(
+        &contracted_ctx(&unsaid, SERVICE, true, said),
+        &stack(&unsaid),
+    )
+    .await;
+
+    let named = |wirings: &[crate::seed::Wiring]| {
+        wirings
+            .iter()
+            .map(|one| one.connection.clone())
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        named(&by_looking).iter().any(
+            |one| one.ends_with("telling the core what happened, by looking for it every 60 s")
+        ),
+        "{by_looking:?}"
+    );
+    assert!(
+        named(&by_telling)
+            .iter()
+            .any(|one| one.ends_with("telling the core what happened, as it is told")),
+        "{by_telling:?}"
+    );
+    assert!(
+        named(&by_looking_unsaid)
+            .iter()
+            .any(|one| one.ends_with("telling the core what happened, by looking for it")),
+        "{by_looking_unsaid:?}"
+    );
+    let body = looked
+        .requests()
+        .into_iter()
+        .find(|one| one.url.ends_with(EVENTS))
+        .and_then(|one| one.body)
+        .unwrap_or_default();
+    assert!(body.contains(r#""every":60"#), "{body}");
+}
+
+#[tokio::test]
 async fn a_media_server_is_handed_the_address_and_a_key_minted_for_it_alone() {
     let project = lemonfiber_fixtures::scratch::Scratch::new("recounting-asked");
     let http = Fake::by_path(vec![(EVENTS, Answer::reply(204, ""))]);

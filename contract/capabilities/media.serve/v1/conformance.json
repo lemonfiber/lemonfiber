@@ -37,6 +37,6 @@
     {"asked":{"filed":[{"folder":"/data/conformance","media_type":"audiobooks"}]},"case":"furnish-answers-audiobooks","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"audiobooks","operation":"furnish","since":0},
     {"asked":{"filed":[{"folder":"/data/conformance","media_type":"podcasts"}]},"case":"furnish-answers-podcasts","expect":{"conforms":true},"keyed":true,"live":false,"media_type":"podcasts","operation":"furnish","since":0},
     {"asked":{"path":"{certificate}","pin":"{certificate:sha256}"},"case":"serve_tls-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"serve_tls","since":0},
-    {"asked":{"address":"https://core.conformance.invalid/api/notify/events","key":"00000000000000000000000000000000","pin":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3}
+    {"asked":{"address":"https://core.conformance.invalid/api/notify/events","every":60,"key":"00000000000000000000000000000000","pin":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3}
   ]
 }

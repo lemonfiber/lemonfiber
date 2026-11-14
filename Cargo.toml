@@ -32,6 +32,7 @@ lemonfiber-outward = { path = "crates/lemonfiber-outward" }
 lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
 lemonfiber-ports = { path = "crates/lemonfiber-ports" }
 lemonfiber-pinned = { path = "crates/lemonfiber-pinned" }
+lemonfiber-random = { path = "crates/lemonfiber-random" }
 lemonfiber-sidecar = { path = "crates/lemonfiber-sidecar" }
 lemonfiber-testing = { path = "crates/lemonfiber-testing" }
 schemars = "1.2"

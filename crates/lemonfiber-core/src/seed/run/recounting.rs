@@ -14,13 +14,39 @@ use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
 use crate::notify::events::Told;
 use crate::ports::filesystem::Readable;
-use crate::ports::service::{Failure, Recounting};
+use crate::ports::service::{Failure, Heard, Hearing, Recounting};
 use crate::seed::{State, Wiring};
 use crate::wiring::{Filler, Fillers};
 
-/// What the report calls this connection for the service `name`.
-fn connection(name: &str) -> String {
-    format!("{name} telling the core what happened")
+/// What the report calls this connection for the service `name`, with how it hears what
+/// happened where it said.
+fn connection(name: &str, heard: Option<Heard>) -> String {
+    let how = match heard {
+        Some(Heard {
+            hearing: Hearing::Push,
+            ..
+        }) => ", as it is told".to_owned(),
+        Some(Heard {
+            hearing: Hearing::Poll,
+            every,
+        }) => every.map_or_else(
+            || ", by looking for it".to_owned(),
+            |seconds| format!(", by looking for it every {seconds} s"),
+        ),
+        None => String::new(),
+    };
+    format!("{name} telling the core what happened{how}")
+}
+
+/// How many seconds apart a filler that polls is asked to look.
+fn every(ctx: &Ctx) -> u32 {
+    ctx.settings
+        .env_file
+        .as_deref()
+        .and_then(|path| crate::config::store::read(path).ok())
+        .map_or(crate::ports::service::EVERY_DEFAULT, |file| {
+            crate::config::events_poll_from_env(&file)
+        })
 }
 
 /// Ask every curator and media server here to tell the core what happened where `told`
@@ -45,59 +71,82 @@ pub(super) async fn seed_events(
     let mut wirings = Vec::new();
     for (speaker, capability, major) in speakers {
         let part = fillers.fronted_by(speaker).unwrap_or(speaker);
-        let state = match (&told, ctx.dry_run) {
-            (Err(why), _) => State::Unmatched {
-                reason: why.clone(),
-            },
-            (Ok(told), true) => State::WouldWire {
-                yours: None,
-                ours: Some(told.address.clone()),
-            },
+        let (state, heard) = match (&told, ctx.dry_run) {
+            (Err(why), _) => (
+                State::Unmatched {
+                    reason: why.clone(),
+                },
+                None,
+            ),
+            (Ok(told), true) => (
+                State::WouldWire {
+                    yours: None,
+                    ours: Some(told.address.clone()),
+                },
+                None,
+            ),
             (Ok(told), false) => asked(ctx, speaker, capability, major, told).await,
         };
-        wirings.push(Wiring::settled(connection(&part.name), state));
+        wirings.push(Wiring::settled(connection(&part.name, heard), state));
     }
     wirings
 }
 
 /// What became of asking `speaker`, over `capability` at `major`, to tell the core where
-/// `told` says.
-async fn asked(ctx: &Ctx, speaker: &Filler, capability: &str, major: u32, told: &Told) -> State {
+/// `told` says, with how it hears where it said.
+async fn asked(
+    ctx: &Ctx,
+    speaker: &Filler,
+    capability: &str,
+    major: u32,
+    told: &Told,
+) -> (State, Option<Heard>) {
+    match hearing(ctx, speaker, capability, major, told).await {
+        Ok(heard) => (State::Wired, heard),
+        Err(state) => (state, None),
+    }
+}
+
+/// How `speaker`, asked over `capability` at `major` to tell the core where `told` says,
+/// hears what happened, or the state it was left in instead.
+async fn hearing(
+    ctx: &Ctx,
+    speaker: &Filler,
+    capability: &str,
+    major: u32,
+    told: &Told,
+) -> Result<Option<Heard>, State> {
     let Spoken::Over(adapter) = spoken(ctx, speaker, capability, major).await else {
-        return State::Skipped {
+        return Err(State::Skipped {
             reason: format!(
                 "{} speaks {} and could not be asked over it",
                 speaker.name,
                 lemonfiber_contract::spoken(capability, major)
             ),
-        };
+        });
     };
-    let key = match crate::notify::events::minted(ctx, &speaker.id) {
-        Ok(key) => key,
-        Err(detail) => return State::Failed { detail },
-    };
-    if let Err(detail) = written(ctx, speaker, &key) {
-        return State::Failed { detail };
-    }
+    let key = crate::notify::events::minted(ctx, &speaker.id)
+        .map_err(|detail| State::Failed { detail })?;
+    written(ctx, speaker, &key).map_err(|detail| State::Failed { detail })?;
+    let every = Some(every(ctx));
     let answer = if capability == curate::CAPABILITY {
         curate::Adapter(adapter)
-            .events(Some(&told.address), Some(&told.pin), Some(&key))
+            .events(Some(&told.address), Some(&told.pin), Some(&key), every)
             .await
     } else {
         serve::Adapter(adapter)
-            .events(Some(&told.address), Some(&told.pin), Some(&key))
+            .events(Some(&told.address), Some(&told.pin), Some(&key), every)
             .await
     };
-    match answer {
-        Ok(()) => State::Wired,
-        Err(Failure::Unsupported { detail, .. }) => State::Unmatched {
+    answer.map_err(|failure| match failure {
+        Failure::Unsupported { detail, .. } => State::Unmatched {
             reason: format!(
                 "{} cannot tell the core what happened yet: {detail}",
                 speaker.name
             ),
         },
-        Err(failure) => crate::seed::unreached(&failure),
-    }
+        failure => crate::seed::unreached(&failure),
+    })
 }
 
 /// `key` written beside `speaker`'s configuration, readable by its user alone.

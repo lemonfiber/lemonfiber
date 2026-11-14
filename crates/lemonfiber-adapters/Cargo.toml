@@ -21,10 +21,10 @@ publish = false
 lemonfiber-ports = { workspace = true }
 lemonfiber-outward = { workspace = true }
 lemonfiber-error = { workspace = true }
+lemonfiber-random = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 futures-util = { workspace = true }
-getrandom = { workspace = true }
 reqwest = { workspace = true }
 # Docker writes what it remembers about contexts as JSON; confined to
 # `docker/context.rs`.
