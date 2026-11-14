@@ -9,7 +9,11 @@
 use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, CuratedTitle, CutoffUnmet, DownloadClient, Downloading, FoundItem, Fulfilling, Grabbed, Heard, Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue, QueueItem, Queues, Record, Recounting, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
+    Credential, CuratedTitle, CutoffUnmet, DownloadClient, Downloading, FoundItem, Fulfilling,
+    Grabbed, Heard, Identity, Importing, ItemPart, Maintenance, MusicQuality, Pipeline, Protocol,
+    QualityProfile, QualityReleases, Queue, QueueItem, Queues, Record, Recounting,
+    RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest,
+    TraceEvent,
 };
 use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
