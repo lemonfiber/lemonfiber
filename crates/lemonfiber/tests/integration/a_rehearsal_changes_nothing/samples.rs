@@ -29,7 +29,8 @@ pub(super) const NOT_DISPATCHED: [&str; 4] = ["logs", "ui", "pass", "help"];
 
 /// What a rehearsal of each subcommand is driven with.
 ///
-/// One sample per subcommand, chosen to be the shape that changes the most: a
+/// One sample per subcommand, and a second for `plugin`, whose `record` refuses the
+/// flag where its `install` rehearses. Each is the shape that changes the most: a
 /// `config set` rather than a `config show`, a rotate rather than a read. A sample
 /// that took the harmless branch would pass this while saying nothing about the one
 /// that matters.
@@ -321,6 +322,13 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
             Command::Plugins(plugins::Asked::Install {
                 source: lemonfiber_core::plugin::Source::Path(a_plugin_source()),
                 consent: plugins::Consent::default(),
+            }),
+        ),
+        (
+            "plugin",
+            Command::Authoring(lemonfiber_core::app::authoring::Asked::Record {
+                path: a_plugin_source(),
+                taking: lemonfiber_core::plugin::Retaking::default(),
             }),
         ),
         (
