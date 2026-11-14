@@ -220,6 +220,7 @@ pub struct Arguments {
     /// Whether to close the live stream named rather than renew its passes.
     pub stop: Option<bool>,
     /// The pass a browser holds, handed back for a new one around the same session.
+    #[schemars(with = "Option<String>", extend("default" = null))]
     pub pass: Option<Handed>,
     /// Whether the title asked for is a series, a film, music or books, as a page of a
     /// member's search names it: `tv`, `movies`, `music` or `books`.
@@ -314,7 +315,7 @@ impl Arguments {
 }
 
 /// A pass handed back, never written where it is debugged.
-#[derive(Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, PartialEq, Eq, Deserialize)]
 #[serde(transparent)]
 pub struct Handed(pub String);
 

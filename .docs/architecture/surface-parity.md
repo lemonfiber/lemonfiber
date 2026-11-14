@@ -182,12 +182,12 @@ expiry period no longer says flatly that nothing runs it — it says that while
 nothing does, and says what is running it once something is.
 
 On the other side of the table forty-eight reach the terminal in full, seven reach
-the terminal in part, one reaches the terminal but for an exception, and seven have
+the terminal in part, one reaches the terminal but for an exception, and ten have
 no terminal form that anybody is still to build. That last figure stood at zero for
-a slice and is at seven, which are `wiring`, `plugin`, `companion`, `key`, `push-endpoint`,
-`notify` and `settings` and are gaps rather than arguments:
+a slice and is at ten, which are `wiring`, `plugin`, `companion`, `key`, `push-endpoint`,
+`notify`, `settings`, `channels`, `tune` and `play` and are gaps rather than arguments:
 three stood there nine slices ago, nine before the one ahead of that, and twenty
-before the one that began it. All but sixteen of them are reachable whole. `pass`
+before the one that began it. All but nineteen of them are reachable whole. `pass`
 is run by the stack and reached by no surface, and the one that is an exception
 rather than a gap is `support`, which is whole on a screen but for the one thing a
 screen has nowhere to put.

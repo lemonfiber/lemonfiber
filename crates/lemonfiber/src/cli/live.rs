@@ -1,6 +1,43 @@
-//! Which channel to open for a member, and which title to play in their browser.
+//! What the media server plays now, the channels a member may watch, which channel to open
+//! for them, and which title to play in their browser.
 
-use clap::Args;
+use clap::{Args, Subcommand};
+
+/// What is watched: what the media server plays now, the channels a member is offered, a
+/// channel opened for them and a title in their browser.
+#[derive(Debug, Subcommand)]
+pub enum Watching {
+    /// Show what the media server is playing now: who is watching what, and where.
+    ///
+    /// Every session in the house, or one member's with `--member`.
+    Playing {
+        /// Whose sessions, by the name they are known by.
+        #[arg(long)]
+        member: Option<String>,
+    },
+    /// Show the live TV channels one member may watch, each with what is on it now.
+    ///
+    /// Read as that member: a channel whose programme now is outside their limits is left
+    /// out, and a member whose account may not watch live TV is shown none.
+    Channels {
+        /// Whose channels, named the way they sign in.
+        #[arg(long)]
+        member: Option<String>,
+    },
+    /// Open a channel's live stream for one member, and say where it is served.
+    ///
+    /// Each location carries a pass for that live stream and that member, which lapses
+    /// five minutes after it is issued. Ask again with `--stream` before then to keep it,
+    /// and with `--stop` as well to close it. Every location is also drawn as a code to
+    /// point a camera at.
+    Tune(RawTune),
+    /// Say where one title plays in a member's browser, on a pass holding a session on
+    /// their own account.
+    ///
+    /// The pass lapses five minutes after it is issued; hand it back with `--pass` before
+    /// then to keep playing. The location is also drawn as a code to point a camera at.
+    Play(RawPlay),
+}
 
 /// A channel to open, or a live stream to keep or close, as the command line spells it.
 #[derive(Debug, Args)]

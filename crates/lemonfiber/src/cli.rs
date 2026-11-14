@@ -48,7 +48,7 @@ pub use companion::{CompanionCommand, RawCompanion};
 pub use credentials::{Granting, RawCredentials};
 pub use downloads::{DownloadsCommand, RawDownloads};
 pub use keys::{KeyCommand, RawKey};
-pub use live::{RawPlay, RawTune};
+pub use live::{RawPlay, RawTune, Watching};
 pub use logs::RawLogs;
 pub use notifying::{NotifyCommand, NotifyKind, NotifyRetries, NotifySecrets, RawNotify};
 pub use plugin::{Authoring, PluginCommand};

@@ -7,6 +7,7 @@ mod healing;
 mod installed;
 mod keys;
 mod notifying;
+mod watching;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
@@ -25,6 +26,7 @@ use built::{
 };
 use installed::what_is_installed;
 use keys::{a_device_key, a_key_claim, a_minted_key, every_device_key, every_key};
+use watching::{a_play, a_tune, the_channels};
 
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
@@ -508,44 +510,6 @@ fn a_title() -> lemonfiber_core::model::TitleReport {
             }],
         }),
         rehearsed: false,
-    }
-}
-
-/// One channel with the programme on it now, with every field a channel can carry.
-fn the_channels() -> lemonfiber_core::model::ChannelsReport {
-    use lemonfiber_core::ports::service::{Channel, Programme};
-    lemonfiber_core::model::ChannelsReport {
-        channels: vec![Channel {
-            id: "news".to_owned(),
-            name: "News".to_owned(),
-            number: Some("101".to_owned()),
-            now: Some(Programme {
-                title: "The evening news".to_owned(),
-                certificate: Some("PG".to_owned()),
-                ends: Some("2026-11-13T19:00:00Z".to_owned()),
-            }),
-        }],
-        ..lemonfiber_core::model::ChannelsReport::default()
-    }
-}
-
-/// A live stream opened at the door, on a pass.
-fn a_tune() -> lemonfiber_core::model::TunedReport {
-    lemonfiber_core::model::TunedReport {
-        stream: Some("ls1".to_owned()),
-        direct: Some("https://house.local:8920/live/ls1/stream.ts?lfpass=a.1.b".to_owned()),
-        fingerprint: Some("ab".repeat(32)),
-        lapses: Some(1_800_000_300),
-        ..lemonfiber_core::model::TunedReport::default()
-    }
-}
-
-/// A title playing in a browser from the front door, on a pass.
-fn a_play() -> lemonfiber_core::model::PlayReport {
-    lemonfiber_core::model::PlayReport {
-        stream_from: Some("https://watch.example.org/master.m3u8?lfpass=a.1.b".to_owned()),
-        lapses: Some(1_800_000_300),
-        ..lemonfiber_core::model::PlayReport::default()
     }
 }
 

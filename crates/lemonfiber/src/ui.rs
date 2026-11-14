@@ -18,6 +18,7 @@ mod answering;
 pub(crate) mod encrypted;
 #[cfg(test)]
 pub(crate) mod fixtures;
+mod holding;
 pub(crate) mod password;
 pub(crate) mod reach;
 pub(crate) mod said;
@@ -48,12 +49,12 @@ use lemonfiber_core::frontend::Source;
 use lemonfiber_core::keys::run as keys;
 use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::PRODUCT;
-use tokio::net::TcpListener;
 
 use crate::exit::complain;
 use crate::say::say;
 use crate::ui::reach::{address, held, permitted, unauthenticated, Offered, Reach};
 use crate::ui::said::{announcement, opening, reverted, Browser};
+use holding::{holding, Held};
 
 use lemonfiber_core::error::codes::serve::NO_TOKEN;
 
@@ -454,80 +455,6 @@ fn recorded(ctx: &Ctx, bound: &Binding, encrypted: bool) -> Vec<String> {
                  paired with it: {why}"
             ),
         ],
-    }
-}
-
-/// What one run of the serving loop holds open.
-struct Held {
-    /// Every socket that was taken, with the address it was taken on.
-    sockets: Vec<(TcpListener, SocketAddr)>,
-    /// What is answered on them.
-    surface: Router,
-    /// How far they were offered.
-    offered: Offered,
-    /// What each connection is handed to first, where this run encrypts.
-    tls: Option<tokio_rustls::TlsAcceptor>,
-}
-
-/// Hold every socket that was taken until one of the two endings arrives.
-///
-/// Whatever ends it, the sockets are given up before this returns, so the next time
-/// round the loop is not asking for a port this run is still holding. A fault from
-/// accepting on a socket this process already holds means the process is going down
-/// around it, and a second message about one event helps nobody.
-async fn holding(
-    held: Held,
-    live: &Live,
-    admitting: &Arc<Admitting>,
-    until: &mut Until,
-    look: Duration,
-) -> Ending {
-    let Held {
-        sockets,
-        surface,
-        offered,
-        tls,
-    } = held;
-    let (stopping, stopped) = tokio::sync::watch::channel(false);
-    let mut running = Vec::new();
-    for (listener, _) in sockets {
-        running.push(tokio::spawn(answering::answering(
-            Box::new(listener),
-            surface.clone(),
-            stopped.clone(),
-            answering::Limits::SERVED,
-            tls.clone(),
-        )));
-    }
-    let ending = tokio::select! {
-        () = &mut *until => Ending::Stopped,
-        () = revoked(Arc::clone(admitting), offered, look) => Ending::Revoked,
-    };
-    let _ = stopping.send(true);
-    // Every stream ends with the binding it was opened on. A stream is a request that
-    // never finishes, so without this the sockets would wait on it for ever, and a
-    // browser on the household network would go on hearing what the operator is shown
-    // after the password that let it in was taken away.
-    live.end_every_stream();
-    for server in running {
-        let _ = tokio::time::timeout(answering::Limits::SERVED.let_go * 2, server).await;
-    }
-    ending
-}
-
-/// Wait until the password this binding rests on is gone.
-///
-/// Never, where it rests on none: a surface answering this machine alone is offered
-/// to nobody a password would have kept out, so there is nothing for its going to
-/// take away.
-async fn revoked(admitting: Arc<Admitting>, offered: Offered, look: Duration) {
-    match offered {
-        Offered::Machine | Offered::Refused => std::future::pending().await,
-        Offered::Network => {
-            while admitting.credential().is_some() {
-                tokio::time::sleep(look).await;
-            }
-        }
     }
 }
 

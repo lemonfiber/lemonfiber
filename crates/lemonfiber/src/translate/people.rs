@@ -14,7 +14,7 @@ use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
     Collected, HouseholdCommand, RawAllowance, RawPlay, RawShelf, RawTune, RawUnrated, RawWhom,
-    Wished, Within,
+    Watching, Wished, Within,
 };
 
 /// The command line spells what somebody may watch as three flags and the core carries
@@ -103,9 +103,20 @@ pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
     }))
 }
 
+/// What a word about watching asks: what is playing, a member's channels, a channel opened
+/// or kept, or a title in their browser.
+pub(crate) fn watching(asked: Watching) -> Result<Command, u8> {
+    match asked {
+        Watching::Playing { member } => Ok(Command::Playing { member }),
+        Watching::Channels { member } => Ok(channels(member)),
+        Watching::Tune(asked) => tuning(asked),
+        Watching::Play(asked) => playing(asked),
+    }
+}
+
 /// The live TV channels one member may watch. Naming nobody is refused by the core,
 /// which knows who is in the household.
-pub(crate) fn channels(member: Option<String>) -> Command {
+fn channels(member: Option<String>) -> Command {
     Command::Viewing(Viewing::Channels {
         member: member.unwrap_or_default(),
     })
@@ -113,7 +124,7 @@ pub(crate) fn channels(member: Option<String>) -> Command {
 
 /// A channel opened, or a live stream kept or closed, for one member: a channel, or a
 /// stream with or without a stop, and never a channel beside a stream.
-pub(crate) fn tuning(asked: RawTune) -> Result<Command, u8> {
+fn tuning(asked: RawTune) -> Result<Command, u8> {
     let RawTune {
         channel,
         member,
@@ -141,7 +152,7 @@ pub(crate) fn tuning(asked: RawTune) -> Result<Command, u8> {
 
 /// Where one title plays in a member's browser, on a new session for `--device` or the
 /// one `--pass` holds, and never both.
-pub(crate) fn playing(asked: RawPlay) -> Result<Command, u8> {
+fn playing(asked: RawPlay) -> Result<Command, u8> {
     let RawPlay {
         item,
         member,
