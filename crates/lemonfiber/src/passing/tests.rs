@@ -26,6 +26,14 @@ const STREAM: &str = "abc123";
 /// An item's id, in the shape the paths below declare.
 const ITEM: &str = "0123456789abcdef0123456789abcdef";
 
+/// A nonce no other pass shares.
+fn nonce() -> [u8; NONCE_BYTES] {
+    use ring::rand::SecureRandom as _;
+    let mut fresh = [0; NONCE_BYTES];
+    let _ = ring::rand::SystemRandom::new().fill(&mut fresh);
+    fresh
+}
+
 /// A configuration directory holding the key and the live-stream paths.
 fn configured(name: &str) -> Scratch {
     let scratch = Scratch::new(name);
@@ -210,9 +218,7 @@ fn an_item_pass_is_answered_with_its_session_in_the_one_header_and_a_live_pass_w
         token: "ab".repeat(16),
     };
     let now = 1_800_000_000;
-    let pass = key()
-        .seal(ITEM, &session, [4; NONCE_BYTES], now)
-        .unwrap_or_default();
+    let pass = key().seal(ITEM, &session, nonce(), now).unwrap_or_default();
     let asking = |forwarded: String| {
         let mut headers = axum::http::HeaderMap::new();
         if let Ok(value) = axum::http::HeaderValue::from_str(&forwarded) {
@@ -259,9 +265,7 @@ fn an_item_pass_sealing_a_session_no_header_can_carry_is_refused() {
         token: "ab\ncd".to_owned(),
     };
     let now = 1_800_000_000;
-    let pass = key()
-        .seal(ITEM, &session, [4; NONCE_BYTES], now)
-        .unwrap_or_default();
+    let pass = key().seal(ITEM, &session, nonce(), now).unwrap_or_default();
     let forwarded = format!("/videos/{ITEM}/master.m3u8?lfpass={pass}");
     let mut headers = axum::http::HeaderMap::new();
     if let Ok(value) = axum::http::HeaderValue::from_str(&forwarded) {
