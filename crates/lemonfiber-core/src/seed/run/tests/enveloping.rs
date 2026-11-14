@@ -3,7 +3,7 @@
 
 use super::super::enveloping::{seed_envelope, ENVELOPE, LIVE};
 use super::*;
-use crate::pass::{File, Live, LivePath, PINNED, SERVICE};
+use crate::pass::{File, PINNED, SERVICE};
 use crate::project::entry::CONFIGURATION_TREE;
 use crate::test_support::media;
 
@@ -107,7 +107,7 @@ fn live_at(project: &std::path::Path) -> std::path::PathBuf {
     project
         .join(CONFIGURATION_TREE)
         .join(SERVICE)
-        .join(File::Live.name())
+        .join(File::Paths.name())
 }
 
 /// A media server declaring `declared`, and a guard enforcing `held` and taking whatever
@@ -151,17 +151,7 @@ fn envelopes(http: &Fake) -> Vec<serde_json::Value> {
 /// The live-stream paths the media server's declaration names, as the pass service reads
 /// them.
 fn declared_live() -> String {
-    Live::of(
-        lemonfiber_fixtures::declaring::enforceable()
-            .live
-            .into_iter()
-            .map(|path| LivePath {
-                pattern: path.pattern,
-                stream: path.stream,
-            })
-            .collect(),
-    )
-    .written()
+    crate::pass::told(&lemonfiber_fixtures::declaring::enforceable()).written()
 }
 
 #[tokio::test]
@@ -569,7 +559,7 @@ async fn live_stream_paths_that_cannot_be_written_fail_saying_where() {
 
     assert!(
         matches!(state(&wirings, LIVE), Some(State::Failed { detail })
-            if detail.contains(File::Live.name())),
+            if detail.contains(File::Paths.name())),
         "{wirings:?}"
     );
 }

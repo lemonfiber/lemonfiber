@@ -48,6 +48,7 @@ fn declared() -> Declared {
         }],
         live: vec![LivePath {
             pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
+            parameter: None,
             stream: HEX.to_owned(),
         }],
         refused: vec!["^/everything/picture$".to_owned()],
@@ -72,6 +73,7 @@ fn declared() -> Declared {
             stream: "{base}/items/{item}/bytes".to_owned(),
             poster: "{base}/items/{item}/poster".to_owned(),
             backdrop: "{base}/items/{item}/backdrop".to_owned(),
+            playlist: None,
         },
         ports: Ports {
             upstream: UPSTREAM_PORT,

@@ -1,7 +1,7 @@
 //! The one reading of a declared path or template as a place on an address: the guard's
 //! question on its addressee, and every location the core gives a member.
 
-use super::{Locations, BASE, ITEM};
+use super::{Locations, BASE, ITEM, PLAY};
 
 /// `path` on `base`, where it stays there exactly as written: joined onto `base` with the
 /// URL parser every reader uses, its scheme, host and port must be `base`'s, and what
@@ -34,6 +34,14 @@ impl Locations {
     pub fn located(template: &str, base: &str, item: &str) -> Option<String> {
         let rest = template.strip_prefix(BASE)?;
         joined(base, &rest.replace(ITEM, item))
+    }
+
+    /// Where `template` locates `item` on `base` for the play `play`, a fresh id the core
+    /// drew for this location alone.
+    #[must_use]
+    pub fn played(template: &str, base: &str, item: &str, play: &str) -> Option<String> {
+        let rest = template.strip_prefix(BASE)?;
+        joined(base, &rest.replace(ITEM, item).replace(PLAY, play))
     }
 }
 

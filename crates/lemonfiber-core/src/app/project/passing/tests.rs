@@ -7,7 +7,7 @@ use lemonfiber_ports::registry::Tagged;
 
 use crate::app::Ctx;
 use crate::config::{Reaching, REACH_REGISTRY_KEY};
-use crate::pass::{File, Key, Live, PINNED, SERVICE};
+use crate::pass::{File, Key, Paths, PINNED, SERVICE};
 use crate::stack::RUNNING;
 
 const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
@@ -78,8 +78,8 @@ async fn a_guard_pins_this_releases_image_and_makes_the_pass_services_files() {
     assert_eq!(registry.asked(), vec![Tagged::new(crate::IMAGE, RUNNING)]);
     assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
     assert_eq!(
-        held(&project, File::Live),
-        Some(Live::of(Vec::new()).written())
+        held(&project, File::Paths),
+        Some(Paths::of(Vec::new(), Vec::new()).written())
     );
     #[cfg(unix)]
     {
@@ -258,18 +258,23 @@ async fn a_key_that_cannot_be_written_says_why_and_pins_nothing() {
 
     assert!(said.contains(File::Key.name()), "{said}");
     assert!(!project.join(PINNED).exists());
-    assert_eq!(held(&project, File::Live), None);
+    assert_eq!(held(&project, File::Paths), None);
 }
 
 #[tokio::test]
 async fn live_paths_that_cannot_be_written_say_why_and_pin_nothing() {
     let registry = Registered::publishing(DIGEST);
     let (ctx, project) = machine("pass-unwritable-live", &registry, true);
-    blocked(&project.join("config").join(SERVICE).join(File::Live.name()));
+    blocked(
+        &project
+            .join("config")
+            .join(SERVICE)
+            .join(File::Paths.name()),
+    );
 
     let said = readied(&ctx).await.unwrap_or_default();
 
-    assert!(said.contains(File::Live.name()), "{said}");
+    assert!(said.contains(File::Paths.name()), "{said}");
     assert!(!project.join(PINNED).exists());
     assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
 }

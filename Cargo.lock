@@ -1559,6 +1559,7 @@ dependencies = [
  "qrcodegen",
  "ra-ap-rustc_lexer",
  "ratatui",
+ "ring",
  "rpassword",
  "rustls",
  "serde",

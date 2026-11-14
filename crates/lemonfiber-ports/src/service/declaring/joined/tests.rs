@@ -77,3 +77,20 @@ fn a_location_is_its_template_on_the_household_address_with_the_item_in_place() 
         None
     );
 }
+
+#[test]
+fn a_play_is_filled_into_a_template_naming_it_and_nothing_else_changes() {
+    assert_eq!(
+        Locations::played(
+            "{base}/films/{item}/master.m3u8?PlaySessionId={play}",
+            BASE,
+            "f1",
+            "p9"
+        ),
+        Some(format!("{BASE}/films/f1/master.m3u8?PlaySessionId=p9"))
+    );
+    assert_eq!(
+        Locations::played("{base}/films/{item}/poster", BASE, "f1", "p9"),
+        Locations::located("{base}/films/{item}/poster", BASE, "f1")
+    );
+}

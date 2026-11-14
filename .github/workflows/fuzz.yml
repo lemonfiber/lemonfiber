@@ -129,6 +129,7 @@ jobs:
         api_guard
         env_file
         archive_restore
+        pass_confirm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -215,6 +216,12 @@ jobs:
           path: fuzz/corpus/archive_restore
           key: fuzz-corpus-archive_restore-${{ github.run_id }}
           restore-keys: fuzz-corpus-archive_restore-
+      - name: Restore corpus (pass_confirm)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/pass_confirm
+          key: fuzz-corpus-pass_confirm-${{ github.run_id }}
+          restore-keys: fuzz-corpus-pass_confirm-
 
       # `TARGETS` is a copy of what the harness declares, and a copy can fall
       # behind. Checked before the build, so a target nothing here would fuzz is
@@ -371,6 +378,13 @@ jobs:
           name: fuzz-artifacts-archive_restore
           path: fuzz/artifacts/archive_restore
           if-no-files-found: ignore
+      - name: Upload crash artefacts (pass_confirm)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-artifacts-pass_confirm
+          path: fuzz/artifacts/pass_confirm
+          if-no-files-found: ignore
 
       # Saved whether or not a target failed, so one crash does not cost every
       # target the corpus it grew during the run.
@@ -428,6 +442,12 @@ jobs:
         with:
           path: fuzz/corpus/archive_restore
           key: fuzz-corpus-archive_restore-${{ github.run_id }}
+      - name: Save corpus (pass_confirm)
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/pass_confirm
+          key: fuzz-corpus-pass_confirm-${{ github.run_id }}
 
   # The weekly run, and the one a person starts by hand. Each target gets a job
   # of its own and fifteen minutes, which is the exploration the smoke above is
@@ -455,6 +475,7 @@ jobs:
           - api_guard
           - env_file
           - archive_restore
+          - pass_confirm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
