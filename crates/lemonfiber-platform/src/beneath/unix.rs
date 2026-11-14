@@ -255,8 +255,8 @@ pub fn replaced(path: &Path, within: &Path, contents: &[u8], kept: Kept) -> Resu
     let written = (&file)
         .write_all(contents)
         .and_then(|()| file.sync_all())
-        .map_err(worded)
-        .and_then(|()| renameat(&here, &staging, &here, name).map_err(worded));
+        .and_then(|()| renameat(&here, &staging, &here, name).map_err(std::io::Error::from))
+        .map_err(|error| error.to_string());
     if let Err(why) = written {
         let _ = unlinkat(&here, &staging, AtFlags::empty());
         return Err(unwritten(path, &why));
@@ -374,11 +374,6 @@ fn linked(error: Errno) -> String {
         }
         other => other.to_string(),
     }
-}
-
-/// A failure in the platform's own words.
-fn worded(error: impl std::fmt::Display) -> String {
-    error.to_string()
 }
 
 /// The refusal of a directory on the way to `path` beneath `within`.
