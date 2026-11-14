@@ -46,8 +46,10 @@
                   "type": "string"
                 },
                 "lapses_at": {
-                  "description": "When the code lapses, as an RFC 3339 instant.",
-                  "type": "string"
+                  "description": "When the code lapses.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
                 }
               },
               "required": [

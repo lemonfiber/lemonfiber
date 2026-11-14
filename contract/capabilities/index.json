@@ -45,8 +45,8 @@
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 38,
-      "sha256": "33d5554781850fbc59f118419456a55304f6998daa033a2109109314934b11a9"
+      "operations": 39,
+      "sha256": "a390dbbe9e2dcdcb7da4fb3a0f63205f1d71b418d580c12ae22c7ebf99c8f78f"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "8ee74c4dfc4919c9c9595be68f7e6c43cdaa0daaf12a1e9f7e5f5949be88b6e9"
+      "sha256": "3bcedd73b8553524c58e9c9e25598d9c57b70eb50fa65ebb6d4173c609790c14"
     },
     {
       "capability": "indexer.pull",
@@ -69,8 +69,8 @@
         1
       ],
       "openapi": "indexer.pull/v1/openapi.json",
-      "operations": 2,
-      "sha256": "2e4ebc22c7332ee5d9260374cf6cf14c9c9a342b92e760ce0c34e2ae72c8b7ec"
+      "operations": 3,
+      "sha256": "66e36dbe3d3409cfe1d47e0c0f3ddaa8b24de1380c243842aaee510ae659f621"
     },
     {
       "capability": "indexer.proxy",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 32,
-      "sha256": "492f3aa2d5a786aef5034fffdfda839f82a9c24511f9f050800cfee5897edba9"
+      "sha256": "abb67b51328aeceb83affd9a775b3513ce566ce668b1921e9481f8467f9665f7"
     },
     {
       "capability": "identity.source",
@@ -118,7 +118,7 @@
       ],
       "openapi": "identity.source/v1/openapi.json",
       "operations": 21,
-      "sha256": "022f2f18b243cace659d8f3925458a661fc3de153cb274db633b9a8bda34dcb7"
+      "sha256": "7b5e1a2e341d71ebf9a405908a827c31bf81c621d114e1328bf57460b7588cd2"
     },
     {
       "capability": "media.serve",
@@ -129,8 +129,8 @@
         1
       ],
       "openapi": "media.serve/v1/openapi.json",
-      "operations": 29,
-      "sha256": "243af596322d307ef9f417ccf8060322d064c050b543e44490d630497093b070"
+      "operations": 32,
+      "sha256": "eae41879e38a49eebbd6331f9f25578c5aa14a38df5ef8f56a057e2af9666b58"
     },
     {
       "capability": "proxy.front",
@@ -190,7 +190,7 @@
       ],
       "openapi": "stream.guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "e993b8e33e8659f8ff5747404befc8784860cca84d2b2c4f68eda77cf598a561"
+      "sha256": "3f08747bb60087b781ea1d0c17faa8fc4e8b9a44950ee8e5dbb88dfcbd7499fe"
     },
     {
       "capability": "invite.decline",
@@ -237,8 +237,8 @@
         1
       ],
       "openapi": "music.curate/v1/openapi.json",
-      "operations": 4,
-      "sha256": "53a843de1f9a21b86ee0903bc900eed38e87c2418e7cbb76ddff3c68a1b4010d"
+      "operations": 5,
+      "sha256": "bbf3b8fc20465ff82f9a523c4f341d7a408bb772bad3c113b0ef80cf768cd612"
     },
     {
       "capability": "books.curate",
@@ -249,8 +249,8 @@
         1
       ],
       "openapi": "books.curate/v1/openapi.json",
-      "operations": 4,
-      "sha256": "7f4f1037120dadf7a0aa8870c14c0221ca1ef015f62fbf9d2fd6c20ac3be14c5"
+      "operations": 5,
+      "sha256": "745a070e3779fb2eb01d00a401cbe281cd59ff46ee189c7391f094577d8a9437"
     },
     {
       "capability": "owner.claim",
