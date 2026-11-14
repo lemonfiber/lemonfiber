@@ -542,6 +542,39 @@
             "type": "object"
           },
           {
+            "description": "Ask a curator to remove what a member asked it for, and take the ask the core\nkeeps for it off the household list; nothing where the curator held some of it\nbefore.",
+            "properties": {
+              "does": {
+                "const": "unask",
+                "type": "string"
+              },
+              "kept": {
+                "description": "The ask the core keeps for it, by its reference.",
+                "type": "string"
+              },
+              "reference": {
+                "description": "The curator's reference for it.",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/Unit",
+                "description": "What was asked for."
+              },
+              "whole": {
+                "description": "Whether the curator held none of it before.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "does",
+              "unit",
+              "reference",
+              "kept",
+              "whole"
+            ],
+            "type": "object"
+          },
+          {
             "description": "Give a grant back to a plugin, or end one it was given.",
             "properties": {
               "does": {
@@ -1387,6 +1420,54 @@
           }
         ]
       },
+      "Asserted": {
+        "description": "One assertion that is not a probe, and what its recording came to.",
+        "properties": {
+          "id": {
+            "description": "What a verdict is reported against.",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Assertion",
+            "description": "Which of the two it is."
+          },
+          "says": {
+            "description": "What it establishes, in one line.",
+            "type": "string"
+          },
+          "service": {
+            "description": "The service it asks.",
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/PluginVerdict",
+            "description": "What the recording said about it."
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "says",
+          "service",
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "Assertion": {
+        "description": "Which kind of assertion a verdict is about.\n\nA probe is reported against the capability it demonstrates and is not here. These\ntwo are, because neither belongs to a capability: one gates the install of this\nplugin and the other is a row in a register that runs every day afterwards.",
+        "oneOf": [
+          {
+            "const": "proof",
+            "description": "What must hold before this plugin is installed.",
+            "type": "string"
+          },
+          {
+            "const": "check",
+            "description": "A check this plugin adds to the doctor's register.",
+            "type": "string"
+          }
+        ]
+      },
       "Assessment": {
         "description": "Whether a pass could assess drift — whether it had the record of what lemonfiber\nlast wrote to compare against.",
         "oneOf": [
@@ -1678,6 +1759,26 @@
           "remedy"
         ],
         "type": "object"
+      },
+      "BookUnit": {
+        "description": "What a member asks a curator of books for.",
+        "oneOf": [
+          {
+            "const": "book",
+            "description": "One book: a work.",
+            "type": "string"
+          },
+          {
+            "const": "author",
+            "description": "A whole author: every book, and those that come later.",
+            "type": "string"
+          },
+          {
+            "const": "series",
+            "description": "A series: every book of it, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "BootOutcome": {
         "description": "What a run at boot came to.",
@@ -2434,6 +2535,140 @@
           }
         ]
       },
+      "Claimed": {
+        "description": "Everything a plugin's source says, and what this build makes of it.",
+        "properties": {
+          "against": {
+            "$ref": "#/components/schemas/PluginEvidence",
+            "description": "What every verdict in this report was reached against."
+          },
+          "capabilities": {
+            "description": "What its services declare they can do.",
+            "items": {
+              "$ref": "#/components/schemas/Claiming"
+            },
+            "type": "array"
+          },
+          "checks": {
+            "description": "The checks it contributes, against the recordings they name.\n\nReported and never counted against the install. A contributed check reports on a\nrunning stack rather than gating one, so a check that its own recording refuses\nis a check doing its job on a machine in the state it was recorded in — which is\na different fact from a claim its recordings refute.",
+            "items": {
+              "$ref": "#/components/schemas/Asserted"
+            },
+            "type": "array"
+          },
+          "contributions": {
+            "description": "What it adds to lemonfiber's own registers.",
+            "items": {
+              "$ref": "#/components/schemas/Contributed"
+            },
+            "type": "array"
+          },
+          "extension_points_version": {
+            "description": "The extension points generation it was held to.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "description": "The plugin's id.",
+            "type": "string"
+          },
+          "installable": {
+            "description": "Whether this plugin would be installed as it stands.\n\nCarried rather than left for a reader to work out. It is one rule over two of\nthe fields above, and a consumer deciding it for itself would be a second copy\nof that rule — free to disagree with the exit status this same answer produces.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Its human-facing name.",
+            "type": "string"
+          },
+          "proofs": {
+            "description": "What must hold before it is installed, against the recordings it ships.",
+            "items": {
+              "$ref": "#/components/schemas/Asserted"
+            },
+            "type": "array"
+          },
+          "refusals": {
+            "description": "Everything the two published vocabularies refuse, in one pass.",
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            },
+            "type": "array"
+          },
+          "version": {
+            "description": "The author's own version of it.",
+            "type": "string"
+          },
+          "vocabulary_version": {
+            "description": "The capability vocabulary generation it was held to.\n\nCarried for the reason every other read under this word carries one: an author\ncomparing what they were refused for with what they read needs to know whether\nthe difference is their manifest or this build.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "vocabulary_version",
+          "extension_points_version",
+          "against",
+          "refusals",
+          "capabilities",
+          "proofs",
+          "checks",
+          "contributions",
+          "installable"
+        ],
+        "type": "object"
+      },
+      "Claiming": {
+        "description": "One capability a plugin's service declares, and what this build makes of it.",
+        "properties": {
+          "filling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filling"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What asking for it would come to, or nothing where nothing can ask.\n\nA namespaced capability has no answer here rather than an empty one: nothing\nconsumes it, which is what *inert* means, and reporting it as unfilled would be\ndescribing a gap where there is a design."
+          },
+          "name": {
+            "description": "The capability's name.",
+            "type": "string"
+          },
+          "own": {
+            "description": "Whether it is this plugin's own rather than one from the core vocabulary.",
+            "type": "boolean"
+          },
+          "probes": {
+            "description": "Every probe the claim binds, in the order the vocabulary declares them.",
+            "items": {
+              "$ref": "#/components/schemas/ProbeRan"
+            },
+            "type": "array"
+          },
+          "service": {
+            "description": "The service declaring it.",
+            "type": "string"
+          },
+          "shown": {
+            "$ref": "#/components/schemas/Shown",
+            "description": "How far the claim has been shown."
+          }
+        },
+        "required": [
+          "name",
+          "service",
+          "own",
+          "shown",
+          "probes"
+        ],
+        "type": "object"
+      },
       "Code": {
         "description": "A stable identifier for a kind of problem.\n\nStability is the whole point: an operator who searches for a code should find\nthe same answer a year later. Every code is declared in the error crate's `codes`\nmodule, and a code is never recycled.",
         "type": "string"
@@ -2584,6 +2819,40 @@
         ],
         "type": "object"
       },
+      "Conformed": {
+        "description": "What a plugin's recordings say about the contracts its adapters speak.",
+        "properties": {
+          "cases": {
+            "description": "Every case of every contract an adapter speaks, as its recording answered it.",
+            "items": {
+              "$ref": "#/components/schemas/Judged"
+            },
+            "type": "array"
+          },
+          "conforms": {
+            "description": "Whether nothing is refused and every case passed.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The plugin's id.",
+            "type": "string"
+          },
+          "refusals": {
+            "description": "Everything the manifest is refused for, which no recording can make up for.",
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "refusals",
+          "cases",
+          "conforms"
+        ],
+        "type": "object"
+      },
       "Consumption": {
         "description": "One line of the accounting.",
         "properties": {
@@ -2638,6 +2907,36 @@
           "missing",
           "taken",
           "terms"
+        ],
+        "type": "object"
+      },
+      "Contributed": {
+        "description": "One row a plugin adds to a register lemonfiber already runs.",
+        "properties": {
+          "at": {
+            "description": "The point it is made at.",
+            "type": "string"
+          },
+          "for": {
+            "description": "The check a remedy is for, where this is one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The identity it holds, namespaced with the plugin's id.",
+            "type": "string"
+          },
+          "says": {
+            "description": "What it says, in one line.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "id",
+          "says"
         ],
         "type": "object"
       },
@@ -4337,9 +4636,97 @@
           }
         ]
       },
+      "Failed": {
+        "description": "A service none of whose recordings was written, and why.",
+        "properties": {
+          "log": {
+            "description": "The last lines its container wrote, scrubbed and with nothing a terminal obeys.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "service": {
+            "description": "The service.",
+            "type": "string"
+          },
+          "step": {
+            "description": "The step it failed at.",
+            "type": "string"
+          },
+          "why": {
+            "description": "Why.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "step",
+          "why",
+          "log"
+        ],
+        "type": "object"
+      },
       "Filenames": {
         "description": "Whether media filenames are shown as they are.\n\nReplaced unless asked otherwise. A library's contents are not a credential, but they\nare the one thing in a bundle that says something about the person rather than about\nthe machine, and replacing them costs a diagnostic a reader can still follow — the\nmarks keep two mentions of one file recognisable as one file.\n\nRead from the bare flag a surface carries rather than from a name of its own,\nbecause that is what both surfaces have: `--filenames` on a command line and a\n`filenames` in a request body are one word that is there or is not. Which way\nround it reads is decided here, once — a surface that read it the other way\nround would put a library's contents in a file people post in public.",
         "type": "boolean"
+      },
+      "Filling": {
+        "description": "What asking for a capability comes to.\n\nCarried as one word and its subject rather than as three shapes, so a reader of the\nmachine-readable form branches on `answer` and finds the rest where the word says.",
+        "oneOf": [
+          {
+            "description": "Exactly one candidate claims it, and it is what a wiring reaches.",
+            "properties": {
+              "answer": {
+                "const": "by",
+                "type": "string"
+              },
+              "service": {
+                "description": "The service that fills it.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "answer",
+              "service"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "More than one does. Refused until the operator chooses, and every one of them\nis named — resolving it by install order, precedence or recency is the thing\nthis answer exists instead of.",
+            "properties": {
+              "answer": {
+                "const": "contested",
+                "type": "string"
+              },
+              "claimants": {
+                "description": "Every candidate, named.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "answer",
+              "claimants"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nothing installed claims it, or everything that does has been refuted or is\nunproven.",
+            "properties": {
+              "answer": {
+                "const": "unfilled",
+                "type": "string"
+              }
+            },
+            "required": [
+              "answer"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "Filtered": {
         "description": "A service a closure asked for that the configuration leaves out, and why.",
@@ -6449,6 +6836,34 @@
           }
         ]
       },
+      "Judged": {
+        "description": "One case, as its recording answered it.",
+        "properties": {
+          "case": {
+            "description": "The case.",
+            "type": "string"
+          },
+          "contract": {
+            "description": "The contract it is a case of, as `capability@major`.",
+            "type": "string"
+          },
+          "recording": {
+            "description": "Where its recording is, beneath the plugin's source.",
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict",
+            "description": "What it came to."
+          }
+        },
+        "required": [
+          "contract",
+          "case",
+          "recording",
+          "verdict"
+        ],
+        "type": "object"
+      },
       "Jump": {
         "description": "How large a step from one version to another is.\n\nNamed after the part of the version that moved rather than after a size, because\nthat is the fact an operator weighs: a first-number change is where a project puts\nthe work that breaks configurations, and the two behind it are where it puts the\nwork that does not.",
         "oneOf": [
@@ -8203,6 +8618,21 @@
           "rehearsed"
         ],
         "type": "object"
+      },
+      "MusicUnit": {
+        "description": "What a member asks a curator of music for.",
+        "oneOf": [
+          {
+            "const": "album",
+            "description": "One album: a release group.",
+            "type": "string"
+          },
+          {
+            "const": "artist",
+            "description": "A whole artist: every album, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "Newest": {
         "description": "The newest of each kind, by what names them and nothing else.\n\nWhat the event stream says. A surface marks a tab from it without reading the\nitems, and reads [`News`] on the screen that lists them.",
@@ -12772,6 +13202,24 @@
         ],
         "type": "object"
       },
+      "ProbeRan": {
+        "description": "One probe a claim binds, and what running it against its recording came to.",
+        "properties": {
+          "probe": {
+            "description": "The probe the vocabulary declares, by name.",
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/PluginVerdict",
+            "description": "What the recording said about it."
+          }
+        },
+        "required": [
+          "probe",
+          "verdict"
+        ],
+        "type": "object"
+      },
       "Problem": {
         "description": "Something that went wrong, in the form an operator can act on.",
         "properties": {
@@ -13715,6 +14163,48 @@
         ],
         "type": "object"
       },
+      "Recorded": {
+        "description": "Every recording a plugin's manifest names, taken again.",
+        "properties": {
+          "failed": {
+            "description": "Each service whose recordings were not taken.",
+            "items": {
+              "$ref": "#/components/schemas/Failed"
+            },
+            "type": "array"
+          },
+          "holds": {
+            "description": "Whether every recording was written or reproduced, each with a note, and each no\ncase asked removed.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The plugin's id.",
+            "type": "string"
+          },
+          "recordings": {
+            "description": "Each recording, in the order the manifest names them.",
+            "items": {
+              "$ref": "#/components/schemas/RecordingTaken"
+            },
+            "type": "array"
+          },
+          "refusals": {
+            "description": "Everything this build refuses about the manifest; nothing is taken where any is.",
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "refusals",
+          "recordings",
+          "failed",
+          "holds"
+        ],
+        "type": "object"
+      },
       "RecordedWith": {
         "anyOf": [
           {
@@ -13732,6 +14222,31 @@
           }
         ],
         "description": "What a recording gives a service in the operator's place: a constant reaching no third\nparty, or, written `\"minted\"`, a value made for that run alone."
+      },
+      "RecordingTaken": {
+        "description": "One recording a manifest names, and what taking it came to.",
+        "properties": {
+          "fixture": {
+            "description": "The recording it names.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "named": {
+            "description": "What names it: a proof, a claim's probe or a contributed check.",
+            "type": "string"
+          },
+          "took": {
+            "$ref": "#/components/schemas/Took",
+            "description": "What taking it came to."
+          }
+        },
+        "required": [
+          "named",
+          "took"
+        ],
+        "type": "object"
       },
       "Refusal": {
         "description": "A named front door that is not one, and why it is not.",
@@ -16805,6 +17320,31 @@
         ],
         "type": "object"
       },
+      "Shown": {
+        "description": "How far a claim has been shown.\n\nThe four the vocabulary's own states name. `Claimed` is not a weaker\n`Demonstrated`: it is what a declaration is before anything has asked the service,\nwhich is a fact about this moment rather than about the service.",
+        "oneOf": [
+          {
+            "const": "claimed",
+            "description": "A service declares it, and nothing has asked the service yet.",
+            "type": "string"
+          },
+          {
+            "const": "demonstrated",
+            "description": "The probes ran and passed against the evidence the report names.\n\nWhich is not the same claim in each case, and the report is where the two are\ntold apart: a recording that answers is evidence about a moment somebody wrote\ndown, and a service that answers is evidence about the service. This word alone\ndoes not distinguish them and must not be read as though it did.",
+            "type": "string"
+          },
+          {
+            "const": "unproven",
+            "description": "The probes could not be run. The claim stands unverified and is not met.",
+            "type": "string"
+          },
+          {
+            "const": "refuted",
+            "description": "The probes ran and failed. The claim is false.",
+            "type": "string"
+          }
+        ]
+      },
       "Snapshot": {
         "description": "Everything the dashboard shows at one moment.\n\nEach source's panel is filled or marked unavailable on its own, so one dead\nsource degrades one region rather than the screen. The surface builds this from\nwhat it gathered; the standing is read from the same facts so it cannot\ndisagree with the panels.",
         "properties": {
@@ -18621,6 +19161,150 @@
           }
         ]
       },
+      "Took": {
+        "description": "What taking one recording came to.",
+        "oneOf": [
+          {
+            "description": "The recording was written.",
+            "properties": {
+              "outcome": {
+                "const": "written",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording was written with an empty note, which its author has to write.",
+            "properties": {
+              "outcome": {
+                "const": "unnoted",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording already held what was taken, byte for byte.",
+            "properties": {
+              "outcome": {
+                "const": "reproduced",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording holds another result for the same image and arguments, so it is\nrefused and left as it was.",
+            "properties": {
+              "outcome": {
+                "const": "unreproduced",
+                "type": "string"
+              },
+              "why": {
+                "description": "What differs.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "why"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The run was still going at its limit, so there is nothing to record.",
+            "properties": {
+              "outcome": {
+                "const": "overran",
+                "type": "string"
+              },
+              "seconds": {
+                "description": "The limit, in seconds.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "outcome",
+              "seconds"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nothing was taken, or there is nowhere to write what was.",
+            "properties": {
+              "outcome": {
+                "const": "unrecorded",
+                "type": "string"
+              },
+              "why": {
+                "description": "Why.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "why"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording answers no case that was asked, so it was removed.",
+            "properties": {
+              "outcome": {
+                "const": "removed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording answers no case that was asked, and is left as it was because the\nrun writes nothing.",
+            "properties": {
+              "outcome": {
+                "const": "unasked",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The recording is of a case reaching a host outside the stack, which a run holding\nrecordings to what it takes again leaves as recorded rather than reaching.",
+            "properties": {
+              "host": {
+                "description": "The host the case reaches.",
+                "type": "string"
+              },
+              "outcome": {
+                "const": "left",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "host"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Total": {
         "description": "What upgrading one kind of media costs in total, or why that could not be worked out.",
         "oneOf": [
@@ -19384,6 +20068,45 @@
           }
         ]
       },
+      "Unit": {
+        "description": "What one ask is for, within its medium.",
+        "oneOf": [
+          {
+            "description": "An album or a whole artist.",
+            "properties": {
+              "medium": {
+                "const": "music",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/MusicUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A book, a whole author or a series.",
+            "properties": {
+              "medium": {
+                "const": "books",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/BookUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Unrated": {
         "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
         "oneOf": [
@@ -20025,6 +20748,76 @@
         ],
         "type": "object"
       },
+      "Verdict": {
+        "description": "What one case's recording came to.",
+        "oneOf": [
+          {
+            "description": "The recorded answer is one the contract declares for the case.",
+            "properties": {
+              "outcome": {
+                "const": "passed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "It is not, in every way it is not.",
+            "properties": {
+              "faults": {
+                "description": "Every way the recorded answer is outside the case.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "outcome": {
+                "const": "failed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "faults"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "No recording of the case is there.",
+            "properties": {
+              "outcome": {
+                "const": "unrecorded",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A recording is there and could not be judged, so it established nothing.",
+            "properties": {
+              "outcome": {
+                "const": "unproven",
+                "type": "string"
+              },
+              "why": {
+                "description": "What stopped it being judged.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "why"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "VersionReport": {
         "description": "What versions are in play: the binary, the stack it operates, and what changed.\n\nThe changelog is here rather than behind a request of its own because it answers\nthe second half of the same question. \"Which version am I on\" is asked by\nsomebody deciding whether to move, and what they need next is what the version\nthey are on actually brought — so every surface that already reaches this read\nreaches both halves, and none of the three had to learn a new question.",
         "properties": {
@@ -20117,6 +20910,24 @@
         ],
         "type": "object"
       },
+      "Violation": {
+        "description": "One thing a manifest got wrong, and where.",
+        "properties": {
+          "location": {
+            "description": "Which declaration it is about, in the manifest's own terms.",
+            "type": "string"
+          },
+          "message": {
+            "description": "What is wrong with it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "location",
+          "message"
+        ],
+        "type": "object"
+      },
       "Vocabulary": {
         "description": "Every word this product explains, for somebody who asked what there is to ask\nabout.",
         "properties": {
@@ -20197,6 +21008,111 @@
           "committed",
           "level",
           "reading"
+        ],
+        "type": "object"
+      },
+      "Vouch": {
+        "description": "What one of a plugin's images is vouched for.",
+        "oneOf": [
+          {
+            "description": "A signature over a payload naming this digest verified against a held key.",
+            "properties": {
+              "by": {
+                "description": "Which key it verified against, so the answer names what was trusted.",
+                "type": "string"
+              },
+              "provenance": {
+                "const": "signed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "provenance",
+              "by"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nothing was established, and nothing follows from it either way.",
+            "properties": {
+              "provenance": {
+                "const": "unproven",
+                "type": "string"
+              },
+              "why": {
+                "description": "What stopped it being established.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "provenance",
+              "why"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A signature is offered and it does not hold.",
+            "properties": {
+              "provenance": {
+                "const": "refused",
+                "type": "string"
+              },
+              "why": {
+                "description": "Every way it does not.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "provenance",
+              "why"
+            ],
+            "type": "object"
+          }
+        ],
+        "properties": {
+          "digest": {
+            "description": "The digest that fixes what runs.",
+            "type": "string"
+          },
+          "image": {
+            "description": "The registry path, as the manifest declares it.",
+            "type": "string"
+          },
+          "service": {
+            "description": "The service the image runs as.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "image",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "Vouched": {
+        "description": "Every image a plugin pins, and what anybody has said about each.",
+        "properties": {
+          "id": {
+            "description": "The plugin's id.",
+            "type": "string"
+          },
+          "images": {
+            "description": "One answer per image it pins.",
+            "items": {
+              "$ref": "#/components/schemas/Vouch"
+            },
+            "type": "array"
+          },
+          "installable": {
+            "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "images",
+          "installable"
         ],
         "type": "object"
       },
@@ -21764,6 +22680,18 @@
           },
           {
             "$ref": "#/components/schemas/kind-playing"
+          },
+          {
+            "$ref": "#/components/schemas/kind-plugin-claims"
+          },
+          {
+            "$ref": "#/components/schemas/kind-plugin-conformance"
+          },
+          {
+            "$ref": "#/components/schemas/kind-plugin-provenance"
+          },
+          {
+            "$ref": "#/components/schemas/kind-plugin-recording"
           },
           {
             "$ref": "#/components/schemas/kind-plugins"
@@ -24021,6 +24949,166 @@
           },
           "data": {
             "$ref": "#/components/schemas/PlayingReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-plugin-claims": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Claimed",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-plugin-conformance": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Conformed",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-plugin-provenance": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Vouched",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-plugin-recording": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Recorded",
             "description": "The payload."
           },
           "host": {
