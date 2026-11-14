@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What refusing one host a plugin's recipes reach stops.",
+  "type": "object",
+  "properties": {
+    "host": {
+      "description": "The host, as the recipes name it.",
+      "type": "string"
+    },
+    "said": {
+      "description": "What stops, in its author's words, where the manifest says.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "steps": {
+      "description": "Every recipe step refusing it stops: each calling it, and each depending on one.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "PluginStopped.json"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "host"
+  ]
+}

@@ -389,6 +389,7 @@ fn the_listing_says_what_each_plugin_is_doing() {
             why: "Add its own entry".to_owned(),
         }],
         reaches: vec!["metadata.example.org".to_owned()],
+        stops: Vec::new(),
         secrets: vec![lemonfiber_core::plugin::Secret {
             serves: None,
             id: "api-key".to_owned(),

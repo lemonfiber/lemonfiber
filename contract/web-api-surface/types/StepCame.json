@@ -2,6 +2,7 @@
   "fields": {},
   "variants": [
     "\"answered\"",
+    "\"declined\"",
     "\"not-reached\"",
     "\"oversized\"",
     "\"refused\"",

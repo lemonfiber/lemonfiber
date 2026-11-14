@@ -36,6 +36,12 @@
       ],
       "required": false
     },
+    "stops": {
+      "type": [
+        "array[ref:PluginStopping]"
+      ],
+      "required": false
+    },
     "upstream": {
       "type": [
         "string"

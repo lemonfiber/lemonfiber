@@ -49,6 +49,7 @@ mod replacing;
 mod shaping;
 mod speaking;
 mod starting;
+mod stopping;
 
 pub use installing::uninstallable;
 pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
@@ -96,6 +97,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     failing::declared(manifest, &mut found);
     requiring(manifest, &mut found);
     recipes::declared(manifest, &mut found);
+    stopping::said(manifest, &mut found);
     readable::readable(manifest, &mut found);
     earlier::named(manifest, &mut found);
     choosing::chosen(manifest, &mut found);

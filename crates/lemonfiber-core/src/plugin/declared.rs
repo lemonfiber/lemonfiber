@@ -57,6 +57,34 @@ pub struct Secret {
     pub captured: bool,
 }
 
+/// What refusing one host a plugin's recipes reach stops.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginStopping")]
+pub struct Stopping {
+    /// The host, as the recipes name it.
+    pub host: String,
+    /// What stops, in its author's words, where the manifest says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub said: Option<String>,
+    /// Every recipe step refusing it stops: each calling it, and each depending on one.
+    #[serde(default)]
+    pub steps: Vec<Stopped>,
+}
+
+/// One recipe step refusing a host stops.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "PluginStopped")]
+pub struct Stopped {
+    /// The recipe's id.
+    pub recipe: String,
+    /// What the recipe accomplishes, in its author's words.
+    pub title: String,
+    /// The step's id.
+    pub step: String,
+}
+
 /// What a plugin declared about itself, as its install read it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -94,6 +122,9 @@ pub struct Declaration {
     /// against is the one on the machine when it is read.
     #[serde(default)]
     pub reaches: Vec<String>,
+    /// What refusing each of [`Self::reaches`] stops, in the same order.
+    #[serde(default)]
+    pub stops: Vec<Stopping>,
     /// Every credential it says it will hold.
     #[serde(default)]
     pub secrets: Vec<Secret>,
@@ -146,6 +177,10 @@ impl Declaration {
                 .map(|claim| claim.capability.clone())
                 .collect(),
             overrides: super::stating::overrides(manifest),
+            stops: reaches
+                .iter()
+                .map(|host| stopping(manifest, host))
+                .collect(),
             reaches,
             secrets: manifest
                 .secrets
@@ -164,6 +199,31 @@ impl Declaration {
                 })
                 .collect(),
         }
+    }
+}
+
+/// What refusing `host` stops of `manifest`'s recipes, and what its author says of it.
+fn stopping(manifest: &Manifest, host: &str) -> Stopping {
+    Stopping {
+        host: host.to_owned(),
+        said: manifest
+            .reaches
+            .iter()
+            .find(|reach| reach.host == host)
+            .map(|reach| reach.stops.clone()),
+        steps: manifest
+            .recipes
+            .iter()
+            .flat_map(|recipe| {
+                lemonfiber_plugin::declined(recipe, &|to| to == host)
+                    .into_iter()
+                    .map(|step| Stopped {
+                        recipe: recipe.id.clone(),
+                        title: recipe.title.clone(),
+                        step: step.id.clone(),
+                    })
+            })
+            .collect(),
     }
 }
 

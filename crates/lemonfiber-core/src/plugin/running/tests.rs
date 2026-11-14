@@ -67,6 +67,7 @@ async fn ran_under(
         reaching: &reaching,
         approved,
         credentials: &credentials,
+        refused: &[],
     };
     let inputs = inputs
         .iter()
@@ -348,6 +349,74 @@ async fn a_host_outside_is_called_held_to_what_its_check_passed() {
     );
     assert_eq!(resolving.asked(), [("plex.tv".to_owned(), 443)]);
     assert_eq!(outcome.ran.steps.first().map(|one| one.landed), Some(true));
+}
+
+/// A host the operator refused is asked nothing: the step calling it, and the one carrying
+/// what it would have captured, come to `declined`, the step depending on neither is made,
+/// and the recipe holds.
+#[tokio::test]
+async fn a_host_the_operator_refused_is_asked_nothing_and_fails_nothing() {
+    let http = Fake::always(Answer::reply(200, r#"{"id":"7"}"#));
+    let resolving = Resolving::standing_for(&[IpAddr::from([192, 88, 99, 7])]);
+    let written = r#"
+[[step]]
+id      = "claim"
+call    = { method = "POST", to = "plex.tv", path = "/api/claim?token={{code}}" }
+capture = [{ name = "server", from = "id", origin = "external-response" }]
+
+[[step]]
+id   = "name"
+call = { method = "PUT", to = "komga", path = "/server", body = "{{server}}" }
+
+[[step]]
+id   = "libraries"
+call = { method = "GET", to = "komga", path = "/libraries" }
+
+[[pair]]
+value = "code"
+to    = "plex.tv"
+
+[[pair]]
+value = "server"
+to    = "komga"
+"#;
+    let reaching = reaching();
+    let refused = ["plex.tv".to_owned()];
+    let approved = [APPROVED.to_owned()];
+    let running = Running {
+        http: http.as_ref(),
+        resolver: resolving.as_ref(),
+        reaching: &reaching,
+        approved: &approved,
+        credentials: &[],
+        refused: &refused,
+    };
+    let outcome = run(
+        &running,
+        &recipe(written),
+        &BTreeMap::from([("code".to_owned(), "c0de".to_owned())]),
+    )
+    .await;
+
+    assert!(outcome.ran.held, "{:?}", outcome.ran);
+    assert_eq!(
+        came(&outcome),
+        [
+            ("claim".to_owned(), Came::Declined),
+            ("name".to_owned(), Came::Declined),
+            ("libraries".to_owned(), Came::Answered),
+        ]
+    );
+    assert!(resolving.asked().is_empty());
+    assert_eq!(
+        http.requests()
+            .iter()
+            .map(|one| one.url.as_str())
+            .collect::<Vec<_>>(),
+        ["http://127.0.0.1:25600/libraries"]
+    );
+    assert!(outcome.ran.steps.first().is_some_and(|one| !one.landed
+        && one.why.as_deref() == Some("was not asked: the operator refused plex.tv")));
 }
 
 /// A host standing for an address here is refused before anything is sent.

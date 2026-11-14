@@ -1,6 +1,6 @@
 use lemonfiber_plugin::Manifest;
 
-use super::{Declaration, Secret};
+use super::{Declaration, Secret, Stopped, Stopping};
 
 /// A manifest declaring one of everything this record keeps: a claim of a core
 /// capability and one of its own, a recipe reaching its own service twice and a
@@ -57,6 +57,10 @@ call = { method = "GET", to = "komga", path = "/api/v1/libraries" }
 value = "token"
 to    = "metadata.example.org"
 
+[[reach]]
+host  = "metadata.example.org"
+stops = "New series arrive undescribed."
+
 [[secret]]
 id  = "api-key"
 of  = "komga"
@@ -87,6 +91,15 @@ fn what_a_plugin_declared_is_kept_as_it_declared_it() {
                 why: "Add its own entry".to_owned(),
             }],
             reaches: vec!["metadata.example.org".to_owned()],
+            stops: vec![Stopping {
+                host: "metadata.example.org".to_owned(),
+                said: Some("New series arrive undescribed.".to_owned()),
+                steps: vec![Stopped {
+                    recipe: "adopt".to_owned(),
+                    title: "t".to_owned(),
+                    step: "tell".to_owned(),
+                }],
+            }],
             secrets: vec![Secret {
                 serves: None,
                 id: "api-key".to_owned(),

@@ -265,12 +265,16 @@ pub(super) async fn following(
     } = against;
     let reaching = reaching(services, would);
     let credentials = credentials(ctx, services);
+    let refused = crate::outbound::behalf::refused(services, would, &|name| {
+        crate::settings::recorded_value(ctx, name)
+    });
     let running = Running {
         http: ctx.seams.http.as_ref(),
         resolver: ctx.seams.resolver.as_ref(),
         reaching: &reaching,
         approved: &consent.approved,
         credentials: &credentials,
+        refused: &refused,
     };
     let mut ran = Vec::new();
     let mut captured = BTreeMap::new();
@@ -360,7 +364,12 @@ fn failed(plugin: &str, ran: &[Ran], meaning: String) -> Problem {
         .iter()
         .flat_map(|one| &one.steps)
         .map(|step| step.came)
-        .find(|came| !matches!(came, Came::Answered | Came::Skipped | Came::NotReached));
+        .find(|came| {
+            !matches!(
+                came,
+                Came::Answered | Came::Skipped | Came::NotReached | Came::Declined
+            )
+        });
     let (code, summary) = match ended {
         Some(Came::Refused) => (
             CALL_REFUSED,

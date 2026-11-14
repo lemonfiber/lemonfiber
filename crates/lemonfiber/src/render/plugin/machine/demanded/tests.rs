@@ -98,6 +98,7 @@ fn every_way_a_step_can_end_is_said_in_words() {
         Came::Unreachable,
         Came::Refused,
         Came::Withheld,
+        Came::Declined,
         Came::Unexpected,
         Came::Uncaptured,
         Came::Oversized,

@@ -56,6 +56,13 @@ pub(crate) fn valued(name: &str, value: &str) -> Result<(), Box<Problem>> {
             "{name} is written as one line, so its value may hold no line break or other \
              control character"
         ))
+    } else if crate::outbound::behalf::switched(name).is_some()
+        && !crate::outbound::behalf::CHOICES.contains(&value)
+    {
+        Some(format!(
+            "{name} allows or refuses the host it names, and takes {}",
+            crate::outbound::behalf::CHOICES.join(" or ")
+        ))
     } else if value.is_empty() && (legacy::setting_key(name).is_some() || own::is_core(name)) {
         Some(format!(
             "{name} cannot hold an empty value; lemonfiber settings clear {name} takes the \

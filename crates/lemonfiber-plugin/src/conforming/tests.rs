@@ -540,7 +540,7 @@ fn the_format_has_no_field_by_which_a_plugin_could_wire_to_a_named_service() {
 /// Held to the whole set rather than to a floor, so that a block added without the
 /// feature saying so fails here — and so does one quietly removed.
 #[test]
-fn a_manifest_is_the_eleven_kinds_of_declaration_and_no_other() {
+fn a_manifest_is_the_twelve_kinds_of_declaration_and_no_other() {
     let published = published();
     let blocks: BTreeSet<&str> = published
         .as_value()
@@ -560,6 +560,7 @@ fn a_manifest_is_the_eleven_kinds_of_declaration_and_no_other() {
             "proof",
             "contribution",
             "recipe",
+            "reach",
             "secret",
             "override",
             "requires",

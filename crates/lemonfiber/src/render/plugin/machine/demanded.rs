@@ -45,6 +45,7 @@ const fn came(came: Came) -> &'static str {
         Came::Unreachable => "nothing answered it",
         Came::Refused => "not sent, because its host is not out on the internet",
         Came::Withheld => "not sent, because a value it carries may not go there",
+        Came::Declined => "not asked, because a host it depends on was refused",
         Came::Unexpected => "answered with something other than what it expects",
         Came::Uncaptured => "its answer held nothing where a capture reads",
         Came::Oversized => "its answer was larger than a recipe reads",

@@ -12,6 +12,10 @@
 //! name standing for somewhere on this machine or its network is refused before
 //! anything is sent, and a name that moves after the check is not followed.
 //!
+//! **A refused host is asked nothing.** A step calling a host the operator refused for
+//! this plugin is not sent, and comes to [`Came::Declined`], as does every step that
+//! depends on one; that ends nothing, and the steps that do not depend on it are made.
+//!
 //! **What landed is said.** A call that reached anything but this plugin's own services
 //! changed something an install going back cannot reach into, so each such call is
 //! marked as having landed, which is what a failure has to name.
@@ -62,6 +66,8 @@ pub struct Running<'a> {
     /// id and the value, which a value holding one is held to however a recipe came by
     /// it.
     pub credentials: &'a [(String, String)],
+    /// Every host outside the stack the operator refused this plugin.
+    pub refused: &'a [String],
 }
 
 /// What one recipe came to.
@@ -122,9 +128,23 @@ pub async fn run(
     let mut answered: BTreeMap<String, u16> = BTreeMap::new();
     let mut steps = Vec::new();
     let mut why = None;
+    let refused = |to: &str| running.refused.iter().any(|host| host == to);
+    let declined: BTreeSet<&str> = lemonfiber_plugin::declined(recipe, &refused)
+        .into_iter()
+        .map(|step| step.id.as_str())
+        .collect();
     for step in &recipe.steps {
         if why.is_some() {
             steps.push(said(step, Came::NotReached, None));
+            continue;
+        }
+        if declined.contains(step.id.as_str()) {
+            let because = if refused(&step.call.to) {
+                format!("was not asked: the operator refused {}", step.call.to)
+            } else {
+                "was not asked: it depends on a step whose host the operator refused".to_owned()
+            };
+            steps.push(said(step, Came::Declined, Some(because)));
             continue;
         }
         // Asked before the guard is: a step left out because its guard read a credential

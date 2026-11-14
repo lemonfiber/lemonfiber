@@ -31,6 +31,11 @@
       "type": "array",
       "items": {"$ref": "#/$defs/Proof"}
     },
+    "reach": {
+      "description": "What stops working where the operator refuses a host its recipes reach, in its\nauthor's words.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/PluginReach"}
+    },
     "recipe": {
       "description": "The ordered calls that configure what it installed.",
       "type": "array",
@@ -472,6 +477,16 @@
         {"description": "Open a connection to the service's port.", "type": "string", "const": "tcp"},
         {"description": "Trust the container's own reported state.", "type": "string", "const": "container"}
       ]
+    },
+    "PluginReach": {
+      "description": "What refusing one host a plugin's recipes reach stops, as its author says it.",
+      "type": "object",
+      "properties": {
+        "host": {"description": "The host outside the stack, as a recipe's call or pair names it.", "type": "string"},
+        "stops": {"description": "What stops working where the operator refuses it, in one line.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["host", "stops"]
     },
     "PluginRecipeCondition": {
       "description": "What an earlier step or value must have come to.\n\nOne of two shapes, and a condition carrying neither or both is refused when the\nmanifest is read: an earlier step answered a status, or an earlier value holds a\ntext exactly.",

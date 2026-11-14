@@ -407,6 +407,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         let problem = super::super::following::Unfollowed::Failed(vec![ran(vec![
             step(Came::Answered, true),
             step(Came::Skipped, false),
+            step(Came::Declined, false),
             step(came, false),
             step(Came::NotReached, false),
         ])])
@@ -415,7 +416,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         assert_eq!(problem.meaning, "put back");
         assert!(problem.detail.as_deref().is_some_and(|detail| detail
             .contains("already landed and not put back from here: adopt claim to sonarr")));
-        assert_eq!(problem.steps.len(), 4);
+        assert_eq!(problem.steps.len(), 5);
     }
     let nowhere =
         super::super::following::Unfollowed::Failed(vec![ran(vec![step(Came::Unexpected, false)])])
@@ -610,86 +611,6 @@ async fn where_a_capture_cannot_be_kept_the_install_goes_back() {
     assert!(!record_of(&ctx).exists());
 }
 
-/// A recipe telling the stack's television curator something, carrying the credential
-/// lemonfiber holds for it.
-const TELLING: &str = r#"
-[[recipe]]
-id    = "tell"
-title = "Tell Sonarr"
-why   = "To say hello"
-
-[[recipe.input]]
-name   = "key"
-origin = "credential-store"
-of     = "sonarr"
-
-[[recipe.step]]
-id     = "status"
-call   = { method = "GET", to = "sonarr", path = "/api/v3/system/status", headers = { X-Api-Key = "{{key}}" } }
-expect = { status = 200 }
-
-[[recipe.pair]]
-value = "key"
-to    = "sonarr"
-
-[requires]
-capabilities = ["recipe.run"]
-"#;
-
-/// The key [`TELLING`] carried to the curator, installed under `name` in a context the
-/// published key `k3y` is recorded in and `prepared` leaves.
-async fn told_with(name: &str, prepared: fn(&crate::app::Ctx)) -> Vec<String> {
-    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
-    let http = Fake::by_path(vec![
-        (
-            "/api/v1/libraries",
-            lemonfiber_fixtures::http::Answer::reply(200, "[]"),
-        ),
-        (
-            "/api/v3/system/status",
-            lemonfiber_fixtures::http::Answer::reply(200, "{}"),
-        ),
-    ]);
-    let ctx = proving(name, runner, http.clone());
-    let env = ctx.settings.env_file.clone().unwrap_or_default();
-    let key = crate::config::for_service("sonarr", crate::config::API_KEY_SUFFIX);
-    crate::test_support::recorded_as(&env, &key, "k3y");
-    prepared(&ctx);
-    let at = crate::plugin::Source::Path(source(name, &format!("{PROVING}{TELLING}")));
-    let asked = Asked::Install {
-        source: at,
-        consent: super::super::Consent::default(),
-    };
-    let install = report(answered(&ctx, asked).await).and_then(|one| one.install);
-    assert_eq!(install.map(|one| one.recorded), Some(true));
-    http.requests()
-        .into_iter()
-        .filter(|one| one.url.contains("/api/v3/system/status"))
-        .flat_map(|one| one.headers)
-        .filter(|(name, _)| name == "X-Api-Key")
-        .map(|(_, value)| value)
-        .collect()
-}
-
-/// A credential the credential store holds for a service of the stack's is the key
-/// lemonfiber publishes for it, carried to that service.
-#[tokio::test]
-async fn a_credential_input_is_the_key_lemonfiber_publishes_for_its_service() {
-    assert_eq!(told_with("credential", |_| {}).await, ["k3y"]);
-}
-
-/// Where a first-party part moved its own service in place of the stack's, the credential
-/// is the key lemonfiber minted for it, which the adapter in front of it is handed too.
-#[tokio::test]
-async fn a_credential_input_of_a_moved_part_is_the_key_lemonfiber_minted_for_it() {
-    let carried = told_with("credential-moved", |ctx| {
-        crate::test_support::curators::TELEVISION.recorded(ctx);
-        crate::test_support::curators::TELEVISION.minted(ctx, "minted-k3y");
-    })
-    .await;
-    assert_eq!(carried, ["minted-k3y"]);
-}
-
 /// An update runs its new version's install recipes once it holds, and reports them.
 #[tokio::test]
 async fn an_update_runs_the_new_versions_recipes_and_reports_them() {
@@ -767,4 +688,65 @@ fn what_an_update_put_back_says_what_the_machine_holds() {
     assert!(said(&left, true, true).ends_with(
         "Still standing from the new version: komga — its container could not be taken off."
     ));
+}
+
+/// A recipe that also describes the library at a host outside the stack.
+const DESCRIBING: &str = r#"
+[[recipe.step]]
+id   = "describe"
+call = { method = "GET", to = "metadata.example", path = "/series" }
+"#;
+
+/// A host the operator refused before the install is asked nothing, and the install's
+/// recipe holds with the step calling it declined.
+#[tokio::test]
+async fn an_install_asks_nothing_of_a_host_the_operator_refused() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let http = claiming(200, r#"{"token":"t0k3n"}"#);
+    let ctx = proving("refused-reach", runner, http);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let refusing =
+        std::collections::BTreeMap::from([("plugin.komga.reach.metadata.example", Some("off"))]);
+    assert!(crate::settings::store::recorded(
+        &env.with_file_name(crate::config::paths::SETTINGS),
+        &refusing
+    )
+    .is_ok());
+    let manifest = format!("{}{DESCRIBING}", reciped());
+    let source = crate::plugin::Source::Path(source("refused-reach", &manifest));
+    let reading = plugins(
+        &ctx,
+        &Asked::Install {
+            source: source.clone(),
+            consent: super::super::Consent::default(),
+        },
+    )
+    .await;
+    let consent = super::super::Consent {
+        agreement: reading.map(|one| one.agreement).unwrap_or_default(),
+        approved: Vec::new(),
+        inputs: super::super::Inputs::of(std::collections::BTreeMap::from([(
+            "claim".to_owned(),
+            "1234".to_owned(),
+        )])),
+    };
+    let shown = report(plugins(&ctx, &Asked::Install { source, consent }).await);
+
+    let ran: Vec<(String, Came)> = shown
+        .and_then(|one| one.install)
+        .map(|one| {
+            one.recipes_ran
+                .into_iter()
+                .flat_map(|ran| ran.steps)
+                .map(|step| (step.step, step.came))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        ran,
+        [
+            ("claim".to_owned(), Came::Answered),
+            ("describe".to_owned(), Came::Declined),
+        ]
+    );
 }

@@ -87,6 +87,10 @@ pub(super) fn declared(manifest: &Manifest) -> Vec<(String, &str)> {
         ("plugin.license".to_owned(), plugin.license.as_str()),
         ("plugin.upstream".to_owned(), plugin.upstream.as_str()),
     ];
+    for (index, reach) in manifest.reaches.iter().enumerate() {
+        every.push((format!("reach[{index}].host"), reach.host.as_str()));
+        every.push((format!("reach[{index}].stops"), reach.stops.as_str()));
+    }
     for service in &manifest.services {
         let at = format!("service {}", service.id);
         every.push((format!("{at}.id"), service.id.as_str()));

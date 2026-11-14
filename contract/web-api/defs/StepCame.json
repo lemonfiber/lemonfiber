@@ -33,6 +33,11 @@
       "const": "withheld"
     },
     {
+      "description": "It was not sent: the operator refused its host, or one a step it depends on calls,\nso nothing was asked.",
+      "type": "string",
+      "const": "declined"
+    },
+    {
       "description": "It was answered with something other than what it expects.",
       "type": "string",
       "const": "unexpected"

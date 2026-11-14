@@ -91,7 +91,7 @@ pub(crate) use container::{
     holding, is_a_plugins, own_secret, secrets_file, services_of, unit, user_of, variables,
 };
 pub use container::{profile, Holding, Reading, Variable};
-pub use declared::{Declaration, Secret};
+pub use declared::{Declaration, Secret, Stopped, Stopping};
 pub use fronting::{routes as household_routes, stack_routes, taken as label_taken};
 pub use granted::{approval as grant_approval, granting, Grant, Granting};
 pub(crate) use installed::implied;
