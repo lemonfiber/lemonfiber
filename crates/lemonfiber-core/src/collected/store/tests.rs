@@ -167,18 +167,18 @@ fn a_withdrawn_ask_keeps_its_number_and_is_withdrawn_once() {
     let _ = filed(&at, &asking(album, Standing::Sent));
 
     assert_eq!(
-        withdrawn(&at, first, "2026-11-13T10:00:00Z").ok(),
+        withdrawn(&at, first, Instant::from_seconds(1_794_564_000)).ok(),
         Some(true)
     );
     assert_eq!(
-        withdrawn(&at, first, "2026-11-13T11:00:00Z").ok(),
+        withdrawn(&at, first, Instant::from_seconds(1_794_567_600)).ok(),
         Some(false)
     );
     assert_eq!(
         withdrawn(
             &at,
             Reference::Kept(Medium::Books, 1),
-            "2026-11-13T11:00:00Z"
+            Instant::from_seconds(1_794_567_600)
         )
         .ok(),
         Some(false)
@@ -186,9 +186,12 @@ fn a_withdrawn_ask_keeps_its_number_and_is_withdrawn_once() {
     let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
     assert_eq!(
         asks.iter()
-            .map(|ask| (ask.standing, ask.settled_at.clone()))
+            .map(|ask| (ask.standing, ask.settled_at))
             .collect::<Vec<_>>(),
-        [(Standing::Withdrawn, Some("2026-11-13T10:00:00Z".to_owned()))]
+        [(
+            Standing::Withdrawn,
+            Some(Instant::from_seconds(1_794_564_000))
+        )]
     );
     assert_eq!(
         filed(&at, &asking(album, Standing::Sent)).ok(),

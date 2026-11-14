@@ -676,7 +676,7 @@ fn a_restart_goes_back_whole() {
 #[test]
 fn an_ask_goes_back_whole_only_where_the_house_held_none_of_it_before() {
     let asked = |whole| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: crate::collected::run::OPERATION.to_owned(),
         target: "lidarr".to_owned(),
         kind: Kind::Asked {
