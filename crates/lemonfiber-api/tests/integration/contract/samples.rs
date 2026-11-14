@@ -3,6 +3,7 @@
 
 mod built;
 mod healing;
+mod installed;
 mod notifying;
 
 use lemonfiber_core::app::Outcome;
@@ -18,8 +19,9 @@ use lemonfiber_core::model::{
 use built::{
     a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
     a_setup_part_way, a_shared_line, a_stack, a_substitution, a_walk, a_word, an_update, manifest,
-    plan, what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
+    plan, what_is_wired, what_leaves, where_this_copy_stands,
 };
+use installed::what_is_installed;
 
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.

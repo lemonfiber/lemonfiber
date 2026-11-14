@@ -471,6 +471,33 @@ fn only_the_operator_reads_how_the_stack_runs_what_setup_settled_and_where_its_a
     }
 }
 
+/// Where each service on this machine keeps its configuration and its library is the
+/// operator's alone: a member, a key scoped to one, and a `read` or an `act` key are
+/// refused the migration survey, and the operator is given it.
+#[test]
+fn only_the_operator_reads_where_the_services_on_this_machine_keep_their_files() {
+    use lemonfiber_core::app::MigrateAction;
+    use lemonfiber_core::keys::Scope;
+    let command = Command::Migrate(MigrateAction::Survey);
+    for caller in [Caller::Machine, Caller::Operator] {
+        assert_eq!(
+            may(&caller, Door::Reading, command.clone()),
+            Permitted::This(command.clone())
+        );
+    }
+    let member_key = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+        assert_eq!(
+            may(&caller, Door::Reading, command.clone()),
+            Permitted::Nothing,
+            "{caller:?}"
+        );
+    }
+}
+
 /// The settings are the operator's alone: a member, a key scoped to one, and a `read` or
 /// an `act` key are refused the read and both changes, and the operator is given them.
 #[test]
