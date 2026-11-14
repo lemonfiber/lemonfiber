@@ -79,6 +79,7 @@ async fn ran(check: &GuidesCheck) -> Vec<Finding> {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     let verdict = match check.http.send(&request).await {
         Ok(response) if response.is_success() => Verdict::Pass {

@@ -38,6 +38,7 @@ fn each_application_registered_is_read_back_from_what_was_posted() {
         headers: Vec::new(),
         body: Some(serde_json::json!({ "application": application }).to_string()),
         pinned: None,
+        deadline: None,
     }];
 
     assert_eq!(registered(&sent), vec![application]);

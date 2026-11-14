@@ -99,6 +99,7 @@ pub(super) fn request(
             .as_deref()
             .map(|body| substituted(body, values, false)),
         pinned: None,
+        deadline: None,
     };
     Ok(Built { request, carried })
 }

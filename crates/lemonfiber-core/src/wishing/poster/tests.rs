@@ -98,6 +98,7 @@ async fn a_member_is_handed_the_poster_fetched_from_the_catalogue_with_nothing_o
             headers: Vec::new(),
             body: None,
             pinned: Some(vec![lemonfiber_fixtures::ports::ANYWHERE]),
+            deadline: None,
         }]
     );
 }

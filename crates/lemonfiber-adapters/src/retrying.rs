@@ -20,6 +20,11 @@
 //! restarting, a name resolving late. One that was made and went silent has
 //! already been given the whole wait, and asking it again would spend that wait
 //! twice more before saying the same thing.
+//!
+//! A request's deadline holds across every attempt: each one asked again carries what
+//! is left of it, and none is made once nothing is.
+
+use std::time::Duration;
 
 use async_trait::async_trait;
 
@@ -61,17 +66,22 @@ impl<H: Http> Http for Retrying<H> {
     }
 }
 
-/// Ask again while it is safe to and there are attempts left.
+/// Ask again while it is safe to, there are attempts left, and the deadline has time left.
 async fn sent<H: Http + ?Sized>(inner: &H, request: &Request) -> Result<Response, Unreachable> {
+    let started = tokio::time::Instant::now();
+    let mut asked = request.clone();
     let mut attempt = 1;
     loop {
-        let failure = match inner.send(request).await {
+        let failure = match inner.send(&asked).await {
             Ok(response) => return Ok(response),
             Err(failure) => failure,
         };
-        let Some(wait) = (is_idempotent(request.method) && !failure.connected)
+        let Some((wait, again)) = (is_idempotent(request.method) && !failure.connected)
             .then(|| retry::again(attempt))
             .flatten()
+            .and_then(|wait| {
+                left(request, started.elapsed().saturating_add(wait)).map(|again| (wait, again))
+            })
         else {
             // Not safe to repeat, not a blip, or the attempts are spent. The count
             // travels with the failure so what reports it can tell a service
@@ -82,8 +92,24 @@ async fn sent<H: Http + ?Sized>(inner: &H, request: &Request) -> Result<Response
             });
         };
         tokio::time::sleep(wait).await;
+        asked = again;
         attempt = attempt.saturating_add(1);
     }
+}
+
+/// `request` carrying what is left of its deadline once `spent` has gone, or nothing where
+/// none is left.
+fn left(request: &Request, spent: Duration) -> Option<Request> {
+    let Some(deadline) = request.deadline else {
+        return Some(request.clone());
+    };
+    deadline
+        .checked_sub(spent)
+        .filter(|left| !left.is_zero())
+        .map(|left| Request {
+            deadline: Some(left),
+            ..request.clone()
+        })
 }
 
 #[cfg(test)]

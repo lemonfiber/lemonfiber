@@ -46,6 +46,7 @@ fn request(method: Method) -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 
@@ -183,4 +184,60 @@ async fn octets_are_handed_on_once() {
         .await;
     assert_eq!(sent.map(|answered| answered.status), Ok(200));
     assert_eq!(asked.load(Ordering::SeqCst), 1);
+}
+
+/// A transport that never connects, keeping the deadline each attempt carried.
+#[derive(Default)]
+struct Refused {
+    deadlines: std::sync::Mutex<Vec<Option<std::time::Duration>>>,
+}
+
+#[async_trait]
+impl Http for Refused {
+    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
+        if let Ok(mut deadlines) = self.deadlines.lock() {
+            deadlines.push(request.deadline);
+        }
+        Err(Unreachable::once(&request.url, "connection refused"))
+    }
+}
+
+/// Every deadline `deadline` was asked with across its attempts, and how many there were.
+async fn attempted(deadline: std::time::Duration) -> (Vec<Option<std::time::Duration>>, u32) {
+    let refused = Arc::new(Refused::default());
+    let retrying = Retrying::around(Arc::clone(&refused) as Arc<dyn Http>);
+    let failure = retrying
+        .send(&Request {
+            deadline: Some(deadline),
+            ..request(Method::Get)
+        })
+        .await
+        .err();
+    let deadlines = refused
+        .deadlines
+        .lock()
+        .map(|deadlines| deadlines.clone())
+        .unwrap_or_default();
+    (deadlines, failure.map_or(0, |failure| failure.attempts))
+}
+
+#[tokio::test(start_paused = true)]
+async fn each_attempt_asked_again_carries_what_is_left_of_the_deadline() {
+    let millis = std::time::Duration::from_millis;
+    assert_eq!(
+        attempted(millis(1000)).await,
+        (
+            vec![Some(millis(1000)), Some(millis(800)), Some(millis(400))],
+            ATTEMPTS
+        )
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn nothing_is_asked_again_once_the_deadline_is_spent() {
+    let millis = std::time::Duration::from_millis;
+    assert_eq!(
+        attempted(millis(300)).await,
+        (vec![Some(millis(300)), Some(millis(100))], 2)
+    );
 }

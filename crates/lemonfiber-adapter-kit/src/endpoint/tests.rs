@@ -22,6 +22,7 @@ fn asking(url: String) -> Request {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     }
 }
 

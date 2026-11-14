@@ -465,6 +465,7 @@ async fn unpassed(
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     match (kind, http.send(&request).await) {
         (HealthKind::Http, Ok(response)) if passes(response.status) => None,

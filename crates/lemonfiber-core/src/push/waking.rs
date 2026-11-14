@@ -139,6 +139,7 @@ async fn woke(ctx: &Ctx, record: &Record, id: &str) -> (DeliveryOutcome, bool) {
         ],
         body: None,
         pinned: None,
+        deadline: None,
     };
     let sent = tokio::time::timeout(WAITED_FOR, ctx.seams.http.send_octets(&request, &sealed));
     match sent.await {

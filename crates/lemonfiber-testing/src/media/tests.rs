@@ -14,6 +14,7 @@ fn sent(url: &str, body: Option<&str>) -> Request {
         headers: Vec::new(),
         body: body.map(str::to_owned),
         pinned: None,
+        deadline: None,
     }
 }
 

@@ -414,6 +414,7 @@ fn a_request_about_to_be_sent_is_held_to_exactly_its_destination() {
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     assert!(super::sending(
         sent("http://127.0.0.1:8989/x"),

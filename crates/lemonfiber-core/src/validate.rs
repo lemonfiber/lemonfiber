@@ -261,6 +261,7 @@ impl Live {
             headers: Vec::new(),
             body: None,
             pinned: None,
+            deadline: None,
         };
 
         let started = Instant::now();

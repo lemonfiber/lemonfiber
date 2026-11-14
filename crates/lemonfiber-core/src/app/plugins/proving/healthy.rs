@@ -27,6 +27,7 @@ pub(super) async fn passed(
         headers: Vec::new(),
         body: None,
         pinned: None,
+        deadline: None,
     };
     while ctx.seams.clock.now() < deadline
         && !ctx
