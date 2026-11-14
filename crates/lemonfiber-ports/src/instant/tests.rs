@@ -100,6 +100,25 @@ fn the_schema_is_an_inline_unsigned_integer() {
 }
 
 #[derive(serde::Deserialize)]
+struct Uses {
+    #[serde(deserialize_with = "super::kept_each")]
+    at: std::collections::BTreeMap<String, Instant>,
+}
+
+#[test]
+fn kept_instants_by_name_read_each_form_and_refuse_a_value_that_is_none() {
+    let read = |text: &str| serde_json::from_str::<Uses>(text).map(|uses| uses.at);
+    assert_eq!(
+        read(r#"{"at": {"pixel": "1786924800"}}"#).ok(),
+        Some(std::collections::BTreeMap::from([(
+            "pixel".to_owned(),
+            Instant::from_seconds(1_786_924_800)
+        )]))
+    );
+    assert!(read(r#"{"at": {"pixel": "yesterday"}}"#).is_err());
+}
+
+#[derive(serde::Deserialize)]
 struct Record {
     #[serde(deserialize_with = "kept")]
     at: Instant,

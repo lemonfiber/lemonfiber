@@ -320,6 +320,22 @@ fn revoked(ended: bool, restarts: &[&str]) -> lemonfiber_core::credential::Revok
 }
 
 #[test]
+fn a_grant_whose_approval_was_not_recorded_says_so() {
+    let mut inventory = Inventory::of(Vec::new());
+    inventory.grants = vec![lemonfiber_core::credential::Granted {
+        at: None,
+        ..a_grant()
+    }];
+
+    let apart = drawn(inventory);
+
+    assert!(
+        apart.contains("approved at a moment not recorded"),
+        "{apart}"
+    );
+}
+
+#[test]
 fn a_grant_is_listed_beside_the_credential_it_crosses_and_apart_where_none_is_listed() {
     let mut inventory = Inventory::of(vec![held(State::Active, None)]);
     inventory.grants = vec![a_grant()];

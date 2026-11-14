@@ -98,7 +98,7 @@ fn a_trace_shows_its_stages_stall_history_and_horizon() {
             },
             TraceMoment {
                 outcome: TraceOutcome::DownloadFailed,
-                at: Some(Instant::from_seconds(1_767_312_000)),
+                at: None,
             },
         ],
         findings: vec!["the queue could not be read".to_owned()],
@@ -110,6 +110,7 @@ fn a_trace_shows_its_stages_stall_history_and_horizon() {
     assert!(text.contains("✓ grabbed   Sonarr   2026-01-01"));
     assert!(text.contains("✗ stopped:"));
     assert!(text.contains("history:"));
+    assert!(text.contains("at a moment not reported"), "{text}");
     assert!(text.contains("! the queue could not be read"));
     assert!(text.contains("~ matched to the library by title"));
     assert!(text.contains(&format!("most recent {HISTORY_HORIZON} history events")));
