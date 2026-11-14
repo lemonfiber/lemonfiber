@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::flows::{asked, candidate, ctx, curator, is, kept, sent, the_house, ALBUM};
+use super::flows::{asked, candidate, ctx, curator, is, journalled, kept, sent, the_house, ALBUM};
 use crate::app::{Answer, Command, Ctx, Decision, Outcome};
 use crate::collected::store::Standing;
 use crate::collected::{Medium, Reference};
@@ -46,6 +46,27 @@ async fn an_ask_let_through_is_sent_to_the_curator_and_said_to_be_fetched() {
         said(&done).is_some_and(|said| said.contains("approved and is being fetched")),
         "{done:?}"
     );
+    assert_eq!(sent(&transport, "request"), 1);
+    assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
+}
+
+#[tokio::test]
+async fn an_ask_let_through_whose_journal_will_not_write_is_refused_as_unrecorded() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "decided-unjournalled");
+    assert!(asked(&ctx, "Ada", ALBUM).await.is_ok());
+    let journal = crate::app::targets::layout(&ctx).map(|paths| paths.journal());
+    assert!(journal.is_some_and(|at| {
+        let _ = std::fs::remove_file(&at);
+        std::fs::create_dir_all(at.join("in-the-way")).is_ok()
+    }));
+
+    let done = decided(&ctx, Answer::LetThrough).await;
+
+    assert!(done.is_err(), "{done:?}");
     assert_eq!(sent(&transport, "request"), 1);
     assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
 }
@@ -107,4 +128,50 @@ async fn a_house_whose_curator_has_gone_leaves_the_ask_waiting() {
 
     assert!(is(&refused, UNREACHABLE), "{refused:?}");
     assert_eq!(kept(&asking), [("music-1".to_owned(), Standing::Waiting)]);
+}
+
+#[tokio::test]
+async fn an_ask_let_through_is_journalled_once_it_is_sent() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "decided-journalled");
+    assert!(asked(&ctx, "Ada", ALBUM).await.is_ok());
+    assert!(journalled(&ctx).is_empty());
+
+    let _ = decided(&ctx, Answer::LetThrough).await;
+
+    assert_eq!(
+        journalled(&ctx)
+            .into_iter()
+            .map(|change| change.kind)
+            .collect::<Vec<_>>(),
+        [crate::journal::Kind::Asked {
+            unit: ALBUM,
+            reference: candidate(CandidateState::MayAsk).reference,
+            kept: "music-1".to_owned(),
+            whole: true,
+        }]
+    );
+}
+
+#[tokio::test]
+async fn an_ask_turned_down_journals_nothing() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "declined-journalled");
+    assert!(asked(&ctx, "Ada", ALBUM).await.is_ok());
+
+    let _ = decided(
+        &ctx,
+        Answer::TurnedDown {
+            reason: "not now".to_owned(),
+        },
+    )
+    .await;
+
+    assert!(journalled(&ctx).is_empty());
 }

@@ -542,6 +542,39 @@
             "type": "object"
           },
           {
+            "description": "Ask a curator to remove what a member asked it for, and take the ask the core\nkeeps for it off the household list; nothing where the curator held some of it\nbefore.",
+            "properties": {
+              "does": {
+                "const": "unask",
+                "type": "string"
+              },
+              "kept": {
+                "description": "The ask the core keeps for it, by its reference.",
+                "type": "string"
+              },
+              "reference": {
+                "description": "The curator's reference for it.",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/Unit",
+                "description": "What was asked for."
+              },
+              "whole": {
+                "description": "Whether the curator held none of it before.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "does",
+              "unit",
+              "reference",
+              "kept",
+              "whole"
+            ],
+            "type": "object"
+          },
+          {
             "description": "Give a grant back to a plugin, or end one it was given.",
             "properties": {
               "does": {
@@ -1672,6 +1705,26 @@
           "remedy"
         ],
         "type": "object"
+      },
+      "BookUnit": {
+        "description": "What a member asks a curator of books for.",
+        "oneOf": [
+          {
+            "const": "book",
+            "description": "One book: a work.",
+            "type": "string"
+          },
+          {
+            "const": "author",
+            "description": "A whole author: every book, and those that come later.",
+            "type": "string"
+          },
+          {
+            "const": "series",
+            "description": "A series: every book of it, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "BootOutcome": {
         "description": "What a run at boot came to.",
@@ -8160,6 +8213,21 @@
           "rehearsed"
         ],
         "type": "object"
+      },
+      "MusicUnit": {
+        "description": "What a member asks a curator of music for.",
+        "oneOf": [
+          {
+            "const": "album",
+            "description": "One album: a release group.",
+            "type": "string"
+          },
+          {
+            "const": "artist",
+            "description": "A whole artist: every album, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "Newest": {
         "description": "The newest of each kind, by what names them and nothing else.\n\nWhat the event stream says. A surface marks a tab from it without reading the\nitems, and reads [`News`] on the screen that lists them.",
@@ -19279,6 +19347,45 @@
               "gone",
               "credentials",
               "left"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Unit": {
+        "description": "What one ask is for, within its medium.",
+        "oneOf": [
+          {
+            "description": "An album or a whole artist.",
+            "properties": {
+              "medium": {
+                "const": "music",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/MusicUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A book, a whole author or a series.",
+            "properties": {
+              "medium": {
+                "const": "books",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/BookUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
             ],
             "type": "object"
           }

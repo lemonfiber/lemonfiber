@@ -53,6 +53,19 @@ impl Collector {
         }
     }
 
+    /// Remove the candidate of `unit` `reference` names, with its files.
+    ///
+    /// # Errors
+    ///
+    /// The [`Failure`] the curator answered with, and one for a unit of the other medium.
+    pub(crate) async fn remove(&self, unit: Unit, reference: &str) -> Result<(), Failure> {
+        match (self, unit) {
+            (Self::Music(curator), Unit::Music(unit)) => curator.remove(unit, reference).await,
+            (Self::Books(curator), Unit::Books(unit)) => curator.remove(unit, reference).await,
+            _ => Err(other_medium()),
+        }
+    }
+
     /// The units of its medium the curator answers for as it is configured now.
     ///
     /// # Errors

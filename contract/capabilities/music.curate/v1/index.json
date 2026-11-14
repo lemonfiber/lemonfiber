@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "music.curate/v1/openapi.json",
-      "sha256": "5deb57cf2174f2b6bd9afb2e31d9e8911624c9242e991fb25d6ee800947de6a1"
+      "sha256": "e8b8d96a2ca75455ad7793b0b0d68d09c37b8e064f47c4fc7e6e2773d70530dd"
     },
     {
       "path": "music.curate/v1/operations/lookup.json",
@@ -22,12 +22,16 @@
       "sha256": "45090b07f0efe218028379d5f4806e52a5131e3e28794e3b5ee05bed4730beb7"
     },
     {
+      "path": "music.curate/v1/operations/remove.json",
+      "sha256": "02d9afc00fa9178d4f662df5c7668aad04d6d8b88d5026ab5547c9f34196e1d7"
+    },
+    {
       "path": "music.curate/v1/holds.json",
       "sha256": "b4b6208dc36ecd55c3e369a0828397a078aa0ddcd1d6b943300486da5818a9c5"
     },
     {
       "path": "music.curate/v1/conformance.json",
-      "sha256": "4dd7cc30dadacfeb47a8b36ad357695ace0d044885f026cc12450d0cb87059b3"
+      "sha256": "8d5c3561ca83cf5bb4495ae7d6661be8612a94e5dd967de28e4812735608c935"
     }
   ],
   "major": 1

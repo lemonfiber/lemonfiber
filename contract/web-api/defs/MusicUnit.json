@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a member asks a curator of music for.",
+  "oneOf": [
+    {
+      "description": "One album: a release group.",
+      "type": "string",
+      "const": "album"
+    },
+    {
+      "description": "A whole artist: every album, and those that come later.",
+      "type": "string",
+      "const": "artist"
+    }
+  ]
+}

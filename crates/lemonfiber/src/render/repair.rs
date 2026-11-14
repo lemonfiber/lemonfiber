@@ -164,6 +164,9 @@ fn restoring(action: &Action) -> String {
             "the dropped release of {} title {title} grabbed again",
             kind.media_type()
         ),
+        Action::Unask {
+            unit, reference, ..
+        } => format!("the {} {reference} removed from the curator", unit.noun()),
         Action::Run {
             service,
             running: true,

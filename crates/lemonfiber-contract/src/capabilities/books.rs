@@ -41,6 +41,12 @@ crate::contract! {
             /// The units it answers for as it is configured now, and the root folders and
             /// profiles a request may name.
             fn profiles() -> AskedWith where asks = Asked {};
+            /// Remove one candidate it holds, by its unit and the curator's reference for it,
+            /// with its files.
+            fn remove(value unit: BookUnit, str reference: &str) -> () where since = 1, asks = Asked {
+                unit: BookUnit::Book,
+                reference: NAMED.to_owned(),
+            };
         }
     }
 }

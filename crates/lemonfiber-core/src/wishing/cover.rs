@@ -34,7 +34,7 @@ pub async fn cover(
     reference: &str,
 ) -> Result<Pictured, Box<Problem>> {
     reached(ctx, named).await?;
-    let curator = curator_of(ctx, unit).await?;
+    let (_, curator) = curator_of(ctx, unit).await?;
     let candidate = curator
         .candidate(unit, reference)
         .await

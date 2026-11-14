@@ -99,6 +99,9 @@
     "/lemonfiber/music.curate/v1/profiles": {
       "$ref": "operations/profiles.json"
     },
+    "/lemonfiber/music.curate/v1/remove": {
+      "$ref": "operations/remove.json"
+    },
     "/lemonfiber/music.curate/v1/request": {
       "$ref": "operations/request.json"
     }

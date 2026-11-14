@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What one ask is for, within its medium.",
+  "oneOf": [
+    {
+      "description": "An album or a whole artist.",
+      "type": "object",
+      "properties": {
+        "medium": {
+          "type": "string",
+          "const": "music"
+        },
+        "unit": {
+          "$ref": "MusicUnit.json"
+        }
+      },
+      "required": [
+        "medium",
+        "unit"
+      ]
+    },
+    {
+      "description": "A book, a whole author or a series.",
+      "type": "object",
+      "properties": {
+        "medium": {
+          "type": "string",
+          "const": "books"
+        },
+        "unit": {
+          "$ref": "BookUnit.json"
+        }
+      },
+      "required": [
+        "medium",
+        "unit"
+      ]
+    }
+  ]
+}

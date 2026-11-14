@@ -29,6 +29,7 @@
         "const:\"revoke-device\"",
         "const:\"rewind\"",
         "const:\"run\"",
+        "const:\"unask\"",
         "const:\"unmoved\"",
         "const:\"unreplaced\"",
         "const:\"withdraw\""
@@ -79,7 +80,8 @@
     },
     "kept": {
       "type": [
-        "null|string"
+        "null|string",
+        "string"
       ],
       "required": false
     },
@@ -131,6 +133,12 @@
       ],
       "required": false
     },
+    "reference": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "release": {
       "type": [
         "string"
@@ -173,6 +181,12 @@
       ],
       "required": true
     },
+    "unit": {
+      "type": [
+        "ref:Unit"
+      ],
+      "required": true
+    },
     "value": {
       "type": [
         "null|string"
@@ -182,6 +196,12 @@
     "volume": {
       "type": [
         "string"
+      ],
+      "required": true
+    },
+    "whole": {
+      "type": [
+        "boolean"
       ],
       "required": true
     },
@@ -220,6 +240,7 @@
     "\"revoke-device\"",
     "\"rewind\"",
     "\"run\"",
+    "\"unask\"",
     "\"unmoved\"",
     "\"unreplaced\"",
     "\"withdraw\""
