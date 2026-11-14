@@ -6,8 +6,17 @@
 
 use std::time::Duration;
 
-use lemonfiber_core::model::kind::Kind;
-use lemonfiber_core::model::Envelope;
+use lemonfiber_core::alert::Alert;
+use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::logs::Line as LogLine;
+use lemonfiber_core::model::kind::{self, Kind};
+use lemonfiber_core::model::{
+    Envelope, HeldReport, HouseholdReport, PlayingReport, SettingsReport, WiringReport,
+};
+use lemonfiber_core::news::Newest;
+use lemonfiber_core::plugin::Installs;
+use lemonfiber_core::walkthrough::Line as StepLine;
+use schemars::{schema_for, Schema};
 use serde::Serialize;
 
 /// The longest the stream may say nothing before saying it is still there.
@@ -23,7 +32,8 @@ pub const BEAT: Duration = Duration::from_secs(15);
 pub const BEAT_SAID: &str = ": beat\n\n";
 
 /// Whether a newer event of the same kind leaves this one worth having.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Nature {
     /// The whole of some state at one moment. Only the newest describes now, so
     /// an older one is never handed to a client that missed it — it would be a
@@ -35,7 +45,8 @@ pub enum Nature {
 }
 
 /// Who on the shared stream may hear an event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Audience {
     /// Everyone the shared stream admits, a `read` or an `act` key included.
     Anyone,
@@ -65,48 +76,118 @@ impl Audience {
     }
 }
 
+/// Declares [`EventKind`] from one list of each kind, its payload, its nature and its audience.
+macro_rules! event_kinds {
+    ($($(#[doc = $doc:literal])* $variant:ident($payload:ty) = $kind:ident, $nature:ident, $audience:ident;)*) => {
+        /// Every kind of event the stream may say, and nothing else.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum EventKind {
+            $($(#[doc = $doc])* $variant,)*
+        }
+
+        impl EventKind {
+            /// Every kind of event, in the order the list declares them.
+            pub const ALL: &[Self] = &[$(Self::$variant,)*];
+
+            /// The kind the event's envelope carries, which is the name the event goes by.
+            #[must_use]
+            pub const fn kind(self) -> Kind {
+                match self {
+                    $(Self::$variant => kind::$kind,)*
+                }
+            }
+
+            /// Whether a newer event of this kind replaces an older one.
+            #[must_use]
+            pub const fn nature(self) -> Nature {
+                match self {
+                    $(Self::$variant => Nature::$nature,)*
+                }
+            }
+
+            /// Who on the shared stream may hear an event of this kind.
+            #[must_use]
+            pub const fn audience(self) -> Audience {
+                match self {
+                    $(Self::$variant => Audience::$audience,)*
+                }
+            }
+
+            /// The schema of the envelope an event of this kind is said in.
+            #[must_use]
+            pub fn schema(self) -> Schema {
+                match self {
+                    $(Self::$variant => schema_for!(Envelope<$payload>),)*
+                }
+            }
+        }
+    };
+}
+
+event_kinds! {
+    /// One alert, at its onset or its resolution.
+    Alert(Alert) = ALERT, Record, Anyone;
+    /// One moment of the dashboard.
+    Dashboard(Snapshot) = DASHBOARD, State, Anyone;
+    /// What one member can watch.
+    Held(HeldReport) = HELD, State, Anyone;
+    /// One member's household row.
+    Household(HouseholdReport) = HOUSEHOLD, State, Anyone;
+    /// One line a followed service wrote.
+    Log(LogLine) = LOG, Record, Anyone;
+    /// The newest few of each kind a surface can mark as new.
+    News(Newest) = NEWS, State, Anyone;
+    /// What the media server is playing.
+    Playing(PlayingReport) = PLAYING, State, Anyone;
+    /// Every plugin installed.
+    Plugins(Installs) = PLUGINS, State, Anyone;
+    /// One line the container engine wrote while pulling images.
+    Pull(String) = PULL, State, Anyone;
+    /// Every setting.
+    Settings(SettingsReport) = SETTINGS, State, Operator;
+    /// One line said while services are starting.
+    Start(String) = START, State, Anyone;
+    /// One step of a walkthrough.
+    Step(StepLine) = STEP, Record, Anyone;
+    /// What the stack wires to what.
+    Wiring(WiringReport) = WIRING, State, Anyone;
+}
+
 /// An envelope rendered, before it has a place in the run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rendered {
-    /// What the envelope calls itself, which is the name the event carries.
-    kind: Kind,
+    /// What kind of event it is.
+    event: EventKind,
     /// The envelope, as the command line renders it.
     said: String,
-    /// Whether a newer one of this kind replaces it.
-    nature: Nature,
-    /// Who may hear it.
-    audience: Audience,
 }
 
 impl Rendered {
-    /// Render an envelope for the stream.
+    /// Render a payload for the stream as an event of one kind.
     ///
     /// `None` where the payload will not serialise, which for the values this
     /// carries cannot happen — an event that cannot be rendered is not sent
     /// rather than sent as something else.
     #[must_use]
-    pub fn of<T: Serialize>(nature: Nature, envelope: &Envelope<T>) -> Option<Self> {
-        Some(Self {
-            kind: envelope.kind,
-            said: envelope.to_json()?,
-            nature,
-            audience: Audience::Anyone,
-        })
+    pub fn of<T: Serialize>(event: EventKind, payload: &T) -> Option<Self> {
+        Self::said_by(event, payload, None)
     }
 
-    /// The same envelope, said to the operator alone.
+    /// Render a payload for the stream as an event of one kind, said by the work a job names.
     #[must_use]
-    pub fn to_the_operator(self) -> Self {
-        Self {
-            audience: Audience::Operator,
-            ..self
-        }
+    pub fn said_by<T: Serialize>(event: EventKind, payload: &T, job: Option<&str>) -> Option<Self> {
+        Some(Self {
+            event,
+            said: Envelope::new(event.kind(), payload)
+                .said_by(job)
+                .to_json()?,
+        })
     }
 
     /// What the envelope calls itself.
     #[must_use]
     pub const fn kind(&self) -> Kind {
-        self.kind
+        self.event.kind()
     }
 
     /// The envelope, as the command line renders it.
@@ -140,13 +221,13 @@ impl Event {
     /// Whether a newer one of this kind replaces it.
     #[must_use]
     pub const fn nature(&self) -> Nature {
-        self.said.nature
+        self.said.event.nature()
     }
 
     /// Who may hear it.
     #[must_use]
     pub const fn audience(&self) -> Audience {
-        self.said.audience
+        self.said.event.audience()
     }
 
     /// This event as it goes down the wire.
@@ -156,7 +237,7 @@ impl Event {
     /// a newline inside a value is escaped — so in practice this is one line.
     #[must_use]
     pub fn framed(&self) -> String {
-        let mut wire = format!("id: {}\nevent: {}\n", self.id, self.said.kind);
+        let mut wire = format!("id: {}\nevent: {}\n", self.id, self.said.kind());
         for line in self.said.said.lines() {
             wire.push_str("data: ");
             wire.push_str(line);

@@ -44,6 +44,28 @@ REGISTRY = (
             "crates/lemonfiber-core/src/plugin.rs",
         ),
     ),
+    Generated(
+        recipe="just contract",
+        paths=("contract/web-api.openapi.json", "contract/contract-diff.json"),
+        sources=(
+            "crates/lemonfiber-api/src/contract/openapi.rs",
+            "crates/lemonfiber-api/src/contract/released.rs",
+            "crates/lemonfiber-api/examples/contract.rs",
+        ),
+    ),
+    Generated(
+        recipe="just version",
+        paths=("contract/released/web-api.contract.json",),
+        sources=("justfile",),
+    ),
+    Generated(
+        recipe="just released-capabilities",
+        paths=("contract/capabilities/released.json",),
+        sources=(
+            "crates/lemonfiber-contract/src/released.rs",
+            "crates/lemonfiber-contract/examples/released.rs",
+        ),
+    ),
 )
 
 

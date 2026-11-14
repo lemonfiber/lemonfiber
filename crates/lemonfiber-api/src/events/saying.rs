@@ -13,12 +13,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::model::kind::{self, Kind};
-use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::Narrator;
 
 use super::live::Live;
-use super::wire::{Nature, Rendered};
+use super::wire::{EventKind, Rendered};
 
 /// A wait, speaking onto the one stream this run keeps.
 pub struct Saying {
@@ -56,12 +54,12 @@ impl Narrator for Saying {
     /// what the wait is waiting for now, so a client that was away is caught up
     /// with where the wait got to instead of being replayed every second of it.
     async fn say(&self, said: &str) {
-        said_to(&self.live, self.job.as_deref(), kind::START, said).await;
+        said_to(&self.live, self.job.as_deref(), EventKind::Start, said).await;
     }
 
     /// Hand one line of a pull to every listener, as the terminal shows it.
     async fn pulled(&self, line: &str) {
-        said_to(&self.live, self.job.as_deref(), kind::PULL, line).await;
+        said_to(&self.live, self.job.as_deref(), EventKind::Pull, line).await;
     }
 }
 
@@ -70,10 +68,7 @@ impl Narrator for Saying {
 /// The dropping is [`Live::say_if_rendered`]'s rather than a branch here, because a
 /// payload that will not render is a case this cannot stage and that one is already
 /// driven where it lives.
-async fn said_to(live: &Live, job: Option<&str>, kind: Kind, said: &str) {
-    live.say_if_rendered(Rendered::of(
-        Nature::State,
-        &Envelope::new(kind, said).said_by(job),
-    ))
-    .await;
+async fn said_to(live: &Live, job: Option<&str>, event: EventKind, said: &str) {
+    live.say_if_rendered(Rendered::said_by(event, &said, job))
+        .await;
 }
