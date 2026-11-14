@@ -28,6 +28,7 @@ fn declared() -> Declared {
         }],
         live: vec![LivePath {
             pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
+            parameter: None,
             stream: "^[0-9]+$".to_owned(),
         }],
         refused: vec!["^/everything$".to_owned()],
@@ -52,6 +53,7 @@ fn declared() -> Declared {
             stream: "{base}/media/{item}/bytes".to_owned(),
             poster: "{base}/media/{item}/poster".to_owned(),
             backdrop: "{base}/media/{item}/backdrop".to_owned(),
+            playlist: None,
         },
         ports: Ports {
             upstream: 8080,
@@ -572,6 +574,30 @@ fn a_live_stream_path_that_does_not_say_where_the_stream_sits_once_is_refused() 
 }
 
 #[test]
+fn a_live_stream_found_in_a_query_value_is_named_by_one_plain_parameter_and_no_group() {
+    let in_query = |pattern: &str, parameter: &str| {
+        let mut found = declared();
+        for live in &mut found.live {
+            pattern.clone_into(&mut live.pattern);
+            live.parameter = Some(parameter.to_owned());
+        }
+        found.checked()
+    };
+
+    assert!(in_query("^/media/(?:live|master)\\.m3u8$", "LiveStreamId").is_ok());
+    assert_eq!(
+        in_query("^/media/live/(?P<stream>[^/]+)/", "LiveStreamId"),
+        Err(Undeclarable::Unstreamed {
+            pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned()
+        })
+    );
+    assert!(matches!(
+        in_query("^/media/live\\.m3u8$", "Live Stream"),
+        Err(Undeclarable::Unspelled { .. })
+    ));
+}
+
+#[test]
 fn a_live_stream_path_or_shape_not_anchored_where_it_is_relied_on_is_refused() {
     let mut loose = declared();
     for live in &mut loose.live {
@@ -722,3 +748,18 @@ fn a_question_sent_to_the_adapter_means_what_an_adapter_answers_it_with() {
 
 mod spaces;
 mod tokens;
+
+#[test]
+fn a_play_is_named_in_a_stream_or_playlist_template_alone() {
+    let mut playing = declared();
+    "{base}/media/{item}/bytes?play={play}".clone_into(&mut playing.locations.stream);
+    playing.locations.playlist = Some("{base}/media/{item}/master.m3u8?play={play}".to_owned());
+    let mut pictured = declared();
+    "{base}/media/{item}/poster?play={play}".clone_into(&mut pictured.locations.poster);
+
+    assert!(playing.checked().is_ok());
+    assert!(matches!(
+        pictured.checked(),
+        Err(Undeclarable::Elsewhere { .. })
+    ));
+}

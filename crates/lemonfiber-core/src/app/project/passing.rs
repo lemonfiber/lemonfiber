@@ -11,7 +11,7 @@ use lemonfiber_ports::registry::Tagged;
 use super::super::Ctx;
 use crate::config::store;
 use crate::config::REACH_REGISTRY_KEY;
-use crate::pass::{File, Key, Live, KEY_BYTES, PINNED, SERVICE};
+use crate::pass::{File, Key, Paths, KEY_BYTES, PINNED, SERVICE};
 use crate::project::entry::CONFIGURATION_TREE;
 use crate::stack::RUNNING;
 
@@ -95,10 +95,10 @@ fn made(ctx: &Ctx, directory: &Path) -> Result<(), String> {
             .ok_or("no randomness could be drawn for the pass service's key")?;
         kept(&configuration.join(File::Key.name()), &key.written())?;
     }
-    if reading(File::Live).is_none() {
+    if reading(File::Paths).is_none() {
         kept(
-            &configuration.join(File::Live.name()),
-            &Live::of(Vec::new()).written(),
+            &configuration.join(File::Paths.name()),
+            &Paths::of(Vec::new(), Vec::new()).written(),
         )?;
     }
     Ok(())

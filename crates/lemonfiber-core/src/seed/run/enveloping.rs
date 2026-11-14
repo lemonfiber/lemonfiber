@@ -12,7 +12,7 @@ use lemonfiber_contract::capabilities::stream::guard;
 
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::pass::{File, Live, LivePath, PATH, PORT, SERVICE};
+use crate::pass::{File, PATH, PORT, SERVICE};
 use crate::ports::service::{Declared, Declaring, Guarded, Guarding};
 use crate::project::entry::CONFIGURATION_TREE;
 use crate::seed::{State, Wiring};
@@ -212,21 +212,11 @@ async fn applied(ctx: &Ctx, guarding: &dyn Guarding, envelope: Guarded) -> State
 /// Write the pass service's file of live-stream paths beneath `project` as `declared`
 /// gives them, where it holds others.
 fn live(ctx: &Ctx, project: &Path, declared: &Declared) -> State {
-    let wanted = Live::of(
-        declared
-            .live
-            .iter()
-            .map(|path| LivePath {
-                pattern: path.pattern.clone(),
-                stream: path.stream.clone(),
-            })
-            .collect(),
-    )
-    .written();
+    let wanted = crate::pass::told(declared).written();
     let at = project
         .join(CONFIGURATION_TREE)
         .join(SERVICE)
-        .join(File::Live.name());
+        .join(File::Paths.name());
     let held = crate::within::read_unlinked(ctx.seams.confined.as_ref(), &at, project)
         .ok()
         .flatten();

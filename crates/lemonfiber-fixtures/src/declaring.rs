@@ -54,6 +54,7 @@ pub fn enforceable() -> Declared {
         }],
         live: vec![LivePath {
             pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
+            parameter: None,
             stream: "^[0-9a-f]{32}$".to_owned(),
         }],
         refused: Vec::new(),
@@ -78,6 +79,7 @@ pub fn enforceable() -> Declared {
             stream: "{base}/media/{item}/bytes".to_owned(),
             poster: "{base}/media/{item}/poster".to_owned(),
             backdrop: "{base}/media/{item}/backdrop".to_owned(),
+            playlist: Some("{base}/media/{item}/playlist.m3u8".to_owned()),
         },
         ports: Ports {
             upstream: 8080,
