@@ -81,11 +81,7 @@ impl MusicCurating for Upstream {
         Ok(asked_with(true))
     }
     async fn remove(&self, _: MusicUnit, reference: &str) -> Result<(), Failure> {
-        self.tell("remove".to_owned());
-        if reference == UNHELD {
-            return Err(unheld(reference));
-        }
-        Ok(())
+        removed(self, reference)
     }
 }
 
@@ -131,11 +127,7 @@ impl BookCurating for Upstream {
         Ok(asked_with(false))
     }
     async fn remove(&self, _: BookUnit, reference: &str) -> Result<(), Failure> {
-        self.tell("remove".to_owned());
-        if reference == UNHELD {
-            return Err(unheld(reference));
-        }
-        Ok(())
+        removed(self, reference)
     }
 }
 
@@ -149,4 +141,13 @@ fn book_request(fake: &Upstream, ask: &BookAsk) -> Result<Candidate, Failure> {
         state: CandidateState::Here,
         ..found(&format!("{:?}", ask.unit), Some("ebook"))
     })
+}
+
+/// How `Upstream` answers a `remove` of either medium.
+fn removed(fake: &Upstream, reference: &str) -> Result<(), Failure> {
+    fake.tell("remove".to_owned());
+    if reference == UNHELD {
+        return Err(unheld(reference));
+    }
+    Ok(())
 }
