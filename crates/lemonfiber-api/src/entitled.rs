@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Diagnosing, Doorway, Viewing, Whom, Wishing};
+use lemonfiber_core::app::{Command, Diagnosing, Doorway, MigrateAction, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
 use lemonfiber_core::push::run::Asked as Pushing;
@@ -111,7 +111,10 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
             (Scope::Read | Scope::Act, Door::Reading)
                 if matches!(
                     command,
-                    Command::Settings(_) | Command::Stack | Command::Settled
+                    Command::Settings(_)
+                        | Command::Stack
+                        | Command::Settled
+                        | Command::Migrate(MigrateAction::Survey)
                 ) =>
             {
                 Permitted::Nothing
