@@ -46,3 +46,6 @@ impl Engine for Slowed {
         self.engine.logs(project, services, query).await
     }
 }
+
+#[cfg(test)]
+mod tests;
