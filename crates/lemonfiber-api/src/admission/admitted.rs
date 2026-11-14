@@ -26,13 +26,11 @@ pub struct Admitted {
     /// **Absent is the operator**, which is the whole of the discriminator. A second
     /// field naming which kind of person this is could disagree with this one, and
     /// the day they disagreed a client would have to choose which to believe.
-    ///
-    /// The id and nothing else. What that member is called, what they may watch and
-    /// what they have left are read from the household report, which already carries
-    /// all of it per member — so there is one fact here and no second copy of
-    /// anything that could go stale against the read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member: Option<String>,
+    /// The member's display name as the media server holds it, where it is a member's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 impl Admitted {
@@ -49,6 +47,13 @@ impl Admitted {
             token,
             until: lemonfiber_core::instant::written(until)?,
             member,
+            name: None,
         })
+    }
+
+    /// This session, carrying the member's display name.
+    #[must_use]
+    pub fn called(self, name: Option<String>) -> Self {
+        Self { name, ..self }
     }
 }

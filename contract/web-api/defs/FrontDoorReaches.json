@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether an address answers from the network a request came from.",
+  "oneOf": [
+    {
+      "description": "It answers from there.",
+      "type": "string",
+      "const": "here"
+    },
+    {
+      "description": "It does not answer from there.",
+      "type": "string",
+      "const": "not-here"
+    },
+    {
+      "description": "Nothing here can tell.",
+      "type": "string",
+      "const": "unknown"
+    }
+  ]
+}

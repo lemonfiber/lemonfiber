@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "name": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "token": {
       "type": [
         "string"

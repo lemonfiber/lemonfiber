@@ -101,9 +101,9 @@ pub(crate) mod watcher;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Diagnosing, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, MigrateAction,
-    QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring, Setting, Settling,
-    Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
+    Diagnosing, Doorway, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking,
+    MigrateAction, QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring, Setting,
+    Settling, Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -413,7 +413,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // after it writes rather than reporting what a write claimed, because a written
         // definition is not a running command and this exists to tell the two apart.
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
-        Command::FrontDoor => door::front_door(ctx).await.map(Outcome::FrontDoor),
+        Command::FrontDoor(doorway) => door::front_door(ctx, doorway).await.map(Outcome::FrontDoor),
         Command::Stack => underneath::stack(ctx).await.map(Outcome::Stack),
         Command::Settled => settled::settled(ctx).map(Outcome::Settled),
         // A read that cannot fail: a kind that could not be read is named in the

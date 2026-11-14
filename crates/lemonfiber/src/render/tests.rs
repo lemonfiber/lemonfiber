@@ -329,9 +329,11 @@ fn the_first_of_them() -> Vec<Outcome> {
         Outcome::Queue(lemonfiber_core::model::QueueHealth::default()),
         Outcome::FrontDoor(FrontDoorReport {
             standing: Standing::Absent,
-            chosen: lemonfiber_core::door::Chosen::Derived,
+            chosen: Some(lemonfiber_core::door::Chosen::Derived),
             service: None,
             address: None,
+            reaches: lemonfiber_core::door::Reaches::Unknown,
+            unaddressed: None,
             facing: None,
             meaning: "there is none".to_owned(),
             beside: Vec::new(),

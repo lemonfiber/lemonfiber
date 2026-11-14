@@ -8,9 +8,11 @@ use crate::setup::tests::{ctx, working_ctx, FakeEngine};
 fn answered(address: Option<Address>) -> FrontDoorReport {
     FrontDoorReport {
         standing: Standing::Established,
-        chosen: Chosen::Derived,
+        chosen: Some(Chosen::Derived),
         service: Some("Seerr".to_owned()),
         address,
+        reaches: lemonfiber_core::door::Reaches::Unknown,
+        unaddressed: None,
         facing: Some(Facing::Asking),
         meaning: "there is no address for this machine yet".to_owned(),
         beside: Vec::new(),

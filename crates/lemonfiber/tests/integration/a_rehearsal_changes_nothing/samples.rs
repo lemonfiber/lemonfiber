@@ -175,7 +175,10 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("boot", Command::Boot),
         ("watcher", Command::Watcher),
         ("queue", Command::Queue(Queueing::Heal)),
-        ("front-door", Command::FrontDoor),
+        (
+            "front-door",
+            Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
+        ),
         ("news", Command::News),
         // The verb that writes rather than the one refused outright: pairing material is
         // refused under the flag, and a replacement, confirmed, is what would un-pair
