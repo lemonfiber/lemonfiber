@@ -80,6 +80,7 @@ pub(super) fn front_door(
         },
         &crate::door::run::place(ctx, named),
         ctx.settings.front_door.as_deref(),
+        crate::door::Whence::Home,
     ))
 }
 

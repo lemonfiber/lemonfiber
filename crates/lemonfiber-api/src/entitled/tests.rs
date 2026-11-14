@@ -571,3 +571,33 @@ fn a_member_chooses_and_confirms_only_for_themselves_and_a_key_does_neither() {
         }
     }
 }
+
+#[test]
+fn a_member_reads_the_front_door_as_the_household_from_where_they_asked() {
+    let from = "203.0.113.7".parse().ok();
+    let asked = Command::FrontDoor(lemonfiber_core::app::Doorway {
+        from,
+        household: false,
+    });
+    let theirs = Permitted::This(Command::FrontDoor(lemonfiber_core::app::Doorway {
+        from,
+        household: true,
+    }));
+
+    assert_eq!(may(&member(), Door::Reading, asked.clone()), theirs);
+    assert_eq!(
+        may(
+            &key(lemonfiber_core::keys::Scope::Member {
+                id: ASKING.to_owned(),
+                name: "ana".to_owned(),
+            }),
+            Door::Reading,
+            asked.clone()
+        ),
+        theirs
+    );
+    assert_eq!(
+        may(&Caller::Operator, Door::Reading, asked.clone()),
+        Permitted::This(asked)
+    );
+}

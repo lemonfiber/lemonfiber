@@ -504,11 +504,19 @@ async fn opening(
         Err(refusal) => return refusal.answered(),
     };
     serving.admitting.attempts.right(&ticket, door, now).await;
+    let name = match &who {
+        Opened::Member(signed) => match serving.admitting.member_named(&signed.id).await {
+            Some(name) => Some(name),
+            None => return Refusal::Unconfirmed.answered(),
+        },
+        Opened::Operator(_) => None,
+    };
     let opened = serving
         .admitting
         .sessions
         .opened(serving.ctx.seams.random.as_ref(), now, who)
-        .await;
+        .await
+        .map(|opened| opened.called(name));
     enveloped(
         StatusCode::OK,
         opened.and_then(|opened| Envelope::new(kind::ADMISSION, opened).to_json()),

@@ -26,7 +26,10 @@ fn reading() -> Vec<(Command, Kind)> {
             kind::DOCTOR,
         ),
         (Command::Hosting(Keeping::Read), kind::HOSTING),
-        (Command::FrontDoor, kind::FRONT_DOOR),
+        (
+            Command::FrontDoor(crate::app::Doorway::default()),
+            kind::FRONT_DOOR,
+        ),
         (Command::Stack, kind::STACK),
         (Command::Settled, kind::SETTLED),
         (

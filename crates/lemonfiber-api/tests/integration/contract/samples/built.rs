@@ -115,12 +115,16 @@ pub(super) fn where_this_copy_stands() -> UpdateReport {
 pub(super) fn a_front_door() -> FrontDoorReport {
     FrontDoorReport {
         standing: lemonfiber_core::model::Standing::Established,
-        chosen: lemonfiber_core::door::Chosen::Named("jellyseerr".to_owned()),
+        chosen: Some(lemonfiber_core::door::Chosen::Named(
+            "jellyseerr".to_owned(),
+        )),
         service: Some("jellyseerr".to_owned()),
         address: Some(lemonfiber_core::door::Address {
             url: "http://a-machine.local:5055".to_owned(),
             caution: Some("this machine's name has to resolve on their network".to_owned()),
         }),
+        reaches: lemonfiber_core::door::Reaches::Here,
+        unaddressed: None,
         facing: Some(lemonfiber_core::door::Facing::Asking),
         meaning: "everybody in the house begins at the request service".to_owned(),
         beside: vec![lemonfiber_core::model::Beside {
@@ -129,10 +133,11 @@ pub(super) fn a_front_door() -> FrontDoorReport {
             because: lemonfiber_core::door::Facing::Operators
                 .because()
                 .to_owned(),
-            address: Some(lemonfiber_core::door::Address {
-                url: "http://a-machine.local:3000".to_owned(),
-                caution: None,
-            }),
+            address: None,
+            reaches: lemonfiber_core::door::Reaches::Unknown,
+            unaddressed: Some(
+                "It is not handed to the household, so no address is given for it.".to_owned(),
+            ),
         }],
     }
 }

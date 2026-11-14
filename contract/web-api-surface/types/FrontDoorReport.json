@@ -14,9 +14,9 @@
     },
     "chosen": {
       "type": [
-        "ref:Chosen"
+        "anyOf(null,ref:Chosen)"
       ],
-      "required": true
+      "required": false
     },
     "facing": {
       "type": [
@@ -27,6 +27,12 @@
     "meaning": {
       "type": [
         "string"
+      ],
+      "required": true
+    },
+    "reaches": {
+      "type": [
+        "ref:FrontDoorReaches"
       ],
       "required": true
     },
@@ -41,6 +47,12 @@
         "ref:FrontDoorStanding"
       ],
       "required": true
+    },
+    "unaddressed": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
     }
   },
   "variants": []

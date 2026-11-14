@@ -454,11 +454,14 @@ async fn a_dispatched_front_door_serialises_under_its_own_kind() {
             crate::ports::docker::Health::Healthy,
         )))
         .build();
-    let json = dispatch(Command::FrontDoor, &household)
-        .await
-        .ok()
-        .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
-        .unwrap_or_default();
+    let json = dispatch(
+        Command::FrontDoor(crate::app::Doorway::default()),
+        &household,
+    )
+    .await
+    .ok()
+    .map(|outcome| outcome.envelope().to_json().unwrap_or_default())
+    .unwrap_or_default();
     assert!(
         json.contains("\"kind\":\"front-door\""),
         "envelope names the kind"

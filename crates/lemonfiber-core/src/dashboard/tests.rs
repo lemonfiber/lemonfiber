@@ -185,12 +185,14 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
         services: Panel::Ready(vec![service("sonarr", State::Healthy)]),
         door: Panel::Ready(crate::model::FrontDoorReport {
             standing: crate::model::Standing::Established,
-            chosen: crate::door::Chosen::Derived,
+            chosen: Some(crate::door::Chosen::Derived),
             service: Some("Seerr".to_owned()),
             address: Some(crate::door::Address {
                 url: "http://kitchen-nas.local:5055".to_owned(),
                 caution: None,
             }),
+            reaches: crate::door::Reaches::Here,
+            unaddressed: None,
             facing: Some(crate::door::Facing::Asking),
             meaning: "send them there".to_owned(),
             beside: Vec::new(),

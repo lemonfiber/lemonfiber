@@ -391,7 +391,11 @@ pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Lin
     // What the operator's own file did to this answer, where it did anything. A
     // refused setting that only appeared in the long answer would be one an operator
     // watching this screen never learned about.
-    if let Some(said) = report.chosen.said() {
+    if let Some(said) = report
+        .chosen
+        .as_ref()
+        .and_then(lemonfiber_core::door::Chosen::said)
+    {
         lines.push(Line::styled(shortened(&said, room), quiet()));
     }
     lines

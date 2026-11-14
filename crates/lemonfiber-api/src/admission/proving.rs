@@ -80,7 +80,7 @@ impl Admitting {
 
     /// The name the household files the member `id` under, or nothing where the
     /// household cannot be asked or holds nobody by that id.
-    async fn member_named(&self, id: &str) -> Option<String> {
+    pub(super) async fn member_named(&self, id: &str) -> Option<String> {
         let household = self.household_now().await?;
         let members = household.household().await.ok()?;
         members

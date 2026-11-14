@@ -424,9 +424,11 @@ fn a_panel_that_could_not_be_filled_marks_the_screen_degraded() {
 fn door(chosen: Chosen, address: Option<Address>) -> FrontDoorReport {
     FrontDoorReport {
         standing: Standing::Established,
-        chosen,
+        chosen: Some(chosen),
         service: Some("Seerr".to_owned()),
         address,
+        reaches: lemonfiber_core::door::Reaches::Here,
+        unaddressed: None,
         facing: Some(Facing::Asking),
         meaning: "a sentence far too long for a panel".to_owned(),
         beside: Vec::new(),

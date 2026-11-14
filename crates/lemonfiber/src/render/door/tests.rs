@@ -7,12 +7,14 @@ use lemonfiber_core::model::{Beside, FrontDoorReport, Standing};
 fn report(standing: Standing, service: Option<&str>) -> FrontDoorReport {
     FrontDoorReport {
         standing,
-        chosen: lemonfiber_core::door::Chosen::Derived,
+        chosen: Some(lemonfiber_core::door::Chosen::Derived),
         service: service.map(str::to_owned),
         address: service.map(|_| Address {
             url: "http://kitchen-nas.local:5055".to_owned(),
             caution: None,
         }),
+        reaches: lemonfiber_core::door::Reaches::Here,
+        unaddressed: None,
         facing: service.map(|_| Facing::Asking),
         meaning: "what this comes to".to_owned(),
         beside: vec![Beside {
@@ -23,6 +25,8 @@ fn report(standing: Standing, service: Option<&str>) -> FrontDoorReport {
                 url: "http://kitchen-nas.local:3000".to_owned(),
                 caution: None,
             }),
+            reaches: lemonfiber_core::door::Reaches::Here,
+            unaddressed: None,
         }],
     }
 }

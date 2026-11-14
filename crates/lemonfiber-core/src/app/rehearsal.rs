@@ -241,7 +241,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Boot => reads("boot"),
         Command::Watcher => reads("watcher"),
         Command::Queue(queueing) => queued(*queueing),
-        Command::FrontDoor => reads("front-door"),
+        Command::FrontDoor(_) => reads("front-door"),
         Command::Stack => reads("stack"),
         Command::Settled => reads("settled"),
         Command::News => reads("news"),

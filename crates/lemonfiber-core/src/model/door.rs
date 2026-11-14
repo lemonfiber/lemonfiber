@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 
-use crate::door::{Address, Chosen, Facing};
+use crate::door::{Address, Chosen, Facing, Reaches};
 
 /// Where the household's one front door stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -50,7 +50,7 @@ pub struct Beside {
     pub service: String,
     /// What it is to the household.
     pub facing: Facing,
-    /// Why it is not somewhere to begin.
+    /// Why it is not somewhere to begin, or for a household member what it is to them.
     pub because: String,
     /// The address to hand somebody for this service, read from this machine at the
     /// moment of asking rather than remembered.
@@ -66,6 +66,11 @@ pub struct Beside {
     /// address is absent then: an address with no port on it is one a browser answers
     /// with a refusal, and the manifest is where a port is declared.
     pub address: Option<Address>,
+    /// Whether the address answers from where the asking came from.
+    pub reaches: Reaches,
+    /// Why there is no address, where there is none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unaddressed: Option<String>,
 }
 
 /// The household's one front door: which service it is, where it stands, and what
@@ -80,7 +85,10 @@ pub struct FrontDoorReport {
     /// Carried as a state rather than left to the sentence beneath it, for the reason
     /// the standing is: an operator whose setting was refused reads the sentence, and
     /// a browser, a script or a dashboard reads this.
-    pub chosen: Chosen,
+    ///
+    /// Absent for a household member.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chosen: Option<Chosen>,
     /// The service the household begins at, by the name it shows itself under.
     /// Absent where this stack publishes nothing they could begin at.
     pub service: Option<String>,
@@ -88,10 +96,15 @@ pub struct FrontDoorReport {
     /// rather than remembered. Absent where there is no door, and where there is
     /// one on a machine that will say neither what it is called nor where it is.
     pub address: Option<Address>,
+    /// Whether the address answers from where the asking came from.
+    pub reaches: Reaches,
+    /// Why there is no address, where there is a door and none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unaddressed: Option<String>,
     /// What that service is to them. Absent for the same reason.
     pub facing: Option<Facing>,
-    /// What this comes to, in the words an operator would say it in — including,
-    /// where there is no door, that there is none.
+    /// What this comes to, in the words an operator would say it in, or a household
+    /// member's for one — including, where there is no door, that there is none.
     pub meaning: String,
     /// Everything else the household can reach, and why none of it is the door.
     pub beside: Vec<Beside>,

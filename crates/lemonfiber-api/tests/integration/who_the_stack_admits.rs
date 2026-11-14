@@ -15,6 +15,10 @@ fn recognising() -> Arc<Fake> {
     Fake::by_path(vec![
         (media::identity("whoever"), recognised()),
         (media::identity("standing"), standing()),
+        (
+            media::identity("household"),
+            media::answered(&vec![media::member("a7f3", "Ana", true)]),
+        ),
     ])
 }
 
@@ -71,7 +75,40 @@ async fn a_member_the_media_server_recognises_is_admitted_as_that_member() {
             .await,
         Knocking::Known(Caller::Member("a7f3".to_owned()))
     );
+    assert_eq!(said(&answer.body, "/data/name"), "Ana");
     let _ = fs::remove_dir_all(a_directory("stack-admits"));
+}
+
+#[tokio::test]
+async fn a_member_whose_name_cannot_be_read_is_not_admitted() {
+    let ctx = a_stack(
+        "stack-unnamed",
+        Fake::by_path(vec![
+            (media::identity("whoever"), recognised()),
+            (media::identity("standing"), standing()),
+            (media::identity("household"), media::refusing()),
+        ]),
+    );
+    seeded(&ctx);
+    let (router, _) = door_over(&ctx);
+
+    let answer = knocked(router, &hers()).await;
+
+    assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert!(session(&answer.body).is_empty());
+    let _ = fs::remove_dir_all(a_directory("stack-unnamed"));
+}
+
+/// The text at `pointer` in an answer's body, or nothing.
+fn said(body: &str, pointer: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|answer| {
+            answer
+                .pointer(pointer)
+                .and_then(|at| at.as_str().map(str::to_owned))
+        })
+        .unwrap_or_default()
 }
 
 #[tokio::test]

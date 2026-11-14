@@ -328,7 +328,7 @@ async fn main() -> ExitCode {
         Request::Boot => Command::Boot,
         Request::Watcher => Command::Watcher,
         Request::Queue { action } => translate::queue(action),
-        Request::FrontDoor => Command::FrontDoor,
+        Request::FrontDoor => Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
         Request::Stack => Command::Stack,
         Request::Settled => Command::Settled,
         Request::News => Command::News,

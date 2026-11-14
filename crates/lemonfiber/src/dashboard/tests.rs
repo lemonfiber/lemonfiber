@@ -41,12 +41,14 @@ pub(crate) fn a_snapshot() -> Snapshot {
         services: Panel::Ready(Vec::new()),
         door: Panel::Ready(lemonfiber_core::model::FrontDoorReport {
             standing: lemonfiber_core::model::Standing::Established,
-            chosen: lemonfiber_core::door::Chosen::Derived,
+            chosen: Some(lemonfiber_core::door::Chosen::Derived),
             service: Some("Seerr".to_owned()),
             address: Some(lemonfiber_core::door::Address {
                 url: "http://kitchen-nas.local:5055".to_owned(),
                 caution: None,
             }),
+            reaches: lemonfiber_core::door::Reaches::Unknown,
+            unaddressed: None,
             facing: Some(lemonfiber_core::door::Facing::Asking),
             meaning: "send them there".to_owned(),
             beside: Vec::new(),

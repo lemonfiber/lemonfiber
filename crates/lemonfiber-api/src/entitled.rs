@@ -19,7 +19,7 @@
 //! fact about the wire, and it is what the requirement about one member seeing
 //! another's requests asks for.
 
-use lemonfiber_core::app::{Command, Diagnosing, Viewing, Whom, Wishing};
+use lemonfiber_core::app::{Command, Diagnosing, Doorway, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
 use lemonfiber_core::push::run::Asked as Pushing;
@@ -251,6 +251,10 @@ fn members(id: &str, command: &Command) -> Permitted {
         // their own account and allowance. Whoever the request named is discarded, so a
         // member cannot search under somebody else's limits or spend their allowance.
         Command::Wish(wishing) => Permitted::This(Command::Wish(their_wish(id, wishing))),
+        Command::FrontDoor(doorway) => Permitted::This(Command::FrontDoor(Doorway {
+            household: true,
+            ..*doorway
+        })),
         Command::Notify(Notifying::Mine { .. }) => {
             Permitted::This(Command::Notify(Notifying::Mine {
                 member: id.to_owned(),

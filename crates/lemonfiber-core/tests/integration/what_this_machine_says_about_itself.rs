@@ -90,7 +90,12 @@ async fn lifecycle(ctx: &Ctx) -> Result<LifecycleReport, String> {
 
 /// The answer the household is handed, or nothing where it could not be assembled.
 async fn front_door(ctx: &Ctx) -> Option<FrontDoorReport> {
-    match dispatch(Command::FrontDoor, ctx).await {
+    match dispatch(
+        Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::FrontDoor(report)) => Some(report),
         _ => None,
     }

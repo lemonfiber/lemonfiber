@@ -22,7 +22,12 @@ use lemonfiber_core::model::FrontDoorReport;
 /// and the least of what setup did: everything above has already reported on a stack
 /// this broken, and a second complaint about it here would only bury them.
 pub(super) async fn handed(ctx: &Ctx) -> Vec<String> {
-    match dispatch(Command::FrontDoor, ctx).await {
+    match dispatch(
+        Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
+        ctx,
+    )
+    .await
+    {
         Ok(Outcome::FrontDoor(report)) => said(&report),
         _ => Vec::new(),
     }

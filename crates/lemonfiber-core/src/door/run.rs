@@ -5,8 +5,11 @@
 //! The reading of what is running is the same survey the status view is built from,
 //! so the two cannot grade one service differently.
 
-use crate::app::Ctx;
-use crate::door::{address, proxied, Address, Candidate, Chosen, Facing, Place, Reached, Refusal};
+use crate::app::{Ctx, Doorway};
+use crate::door::{
+    address, proxied, reaches, whence, Address, Candidate, Chosen, Facing, Place, Reached, Reaches,
+    Refusal, Whence,
+};
 use crate::error::{Diagnose, Problem};
 use crate::model::{Beside, FrontDoorReport, Standing};
 
@@ -36,8 +39,11 @@ impl Running<'_> {
     }
 }
 
-/// What there is to hand somebody who lives here, and where it stands.
-pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem>> {
+/// What there is to hand somebody who lives here, and where it stands, as `doorway` asks.
+pub(crate) async fn front_door(
+    ctx: &Ctx,
+    doorway: Doorway,
+) -> Result<FrontDoorReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -72,7 +78,7 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         None,
     )
     .numbered(crate::app::targets::ordinals(ctx));
-    Ok(assembled(
+    let report = assembled(
         &crate::door::candidates(&manifest.services, register.installed(), &fillers),
         Running {
             surveyed: &surveyed,
@@ -80,7 +86,13 @@ pub(crate) async fn front_door(ctx: &Ctx) -> Result<FrontDoorReport, Box<Problem
         },
         &place(ctx, named.as_deref()),
         ctx.settings.front_door.as_deref(),
-    ))
+        whence(doorway.from),
+    );
+    Ok(if doorway.household {
+        household::told(report)
+    } else {
+        report
+    })
 }
 
 /// Where this machine is, as the settings and its own name say, for every address the
@@ -104,6 +116,7 @@ pub(crate) fn assembled(
     running: Running<'_>,
     place: &Place<'_>,
     chose: Option<&str>,
+    from: Whence,
 ) -> FrontDoorReport {
     let (chosen, door) = crate::door::chosen(candidates, chose);
     let Some((faces, door)) = door else {
@@ -111,10 +124,12 @@ pub(crate) fn assembled(
             standing: Standing::Absent,
             service: None,
             address: None,
+            reaches: Reaches::Unknown,
+            unaddressed: None,
             facing: None,
             meaning: meaning(Standing::Absent, "", UNADDRESSED, &chosen),
-            chosen,
-            beside: beside(candidates, None, place),
+            chosen: Some(chosen),
+            beside: beside(candidates, None, place, from),
         };
     };
 
@@ -126,9 +141,13 @@ pub(crate) fn assembled(
         service: Some(door.name.to_owned()),
         facing: Some(faces),
         meaning: meaning(standing, door.name, unaddressed(door), &chosen),
-        chosen,
+        chosen: Some(chosen),
+        reaches: reaches(from, reached.as_ref()),
+        unaddressed: reached
+            .is_none()
+            .then(|| unaddressed(door).trim().to_owned()),
         address: reached,
-        beside: beside(candidates, Some(door.id), place),
+        beside: beside(candidates, Some(door.id), place, from),
     }
 }
 
@@ -208,7 +227,12 @@ const fn standing(faces: Facing, answering: bool, addressed: bool) -> Standing {
 /// which is the right default for a machine nobody has told where it is and the
 /// wrong address to hand anybody. So it is not handed over — it is said, with the
 /// one thing that fixes it.
-const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another                            device would reach: it does not publish its own name, and the                            address the household's links point at is still the one that means                            this machine and nowhere else. Record this machine's address on your network with                            lemonfiber settings set lan-host=<address> and it will be the address                            given here.";
+const UNADDRESSED: &str = " Nothing here can work out an address for this machine that another \
+                           device would reach: it does not publish its own name, and the \
+                           address the household's links point at is still the one that means \
+                           this machine and nowhere else. Record this machine's address on \
+                           your network with lemonfiber settings set lan-host=<address> and it \
+                           will be the address given here.";
 
 /// What is said where nothing here can work out where `door` is reached: the fix for
 /// the way it is published.
@@ -287,33 +311,55 @@ fn said(standing: Standing, name: &str, unaddressed: &str) -> String {
 /// The stack's in the order the manifest declares them, then each plugin's, so the same
 /// stack answers the same way twice. The door itself is left out: it is named above,
 /// and naming it here as well would be one fact stated in two places that can disagree.
-fn beside(candidates: &[Candidate<'_>], door: Option<&str>, place: &Place<'_>) -> Vec<Beside> {
+fn beside(
+    candidates: &[Candidate<'_>],
+    door: Option<&str>,
+    place: &Place<'_>,
+    from: Whence,
+) -> Vec<Beside> {
     candidates
         .iter()
         .filter(|candidate| Some(candidate.id) != door)
         .filter_map(|candidate| {
             let facing = candidate.facing?;
+            let address = facing
+                .handed_over()
+                .then(|| reached(candidate, place))
+                .flatten();
             Some(Beside {
                 service: candidate.name.to_owned(),
                 facing,
                 because: facing.because().to_owned(),
-                // The same reading the door's own address gets, for the same machine
-                // at the same moment. A second way of working out where a service is
-                // would be a second answer able to disagree with the first.
-                //
-                // Only where somebody in the house may be handed the way there.
-                // Naming a service and handing over the address of one are different
-                // acts: the index over every service is named here in order to be
-                // refused by name, and an address on it would be the refusal
-                // undone.
-                address: facing
-                    .handed_over()
-                    .then(|| reached(candidate, place))
-                    .flatten(),
+                reaches: reaches(from, address.as_ref()),
+                unaddressed: address
+                    .is_none()
+                    .then(|| unreached(candidate, facing).to_owned()),
+                address,
             })
         })
         .collect()
 }
+
+/// Why a service standing beside the door has no address.
+fn unreached(candidate: &Candidate<'_>, facing: Facing) -> &'static str {
+    if !facing.handed_over() {
+        return NOT_HANDED_OVER;
+    }
+    match candidate.reached {
+        Reached::Port(None) => NO_PORT,
+        Reached::Port(Some(_)) => UNADDRESSED.trim_start(),
+        Reached::Proxied(_) => UNPROXIED.trim_start(),
+    }
+}
+
+/// What is said of a service nobody in the house is handed the way to.
+const NOT_HANDED_OVER: &str = "It is not handed to the household, so no address is given for it.";
+
+/// What is said of a service the stack publishes no port for.
+const NO_PORT: &str = "The stack publishes no port for it, so there is no address a browser \
+                       would be answered at.";
+
+mod household;
 
 #[cfg(test)]
 mod tests;

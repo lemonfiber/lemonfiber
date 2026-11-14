@@ -15,6 +15,7 @@ mod allowance;
 mod bandwidth;
 mod credentials;
 mod diagnosing;
+mod doorway;
 mod filling;
 mod gathering;
 mod hosting;
@@ -40,6 +41,7 @@ pub use allowance::Allowance;
 pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
 pub use diagnosing::Diagnosing;
+pub use doorway::Doorway;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
@@ -283,7 +285,7 @@ pub enum Command {
     Queue(Queueing),
     /// Name the one address to hand somebody who lives here, and say where it stands —
     /// including that there is none, where this stack runs nothing they could begin at.
-    FrontDoor,
+    FrontDoor(Doorway),
     /// Say how the stack runs without lemonfiber, and the plain Compose words that start it.
     Stack,
     /// Say what setup settled, read from the configuration as it stands, and whether this

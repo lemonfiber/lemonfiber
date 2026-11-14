@@ -1,6 +1,6 @@
 use super::{answering, assembled, front_door, meaning, NOWHERE, UNADDRESSED};
 use crate::door::fixtures::{asking, service, watching};
-use crate::door::{Chosen, Facing, Place, Refusal, KEPT};
+use crate::door::{Chosen, Facing, Place, Refusal, Whence, KEPT};
 use crate::model::Standing;
 use crate::platform::Environment;
 use crate::ports::docker::{Health, Lifecycle};
@@ -31,7 +31,11 @@ fn ctx(name: &str, up: &[&str]) -> crate::app::Ctx {
 
 #[tokio::test]
 async fn the_request_service_is_the_door_and_the_library_stands_beside_it() {
-    let report = front_door(&ctx("door-beside", &["seerr", "jellyfin"])).await;
+    let report = front_door(
+        &ctx("door-beside", &["seerr", "jellyfin"]),
+        crate::app::Doorway::default(),
+    )
+    .await;
     let report = report.ok();
     assert_eq!(
         report.as_ref().map(|report| report.standing),
@@ -63,9 +67,12 @@ async fn the_request_service_is_the_door_and_the_library_stands_beside_it() {
 /// turned out to be.
 #[tokio::test]
 async fn the_library_beside_the_door_can_still_be_handed_over() {
-    let report = front_door(&ctx("door-library", &["seerr", "jellyfin"]))
-        .await
-        .ok();
+    let report = front_door(
+        &ctx("door-library", &["seerr", "jellyfin"]),
+        crate::app::Doorway::default(),
+    )
+    .await
+    .ok();
     let library = report
         .iter()
         .flat_map(|report| report.beside.iter())
@@ -86,7 +93,12 @@ async fn the_library_beside_the_door_can_still_be_handed_over() {
 /// have to disagree about it on purpose.
 #[tokio::test]
 async fn the_index_over_everything_is_named_without_being_handed_over() {
-    let report = front_door(&ctx("door-index", &["seerr"])).await.ok();
+    let report = front_door(
+        &ctx("door-index", &["seerr"]),
+        crate::app::Doorway::default(),
+    )
+    .await
+    .ok();
     let homepage = report
         .iter()
         .flat_map(|report| report.beside.iter())
@@ -105,9 +117,12 @@ async fn the_index_over_everything_is_named_without_being_handed_over() {
 
 #[tokio::test]
 async fn the_index_over_everything_is_named_beside_the_door_and_refused() {
-    let report = front_door(&ctx("door-refused-index", &["seerr"]))
-        .await
-        .ok();
+    let report = front_door(
+        &ctx("door-refused-index", &["seerr"]),
+        crate::app::Doorway::default(),
+    )
+    .await
+    .ok();
     let homepage = report
         .iter()
         .flat_map(|report| report.beside.iter())
@@ -123,7 +138,9 @@ async fn the_index_over_everything_is_named_beside_the_door_and_refused() {
 async fn a_door_nothing_is_running_behind_is_said_to_be_unreachable() {
     // Nothing is up, so the door this stack declares is not answering — which is
     // not the same answer as there being no door.
-    let report = front_door(&ctx("door-down", &[])).await.ok();
+    let report = front_door(&ctx("door-down", &[]), crate::app::Doorway::default())
+        .await
+        .ok();
     assert_eq!(
         report.as_ref().map(|report| report.standing),
         Some(Standing::Unreachable)
@@ -148,7 +165,7 @@ async fn the_address_is_the_one_this_machine_answers_to_now() {
         .with_site(std::sync::Arc::clone(&renamed) as std::sync::Arc<dyn crate::ports::Site>);
     let household = moved(household, "door-renamed");
 
-    let first = front_door(&household)
+    let first = front_door(&household, crate::app::Doorway::default())
         .await
         .ok()
         .and_then(|report| report.address);
@@ -159,7 +176,7 @@ async fn the_address_is_the_one_this_machine_answers_to_now() {
 
     // The machine has been renamed and says something else about itself. Nothing
     // was kept, so the second answer is the second answer rather than the first.
-    let again = front_door(&household)
+    let again = front_door(&household, crate::app::Doorway::default())
         .await
         .ok()
         .and_then(|report| report.address);
@@ -185,7 +202,9 @@ async fn a_machine_nothing_can_address_is_told_what_to_set() {
         .build()
         .with_site(Renamed::called(Some("kitchen-nas")));
     let household = moved(household, "door-unaddressed");
-    let report = front_door(&household).await.ok();
+    let report = front_door(&household, crate::app::Doorway::default())
+        .await
+        .ok();
     assert_eq!(
         report.as_ref().and_then(|report| report.address.clone()),
         None
@@ -210,7 +229,7 @@ async fn the_address_the_operator_recorded_is_the_one_that_is_given() {
         .build()
         .with_site(Renamed::called(None));
     let household = moved(household, "door-recorded");
-    let address = front_door(&household)
+    let address = front_door(&household, crate::app::Doorway::default())
         .await
         .ok()
         .and_then(|report| report.address);
@@ -245,7 +264,9 @@ fn a_door_with_no_address_says_so_and_a_stack_with_no_door_does_not() {
 #[tokio::test]
 async fn a_stack_that_cannot_be_read_is_a_problem_rather_than_no_door() {
     let ctx = a_context().over(crate::test_support::nowhere()).build();
-    assert!(front_door(&ctx).await.is_err());
+    assert!(front_door(&ctx, crate::app::Doorway::default())
+        .await
+        .is_err());
 }
 
 #[tokio::test]
@@ -253,7 +274,9 @@ async fn an_engine_nothing_can_reach_is_a_problem_rather_than_a_door_that_is_dow
     // Not knowing what is running is a different answer from knowing nothing is,
     // and reporting the second would be a guess dressed as a reading.
     let ctx = a_context().build();
-    assert!(front_door(&ctx).await.is_err());
+    assert!(front_door(&ctx, crate::app::Doorway::default())
+        .await
+        .is_err());
 }
 
 /// A running service, as the survey reports one.
@@ -289,6 +312,7 @@ fn a_stack_that_publishes_nothing_to_the_household_is_told_there_is_no_door() {
             environment: Environment::MacOs,
         },
         None,
+        Whence::Home,
     );
     assert_eq!(report.standing, Standing::Absent);
     assert_eq!(report.service, None);
@@ -313,6 +337,7 @@ fn a_stack_with_only_a_library_makes_the_library_the_door() {
             environment: Environment::MacOs,
         },
         None,
+        Whence::Home,
     );
     assert_eq!(report.standing, Standing::LibraryOnly);
     assert_eq!(report.service, Some("door".to_owned()));
@@ -337,6 +362,7 @@ fn a_door_the_operating_system_runs_is_answering_like_any_other() {
             environment: Environment::MacOs,
         },
         None,
+        Whence::Home,
     );
     assert_eq!(report.standing, Standing::LibraryOnly);
 }
@@ -359,6 +385,7 @@ fn a_door_still_starting_has_not_begun_answering() {
             environment: Environment::MacOs,
         },
         None,
+        Whence::Home,
     );
     assert_eq!(report.standing, Standing::Unreachable);
 }
@@ -393,8 +420,11 @@ async fn a_service_that_is_down_and_a_machine_with_no_address_are_two_answers() 
         .with_site(Renamed::called(None));
     let stranded = moved(stranded, "door-stranded");
 
-    let down = front_door(&down).await.ok().map(|report| report.standing);
-    let stranded = front_door(&stranded)
+    let down = front_door(&down, crate::app::Doorway::default())
+        .await
+        .ok()
+        .map(|report| report.standing);
+    let stranded = front_door(&stranded, crate::app::Doorway::default())
         .await
         .ok()
         .map(|report| report.standing);
@@ -426,7 +456,9 @@ async fn a_door_with_no_address_is_not_reported_as_established() {
         .build()
         .with_site(Renamed::called(None));
     let household = moved(household, "door-unestablished");
-    let report = front_door(&household).await.ok();
+    let report = front_door(&household, crate::app::Doorway::default())
+        .await
+        .ok();
 
     assert_eq!(
         report.as_ref().map(|report| report.standing),
@@ -480,14 +512,16 @@ async fn the_door_the_operator_named_is_the_one_that_is_given() {
         .build()
         .with_site(Renamed::called(Some("kitchen-nas")));
     let household = moved(household, "door-named");
-    let report = front_door(&household).await.ok();
+    let report = front_door(&household, crate::app::Doorway::default())
+        .await
+        .ok();
 
     assert_eq!(
         report.as_ref().and_then(|report| report.service.clone()),
         Some("Jellyfin".to_owned())
     );
     assert_eq!(
-        report.as_ref().map(|report| report.chosen.clone()),
+        report.as_ref().and_then(|report| report.chosen.clone()),
         Some(Chosen::Named("door".to_owned()))
     );
     assert_eq!(
@@ -517,9 +551,11 @@ async fn a_named_door_the_household_tier_does_not_publish_is_refused_and_said() 
         .build()
         .with_site(Renamed::called(Some("kitchen-nas")));
     let household = moved(household, "door-sonarr");
-    let report = front_door(&household).await.ok();
+    let report = front_door(&household, crate::app::Doorway::default())
+        .await
+        .ok();
 
-    let refused = report.as_ref().map(|report| report.chosen.clone());
+    let refused = report.as_ref().and_then(|report| report.chosen.clone());
     assert!(
         matches!(refused, Some(Chosen::Refused(Refusal { ref named, .. })) if named == "sonarr"),
         "{refused:?}"
@@ -566,6 +602,7 @@ fn a_refusal_is_said_even_where_there_was_no_door_to_fall_back_to() {
             environment: Environment::MacOs,
         },
         Some("sonarr"),
+        Whence::Home,
     );
     assert_eq!(report.standing, Standing::Absent);
     assert!(report.meaning.starts_with(NOWHERE));
@@ -581,143 +618,119 @@ fn no_door_at_all_says_so_rather_than_naming_the_nearest_thing() {
     assert!(!NOWHERE.contains("Homepage"));
 }
 
-/// A plugin's container, as the engine reports one the stack does not declare.
-fn stranger(id: &str, state: crate::docker::State) -> crate::docker::Undeclared {
-    crate::docker::Undeclared {
-        id: id.to_owned(),
-        state,
-        describes: crate::docker::UNDESCRIBED.to_owned(),
-    }
+#[test]
+fn every_service_says_whether_its_address_answers_from_where_the_asking_came_from() {
+    let mut index = service("index", Some(lemonfiber_manifest::Bind::Lan));
+    index.provides = vec!["dashboard.show".to_owned()];
+    let declared = [watching(), index];
+    let place = Place {
+        named: None,
+        recorded: Some("192.168.1.5"),
+        domain: None,
+        environment: Environment::LinuxNative,
+    };
+    let answered = |from| {
+        assembled(
+            &crate::door::candidates(&declared, &[], &crate::wiring::Fillers::default()),
+            super::Running {
+                surveyed: &[up("door", crate::docker::State::Healthy)],
+                undeclared: &[],
+            },
+            &place,
+            None,
+            from,
+        )
+    };
+
+    let home = answered(Whence::Home);
+    let away = answered(Whence::Away);
+    let unknown = answered(Whence::Unknown);
+
+    assert_eq!(home.reaches, crate::door::Reaches::Here);
+    assert_eq!(away.reaches, crate::door::Reaches::NotHere);
+    assert_eq!(unknown.reaches, crate::door::Reaches::Unknown);
+    assert!(away.address.is_some());
+    assert_eq!(away.unaddressed, None);
+    assert_eq!(away.chosen, Some(Chosen::Derived));
+    let index = away.beside.iter().find(|one| one.service == "index");
+    assert_eq!(index.and_then(|one| one.address.clone()), None);
+    assert_eq!(
+        index.and_then(|one| one.unaddressed.as_deref()),
+        Some(super::NOT_HANDED_OVER)
+    );
+    assert_eq!(
+        index.map(|one| one.reaches),
+        Some(crate::door::Reaches::Unknown)
+    );
 }
 
-/// The door over a stack holding a library and its proxy, and a plugin's request
-/// service published through that proxy, with the plugin's container `state` where it
-/// runs, the proxy `proxying` where it is up, and the proxy's domain `domain`.
-fn over_a_plugin_door(
-    state: Option<crate::docker::State>,
-    proxying: bool,
-    domain: Option<&str>,
-) -> crate::model::FrontDoorReport {
-    let mut proxy = service("front", Some(lemonfiber_manifest::Bind::Lan));
-    proxy.provides = vec!["proxy.front".to_owned()];
-    let declared = [watching(), proxy];
-    let mut surveyed = vec![up("door", crate::docker::State::Healthy)];
-    if proxying {
-        surveyed.push(up("front", crate::docker::State::Running));
-    }
-    let plugin = crate::door::fixtures::fronted("requests", Some("request.intake@1"), Some("ask"));
-    let undeclared: Vec<crate::docker::Undeclared> = state
-        .map(|state| stranger("requests", state))
-        .into_iter()
-        .collect();
-    assembled(
-        &crate::door::candidates(
-            &declared,
-            std::slice::from_ref(&plugin),
-            &crate::wiring::Fillers::default(),
-        ),
+#[test]
+fn a_door_with_no_address_says_why() {
+    let declared = [watching()];
+    let report = assembled(
+        &crate::door::candidates(&declared, &[], &crate::wiring::Fillers::default()),
         super::Running {
-            surveyed: &surveyed,
-            undeclared: &undeclared,
+            surveyed: &[up("door", crate::docker::State::Healthy)],
+            undeclared: &[],
         },
         &Place {
-            named: Some("kitchen-nas"),
+            named: None,
             recorded: None,
-            domain,
-            environment: Environment::MacOs,
+            domain: None,
+            environment: Environment::LinuxNative,
         },
         None,
-    )
-}
-
-/// A plugin's request service is the front door, handed over at the address the proxy
-/// publishes it at, and the stack's library stands beside it at this machine's.
-#[test]
-fn a_plugins_request_service_is_the_door_at_the_address_the_proxy_publishes() {
-    let report = over_a_plugin_door(Some(crate::docker::State::Running), true, Some("home.lan"));
-
-    assert_eq!(report.standing, Standing::Established);
-    assert_eq!(report.service.as_deref(), Some("requests the plugin's"));
-    assert_eq!(
-        report.address.map(|address| address.url),
-        Some("https://ask.home.lan".to_owned())
+        Whence::Home,
     );
-    assert!(report.beside.iter().any(|beside| beside.service == "door"
-        && beside
-            .address
-            .as_ref()
-            .is_some_and(|address| address.url.contains("kitchen-nas"))));
+
+    assert_eq!(report.address, None);
+    assert_eq!(report.reaches, crate::door::Reaches::Unknown);
+    assert_eq!(report.unaddressed.as_deref(), Some(UNADDRESSED.trim()));
 }
 
-/// With no domain configured for the proxy, a plugin's door is answering and has no
-/// address to hand anybody, and what is said names the setting that gives it one rather
-/// than the household address a stack's door would need.
 #[test]
-fn a_plugins_door_with_no_domain_has_no_address_and_says_which_setting_gives_one() {
-    for domain in [None, Some("home.example")] {
-        let report = over_a_plugin_door(Some(crate::docker::State::Healthy), true, domain);
-
-        assert_eq!(report.standing, Standing::Stranded, "{domain:?}");
-        assert_eq!(report.address, None, "{domain:?}");
-        assert!(
-            report.meaning.contains(super::UNPROXIED.trim()),
-            "{}",
-            report.meaning
-        );
-        assert!(
-            !report.meaning.contains("settings set lan-host"),
-            "{}",
-            report.meaning
-        );
-    }
-}
-
-/// A plugin's door whose container is not running is a door that is down, and so is
-/// one whose container runs behind a proxy that does not: the household reaches it
-/// through nothing else.
-#[test]
-fn a_plugins_door_that_is_not_running_or_not_proxied_is_unreachable() {
-    for (state, proxying) in [
-        (None, true),
-        (Some(crate::docker::State::Starting), true),
-        (Some(crate::docker::State::Running), false),
+fn a_service_beside_the_door_says_why_it_has_no_address() {
+    let candidate = |reached| crate::door::Candidate {
+        id: "library",
+        name: "Library",
+        facing: Some(Facing::Watching),
+        reached,
+    };
+    for (reached, why) in [
+        (crate::door::Reached::Port(None), super::NO_PORT),
+        (
+            crate::door::Reached::Port(Some(8096)),
+            UNADDRESSED.trim_start(),
+        ),
+        (
+            crate::door::Reached::Proxied("watch"),
+            super::UNPROXIED.trim_start(),
+        ),
     ] {
-        assert_eq!(
-            over_a_plugin_door(state, proxying, Some("home.lan")).standing,
-            Standing::Unreachable,
-            "{state:?}, proxying: {proxying}"
-        );
+        assert_eq!(super::unreached(&candidate(reached), Facing::Watching), why);
     }
 }
 
-/// A record of what is installed that will not read leaves the stack's own services to
-/// answer for the door, rather than taking the door away with it.
 #[tokio::test]
-async fn an_unreadable_register_leaves_the_stacks_own_door() {
-    let env = crate::test_support::env_without_password("door-unread");
-    let beside = env.with_file_name(crate::config::paths::PLUGINS);
-    assert!(std::fs::write(&beside, "not a register").is_ok());
-    let watching = a_context()
-        .engine(std::sync::Arc::new(Reporting::holding(
-            &["door"],
-            Lifecycle::Running,
-            Health::Healthy,
-        )))
-        .settings(crate::config::Settings {
-            env_file: Some(env),
-            ..crate::config::Settings::default()
-        })
-        .build()
-        .with_site(Renamed::called(Some("kitchen-nas")));
+async fn a_household_member_is_told_the_door_in_their_words() {
+    let report = front_door(
+        &ctx("door-household", &["seerr", "jellyfin"]),
+        crate::app::Doorway {
+            from: "203.0.113.7".parse().ok(),
+            household: true,
+        },
+    )
+    .await
+    .ok();
 
-    let report = front_door(&watching).await.ok();
-
-    assert_eq!(
-        report.as_ref().and_then(|report| report.service.clone()),
-        Some("Jellyfin".to_owned())
-    );
-    assert_eq!(
-        report.as_ref().map(|report| report.standing),
-        Some(Standing::LibraryOnly)
-    );
+    assert_eq!(report.as_ref().and_then(|one| one.chosen.clone()), None);
+    assert!(report
+        .as_ref()
+        .is_some_and(|one| one.meaning.starts_with("Start at Seerr")));
+    assert!(report
+        .iter()
+        .flat_map(|one| one.beside.iter())
+        .all(|one| one.facing.handed_over()));
 }
+
+mod plugins;

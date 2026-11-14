@@ -105,7 +105,12 @@ async fn answered(chose: Option<&str>) -> FrontDoorReport {
         .build()
         .with_site(Renamed::called(Some("kitchen-nas")));
     lemonfiber_testing::adapted::parts_recorded(&ctx);
-    let answer = dispatch(Command::FrontDoor, &ctx).await.ok();
+    let answer = dispatch(
+        Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
+        &ctx,
+    )
+    .await
+    .ok();
     let Some(Outcome::FrontDoor(report)) = answer else {
         unreachable!("the front-door command answers with a front-door report: {answer:?}")
     };
