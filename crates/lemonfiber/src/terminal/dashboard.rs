@@ -159,6 +159,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     // waiting for is dropped with it. And leaving has to wait for the *action*
     // rather than for whatever answered first, which a shared channel cannot say.
     let mut carrying: Option<tokio::task::JoinHandle<Answer>> = None;
+    let mut asking: Option<tokio::task::JoinHandle<Answer>> = None;
     // Every way out carries what is still running away with it, because each of them
     // can be taken with an action in flight.
     let (outcome, leaving, after) = loop {
@@ -197,12 +198,11 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                             super::learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
                         }
                     }
-                    // Awaited here rather than on a task of its own: this reads the
-                    // stack's own declaration of itself off disk and awaits nothing,
-                    // where an action reaches the container engine and the services.
-                    // No frame is drawn between the asking and the answer, which is
-                    // why being asked is not one of [`crate::acting`]'s stages.
-                    Wanted::Ask(command) => acting.told(dispatch(command, &ctx).await),
+                    Wanted::Ask(command) => {
+                        if let Some(earlier) = asking.replace(carry(command, Arc::clone(&ctx))) {
+                            earlier.abort();
+                        }
+                    }
                     Wanted::Carry(command) => carrying = Some(carry(command, Arc::clone(&ctx))),
                     // Aborted rather than asked to stop: there is nothing to ask,
                     // and a run abandoned at its next await point is exactly what
@@ -226,7 +226,13 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                 }
                 refreshing = gathering(&ctx, gathered.as_ref(), TICK);
             }
-            done = carried(&mut carrying) => {
+            told = super::finished(&mut asking) => {
+                asking = None;
+                if let Some(told) = told {
+                    acting.told(told);
+                }
+            }
+            done = super::finished(&mut carrying) => {
                 carrying = None;
                 if let Some(done) = done {
                     acting.came_to(done);
@@ -243,20 +249,12 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
         }
     };
     refreshing.abort();
+    if let Some(asked) = asking {
+        asked.abort();
+    }
     drop(typed);
     let _ = reader.join();
     (outcome, unfinished(leaving, carrying), after)
-}
-
-/// What the core came back with, or nothing at all where it was not asked.
-///
-/// A pending future where there is no task, so a screen with nothing outstanding
-/// waits on its other branches rather than spinning on a branch that is always ready.
-async fn carried(task: &mut Option<tokio::task::JoinHandle<Answer>>) -> Option<Answer> {
-    match task {
-        Some(handle) => (&mut *handle).await.ok(),
-        None => std::future::pending().await,
-    }
 }
 
 /// What carrying out an action came to.

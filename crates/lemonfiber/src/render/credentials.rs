@@ -13,6 +13,7 @@
 use lemonfiber_core::credential::{Inventory, Reach, Revealed, Revoked, Rotation, Settled};
 use lemonfiber_core::text::plain;
 
+use super::news::when;
 use super::Lines;
 
 /// Everything held, and what became of anything asked about one of them.
@@ -35,9 +36,10 @@ pub(crate) fn listing(inventory: &Inventory) -> Lines {
             .filter(|grant| grant.credential == held.setting)
         {
             lines.put(format!(
-                "    granted to   the plugin {}, for {}",
+                "    granted to   the plugin {}, for {}, approved {}",
                 plain(&grant.plugin),
-                plain(&grant.serves)
+                plain(&grant.serves),
+                when(&grant.at)
             ));
         }
     }
@@ -75,11 +77,12 @@ fn granted_elsewhere(inventory: &Inventory) -> Lines {
     lines.spaced("Granted to third-party plugins:");
     for grant in unlisted {
         lines.put(format!(
-            "  {}, {}'s, to the plugin {}, for {}",
+            "  {}, {}'s, to the plugin {}, for {}, approved {}",
             plain(&grant.credential),
             plain(&grant.of),
             plain(&grant.plugin),
-            plain(&grant.serves)
+            plain(&grant.serves),
+            when(&grant.at)
         ));
     }
     lines

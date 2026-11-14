@@ -10,6 +10,7 @@ mod shape;
 mod source_tree;
 mod spelling;
 
+mod a_frame_awaits_nothing;
 mod a_latch_is_settled_once;
 mod an_adapter_only_reads_its_upstreams_credential;
 mod every_declared_code_is_raised;

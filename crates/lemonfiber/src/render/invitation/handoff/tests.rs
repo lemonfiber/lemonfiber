@@ -1,4 +1,5 @@
 use super::handoff;
+use crate::render::fixtures::drawn_under;
 use lemonfiber_core::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 
 const ADDRESS: &str = "http://192.168.1.20:8096";
@@ -33,7 +34,14 @@ fn a_ready_code_is_drawn_with_the_steps_to_take() {
 
     assert!(said.contains("ana's code is ready"), "{said}");
     assert!(said.contains(ADDRESS), "{said}");
-    assert!(said.contains('\u{2588}'), "no code was drawn: {said}");
+    assert!(
+        drawn_under(
+            &said,
+            "Point the device's camera, or the app's scanner, at this:",
+            ADDRESS
+        ),
+        "{said}"
+    );
     assert!(
         said.contains("1. Open the app.") && said.contains("2. Sign in as ana."),
         "{said}"
@@ -260,7 +268,11 @@ fn a_clients_own_link_is_offered_as_a_code_of_its_own() {
     let said = handoff(&linked).text();
 
     assert!(
-        said.contains("To open Swiftfin on iPhone or iPad at it, this:"),
+        drawn_under(
+            &said,
+            "To open Swiftfin on iPhone or iPad at it, this:",
+            &format!("swiftfin://server?url={ADDRESS}")
+        ),
         "{said}"
     );
     assert!(

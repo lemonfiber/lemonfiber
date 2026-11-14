@@ -2,6 +2,7 @@ use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, Purpose, Secret, S
 use lemonfiber_fixtures::ports::Chance;
 
 use super::{claimed, devices, listing, minted, registered};
+use crate::render::fixtures::drawn_under;
 
 /// A secret minted from a source a test chose.
 fn a_secret() -> Secret {
@@ -49,7 +50,14 @@ fn a_minted_key_is_shown_once_with_what_a_client_elsewhere_needs() {
     );
     assert!(said.contains(report.secret.as_str()), "{said}");
     assert!(said.contains("not shown again"), "{said}");
-    assert!(said.contains("The same secret, for a camera:"), "{said}");
+    assert!(
+        drawn_under(
+            &said,
+            "The same secret, for a camera:",
+            report.secret.as_str()
+        ),
+        "{said}"
+    );
     assert!(said.contains("address  https://192.168.1.9:8443"), "{said}");
     assert!(
         said.contains(&format!("pin      {}", "ab".repeat(32))),
@@ -153,7 +161,10 @@ fn a_claim_is_shown_once_as_a_link_and_a_code_with_when_it_lapses() {
         "{said}"
     );
     assert!(said.contains(&format!("  {link}")), "{said}");
-    assert!(said.contains("The same link, for a camera:"), "{said}");
+    assert!(
+        drawn_under(&said, "The same link, for a camera:", &link),
+        "{said}"
+    );
     assert!(said.contains("until 2026-10-05T06:10:00"), "{said}");
 }
 

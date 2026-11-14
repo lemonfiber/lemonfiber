@@ -1,4 +1,5 @@
 use super::{front_door, standing};
+use crate::render::fixtures::drawn_under;
 use lemonfiber_core::door::{Address, Facing};
 use lemonfiber_core::model::{Beside, FrontDoorReport, Standing};
 
@@ -56,6 +57,14 @@ fn the_address_is_drawn_for_a_camera_as_well_as_written_out() {
         written.is_some_and(|written| drawn.is_some_and(|drawn| drawn > written)),
         "the address is written at {written:?} and drawn at {drawn:?}; it needs \
          to be both, in that order"
+    );
+    assert!(
+        drawn_under(
+            &said,
+            "Or point a phone's camera at this:",
+            "http://kitchen-nas.local:5055"
+        ),
+        "{said}"
     );
 }
 

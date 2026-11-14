@@ -92,3 +92,23 @@ fn an_address_too_long_to_encode_is_no_code_rather_than_a_wrong_one() {
         "an address that does not fit in a code was drawn as one anyway"
     );
 }
+
+#[test]
+fn a_code_is_found_under_its_label_only_for_the_text_it_was_drawn_from() {
+    let mut lines = crate::render::Lines::default();
+    super::labelled(&mut lines, "Scan this:", &an_address());
+    let said = lines.text();
+
+    assert!(
+        crate::render::fixtures::drawn_under(&said, "Scan this:", &an_address()),
+        "{said}"
+    );
+    assert!(
+        !crate::render::fixtures::drawn_under(&said, "Scan this:", "http://192.168.1.10:5056"),
+        "{said}"
+    );
+    assert!(
+        !crate::render::fixtures::drawn_under(&said, "Scan that:", &an_address()),
+        "{said}"
+    );
+}

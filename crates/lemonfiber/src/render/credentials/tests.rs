@@ -327,7 +327,9 @@ fn a_grant_is_listed_beside_the_credential_it_crosses_and_apart_where_none_is_li
     let apart = drawn(inventory);
 
     assert!(
-        beside.contains("granted to   the plugin comics, for download.torrent"),
+        beside.contains(
+            "granted to   the plugin comics, for download.torrent, approved 1970-01-01T00:00:01 UTC"
+        ),
         "{beside}"
     );
     assert!(
@@ -336,7 +338,10 @@ fn a_grant_is_listed_beside_the_credential_it_crosses_and_apart_where_none_is_li
     );
     assert!(apart.contains("Granted to third-party plugins:"), "{apart}");
     assert!(
-        apart.contains("QBITTORRENT_PASSWORD, qbittorrent's, to the plugin comics"),
+        apart.contains(
+            "QBITTORRENT_PASSWORD, qbittorrent's, to the plugin comics, for download.torrent, \
+             approved 1970-01-01T00:00:01 UTC"
+        ),
         "{apart}"
     );
 }

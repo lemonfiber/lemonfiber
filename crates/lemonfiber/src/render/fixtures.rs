@@ -279,3 +279,17 @@ pub(crate) fn a_lifecycle(action: &str, plan: Plan) -> LifecycleReport {
         forwarded: None,
     }
 }
+
+/// Whether `said` draws `text` as a code on the lines straight under `label`.
+pub(crate) fn drawn_under(said: &str, label: &str, text: &str) -> bool {
+    let lines: Vec<&str> = said.lines().collect();
+    super::qr::rows(text, crate::say::folding()).is_some_and(|rows| {
+        lines.iter().enumerate().any(|(at, line)| {
+            *line == label
+                && rows
+                    .iter()
+                    .enumerate()
+                    .all(|(n, row)| lines.get(at + 1 + n) == Some(&format!("  {row}").as_str()))
+        })
+    })
+}

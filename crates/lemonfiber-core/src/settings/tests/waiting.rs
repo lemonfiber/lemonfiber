@@ -284,3 +284,35 @@ async fn a_service_held_back_is_written_apart_and_started_by_the_act_giving_its_
         .any(|argv| argv.iter().any(|word| word == "up")
             && argv.last().map(String::as_str) == Some("tunnel")));
 }
+
+#[tokio::test]
+async fn a_secret_whose_needs_stop_being_met_keeps_the_value_already_held() {
+    let machine = super::changing::holding("waiting-kept", super::changing::running(&[]), GUARD);
+    let at = crate::settings::secrets_at(&machine.ctx).unwrap_or_default();
+    let keeping = [crate::settings::Keeping {
+        name: "guard:openvpn-user",
+        value: "someone",
+        from: crate::settings::Source::Operator,
+        at: 1,
+    }];
+    assert!(crate::settings::kept(
+        &at,
+        &keeping,
+        &lemonfiber_fixtures::ports::Chance::cycling(),
+        &|_| Ok(())
+    )
+    .is_ok());
+    let held = || {
+        crate::settings::Secrets::at(&at)
+            .ok()
+            .and_then(|secrets| secrets.value("guard:openvpn-user").map(str::to_owned))
+    };
+
+    for value in ["openvpn", "wireguard"] {
+        let made = super::changing::change(
+            super::changing::agreed(&machine.ctx, "guard:vpn-type", Some(value)).await,
+        );
+        assert_eq!(made.map(|one| one.applied), Some(true), "{value}");
+        assert_eq!(held().as_deref(), Some("someone"), "{value}");
+    }
+}
