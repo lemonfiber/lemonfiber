@@ -9856,7 +9856,7 @@
         "type": "object"
       },
       "PanelArray_of_Downloader": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -9903,11 +9903,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelArray_of_Queue": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -9954,11 +9967,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelArray_of_Service": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10005,11 +10031,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelArray_of_Transfer": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10056,11 +10095,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelFrontDoorReport": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10104,11 +10156,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelHouseholdReport": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10152,11 +10217,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelStorage": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10200,11 +10278,24 @@
               "data"
             ],
             "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
+            ],
+            "type": "object"
           }
         ]
       },
       "PanelVpn": {
-        "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+        "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
         "oneOf": [
           {
             "description": "The source answered; here is the panel.",
@@ -10246,6 +10337,19 @@
             "required": [
               "panel",
               "data"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+            "properties": {
+              "panel": {
+                "const": "pending",
+                "type": "string"
+              }
+            },
+            "required": [
+              "panel"
             ],
             "type": "object"
           }
