@@ -29,7 +29,7 @@ jobs:
   tell:
     permissions:
       contents: read
-    uses: lemonfiber/spec/.github/workflows/tell.yml@c39b30a096b2debc080e3d945b782dc67dc20a6c # v1.0.147
+    uses: lemonfiber/spec/.github/workflows/tell.yml@7aaa0b068eebfefb516e1abc34628d95bb299051 # v1.0.151
     with:
       repos: spec
       event: tracker-moved
