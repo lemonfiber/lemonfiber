@@ -11,9 +11,9 @@
 //! of that file is safe to put somewhere, and the answer is longer than "yes".
 
 use lemonfiber_core::credential::{Inventory, Reach, Revealed, Revoked, Rotation, Settled};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::text::plain;
 
-use super::news::when;
 use super::Lines;
 
 /// Everything held, and what became of anything asked about one of them.
@@ -39,7 +39,7 @@ pub(crate) fn listing(inventory: &Inventory) -> Lines {
                 "    granted to   the plugin {}, for {}, approved {}",
                 plain(&grant.plugin),
                 plain(&grant.serves),
-                when(&grant.at)
+                approved(grant.at)
             ));
         }
     }
@@ -82,7 +82,7 @@ fn granted_elsewhere(inventory: &Inventory) -> Lines {
             plain(&grant.of),
             plain(&grant.plugin),
             plain(&grant.serves),
-            when(&grant.at)
+            approved(grant.at)
         ));
     }
     lines
@@ -256,6 +256,11 @@ fn reveal(revealed: &Revealed) -> Lines {
         lines.spaced(format!("  {}: {value}", revealed.name));
     }
     lines
+}
+
+/// When the operator approved a grant, as a date and a time in UTC.
+fn approved(at: Option<Instant>) -> String {
+    at.map_or_else(|| "at a moment not recorded".to_owned(), Instant::said)
 }
 
 #[cfg(test)]

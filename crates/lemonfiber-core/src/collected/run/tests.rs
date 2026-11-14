@@ -312,13 +312,13 @@ fn a_kept_ask_is_listed_by_its_reference_in_the_household_s_words() {
 
 #[test]
 fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
-    let now = SystemTime::UNIX_EPOCH + DAY * 20_000;
+    let now = Instant::from_seconds(DAY * 20_000);
     let reasons = crate::asking::Reasons::default();
     let of = |unit| {
         let one = listed(
             &Ask {
                 unit,
-                ..ask("ada", written(now), Standing::Waiting)
+                ..ask("ada", now, Standing::Waiting)
             },
             &reasons,
             now,
@@ -345,12 +345,8 @@ fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
         of(Unit::Books(BookUnit::Series)),
         (Some(TitleKind::Books), Some(TitleUnit::Series))
     );
-    let shape = serde_json::to_value(listed(
-        &ask("ada", written(now), Standing::Waiting),
-        &reasons,
-        now,
-    ))
-    .ok();
+    let shape =
+        serde_json::to_value(listed(&ask("ada", now, Standing::Waiting), &reasons, now)).ok();
     assert_eq!(
         shape
             .as_ref()
