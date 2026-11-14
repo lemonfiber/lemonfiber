@@ -61,7 +61,7 @@ async fn what_was_asked_for_as_the_owner_counts_toward_the_members_allowance() {
             "requests",
             answered(&vec![HouseholdRequest {
                 id: 7,
-                made: Some(format!("{}.000Z", stamp(-HOUR))),
+                made: Some(moment(-HOUR)),
                 member: "owner".to_owned(),
                 member_id: None,
                 kind: Some(Kind::Movies),
