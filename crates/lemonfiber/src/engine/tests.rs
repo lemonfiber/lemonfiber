@@ -20,7 +20,7 @@ fn talking() -> Reporting {
         service: "sonarr".to_owned(),
         stream: Stream::Stdout,
         line: "started".to_owned(),
-        at: None,
+        stamped: None,
     })
 }
 

@@ -2,6 +2,7 @@ use super::{
     prose, residual, settings, shown, Contents, Filenames, Marks, Piece, Residual, Taken, Terms,
     SALT_BYTES,
 };
+use crate::instant::Instant;
 use lemonfiber_fixtures::ports::Chance;
 
 /// Salt built rather than written, for the reason every credential-shaped fixture in

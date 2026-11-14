@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
+use lemonfiber_fixtures::ports::STAMPED;
 
 #[tokio::test]
 async fn an_answer_that_does_not_apply_here_stops_the_run() {

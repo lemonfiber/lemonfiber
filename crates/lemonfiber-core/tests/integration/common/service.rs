@@ -6,6 +6,7 @@ use lemonfiber_core::ports::service::{
     Category, Credential, DownloadClient, Protocol, RegisteredClient, RootFolder,
 };
 use lemonfiber_core::seed::{wire_root_folders, Backing, Placing, State};
+use lemonfiber_fixtures::ports::STAMPED;
 pub use lemonfiber_fixtures::receiving::{Mode, Receiving};
 use std::collections::BTreeMap;
 

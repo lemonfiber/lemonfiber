@@ -10,11 +10,11 @@ async fn it_runs_nothing_inside_and_its_stats_and_logs_end_at_once() {
         Err(EngineFailure::NoSuchContainer { name }) if name == "web"
     ));
     let stats = machine.stats("stack").await;
-    assert!(matches!(stats, Ok(mut receiver) if receiver.recv().await.is_none()));
+    assert!(stats.is_ok_and(|mut receiver| receiver.try_recv().is_err()));
     let query = LogQuery {
         tail: 1,
         follow: false,
     };
     let logs = machine.logs("stack", &[], query).await;
-    assert!(matches!(logs, Ok(mut receiver) if receiver.recv().await.is_none()));
+    assert!(logs.is_ok_and(|mut receiver| receiver.try_recv().is_err()));
 }

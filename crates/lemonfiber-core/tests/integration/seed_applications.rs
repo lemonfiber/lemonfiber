@@ -3,6 +3,7 @@
 //! The same shape again, matched by the base URL the aggregator reaches the service on.
 
 use common::service::*;
+use lemonfiber_fixtures::ports::STAMPED;
 
 use crate::common;
 use lemonfiber_core::journal::Journal;
