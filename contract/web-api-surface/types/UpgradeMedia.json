@@ -18,9 +18,9 @@
       ],
       "required": true
     },
-    "size_per_hour": {
+    "total": {
       "type": [
-        "string"
+        "ref:Total"
       ],
       "required": true
     }

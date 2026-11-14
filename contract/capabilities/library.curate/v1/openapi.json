@@ -105,6 +105,9 @@
     "/lemonfiber/library.curate/v1/catalogued": {
       "$ref": "operations/catalogued.json"
     },
+    "/lemonfiber/library.curate/v1/cutoff_unmet": {
+      "$ref": "operations/cutoff_unmet.json"
+    },
     "/lemonfiber/library.curate/v1/download_clients": {
       "$ref": "operations/download_clients.json"
     },

@@ -139,7 +139,7 @@ fn an_upgrade_states_its_cost_before_it_is_confirmed() {
     let media = vec![UpgradeMedia {
         media_type: "tv".to_owned(),
         preset: "Balanced".to_owned(),
-        size_per_hour: "3 GB".to_owned(),
+        total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
         outcome: None,
     }];
     let unconfirmed = UpgradeReport {
@@ -177,10 +177,38 @@ fn a_confirmed_upgrade_reports_each_services_answer() {
             media: vec![UpgradeMedia {
                 media_type: "tv".to_owned(),
                 preset: "Balanced".to_owned(),
-                size_per_hour: "3 GB".to_owned(),
+                total: lemonfiber_core::model::Total::Bytes(3_000_000_000),
                 outcome,
             }],
         };
         assert!(upgrade(&report).text().contains(expected));
     }
+}
+
+#[test]
+fn an_upgrade_states_each_kinds_total_or_why_it_is_not_known() {
+    let report = UpgradeReport {
+        rehearsed: false,
+        confirmed: false,
+        media: vec![
+            UpgradeMedia {
+                media_type: "tv".to_owned(),
+                preset: "balanced".to_owned(),
+                total: lemonfiber_core::model::Total::Bytes(3 << 30),
+                outcome: None,
+            },
+            UpgradeMedia {
+                media_type: "music".to_owned(),
+                preset: "lossless".to_owned(),
+                total: lemonfiber_core::model::Total::Unknown("it does not say".to_owned()),
+                outcome: None,
+            },
+        ],
+    };
+    let text = upgrade(&report).text();
+    assert!(text.contains("tv: balanced — 3.0 GiB"), "{text}");
+    assert!(
+        text.contains("music: lossless — not known: it does not say"),
+        "{text}"
+    );
 }

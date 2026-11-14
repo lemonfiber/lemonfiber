@@ -104,3 +104,16 @@ fn each_kind_names_its_media_type_its_item_and_whether_it_is_video() {
         assert_eq!(TitleKind::from(kind).media_type(), kind.media_type());
     }
 }
+
+#[test]
+fn each_music_format_costs_more_an_hour_than_the_one_before_it() {
+    let rates: Vec<u64> = super::Format::ALL
+        .iter()
+        .map(|format| format.bytes_per_hour())
+        .collect();
+    assert!(
+        rates.windows(2).all(|pair| pair.first() < pair.last()),
+        "{rates:?}"
+    );
+    assert_eq!(super::Format::Lossless.bytes_per_hour(), 450_000_000);
+}

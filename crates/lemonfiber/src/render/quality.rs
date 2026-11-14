@@ -3,8 +3,10 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
+use lemonfiber_core::bytes::humanize;
 use lemonfiber_core::model::{
-    Disposition, MusicChoice, MusicReport, PresetChoice, QualityReport, Triggered, UpgradeReport,
+    Disposition, MusicChoice, MusicReport, PresetChoice, QualityReport, Total, Triggered,
+    UpgradeReport,
 };
 use lemonfiber_core::PRODUCT;
 
@@ -190,7 +192,12 @@ pub(super) fn upgrade(report: &UpgradeReport) -> Lines {
     for media in &report.media {
         lines.put(format!(
             "  {}: {} — {}",
-            media.media_type, media.preset, media.size_per_hour
+            media.media_type,
+            media.preset,
+            match &media.total {
+                Total::Bytes(bytes) => humanize(*bytes),
+                Total::Unknown(why) => format!("not known: {why}"),
+            }
         ));
         match &media.outcome {
             None => {}
