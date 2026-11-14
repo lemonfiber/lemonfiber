@@ -124,6 +124,14 @@ async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
     .await
 }
 
+/// What the screen shows: the first wave where one is in, or else the last gather.
+fn showing<'a>(
+    early: Option<&'a Snapshot>,
+    gathered: Option<&'a Gathered>,
+) -> Option<&'a Snapshot> {
+    early.or(gathered.map(|gathered| &gathered.snapshot))
+}
+
 /// The loop itself, with the terminal already in hand.
 ///
 /// What a key *means* is [`crate::acting`]'s and so is every decision that follows
@@ -166,10 +174,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     // Every way out carries what is still running away with it, because each of them
     // can be taken with an action in flight.
     let (outcome, leaving, after) = loop {
-        if let Some(snapshot) = early
-            .as_ref()
-            .or(gathered.as_ref().map(|gathered| &gathered.snapshot))
-        {
+        if let Some(snapshot) = showing(early.as_ref(), gathered.as_ref()) {
             if let Err(err) = screen.draw(snapshot, &acting) {
                 break (
                     complain(&drawing("dashboard", &err.to_string())),
@@ -199,7 +204,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Wanted::Words => {
-                        if let Some(snapshot) = early.as_ref().or(gathered.as_ref().map(|gathered| &gathered.snapshot)) {
+                        if let Some(snapshot) = showing(early.as_ref(), gathered.as_ref()) {
                             let area = screen.area();
                             super::learned(&crate::dashboard::showing(snapshot), area, ctx.dry_run);
                         }
