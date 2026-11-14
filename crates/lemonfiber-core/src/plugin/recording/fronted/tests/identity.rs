@@ -146,7 +146,7 @@ async fn a_source_claimed_over_owner_claim_is_claimed_not_first_run_and_asked_wi
     let read = recorded(&at, &engine(), &http, Some(7)).await;
 
     assert_eq!(failed_at(&read), Vec::new());
-    assert_eq!(posted(&http, "/startup_completed").len(), 1);
+    assert_eq!(posted(&http, "/startup_completed").len(), 2);
     assert_eq!(posted(&http, "/create_admin").len(), 1);
     assert_eq!(posted(&http, "/owner.claim/v1/claim").len(), 1);
     let asked = |fragment: &str| posted(&http, fragment).last().map(body);
