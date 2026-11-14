@@ -325,6 +325,12 @@ fn the_machine_readable_form_is_the_report_in_an_envelope() {
     )
     .text();
     assert!(page.starts_with(&claims(&read).text()), "{page}");
+    assert_eq!(
+        crate::exit::shown(crate::exit::settled(
+            &lemonfiber_core::app::Outcome::PluginClaims(read)
+        )),
+        crate::exit::success()
+    );
 }
 
 /// What a probe came to is said in its own words, whichever of the three it was —
