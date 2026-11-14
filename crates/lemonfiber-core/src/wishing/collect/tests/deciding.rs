@@ -51,6 +51,27 @@ async fn an_ask_let_through_is_sent_to_the_curator_and_said_to_be_fetched() {
 }
 
 #[tokio::test]
+async fn an_ask_let_through_whose_journal_will_not_write_is_refused_as_unrecorded() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "decided-unjournalled");
+    assert!(asked(&ctx, "Ada", ALBUM).await.is_ok());
+    let journal = crate::app::targets::layout(&ctx).map(|paths| paths.journal());
+    assert!(journal.is_some_and(|at| {
+        let _ = std::fs::remove_file(&at);
+        std::fs::create_dir_all(at.join("in-the-way")).is_ok()
+    }));
+
+    let done = decided(&ctx, Answer::LetThrough).await;
+
+    assert!(done.is_err(), "{done:?}");
+    assert_eq!(sent(&transport, "request"), 1);
+    assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
+}
+
+#[tokio::test]
 async fn a_rehearsed_decision_says_what_it_would_do_and_sends_nothing() {
     let transport = the_house(vec![curator(
         "candidate",

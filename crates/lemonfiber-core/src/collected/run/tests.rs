@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use super::{collector, decided, every, expired, kept_at, left, listed};
+use super::{collector, decided, every, expired, journalled, kept_at, left, listed, unasked};
 use crate::collected::store::{filed, Ask, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::config::Settings;
@@ -382,4 +382,33 @@ fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
             Some(serde_json::json!("album"))
         ))
     );
+}
+
+#[test]
+fn an_ask_with_nowhere_to_journal_it_is_refused_as_unrecorded() {
+    let ctx = a_context().build();
+
+    assert!(journalled(
+        &ctx,
+        "curator",
+        Unit::Music(MusicUnit::Album),
+        "mbid-1",
+        Reference::Kept(Medium::Music, 1),
+        true,
+    )
+    .is_err());
+}
+
+#[tokio::test]
+async fn an_ask_is_not_undone_where_nowhere_keeps_asks_or_it_names_no_ask() {
+    let album = Unit::Music(MusicUnit::Album);
+    let nowhere = a_context().build();
+    let ctx = ctx("collected-unasked-unnamed");
+
+    assert!(unasked(&nowhere, "curator", (album, "mbid-1", "music-1"))
+        .await
+        .is_err());
+    assert!(unasked(&ctx, "curator", (album, "mbid-1", "no ask"))
+        .await
+        .is_err());
 }

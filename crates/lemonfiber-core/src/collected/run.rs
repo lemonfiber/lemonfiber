@@ -104,15 +104,12 @@ pub(crate) async fn unasked(
 ) -> Result<(), String> {
     let gone = || format!("the ask {kept} at {target}");
     let named: Reference = kept.parse().map_err(|_| gone())?;
-    let (service, curator) = named_collector(ctx, unit.medium())
+    let path = kept_at(ctx).map_err(|_| gone())?;
+    let (_, curator) = named_collector(ctx, unit.medium())
         .await
         .filter(|(service, _)| service == target)
         .ok_or_else(gone)?;
-    curator
-        .remove(unit, reference)
-        .await
-        .map_err(|_| format!("the ask {kept} at {service}"))?;
-    let path = kept_at(ctx).map_err(|_| gone())?;
+    curator.remove(unit, reference).await.map_err(|_| gone())?;
     let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
     store::withdrawn(&path, named, &at)
         .map(|_| ())

@@ -542,6 +542,39 @@
             "type": "object"
           },
           {
+            "description": "Ask a curator to remove what a member asked it for, and take the ask the core\nkeeps for it off the household list; nothing where the curator held some of it\nbefore.",
+            "properties": {
+              "does": {
+                "const": "unask",
+                "type": "string"
+              },
+              "kept": {
+                "description": "The ask the core keeps for it, by its reference.",
+                "type": "string"
+              },
+              "reference": {
+                "description": "The curator's reference for it.",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/Unit",
+                "description": "What was asked for."
+              },
+              "whole": {
+                "description": "Whether the curator held none of it before.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "does",
+              "unit",
+              "reference",
+              "kept",
+              "whole"
+            ],
+            "type": "object"
+          },
+          {
             "description": "Give a grant back to a plugin, or end one it was given.",
             "properties": {
               "does": {
@@ -1665,6 +1698,26 @@
           "remedy"
         ],
         "type": "object"
+      },
+      "BookUnit": {
+        "description": "What a member asks a curator of books for.",
+        "oneOf": [
+          {
+            "const": "book",
+            "description": "One book: a work.",
+            "type": "string"
+          },
+          {
+            "const": "author",
+            "description": "A whole author: every book, and those that come later.",
+            "type": "string"
+          },
+          {
+            "const": "series",
+            "description": "A series: every book of it, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "BootOutcome": {
         "description": "What a run at boot came to.",
@@ -8103,6 +8156,21 @@
           "rehearsed"
         ],
         "type": "object"
+      },
+      "MusicUnit": {
+        "description": "What a member asks a curator of music for.",
+        "oneOf": [
+          {
+            "const": "album",
+            "description": "One album: a release group.",
+            "type": "string"
+          },
+          {
+            "const": "artist",
+            "description": "A whole artist: every album, and those that come later.",
+            "type": "string"
+          }
+        ]
       },
       "Newest": {
         "description": "The newest of each kind, by what names them and nothing else.\n\nWhat the event stream says. A surface marks a tab from it without reading the\nitems, and reads [`News`] on the screen that lists them.",
@@ -18388,6 +18456,39 @@
           }
         ]
       },
+      "Total": {
+        "description": "What upgrading one kind of media costs in total, or why that could not be worked out.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "The bytes re-fetching what its curator holds below the cutoff would take.",
+            "properties": {
+              "bytes": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "bytes"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Why the total could not be worked out, in the operator's words.",
+            "properties": {
+              "unknown": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "unknown"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "TraceConfidence": {
         "description": "How sure the correlation behind a trace is — a release renamed between services can\nonly be matched fuzzily, and a guess presented as fact is worse than a marked one.",
         "oneOf": [
@@ -19112,6 +19213,45 @@
           }
         ]
       },
+      "Unit": {
+        "description": "What one ask is for, within its medium.",
+        "oneOf": [
+          {
+            "description": "An album or a whole artist.",
+            "properties": {
+              "medium": {
+                "const": "music",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/MusicUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A book, a whole author or a series.",
+            "properties": {
+              "medium": {
+                "const": "books",
+                "type": "string"
+              },
+              "unit": {
+                "$ref": "#/components/schemas/BookUnit"
+              }
+            },
+            "required": [
+              "medium",
+              "unit"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Unrated": {
         "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",
         "oneOf": [
@@ -19446,7 +19586,7 @@
         "description": "One media type an upgrade covers: its chosen quality, that quality's cost, and —\nonce confirmed — what became of asking its service to re-search.\n\nReported per media type rather than as one figure, because each type carries its\nown preset and so its own cost: film at maximum and television at space-saving are\nupgraded to different bars, and a single number would misstate one of them.",
         "properties": {
           "media_type": {
-            "description": "The media type — `tv` or `movies`.",
+            "description": "The media type: `tv`, `movies` or `music`.",
             "type": "string"
           },
           "outcome": {
@@ -19461,18 +19601,18 @@
             "description": "What became of the re-search, or `None` where the upgrade was not confirmed\nand only the cost was stated."
           },
           "preset": {
-            "description": "The preset in force for it.",
+            "description": "The preset in force for it, or for music the format.",
             "type": "string"
           },
-          "size_per_hour": {
-            "description": "Roughly what an hour of it costs at that preset.",
-            "type": "string"
+          "total": {
+            "$ref": "#/components/schemas/Total",
+            "description": "What upgrading it costs in total: the runtime its curator holds below the cutoff\ntimes the bytes an hour takes at that preset or format."
           }
         },
         "required": [
           "media_type",
           "preset",
-          "size_per_hour"
+          "total"
         ],
         "type": "object"
       },
