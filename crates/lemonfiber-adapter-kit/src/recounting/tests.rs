@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use axum::http::StatusCode;
 use lemonfiber_contract::adapter::EVENTS_KEY_FILE;
 use lemonfiber_fixtures::heard::Heard as Narrated;
+use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_pinned::fake::Served;
 use lemonfiber_ports::service::{Event, Failure, Heard, Hearing, Recounting};
@@ -579,15 +580,6 @@ async fn the_kit_takes_a_push_at_the_secret_path_alone() {
     );
 }
 
-/// Randomness the platform could not give.
-struct Exhausted;
-
-impl lemonfiber_ports::random::Random for Exhausted {
-    fn bytes(&self, _n: usize) -> Option<Vec<u8>> {
-        None
-    }
-}
-
 #[tokio::test]
 async fn with_no_randomness_for_a_secret_it_polls_and_points_nothing_at_itself() {
     let dir = Scratch::new("recounter-no-randomness");
@@ -599,7 +591,8 @@ async fn with_no_randomness_for_a_secret_it_polls_and_points_nothing_at_itself()
     let Some((served, _)) = core(StatusCode::ACCEPTED) else {
         return;
     };
-    let recounter = pushed(dir.path(), &history, &hook).drawing_from(Arc::new(Exhausted));
+    let recounter =
+        pushed(dir.path(), &history, &hook).drawing_from(Arc::new(Chance::exactly(None)));
     let heard = asked(&recounter, &served, KEY, None).await.ok().flatten();
     assert_eq!(heard.map(|heard| heard.hearing), Some(Hearing::Poll));
     assert!(hook.pointed.lock().is_ok_and(|pointed| pointed.is_empty()));
