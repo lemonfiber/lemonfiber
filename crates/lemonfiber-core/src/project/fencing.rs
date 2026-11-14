@@ -125,6 +125,7 @@ impl<'a> Fencing<'a> {
             shape: None,
             secrets_file: None,
             command: Vec::new(),
+            hostname: None,
             granted: &crate::fence::GRANTED,
             reaches_host: false,
         }

@@ -56,6 +56,9 @@ macro_rules! container_fields {
             /// The certificate lemonfiber makes for it before it first starts.
             #[serde(default)]
             pub certificate: ::std::option::Option<$crate::container::Certificate>,
+            /// The name its container knows itself by, where not the engine's own.
+            #[serde(default)]
+            pub container_hostname: ::std::option::Option<::std::string::String>,
             /// Each kernel capability an earlier format granted it, read only to be refused
             /// naming the shape that grants it.
             #[serde(default, alias = "capabilities")]

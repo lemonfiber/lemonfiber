@@ -35,9 +35,6 @@
 use crate::schema::{Manifest, Request};
 use crate::Violation;
 
-/// The longest a DNS label may be.
-const LABEL: usize = 63;
-
 /// The longest a registry path may be, as the registry's own grammar bounds it.
 const REFERENCE: usize = 255;
 
@@ -67,21 +64,7 @@ pub fn is_plugin_id(text: &str) -> bool {
             .all(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit() || letter == '-')
 }
 
-/// Whether `text` is one DNS label: lowercase letters, digits and hyphens, at most
-/// sixty-three of them, starting and ending with a letter or a digit.
-///
-/// Lowercase only, although DNS is not case-sensitive: the label is also a container
-/// name and a directory name, and a service written `Komga` in one place and `komga`
-/// in another would be two directories on a case-sensitive disk and one address.
-#[must_use]
-pub fn is_label(text: &str) -> bool {
-    let letters = |letter: char| letter.is_ascii_lowercase() || letter.is_ascii_digit();
-    !text.is_empty()
-        && text.len() <= LABEL
-        && text.chars().all(|letter| letters(letter) || letter == '-')
-        && text.starts_with(letters)
-        && text.ends_with(letters)
-}
+pub use lemonfiber_manifest::container::is_label;
 
 /// Whether `text` names an icon from the dashboard's own icon set: lowercase letters,
 /// digits, `.` and `-`, and a file name of one of its types or a name from one of its

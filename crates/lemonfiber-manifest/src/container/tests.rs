@@ -46,6 +46,7 @@ pub(super) fn plain(env: &BTreeMap<String, Value>) -> Container<'_> {
         network: None,
         shape: None,
         certificate: None,
+        hostname: None,
         provides: &[],
         speaks: false,
         grants: &[],
@@ -341,6 +342,19 @@ fn a_memory_ceiling_is_more_than_nothing() {
     let mut capped = plain(&none);
     capped.mem_limit_mib = Some(0);
     assert_eq!(wrong(&capped).len(), 1);
+}
+
+#[test]
+fn a_declared_hostname_is_refused_where_it_could_read_as_a_number() {
+    let none = NONE;
+    let mut named = plain(&none);
+    named.hostname = Some("jellyfin");
+    assert!(wrong(&named).is_empty());
+    named.hostname = Some("77e670703184");
+    assert_eq!(
+        wrong(&named),
+        ["service jellyfin.container_hostname: 77e670703184 does not begin with a letter"]
+    );
 }
 
 #[test]

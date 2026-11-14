@@ -29,6 +29,7 @@ impl Service {
             network: self.network.as_ref(),
             shape: self.shape,
             certificate: self.certificate.as_ref(),
+            hostname: self.container_hostname.as_deref(),
             provides: &self.provides,
             speaks: false,
             grants: &self.grants,
