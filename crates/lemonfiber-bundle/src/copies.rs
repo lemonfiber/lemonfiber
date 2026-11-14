@@ -190,19 +190,8 @@ pub(crate) fn bytes(path: &Path) -> Result<Vec<u8>, Refused> {
 }
 
 /// The file at `path`, opened for reading through no link and waiting on no pipe.
-#[cfg(unix)]
 fn opened(path: &Path) -> std::io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    File::options()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path)
-}
-
-/// The file at `path`, where the platform has no flag that refuses a link.
-#[cfg(not(unix))]
-fn opened(path: &Path) -> std::io::Result<File> {
-    File::open(path)
+    lemonfiber_platform::fs::unfollowed_unwaiting(File::options().read(true)).open(path)
 }
 
 /// The refusal for `path`, which reading answered with `source`.

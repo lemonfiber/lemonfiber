@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::env::NETWORKS_MIRRORED;
 use crate::error::{Problem, Remedy, State};
-use crate::platform::Environment;
+use crate::platform::engine_is_orbstack;
 use crate::ports::docker::Target;
 use crate::ports::Runner;
 
@@ -62,7 +62,7 @@ fn shown() -> Vec<String> {
 
 /// What the bridge setting is, where the engine is `OrbStack`'s.
 async fn ran(check: &BridgingCheck) -> Verdict {
-    if !Environment::engine_is_orbstack(&check.target) {
+    if !engine_is_orbstack(&check.target) {
         return Verdict::Skipped {
             reason: "the stack's engine is not OrbStack".to_owned(),
         };

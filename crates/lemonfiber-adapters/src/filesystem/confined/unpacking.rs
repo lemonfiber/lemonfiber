@@ -11,15 +11,13 @@
 use std::io::Read as _;
 use std::path::{Component, Path};
 
+use lemonfiber_platform::beneath;
+use lemonfiber_platform::fs::PERMISSION_BITS;
 use lemonfiber_ports::filesystem::Fault;
 
 /// The most an archive may hold once unpacked, so a volume that is not what it should be
 /// cannot fill the disk it is copied onto.
 pub(crate) const UNPACKED_AT_MOST: u64 = 1 << 30;
-
-/// The permission bits a written file or directory may keep: none of set-user, set-group
-/// or sticky.
-const PERMITTED: u32 = 0o777;
 
 /// Write every plain file and directory of the tar `archive` beneath `into`, which lies
 /// beneath `within`, dropping the archive's first step: the name of what was archived.
@@ -43,9 +41,9 @@ fn bounded(archive: &[u8], into: &Path, within: &Path, at_most: u64) -> Result<(
         let mut entry = entry.map_err(unreadable)?;
         let header = entry.header();
         let kind = header.entry_type();
-        let mode = header.mode().map_err(unreadable)? & PERMITTED;
+        let mode = header.mode().map_err(unreadable)? & PERMISSION_BITS;
         let path = entry.path().map_err(unreadable)?.into_owned();
-        let Some(names) = beneath(&path) else {
+        let Some(names) = archived(&path) else {
             return Err(stepping_out(&path));
         };
         let Some((last, inside)) = names.split_last() else {
@@ -53,7 +51,8 @@ fn bounded(archive: &[u8], into: &Path, within: &Path, at_most: u64) -> Result<(
         };
         let above = [below.as_slice(), inside].concat();
         if kind.is_dir() {
-            directory(within, &[above.as_slice(), &[*last]].concat(), mode)?;
+            beneath::unpacked_directory(within, &[above.as_slice(), &[*last]].concat(), mode)
+                .map_err(|refusal| super::fault(refusal, into, within))?;
         } else if kind.is_file() {
             written = written.saturating_add(entry.size());
             if written > at_most {
@@ -64,7 +63,8 @@ fn bounded(archive: &[u8], into: &Path, within: &Path, at_most: u64) -> Result<(
             }
             let mut contents = Vec::new();
             entry.read_to_end(&mut contents).map_err(unreadable)?;
-            file(within, &above, last, mode, &contents)?;
+            beneath::unpacked_file(within, &above, last, mode, &contents)
+                .map_err(|refusal| super::fault(refusal, into, within))?;
         }
     }
     Ok(())
@@ -72,7 +72,7 @@ fn bounded(archive: &[u8], into: &Path, within: &Path, at_most: u64) -> Result<(
 
 /// The names `path` steps through below what was archived, or nothing where it steps
 /// anywhere but down.
-fn beneath(path: &Path) -> Option<Vec<&std::ffi::OsStr>> {
+fn archived(path: &Path) -> Option<Vec<&std::ffi::OsStr>> {
     let mut names = Vec::new();
     for (at, part) in path.components().enumerate() {
         match part {
@@ -82,103 +82,6 @@ fn beneath(path: &Path) -> Option<Vec<&std::ffi::OsStr>> {
         }
     }
     Some(names)
-}
-
-/// Make the directory `names` lead to beneath `root`, with `mode`.
-#[cfg(unix)]
-fn directory(root: &Path, names: &[&std::ffi::OsStr], mode: u32) -> Result<(), Fault> {
-    walked(root, names, mode).map(|_| ())
-}
-
-/// Make the file `last` in the directory `above` leads to beneath `root`, new, with
-/// `mode`, holding `contents`.
-#[cfg(unix)]
-fn file(
-    root: &Path,
-    above: &[&std::ffi::OsStr],
-    last: &std::ffi::OsStr,
-    mode: u32,
-    contents: &[u8],
-) -> Result<(), Fault> {
-    use rustix::fs::{openat, OFlags};
-    use std::io::Write as _;
-    let names = [above, &[last]].concat();
-    let here = walked(root, above, PERMITTED)?;
-    openat(
-        &here,
-        last,
-        OFlags::RDWR | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        permitted(mode),
-    )
-    .map(std::fs::File::from)
-    .map_err(std::io::Error::from)
-    .and_then(|mut opened| opened.write_all(contents))
-    .map_err(|error| unwritten(root, &names, &error.to_string()))
-}
-
-/// The directory `names` lead to beneath `root`, each step made where it is missing and
-/// opened through the handle of the one above it, never through a link.
-#[cfg(unix)]
-fn walked(
-    root: &Path,
-    names: &[&std::ffi::OsStr],
-    mode: u32,
-) -> Result<rustix::fd::OwnedFd, Fault> {
-    use rustix::fs::{mkdirat, openat, Mode, OFlags, CWD};
-    let opening = OFlags::DIRECTORY | OFlags::RDONLY | OFlags::NONBLOCK | OFlags::CLOEXEC;
-    let unmade = |error: rustix::io::Errno| unwritten(root, names, &error.to_string());
-    let mut here = openat(CWD, root, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
-    for name in names {
-        match mkdirat(&here, *name, permitted(mode)) {
-            Ok(()) | Err(rustix::io::Errno::EXIST) => {}
-            Err(error) => return Err(unmade(error)),
-        }
-        here = openat(&here, *name, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
-    }
-    Ok(here)
-}
-
-/// `mode` as the permission bits a file or directory is made with, none beyond
-/// [`PERMITTED`].
-#[cfg(unix)]
-fn permitted(mode: u32) -> rustix::fs::Mode {
-    let bits = rustix::fs::RawMode::try_from(mode & PERMITTED).unwrap_or_default();
-    rustix::fs::Mode::from_bits_truncate(bits)
-}
-
-/// Make the directory `names` lead to beneath `root`. Windows has no flag that refuses a
-/// link on the way, so the making is [`super::make`]'s, which looks at each step first.
-#[cfg(windows)]
-fn directory(root: &Path, names: &[&std::ffi::OsStr], _mode: u32) -> Result<(), Fault> {
-    let path = names
-        .iter()
-        .fold(root.to_path_buf(), |at, name| at.join(name));
-    super::make(&path, root)
-}
-
-/// Make the file `last` in the directory `above` leads to beneath `root`, new, holding
-/// `contents`.
-#[cfg(windows)]
-fn file(
-    root: &Path,
-    above: &[&std::ffi::OsStr],
-    last: &std::ffi::OsStr,
-    _mode: u32,
-    contents: &[u8],
-) -> Result<(), Fault> {
-    use std::io::Write as _;
-    let names = [above, &[last]].concat();
-    let names = names.as_slice();
-    directory(root, above, PERMITTED)?;
-    let path = names
-        .iter()
-        .fold(root.to_path_buf(), |at, name| at.join(name));
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-        .and_then(|mut made| made.write_all(contents))
-        .map_err(|error| unwritten(root, names, &error.to_string()))
 }
 
 /// The refusal of an archive that could not be read.
@@ -193,14 +96,6 @@ fn stepping_out(named: &Path) -> Fault {
          lemonfiber writes nothing outside it",
         named.display()
     ))
-}
-
-/// The refusal of writing what `names` lead to beneath `root`, saying `why`.
-fn unwritten(root: &Path, names: &[&std::ffi::OsStr], why: &str) -> Fault {
-    let path = names
-        .iter()
-        .fold(root.to_path_buf(), |at, name| at.join(name));
-    Fault::new(format!("{} was not written: {why}", path.display()))
 }
 
 #[cfg(test)]

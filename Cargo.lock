@@ -1554,6 +1554,7 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
+ "lemonfiber-platform",
  "lemonfiber-sdk",
  "lemonfiber-testing",
  "qrcodegen",
@@ -1610,11 +1611,10 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-fixtures",
  "lemonfiber-outward",
+ "lemonfiber-platform",
  "lemonfiber-ports",
  "lemonfiber-random",
- "libc",
  "reqwest",
- "rustix",
  "rustls",
  "rustls-pki-types",
  "serde_json",
@@ -1653,7 +1653,7 @@ name = "lemonfiber-bundle"
 version = "0.17.0"
 dependencies = [
  "lemonfiber-manifest",
- "libc",
+ "lemonfiber-platform",
  "ring",
  "serde",
  "thiserror",
@@ -1724,11 +1724,11 @@ dependencies = [
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
  "lemonfiber-outward",
+ "lemonfiber-platform",
  "lemonfiber-plugin",
  "lemonfiber-ports",
  "lemonfiber-sidecar",
  "lemonfiber-testing",
- "libc",
  "p12-keystore",
  "rcgen",
  "regex",
@@ -1760,6 +1760,7 @@ dependencies = [
  "async-trait",
  "lemonfiber-bundled",
  "lemonfiber-manifest",
+ "lemonfiber-platform",
  "lemonfiber-ports",
  "tokio",
  "toml",
@@ -1802,6 +1803,14 @@ dependencies = [
  "rustls",
  "tokio",
  "tokio-rustls",
+]
+
+[[package]]
+name = "lemonfiber-platform"
+version = "0.17.0"
+dependencies = [
+ "libc",
+ "rustix",
 ]
 
 [[package]]

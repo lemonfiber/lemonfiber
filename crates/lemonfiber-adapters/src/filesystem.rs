@@ -5,10 +5,9 @@
 //! straight back; what a sequence of them proves is decided in
 //! the core's own storage diagnosis, where a fake filesystem can drive every outcome.
 //!
-//! The identity a file reports differs by platform — an inode on Unix, a file
-//! index on Windows — so reading it is the one place here that asks what it is
-//! running on. It asks with `cfg(unix)`/`cfg(windows)`, which selects the code
-//! at compile time rather than testing the operating system at runtime.
+//! What differs by platform — the identity a file reports, its owner and mode, the
+//! flag that refuses a link — is asked of `lemonfiber_platform`, so nothing here asks
+//! what it is running on.
 //!
 //! `sysinfo` lives here and nowhere else, which an architecture test enforces.
 
@@ -16,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use lemonfiber_platform::fs;
 use sysinfo::{DiskRefreshKind, Disks};
 
 use lemonfiber_ports::filesystem::{
@@ -145,32 +145,24 @@ async fn written(path: &Path, contents: &str) {
     let _ = private(path, contents).await;
 }
 
-/// Write `contents` to a file readable by its owner alone.
+/// Write `contents` to a file readable by its owner alone, where the platform keeps a
+/// mode.
 ///
 /// Never through a link at its name, and tightened through the handle rather than by the
 /// name, so a link put there after the open cannot turn the mode change onto another file.
-#[cfg(unix)]
 async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt as _;
     use tokio::io::AsyncWriteExt as _;
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
-        .await?;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    fs::owner_only(&mut options);
+    fs::unfollowed(&mut options);
+    let mut file = tokio::fs::OpenOptions::from(options).open(path).await?;
     file.write_all(contents.as_bytes()).await?;
     file.flush().await?;
-    file.set_permissions(std::fs::Permissions::from_mode(0o600))
+    let file = file.into_std().await;
+    tokio::task::spawn_blocking(move || fs::set_mode(&file, fs::OWNER_FILE))
         .await
-}
-
-/// Where the platform tracks no file mode, an ordinary write.
-#[cfg(not(unix))]
-async fn private(path: &Path, contents: &str) -> std::io::Result<()> {
-    tokio::fs::write(path, contents).await
+        .map_err(std::io::Error::other)?
 }
 
 /// The directory a file is about to go in, where the path names one.
@@ -300,76 +292,37 @@ fn fault(error: &std::io::Error) -> Fault {
     Fault::new(error.to_string())
 }
 
-/// A file's identity as Unix reports it: its inode and how many names point at
-/// it.
-#[cfg(unix)]
+/// A file's identity as the platform numbers it: its number on its volume and how many
+/// names point at it.
 pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
-    use std::os::unix::fs::MetadataExt as _;
-
+    let numbered = fs::numbered(meta);
     Identity {
-        file: meta.ino(),
-        links: meta.nlink(),
+        file: numbered.file,
+        links: numbered.links,
     }
 }
 
-/// Who owns a path on Unix, and its permission bits.
+/// Who owns a path, and its permission bits, where the platform keeps both; nothing
+/// where it does not, and the check skips accordingly.
 ///
 /// Only the low bits of the mode are kept — the nine that decide who may read,
 /// write and traverse — because the file-type bits above them are not what the
 /// permission check reasons about.
-#[cfg(unix)]
 fn ownership_of(path: &Path) -> Option<Ownership> {
-    use std::os::unix::fs::MetadataExt as _;
-
     let meta = std::fs::metadata(path).ok()?;
+    let owned = fs::owned(&meta)?;
     Some(Ownership {
-        uid: meta.uid(),
-        gid: meta.gid(),
-        mode: meta.mode() & 0o777,
+        uid: owned.uid,
+        gid: owned.gid,
+        mode: owned.mode & fs::PERMISSION_BITS,
     })
 }
 
-/// Ownership as Windows reports it: it does not, in the terms this check needs,
-/// so there is nothing to report and the check skips accordingly.
-#[cfg(not(unix))]
-fn ownership_of(_path: &Path) -> Option<Ownership> {
-    None
-}
-
-/// The volume a file sits on, as Unix's device number.
-///
-/// The number that changes when the same path resolves to a different mount —
-/// the signal a watch reads to tell a drive that is still there from one that
-/// was pulled and left its mount point behind.
-#[cfg(unix)]
+/// The volume a file sits on: the number that changes when the same path resolves to a
+/// different mount, which a watch reads to tell a drive that is still there from one
+/// that was pulled and left its mount point behind.
 fn volume_of(meta: &std::fs::Metadata) -> u64 {
-    use std::os::unix::fs::MetadataExt as _;
-
-    meta.dev()
-}
-
-/// The volume as Windows reports it: with no device number to read, every
-/// present path reads as the same volume, so a watch there notices a path
-/// disappearing but not a mount being swapped beneath it.
-#[cfg(not(unix))]
-fn volume_of(_meta: &std::fs::Metadata) -> u64 {
-    0
-}
-
-/// A file's identity as Windows reports it: its file index, and its link count
-/// where the filesystem supplies one.
-///
-/// A filesystem that reports no index leaves nothing to compare, which the
-/// caller reads as being unable to confirm the link rather than as a failure to
-/// make one.
-#[cfg(windows)]
-pub(super) fn identity_of(meta: &std::fs::Metadata) -> Identity {
-    use std::os::windows::fs::MetadataExt as _;
-
-    Identity {
-        file: meta.file_index().unwrap_or_default(),
-        links: u64::from(meta.number_of_links().unwrap_or_default()),
-    }
+    fs::volume(meta)
 }
 
 mod confined;

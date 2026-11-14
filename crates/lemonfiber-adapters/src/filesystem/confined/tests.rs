@@ -5,7 +5,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_ports::filesystem::{Beneath, Confined, Lying, Readable, READ_LIMIT};
 
 use super::super::Disk;
-use super::landed;
+use super::{landed, steps};
 
 /// A container's own directory holding one plain file, and a file of the operator's
 /// beside it that nothing written into the directory may reach. Each of its own, by a
@@ -263,16 +263,14 @@ fn a_file_written_through_a_link_is_refused() {
 #[cfg(unix)]
 #[test]
 fn a_file_written_where_no_plain_file_can_be_is_refused() {
-    use std::os::unix::fs::OpenOptionsExt as _;
     let (_dir, owned, _) = owned();
     let _ = std::fs::create_dir_all(owned.join("folder.yml"));
     let pipe = owned.join("pipe.yml");
     let made = std::process::Command::new("mkfifo").arg(&pipe).status();
     assert!(made.is_ok_and(|status| status.success()), "a pipe was made");
-    let reader = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK)
-        .open(&pipe);
+    let reader =
+        lemonfiber_platform::fs::unfollowed_unwaiting(std::fs::OpenOptions::new().read(true))
+            .open(&pipe);
     assert!(reader.is_ok(), "the pipe has a reader");
 
     let folder = Disk.written(&owned.join("folder.yml"), &owned, b"ours", Readable::Shared);
@@ -283,4 +281,15 @@ fn a_file_written_where_no_plain_file_can_be_is_refused() {
     assert!(folder.is_err());
     assert!(piped.is_err_and(|fault| fault.message.contains("not a plain file")));
     assert!(nameless.is_err_and(|fault| fault.message.contains("not a plain file")));
+}
+
+mod moving;
+mod replacing;
+
+#[test]
+fn a_path_outside_the_root_has_no_steps_beneath_it() {
+    let (_dir, owned, _) = owned();
+
+    assert!(steps(&owned.join("inside"), &owned).is_ok());
+    assert!(steps(std::path::Path::new("/elsewhere"), &owned).is_err());
 }

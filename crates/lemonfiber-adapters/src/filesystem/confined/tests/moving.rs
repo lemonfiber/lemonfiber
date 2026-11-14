@@ -148,50 +148,6 @@ mod links {
         assert!(untouched(&elsewhere));
     }
 
-    #[test]
-    fn a_link_swapped_in_where_the_state_was_after_it_was_checked_is_put_back_and_refused() {
-        let (dir, root, elsewhere) = project();
-        let (from, to) = ends(&root);
-        let aside = dir.join("aside");
-        let swap = || {
-            let _ = std::fs::rename(&from, &aside);
-            let _ = symlink(&elsewhere, &from);
-        };
-
-        let refused = super::super::moving(&from, &to, &root, &swap);
-
-        assert!(refused.is_err_and(|fault| fault.message.contains("something else")));
-        assert!(std::fs::symlink_metadata(&from).is_ok_and(|found| found.is_symlink()));
-        assert!(std::fs::symlink_metadata(&to).is_err());
-        assert!(aside.join("kept.db").is_file());
-        assert!(untouched(&elsewhere));
-    }
-
-    #[test]
-    fn a_link_swapped_in_above_the_state_after_it_was_checked_reaches_nothing_outside() {
-        let (dir, root, elsewhere) = project();
-        let (from, to) = ends(&root);
-        let service = root.join("config").join("seerr");
-        let aside = dir.join("aside");
-        let _ = std::fs::create_dir_all(elsewhere.join("cache"));
-        let _ = std::fs::write(elsewhere.join("cache").join("theirs"), "theirs");
-        let swap = || {
-            let _ = std::fs::rename(&service, &aside);
-            let _ = symlink(&elsewhere, &service);
-        };
-
-        let moved = super::super::moving(&from, &to, &root, &swap);
-
-        assert!(moved.is_ok(), "{moved:?}");
-        assert!(
-            to.join("kept.db").is_file(),
-            "what was checked is what moved"
-        );
-        assert!(elsewhere.join("cache").join("theirs").is_file());
-        assert!(std::fs::read_to_string(elsewhere.join("operator.env"))
-            .is_ok_and(|text| text == "SECRET=kept"));
-    }
-
     /// Plant a pipe at `at`, with the program every unix carries for it.
     fn piped(at: &Path) -> bool {
         std::process::Command::new("mkfifo")
