@@ -47,6 +47,12 @@ fn identity_and(
                     vec![json("{\"id\": \"m1\", \"token\": \"t0k3n\"}")],
                 ),
                 ("/invite", vec![json("{\"id\": \"m2\"}")]),
+                (
+                    "/sign_in_by_code",
+                    vec![json(
+                        "{\"id\": \"c1\", \"code\": \"ABCD\", \"approve_at\": \"https://outside.example/link\", \"lapses_at\": \"2026-11-14T12:00:00Z\"}",
+                    )],
+                ),
                 ("/lemonfiber/identity.source/v1/", vec![json("null")]),
             ],
         ]

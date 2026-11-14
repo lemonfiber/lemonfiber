@@ -236,6 +236,11 @@ fn an_operation_publishes_where_its_answer_holds_a_credential() {
                 serde_json::json!(["/token"])
             ),
             (
+                "identity.source@1".to_owned(),
+                "signed_by_code",
+                serde_json::json!(["/token"])
+            ),
+            (
                 "media.serve@1".to_owned(),
                 "signed_in",
                 serde_json::json!([""])
