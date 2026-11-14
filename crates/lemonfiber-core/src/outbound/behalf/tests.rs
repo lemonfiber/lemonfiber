@@ -1,4 +1,4 @@
-use super::{cost, declared, refused, switch, switched, CARRIED};
+use super::{consequence, cost, declared, refused, switch, switched, CARRIED};
 use crate::outbound::OnBehalf;
 use crate::plugin::{Register, Stopped, Stopping};
 
@@ -117,6 +117,54 @@ fn the_cost_is_the_steps_alone_where_the_author_said_nothing() {
         "Not asked: Describe new series (tell)."
     );
     assert!(cost(None).contains("was not recorded"));
+}
+
+#[test]
+fn a_host_no_step_calls_costs_no_step() {
+    let stopping = Stopping {
+        host: "metadata.example".to_owned(),
+        said: None,
+        steps: Vec::new(),
+    };
+    assert_eq!(
+        cost(Some(&stopping)),
+        "No step of its recipes calls it, so refusing it stops none."
+    );
+}
+
+#[test]
+fn switching_a_reach_says_what_refusing_stops_and_that_allowing_asks_again() {
+    let installed = Register::parse(INSTALLED)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    assert_eq!(
+        consequence(&installed, SWITCH, Some("off")).as_deref(),
+        Some("New series arrive undescribed. Not asked: Describe new series (tell, file).")
+    );
+    assert_eq!(
+        consequence(&installed, SWITCH, Some("on")).as_deref(),
+        Some("comics's recipes may ask metadata.example again.")
+    );
+    assert_eq!(
+        consequence(
+            &installed,
+            "plugin.comics.reach.elsewhere.example",
+            Some("off")
+        ),
+        None
+    );
+    assert_eq!(
+        consequence(
+            &installed,
+            "plugin.other.reach.metadata.example",
+            Some("off")
+        ),
+        None
+    );
+    assert_eq!(
+        consequence(&installed, "LEMONFIBER_REACH", Some("off")),
+        None
+    );
 }
 
 #[test]

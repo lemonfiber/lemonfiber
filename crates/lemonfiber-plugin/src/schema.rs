@@ -12,6 +12,8 @@
 
 mod asking;
 mod evidence;
+mod health;
+mod reach;
 mod recipe;
 
 use lemonfiber_manifest::container::Container;
@@ -25,7 +27,9 @@ pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
 };
+pub use health::{Health, HealthKind};
 pub use lemonfiber_manifest::container::{Secret, Shape};
+pub use reach::Reach;
 pub use recipe::{
     Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
     CALL_DEADLINE, HEADER, LARGEST_ANSWER, LONGEST_WAIT, MOST_RETRIES, RUN,
@@ -428,17 +432,6 @@ impl Manifest {
     }
 }
 
-/// What refusing one host a plugin's recipes reach stops, as its author says it.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginReach")]
-pub struct Reach {
-    /// The host outside the stack, as a recipe's call or pair names it.
-    pub host: String,
-    /// What stops working where the operator refuses it, in one line.
-    pub stops: String,
-}
-
 /// A bundled thing the plugin will change.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -526,34 +519,6 @@ impl Criticality {
             Self::Optional => "optional",
         }
     }
-}
-
-/// How to tell a plugin's service has started.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginHealth")]
-pub struct Health {
-    /// Which kind of probe to use.
-    pub kind: HealthKind,
-    /// HTTP path, for `http` probes.
-    #[serde(default)]
-    pub path: Option<String>,
-    /// How long to wait before calling it unhealthy.
-    #[serde(default)]
-    pub timeout_s: Option<u32>,
-}
-
-/// The kinds of health probe a plugin's service can declare.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "PluginHealthKind")]
-pub enum HealthKind {
-    /// Fetch a path on the service's port.
-    Http,
-    /// Open a connection to the service's port.
-    Tcp,
-    /// Trust the container's own reported state.
-    Container,
 }
 
 mod speaking;

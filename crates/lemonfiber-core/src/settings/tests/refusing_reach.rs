@@ -1,6 +1,7 @@
 //! A plugin's reach to one host is a setting of its own: known only where an installed
 //! plugin reaches the host, taking `on` or `off`, and said to be the plugin's.
 
+use super::changing::{asked, change, machine, running};
 use crate::model::Owner;
 use crate::plugin::Register;
 use crate::settings::fences::valued;
@@ -74,5 +75,25 @@ fn forgetting_a_plugin_takes_its_reach_settings_and_no_other_plugins() {
         kept.as_ref()
             .and_then(|kept| kept.value("plugin.comicstwo.reach.metadata.example")),
         Some("off")
+    );
+}
+
+#[tokio::test]
+async fn refusing_a_reach_says_what_refusing_it_stops_before_it_lands() {
+    let machine = machine("reach-consequence", running(&[]));
+    let register = Register::parse(INSTALLED).unwrap_or_else(|_| Register::empty());
+    let kept = crate::app::targets::beside_env(&machine.ctx, crate::config::paths::PLUGINS);
+    assert!(crate::app::record::keep(kept.as_deref(), &register).is_ok());
+
+    let offered = change(asked(&machine.ctx, SWITCH, Some("off"), None).await);
+
+    let consequences: Vec<Option<&str>> = offered
+        .iter()
+        .flat_map(|change| &change.settings)
+        .map(|one| one.consequence.as_deref())
+        .collect();
+    assert!(
+        matches!(consequences.as_slice(), [Some(said)] if said.contains("was not recorded")),
+        "{consequences:?}"
     );
 }
