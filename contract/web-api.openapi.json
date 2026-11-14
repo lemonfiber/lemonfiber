@@ -770,7 +770,14 @@
         "description": "A session opened, and the moment it stops being one.\n\nThe ending is carried rather than left for a client to work out, because a client\nthat guessed would be a second opinion about who is admitted — and the two would\ndisagree on the day somebody's clock is wrong.",
         "properties": {
           "member": {
-            "description": "The household member this session is for, where it is a member's.\n\n**Absent is the operator**, which is the whole of the discriminator. A second\nfield naming which kind of person this is could disagree with this one, and\nthe day they disagreed a client would have to choose which to believe.\n\nThe id and nothing else. What that member is called, what they may watch and\nwhat they have left are read from the household report, which already carries\nall of it per member — so there is one fact here and no second copy of\nanything that could go stale against the read.",
+            "description": "The household member this session is for, where it is a member's.\n\n**Absent is the operator**, which is the whole of the discriminator. A second\nfield naming which kind of person this is could disagree with this one, and\nthe day they disagreed a client would have to choose which to believe.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The member's display name as the media server holds it, where it is a member's.",
             "type": [
               "string",
               "null"
@@ -4727,24 +4734,56 @@
             "description": "The address to hand somebody for this service, read from this machine at the\nmoment of asking rather than remembered.\n\n**Carried because not-the-door is not nowhere.** A household member wanting to\nwatch something, or to ask for something, wants the service that faces them —\nand which of the two happens to be the front door is an operator's\narrangement, not an answer to their question. Without this a surface can hand\nthem only whichever one the door turned out to be, and say nothing at all\nabout the other.\n\nAbsent where the stack declares no port for it, for the reason the door's own\naddress is absent then: an address with no port on it is one a browser answers\nwith a refusal, and the manifest is where a port is declared."
           },
           "because": {
-            "description": "Why it is not somewhere to begin.",
+            "description": "Why it is not somewhere to begin, or for a household member what it is to them.",
             "type": "string"
           },
           "facing": {
             "$ref": "#/components/schemas/Facing",
             "description": "What it is to the household."
           },
+          "reaches": {
+            "$ref": "#/components/schemas/FrontDoorReaches",
+            "description": "Whether the address answers from where the asking came from."
+          },
           "service": {
             "description": "The service, by the name it shows itself under.",
             "type": "string"
+          },
+          "unaddressed": {
+            "description": "Why there is no address, where there is none.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "service",
           "facing",
-          "because"
+          "because",
+          "reaches"
         ],
         "type": "object"
+      },
+      "FrontDoorReaches": {
+        "description": "Whether an address answers from the network a request came from.",
+        "oneOf": [
+          {
+            "const": "here",
+            "description": "It answers from there.",
+            "type": "string"
+          },
+          {
+            "const": "not-here",
+            "description": "It does not answer from there.",
+            "type": "string"
+          },
+          {
+            "const": "unknown",
+            "description": "Nothing here can tell.",
+            "type": "string"
+          }
+        ]
       },
       "FrontDoorReport": {
         "description": "The household's one front door: which service it is, where it stands, and what\nelse they can reach that is not it.",
@@ -4768,8 +4807,15 @@
             "type": "array"
           },
           "chosen": {
-            "$ref": "#/components/schemas/Chosen",
-            "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Chosen"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How this came to be the door: worked out from what the stack declares, named\nby the operator, or named by them and refused.\n\nCarried as a state rather than left to the sentence beneath it, for the reason\nthe standing is: an operator whose setting was refused reads the sentence, and\na browser, a script or a dashboard reads this.\n\nAbsent for a household member."
           },
           "facing": {
             "anyOf": [
@@ -4783,8 +4829,12 @@
             "description": "What that service is to them. Absent for the same reason."
           },
           "meaning": {
-            "description": "What this comes to, in the words an operator would say it in — including,\nwhere there is no door, that there is none.",
+            "description": "What this comes to, in the words an operator would say it in, or a household\nmember's for one — including, where there is no door, that there is none.",
             "type": "string"
+          },
+          "reaches": {
+            "$ref": "#/components/schemas/FrontDoorReaches",
+            "description": "Whether the address answers from where the asking came from."
           },
           "service": {
             "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
@@ -4796,11 +4846,18 @@
           "standing": {
             "$ref": "#/components/schemas/FrontDoorStanding",
             "description": "Where the front door stands."
+          },
+          "unaddressed": {
+            "description": "Why there is no address, where there is a door and none.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "standing",
-          "chosen",
+          "reaches",
           "meaning",
           "beside"
         ],
@@ -8966,6 +9023,14 @@
       "OnBehalf": {
         "description": "A request lemonfiber makes on an installed plugin's behalf, attributed to it.",
         "properties": {
+          "allowed": {
+            "description": "Whether this machine's settings allow it.",
+            "type": "boolean"
+          },
+          "cost": {
+            "description": "What stops working once it is refused.",
+            "type": "string"
+          },
           "destination": {
             "description": "Where it goes, as the plugin declared it.",
             "type": "string"
@@ -8977,12 +9042,19 @@
           "purpose": {
             "description": "Why it may be made.",
             "type": "string"
+          },
+          "switch": {
+            "description": "The setting that refuses it: `plugin.<id>.reach.<host>`.",
+            "type": "string"
           }
         },
         "required": [
           "plugin",
           "destination",
-          "purpose"
+          "purpose",
+          "allowed",
+          "switch",
+          "cost"
         ],
         "type": "object"
       },
@@ -10480,6 +10552,14 @@
             },
             "type": "array"
           },
+          "stops": {
+            "default": [],
+            "description": "What refusing each of [`Self::reaches`] stops, in the same order.",
+            "items": {
+              "$ref": "#/components/schemas/PluginStopping"
+            },
+            "type": "array"
+          },
           "upstream": {
             "default": "",
             "description": "Where its source is published, as the plugin names it.",
@@ -10829,6 +10909,7 @@
               "reaches": [],
               "reviewed": false,
               "secrets": [],
+              "stops": [],
               "upstream": ""
             },
             "description": "What the plugin declared about itself: where it is published, whether it was\nreviewed, what it claims, what it may change, where it may reach and what it\nwill hold."
@@ -12249,6 +12330,59 @@
           "came",
           "tries",
           "landed"
+        ],
+        "type": "object"
+      },
+      "PluginStopped": {
+        "additionalProperties": false,
+        "description": "One recipe step refusing a host stops.",
+        "properties": {
+          "recipe": {
+            "description": "The recipe's id.",
+            "type": "string"
+          },
+          "step": {
+            "description": "The step's id.",
+            "type": "string"
+          },
+          "title": {
+            "description": "What the recipe accomplishes, in its author's words.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipe",
+          "title",
+          "step"
+        ],
+        "type": "object"
+      },
+      "PluginStopping": {
+        "additionalProperties": false,
+        "description": "What refusing one host a plugin's recipes reach stops.",
+        "properties": {
+          "host": {
+            "description": "The host, as the recipes name it.",
+            "type": "string"
+          },
+          "said": {
+            "description": "What stops, in its author's words, where the manifest says.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "default": [],
+            "description": "Every recipe step refusing it stops: each calling it, and each depending on one.",
+            "items": {
+              "$ref": "#/components/schemas/PluginStopped"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "host"
         ],
         "type": "object"
       },
@@ -17425,6 +17559,11 @@
           {
             "const": "withheld",
             "description": "It was not sent: a value it carries may not go where it was going.",
+            "type": "string"
+          },
+          {
+            "const": "declined",
+            "description": "It was not sent: the operator refused its host, or one a step it depends on calls,\nso nothing was asked.",
             "type": "string"
           },
           {
