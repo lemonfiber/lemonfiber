@@ -6,8 +6,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use lemonfiber_api::events::backlog::{Backlog, HELD};
-use lemonfiber_api::events::wire::{Event, Nature, Rendered, BEAT, BEAT_SAID};
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_api::events::wire::{Event, EventKind, Nature, Rendered, BEAT, BEAT_SAID};
 use lemonfiber_core::ports::Clock;
 use lemonfiber_fixtures::ports::Stopped;
 use serde::{Serialize, Serializer};
@@ -60,11 +59,11 @@ impl Run {
 
     /// The run, having also said this.
     fn said(mut self, nature: Nature, what: &'static str) -> Self {
-        let kind = match nature {
-            Nature::State => kind::DASHBOARD,
-            Nature::Record => kind::LOG,
+        let event = match nature {
+            Nature::State => EventKind::Dashboard,
+            Nature::Record => EventKind::Log,
         };
-        if let Some(said) = Rendered::of(nature, &Envelope::new(kind, what)) {
+        if let Some(said) = Rendered::of(event, &what) {
             let event = self.backlog.say(said);
             self.said.push(event);
         }
@@ -106,7 +105,7 @@ fn what_breaks_a_silence_is_a_comment_and_not_an_event() {
 
 #[test]
 fn a_payload_that_will_not_serialise_is_not_sent_as_something_else() {
-    assert!(Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, Awkward)).is_none());
+    assert!(Rendered::of(EventKind::Dashboard, &Awkward).is_none());
 }
 
 #[test]

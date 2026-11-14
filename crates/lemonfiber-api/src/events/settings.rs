@@ -8,11 +8,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{Ctx, Outcome};
+use lemonfiber_core::app::Ctx;
 use tokio::sync::Mutex;
 
 use super::live::Gathers;
-use super::wire::{Nature, Rendered};
+use super::wire::{EventKind, Rendered};
 
 /// The settings, as the stream's source.
 pub struct Settings {
@@ -44,8 +44,7 @@ impl Settings {
     /// The settings, where they are owed and can be read.
     async fn said(&self, joined: bool) -> Option<Rendered> {
         let report = lemonfiber_core::listed_settings(&self.ctx).ok()?;
-        let rendered =
-            Rendered::of(Nature::State, &Outcome::Settings(report).envelope())?.to_the_operator();
+        let rendered = Rendered::of(EventKind::Settings, &report)?;
         let mut told = self.told.lock().await;
         if !joined && told.as_ref() == Some(&rendered) {
             return None;

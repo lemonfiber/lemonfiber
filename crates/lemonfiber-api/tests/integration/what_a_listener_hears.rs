@@ -18,11 +18,10 @@ use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::{Gathers, Live, TICK};
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
-use lemonfiber_api::events::wire::{Event, Nature, Rendered, BEAT, BEAT_SAID};
+use lemonfiber_api::events::wire::{Event, EventKind, Rendered, BEAT, BEAT_SAID};
 use lemonfiber_api::events::{routes, stream, Streaming, LAST_EVENT_ID, PATH};
 use lemonfiber_api::guard::{Token, TOKEN_HEADER};
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::{Clock as _, Narrator as _};
 use lemonfiber_core::walkthrough::{Line, Narrator as _};
 use lemonfiber_fixtures::files::Files;
@@ -48,7 +47,7 @@ struct Counting(AtomicUsize);
 impl Gathers for Counting {
     async fn gather(&self, _joined: bool) -> Vec<Rendered> {
         let at = self.0.fetch_add(1, Ordering::SeqCst);
-        Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, at))
+        Rendered::of(EventKind::Dashboard, &at)
             .into_iter()
             .collect()
     }
@@ -125,7 +124,7 @@ fn welcome(token: &str) -> Vec<(&str, &str)> {
 
 /// Say one thing to everyone listening.
 async fn say(live: &Live, what: &'static str) -> Option<Event> {
-    let said = Rendered::of(Nature::Record, &Envelope::new(kind::LOG, what))?;
+    let said = Rendered::of(EventKind::Log, &what)?;
     Some(live.say(said).await)
 }
 

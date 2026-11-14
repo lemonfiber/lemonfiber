@@ -32,12 +32,11 @@ use std::sync::Arc;
 use axum::response::Response;
 use lemonfiber_core::app::{logs, Ctx};
 use lemonfiber_core::logs::Line;
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::ports::docker::LogQuery;
 
 use crate::actions::unnameable;
 use crate::events::live::Live;
-use crate::events::wire::{Nature, Rendered};
+use crate::events::wire::{EventKind, Rendered};
 use crate::jobs::ended::Ending;
 use crate::jobs::{accepted, Job, Lease, Standing};
 use crate::router::Serving;
@@ -96,7 +95,7 @@ async fn following(
         // A record rather than state: a line skipped is a hole in what a service
         // said, not a figure that has been overtaken, so a client that was away is
         // given the ones it missed rather than only the newest.
-        let said = Rendered::of(Nature::Record, &Envelope::new(kind::LOG, &Line::from(line)));
+        let said = Rendered::of(EventKind::Log, &Line::from(line));
         live.say_if_rendered(said).await;
     }
     Standing::Ended(Ending::Quiet)

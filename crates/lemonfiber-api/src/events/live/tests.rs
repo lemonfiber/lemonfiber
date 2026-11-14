@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use lemonfiber_fixtures::ports::Stopped;
 
-use lemonfiber_core::app::Outcome;
 use lemonfiber_core::model::PlayingReport;
 
 use super::Live;
-use crate::events::wire::{Nature, Rendered};
+use crate::events::wire::{EventKind, Rendered};
 
 /// A stream open when every stream is told to end, ends; one opened afterwards does not.
 #[tokio::test]
@@ -39,8 +38,7 @@ async fn a_stream_beside_this_one_hears_none_of_it_and_ends_with_it() {
     let beside = live.beside(clock.as_ref());
     let mut theirs = beside.listening(None).await;
 
-    let envelope = Outcome::Playing(PlayingReport::default()).envelope();
-    live.say_if_rendered(Rendered::of(Nature::State, &envelope))
+    live.say_if_rendered(Rendered::of(EventKind::Playing, &PlayingReport::default()))
         .await;
     let heard = tokio::time::timeout(Duration::from_millis(50), theirs.next()).await;
     assert!(

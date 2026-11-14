@@ -54,6 +54,11 @@ release-tag VERSION:
             https://github.com/lemonfiber/spec.git .spec-canonical
     fi
     python3 scripts/the_gate_a_tag_must_pass.py --version "{{VERSION}}"
+    cargo run --quiet --example released -p lemonfiber-contract -- check
+    if [ "$(cat contract/released/VERSION)" != "{{released}}" ]; then
+        echo "contract/released/ is not v{{released}}'s artefact: run just version {{VERSION}}" >&2
+        exit 1
+    fi
     git tag -s "v{{VERSION}}" -m "lemonfiber v{{VERSION}}"
     git push origin "v{{VERSION}}"
     echo "tagged v{{VERSION}} — release.yml will build it and leave a draft"
@@ -125,6 +130,39 @@ contract:
 # declarations in `lemonfiber-contract`.
 capability-contracts:
     cargo run --quiet --example contracts -p lemonfiber-contract
+
+# Rewrite the capability index the last release published from the one this build
+# publishes, refusing where an operation would be dropped under an unchanged major.
+released-capabilities:
+    cargo run --quiet --example released -p lemonfiber-contract
+
+# The newest release tagged before this checkout, a pre-release never counting as one.
+released := `git tag --list 'v[0-9]*' --merged HEAD --sort=-v:refname | grep -v -- - | head -n 1 | sed 's/^v//'`
+
+# Set the version a release carries, commit the previous release's web API artefact
+# for the diff against it, and rewrite the capability index this release publishes.
+version VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    previous="{{released}}"
+    if [ -z "${previous}" ] || [ "${previous}" = "{{VERSION}}" ]; then
+        echo "no release before {{VERSION}} is tagged" >&2
+        exit 1
+    fi
+    python3 -c "import pathlib,re,sys; p=pathlib.Path('Cargo.toml'); p.write_text(re.sub(r'(?m)^version = \"[^\"]*\"', 'version = \"' + sys.argv[1] + '\"', p.read_text(), count=1))" "{{VERSION}}"
+    cargo update --workspace --quiet
+    rm -rf contract/released.next
+    mkdir -p contract/released.next
+    if git cat-file -e "v${previous}:contract/web-api/index.json" 2>/dev/null; then
+        git archive "v${previous}" contract/web-api | tar -x -C contract/released.next --strip-components=1
+    else
+        git show "v${previous}:contract/web-api.contract.json" > contract/released.next/web-api.contract.json
+    fi
+    printf '%s\n' "${previous}" > contract/released.next/VERSION
+    rm -rf contract/released
+    mv contract/released.next contract/released
+    just contract
+    just released-capabilities
 
 # Rewrite the stable surface the contract is held to between releases: the
 # `contract/web-api-surface/` directory, an index beside one file per type.

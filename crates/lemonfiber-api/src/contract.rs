@@ -41,7 +41,9 @@
 //! [`Outcome`]: lemonfiber_core::app::Outcome
 
 pub mod layout;
+pub mod openapi;
 mod path;
+pub mod released;
 mod split;
 pub mod stability;
 
@@ -66,6 +68,7 @@ use crate::actions::published::Action;
 use crate::actions::{self, named, Arguments, KEY_CALLABLE};
 use crate::admission::admitted::Admitted;
 use crate::capabilities::Capabilities;
+use crate::events::wire::{Audience, EventKind, Nature, BEAT};
 use crate::jobs::ended::Ended;
 use crate::jobs::started::Started;
 
@@ -108,6 +111,8 @@ pub struct Contract {
     /// not a document any request answers with, and a client deciding which controls to
     /// offer a key reads it before it asks anything.
     pub key_callable: Vec<Callable>,
+    /// The event stream: the heartbeat's interval and every kind of event it says.
+    pub events: Events,
     /// `kind` to the schema of the envelope carrying it.
     pub kinds: BTreeMap<String, Schema>,
     /// Every read the surface serves: where it is asked, what it may be given, and
@@ -124,6 +129,47 @@ pub struct Contract {
     /// branches on is which of these a refusal is, so they are listed where a
     /// generator can give each one a name rather than copy it.
     pub refusals: BTreeMap<String, Listed>,
+}
+
+/// The event stream, as the contract describes it.
+#[derive(Debug, Serialize)]
+pub struct Events {
+    /// The longest the stream says nothing before it says it is still there, in seconds.
+    pub heartbeat_seconds: u64,
+    /// Each kind of event the stream says, to what it is.
+    pub kinds: BTreeMap<String, Said>,
+}
+
+/// One kind of event the stream says.
+#[derive(Debug, Serialize)]
+pub struct Said {
+    /// Whether a newer event of this kind replaces an older one.
+    pub nature: Nature,
+    /// Who on the shared stream hears it.
+    pub audience: Audience,
+    /// The schema of the envelope it is said in.
+    pub schema: Schema,
+}
+
+impl Events {
+    /// The event stream, from the kinds the stream is declared to say.
+    #[must_use]
+    pub fn described() -> Self {
+        Self {
+            heartbeat_seconds: BEAT.as_secs(),
+            kinds: EventKind::ALL
+                .iter()
+                .map(|event| {
+                    let said = Said {
+                        nature: event.nature(),
+                        audience: event.audience(),
+                        schema: event.schema(),
+                    };
+                    (event.kind().as_str().to_owned(), said)
+                })
+                .collect(),
+        }
+    }
 }
 
 /// One action a key may call, as the contract lists it.
@@ -169,6 +215,7 @@ impl Contract {
             api_version: API_VERSION,
             actions: actions::published::every(rehearsable),
             bodies: bodies(),
+            events: Events::described(),
             key_callable: key_callable(),
             kinds,
             reads: published::every(),

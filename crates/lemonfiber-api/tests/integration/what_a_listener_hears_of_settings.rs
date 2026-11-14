@@ -15,12 +15,11 @@ use lemonfiber_api::admission::{Admitting, Caller, Keyed, Keyring};
 use lemonfiber_api::events::extending::Together;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::settings::Settings;
-use lemonfiber_api::events::wire::{Audience, Nature, Rendered};
+use lemonfiber_api::events::wire::{Audience, EventKind, Rendered};
 use lemonfiber_api::events::{stream, Streaming};
 use lemonfiber_api::guard::{Arrived, Binding, Token, TOKEN_HEADER};
 use lemonfiber_core::app::{Command, Settling};
 use lemonfiber_core::keys::Scope;
-use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 
 use crate::reading::{as_the_command_renders_it, configured};
@@ -177,14 +176,10 @@ async fn opened(
 
 /// What is said to the operator alone, then what is said to anyone.
 async fn both_said(live: &Live) {
-    let settings = Rendered::of(Nature::State, &Envelope::new(kind::SETTINGS, "held"))
-        .map(Rendered::to_the_operator);
-    live.say_if_rendered(settings).await;
-    live.say_if_rendered(Rendered::of(
-        Nature::State,
-        &Envelope::new(kind::NEWS, "anyone"),
-    ))
-    .await;
+    live.say_if_rendered(Rendered::of(EventKind::Settings, &"held"))
+        .await;
+    live.say_if_rendered(Rendered::of(EventKind::News, &"anyone"))
+        .await;
 }
 
 /// The first thing that comes down an answered stream.
@@ -232,12 +227,12 @@ async fn the_per_run_token_on_the_stream_hears_what_is_said_to_the_operator() {
 #[tokio::test]
 async fn a_listener_coming_back_is_not_handed_what_was_said_to_the_operator_alone() {
     let live = Live::opening(Stopped::at(0).as_ref());
-    let record = |what: &'static str| Rendered::of(Nature::Record, &Envelope::new(kind::LOG, what));
+    let record = |what: &'static str| Rendered::of(EventKind::Log, &what);
     let Some(before) = record("before") else {
         unreachable!("a log line renders");
     };
     let seen = live.say(before).await;
-    live.say_if_rendered(record("theirs").map(Rendered::to_the_operator))
+    live.say_if_rendered(Rendered::of(EventKind::Settings, &"theirs"))
         .await;
     live.say_if_rendered(record("anyone's")).await;
 
@@ -246,8 +241,9 @@ async fn a_listener_coming_back_is_not_handed_what_was_said_to_the_operator_alon
         .listening(Some(seen.id()))
         .await
         .heard_as(Audience::Operator);
-    let missed = anyone.next().await.unwrap_or_default();
-    assert!(missed.contains("anyone's"), "{missed}");
-    let told = operator.next().await.unwrap_or_default();
-    assert!(told.contains("theirs"), "{told}");
+    for missed in [anyone.next().await, operator.next().await] {
+        let missed = missed.unwrap_or_default();
+        assert!(missed.contains("anyone's"), "{missed}");
+        assert!(!missed.contains("theirs"), "{missed}");
+    }
 }
