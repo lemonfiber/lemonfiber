@@ -69,10 +69,16 @@ impl Instant {
     /// The second `at` falls in, or the epoch for a moment before it.
     #[must_use]
     pub fn of(at: SystemTime) -> Self {
-        Self(
-            at.duration_since(UNIX_EPOCH)
-                .map_or(0, |elapsed| elapsed.as_secs()),
-        )
+        Self::dated(at).unwrap_or(Self::EPOCH)
+    }
+
+    /// The second `at` falls in, or none for a moment before the epoch, which no
+    /// instant names.
+    #[must_use]
+    pub fn dated(at: SystemTime) -> Option<Self> {
+        at.duration_since(UNIX_EPOCH)
+            .ok()
+            .map(|elapsed| Self(elapsed.as_secs()))
     }
 
     /// The instant ISO-8601 text in UTC names, as a service writes one and [`read`] reads

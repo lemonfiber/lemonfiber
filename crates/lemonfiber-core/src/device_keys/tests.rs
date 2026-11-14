@@ -91,7 +91,7 @@ fn a_challenge_handed_over_says_when_it_lapses_and_not_the_challenge() {
         expires: Instant::from_seconds(1_791_849_660),
     };
     let said = format!("{challenged:?}");
-    assert!(said.contains("2026-10-13T00:01:00Z"));
+    assert!(said.contains("1791849660"));
     assert!(!said.contains("the-challenge"));
 }
 

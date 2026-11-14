@@ -88,7 +88,7 @@ fn a_device_signed_in_is_named_and_no_code_is_drawn() {
 
     assert!(said.contains("signed in on one device"), "{said}");
     assert!(
-        said.contains("Pixel 8 — Jellyfin Android, last heard from 2026-09-29T10:05:00Z"),
+        said.contains("Pixel 8 — Jellyfin Android, last heard from 2026-09-29T10:05:00 UTC"),
         "{said}"
     );
     assert!(!said.contains('\u{2588}'), "{said}");

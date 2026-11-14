@@ -356,7 +356,7 @@ pub(super) fn trace(report: &TraceReport) -> Lines {
     for stage in &report.stages {
         let label = stage.stage.label();
         match &stage.at {
-            Some(at) => lines.put(format!("  ✓ {label}   {}   {at}", stage.service)),
+            Some(at) => lines.put(format!("  ✓ {label}   {}   {}", stage.service, at.said())),
             None => lines.put(format!("  ✓ {label}   {}", stage.service)),
         }
     }

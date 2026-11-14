@@ -220,10 +220,10 @@ async fn what_the_services_said_arrives_as_one_envelope_a_line() {
             StatusCode::OK,
             concat!(
                 r#"{"api_version":1,"kind":"log","data":{"service":"sonarr","stream":"stdout","#,
-                r#""at":"2026-01-01T00:00:00Z","line":"started"}}"#,
+                r#""stamped":"2026-01-01T00:00:00Z","line":"started"}}"#,
                 "\n",
                 r#"{"api_version":1,"kind":"log","data":{"service":"sonarr","stream":"stdout","#,
-                r#""at":"2026-01-01T00:00:01Z","line":"importing"}}"#,
+                r#""stamped":"2026-01-01T00:00:01Z","line":"importing"}}"#,
                 "\n",
             )
             .to_owned()

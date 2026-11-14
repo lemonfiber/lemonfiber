@@ -196,7 +196,7 @@ async fn a_signature_over_an_issued_challenge_mints_in_place_of_the_password_onc
     assert_eq!(read(&minted.body, "/kind"), "minted-key");
     let kept = fs::read_to_string(env.with_file_name(lemonfiber_core::device_keys::FILE))
         .unwrap_or_default();
-    assert!(kept.contains("\"used\": \"2025-01-08"), "{kept}");
+    assert!(kept.contains("\"used\": 1736294400"), "{kept}");
     let again = minting(&router, &token, &body.replace("\"ha\"", "\"ha2\"")).await;
     assert_eq!(code(&again), "DEVICE-10");
     let listed = presented(router, "GET", "/api/keys", &token, Some((HERE, false))).await;

@@ -142,7 +142,7 @@ fn re_recording_the_same_value_keeps_its_original_timestamp() {
     );
     let unchanged = serde_json::to_string(&baseline).unwrap_or_default();
     assert!(
-        unchanged.contains(r#""at":"100""#) && !unchanged.contains(r#""at":"200""#),
+        unchanged.contains(r#""at":100,"#) && !unchanged.contains(r#""at":200,"#),
         "a re-record of the same value keeps the first timestamp: {unchanged}"
     );
     baseline.record(
@@ -153,7 +153,7 @@ fn re_recording_the_same_value_keeps_its_original_timestamp() {
     );
     let changed = serde_json::to_string(&baseline).unwrap_or_default();
     assert!(
-        changed.contains(r#""at":"300""#),
+        changed.contains(r#""at":300,"#),
         "a changed value takes the new timestamp: {changed}"
     );
 }
@@ -203,7 +203,7 @@ fn merging_gathers_each_baselines_records_and_keeps_timestamps() {
     // The unchanged `sonarr` value keeps its original timestamp, not the merged one.
     let json = serde_json::to_string(&main).unwrap_or_default();
     assert!(
-        json.contains(r#""at":"1""#) && !json.contains(r#""at":"9""#),
+        json.contains(r#""at":1,"#) && !json.contains(r#""at":9,"#),
         "an unchanged value keeps its timestamp through a merge: {json}"
     );
 }

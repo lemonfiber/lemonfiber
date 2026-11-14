@@ -63,7 +63,7 @@ fn service(service: &str, at: Instant) -> Existing {
 
 /// The name a whole-stack capture at the stamp `capturing` uses is written
 /// under — the fresh archive retention must never prune.
-const FRESH: &str = "lemonfiber-full-2026-07-30T00-00-00Z.tar.gz";
+const FRESH: &str = "lemonfiber-full-1785369600.tar.gz";
 
 #[tokio::test]
 async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
@@ -72,11 +72,11 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
     // archive directory is untouched.
     let archive = FakeArchive::keeping_backups(&[
         (
-            "lemonfiber-full-2026-07-01T00-00-00Z.tar.gz",
+            "lemonfiber-full-1782864000.tar.gz",
             Instant::from_seconds(1_782_864_000),
         ),
         (
-            "lemonfiber-full-2026-07-02T00-00-00Z.tar.gz",
+            "lemonfiber-full-1782950400.tar.gz",
             Instant::from_seconds(1_782_950_400),
         ),
     ]);
@@ -93,9 +93,7 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
     );
     assert_eq!(
         report.map(|report| report.pruned),
-        Ok(vec![
-            "lemonfiber-full-2026-07-01T00-00-00Z.tar.gz".to_owned()
-        ]),
+        Ok(vec!["lemonfiber-full-1782864000.tar.gz".to_owned()]),
         "a rehearsal that only counted them would not say which is about to go"
     );
     assert!(archive.writes().is_empty(), "the archive was written");
@@ -108,7 +106,7 @@ async fn a_capture_writes_the_archive_under_the_backups_directory_and_reports_it
     let report = capturing(&archive).await;
 
     // The archive lands under the backups directory, named for the scope and
-    // the stamp with its colons made filename-safe; the report is sensitive.
+    // the instant in whole seconds; the report is sensitive.
     assert_eq!(
         report.map(|report| (report.path, report.sensitive, report.pruned)),
         Ok((
@@ -143,7 +141,7 @@ async fn a_single_service_capture_is_named_for_its_service() {
     assert_eq!(
         report.map(|report| report.path),
         Ok(PathBuf::from(
-            "/data/lemonfiber/backups/lemonfiber-sonarr-2026-07-30T00-00-00Z.tar.gz"
+            "/data/lemonfiber/backups/lemonfiber-sonarr-1785369600.tar.gz"
         ))
     );
 }
@@ -162,11 +160,11 @@ async fn a_capture_prunes_the_oldest_backups_past_the_keep_count() {
     // Keeping two of three prunes only the eldest, whatever order it was listed.
     assert_eq!(
         report.map(|report| report.pruned),
-        Ok(vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()])
+        Ok(vec!["lemonfiber-full-1782864000.tar.gz".to_owned()])
     );
     assert_eq!(
         archive.removes(),
-        vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()]
+        vec!["lemonfiber-full-1782864000.tar.gz".to_owned()]
     );
 }
 
@@ -197,7 +195,7 @@ async fn retention_keeps_each_scope_on_its_own_count() {
     // the curator's archive, which belongs to a different scope's count.
     assert_eq!(
         report.map(|report| report.pruned),
-        Ok(vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()])
+        Ok(vec!["lemonfiber-full-1782864000.tar.gz".to_owned()])
     );
 }
 
@@ -318,7 +316,7 @@ async fn an_old_backup_that_will_not_delete_is_left_and_the_capture_still_succee
     );
     assert_eq!(
         archive.removes(),
-        vec!["lemonfiber-full-2026-07-01.tar.gz".to_owned()],
+        vec!["lemonfiber-full-1782864000.tar.gz".to_owned()],
         "it was attempted"
     );
 }
