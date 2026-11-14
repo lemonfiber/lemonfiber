@@ -75,6 +75,18 @@ fn the_arguments_a_service_declares_are_its_command_in_order_each_a_literal() {
 }
 
 #[test]
+fn the_hostname_a_service_declares_is_its_container_s_and_none_is_written_otherwise() {
+    let named = entry_of(&document(with(Fields {
+        container_hostname: Some("bazarr".to_owned()),
+        ..Fields::default()
+    })));
+    let unnamed = entry_of(&document(placed()));
+
+    assert_eq!(text(&named, &["hostname"]).as_deref(), Some("bazarr"));
+    assert!(unnamed.get("hostname").is_none(), "{unnamed:?}");
+}
+
+#[test]
 fn further_mounts_come_from_the_mount_tree_and_the_configuration_may_be_read_only() {
     let entry = entry_of(&document(with(Fields {
         config_ro: true,

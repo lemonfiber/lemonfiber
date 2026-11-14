@@ -310,6 +310,7 @@ impl Service {
             mem_limit_mib: self.mem_limit_mib,
             network: self.network.as_ref(),
             shape: self.shape,
+            hostname: self.container_hostname.as_deref(),
             certificate: self.certificate.as_ref(),
             provides: &self.provides,
             speaks: !self.speaks.is_empty(),

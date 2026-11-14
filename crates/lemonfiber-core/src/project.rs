@@ -361,6 +361,7 @@ fn pass_unit<'a>(
         shape: None,
         secrets_file: None,
         command: crate::pass::command(at),
+        hostname: None,
         granted: &[],
         reaches_host: false,
     })
@@ -434,6 +435,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
             .then(|| (reading.secrets_file)(&service.id))
             .flatten(),
         command: Vec::new(),
+        hostname: service.container_hostname.as_deref(),
         granted: &[],
         reaches_host: false,
     }

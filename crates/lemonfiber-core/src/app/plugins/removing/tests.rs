@@ -67,6 +67,7 @@ fn bundled(id: &str, provides: &[&str]) -> lemonfiber_manifest::Service {
         network: None,
         shape: None,
         certificate: None,
+        container_hostname: None,
         asks_for: None,
         reaches: None,
         shares_config: None,

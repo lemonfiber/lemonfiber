@@ -143,6 +143,8 @@ pub struct Unit<'a> {
     pub secrets_file: Option<PathBuf>,
     /// The arguments its image's program is run with, where not the image's own.
     pub command: Vec<String>,
+    /// The name its container knows itself by, where not the engine's own.
+    pub hostname: Option<&'a str>,
     /// The capabilities it alone is given back, whatever its posture: a fence's, and none
     /// for any other service.
     pub granted: &'static [&'static str],
@@ -181,6 +183,9 @@ pub struct Entry {
     /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<String>,
+    /// The name its container knows itself by, where not the engine's own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostname: Option<String>,
     /// The names it resolves to this machine.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     extra_hosts: Vec<String>,
@@ -298,6 +303,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
             let (uid, gid) = ids(unit, values);
             format!("{uid}:{gid}")
         }),
+        hostname: unit.hostname.map(literal),
         extra_hosts: unit
             .reaches_host
             .then(|| format!("{}:{HOST_GATEWAY}", crate::notify::events::HOST))

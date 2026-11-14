@@ -447,6 +447,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "certificate",
         "config_path",
         "config_ro",
+        "container_hostname",
         "contract",
         "criticality",
         "digest",

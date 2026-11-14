@@ -91,3 +91,32 @@ fn only_a_declared_memory_ceiling_is_written_as_a_limit_and_an_estimate_never_is
         );
     }
 }
+
+#[test]
+fn a_stack_service_s_declared_hostname_is_its_container_s_and_no_other_is_written() {
+    let mut manifest = carried();
+    let unnamed = project(&manifest, &[]);
+    let written =
+        |project: &Project, id: &str| Some(entry(project, id)).filter(|written| !written.is_null());
+    let named = manifest
+        .services
+        .iter_mut()
+        .find(|service| written(&unnamed, &service.id).is_some())
+        .map(|service| {
+            service.container_hostname = Some("named".to_owned());
+            service.id.clone()
+        });
+    assert!(named.is_some());
+    let project = project(&manifest, &[]);
+
+    for service in &manifest.services {
+        let hostname = written(&project, &service.id).and_then(|written| {
+            written
+                .get("hostname")
+                .and_then(Yaml::as_str)
+                .map(str::to_owned)
+        });
+        let expected = (Some(&service.id) == named.as_ref()).then(|| "named".to_owned());
+        assert_eq!(hostname, expected, "{}", service.id);
+    }
+}

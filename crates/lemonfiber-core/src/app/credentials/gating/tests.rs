@@ -55,6 +55,7 @@ fn service(id: &str, port: u16) -> lemonfiber_manifest::Service {
         network: None,
         shape: None,
         certificate: None,
+        container_hostname: None,
         asks_for: None,
         reaches: None,
         listens: None,

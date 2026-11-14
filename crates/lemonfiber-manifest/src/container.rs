@@ -9,6 +9,7 @@ mod apis;
 mod certified;
 pub mod choices;
 pub mod earlier;
+mod named;
 mod paths;
 mod ports;
 mod record;
@@ -19,6 +20,7 @@ mod words;
 
 pub use apis::Apis;
 pub use certified::{Certificate, MOST_NAMES};
+pub use named::is_label;
 use paths::target;
 pub use paths::{is_plain, is_source, is_target, lies_inside, shares_a_source};
 pub use ports::{doubled, exposed, exposes, inside, published, reached, Reach};
@@ -214,6 +216,8 @@ pub struct Container<'a> {
     pub shape: Option<Shape>,
     /// The certificate lemonfiber makes for it, where it declares one.
     pub certificate: Option<&'a Certificate>,
+    /// The name its container knows itself by, where it declares one.
+    pub hostname: Option<&'a str>,
     /// The capabilities it provides.
     pub provides: &'a [String],
     /// Whether it speaks a capability contract.
@@ -248,6 +252,9 @@ impl Container<'_> {
         self.held(&mut found);
         self.routed(&mut found);
         self.retired(&mut found);
+        if let Some(wrong) = self.hostname.and_then(named::wrong) {
+            found.push((self.at(named::FIELD), wrong));
+        }
         found
     }
 

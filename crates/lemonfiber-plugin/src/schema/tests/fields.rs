@@ -16,7 +16,7 @@ env         = { TZ = "Europe/Amsterdam", MODE = { setting = "elsewhere:mode", de
 
 /// Every field the one container model declares, which the stack's services and every
 /// plugin's take alike.
-const CONTAINER_FIELDS: [&str; 15] = [
+const CONTAINER_FIELDS: [&str; 16] = [
     "publish",
     "takes_data",
     "config_path",
@@ -32,6 +32,7 @@ const CONTAINER_FIELDS: [&str; 15] = [
     "network",
     "shape",
     "certificate",
+    "container_hostname",
 ];
 
 #[test]
