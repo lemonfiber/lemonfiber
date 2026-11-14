@@ -4,11 +4,12 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Dated, Declared, Declaring, Encrypting,
-    EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Held, Holds, HowFar, Image,
-    Item, ItemDetail, ItemProgress, Library, LivePath, Locations, Medium, Naming, OutsideAccount,
-    OutsideServer, Picture, Playback, Ports, Presentation, Question, Recounting, Screening,
-    SeasonDetail, SeriesHeld, Statuses, Token, Upkeep,
+    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared, Declaring,
+    Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Heard, Hearing,
+    Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations,
+    Medium, Naming, OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation,
+    Programme, Question, Recounting, Screening, SeasonDetail, SeriesHeld, Statuses, Token, Tuned,
+    Tuning, Upkeep,
 };
 
 use super::Upstream;
@@ -224,6 +225,7 @@ pub fn declared() -> Declared {
         }],
         live: vec![LivePath {
             pattern: "^/films/live/(?P<stream>[^/]+)/".to_owned(),
+            parameter: None,
             stream: "^[a-z]{6}$".to_owned(),
         }],
         refused: vec!["^/posters/by-name/.*$".to_owned()],
@@ -250,6 +252,7 @@ pub fn declared() -> Declared {
             stream: "{base}/films/{item}/reel".to_owned(),
             poster: "{base}/films/{item}/poster".to_owned(),
             backdrop: "{base}/films/{item}/wide".to_owned(),
+            playlist: None,
         },
         ports: Ports {
             upstream: 8000,
@@ -273,13 +276,48 @@ impl Recounting for Upstream {
         address: Option<&str>,
         pin: Option<&str>,
         key: Option<&str>,
-    ) -> Result<(), Failure> {
+        every: Option<u32>,
+    ) -> Result<Option<Heard>, Failure> {
         self.tell(format!(
-            "events {} {} {}",
+            "events {} {} {} {}",
             address.unwrap_or("nowhere"),
             pin.unwrap_or("unpinned"),
-            key.map_or("none", |_| "keyed")
+            key.map_or("none", |_| "keyed"),
+            every.unwrap_or_default()
         ));
+        Ok(address.map(|_| Heard {
+            hearing: Hearing::Poll,
+            every,
+        }))
+    }
+}
+
+#[async_trait]
+impl Tuning for Upstream {
+    async fn channels(&self, member: &str) -> Result<Vec<Channel>, Failure> {
+        Ok(vec![Channel {
+            id: format!("{member}-news"),
+            name: "News".to_owned(),
+            number: Some("101".to_owned()),
+            now: Some(Programme {
+                title: "The evening news".to_owned(),
+                certificate: Some("PG".to_owned()),
+                ends: Some("2026-11-13T19:00:00Z".to_owned()),
+            }),
+        }])
+    }
+
+    async fn tune(&self, member: &str, channel: &str) -> Result<Option<Tuned>, Failure> {
+        self.tell(format!("tune {member} {channel}"));
+        Ok((channel != "barred").then(|| Tuned {
+            closes_by: "ls1".to_owned(),
+            direct: "/live/0123456789abcdef0123456789abcdef/stream.ts".to_owned(),
+            transcoded: format!("/videos/{channel}/live.m3u8?LiveStreamId=ls1"),
+        }))
+    }
+
+    async fn untune(&self, closes_by: &str) -> Result<(), Failure> {
+        self.tell(format!("untune {closes_by}"));
         Ok(())
     }
 }

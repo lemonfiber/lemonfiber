@@ -5,10 +5,11 @@ use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::stage::Stage;
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, ClientProbe, CuratedSeason,
-    CuratedTitle, DownloadClient, DownloadState, DownloadedEpisode, Downloading, Failure,
-    FoundItem, Fulfilling, Grabbed, Identity, Importing, ItemPart, Maintenance, MusicQuality,
-    Pipeline, QualityProfile, QualityReleases, Queue, QueueItem, Queues, Record, RegisteredClient,
-    RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest, TraceEvent,
+    CuratedTitle, CutoffUnmet, DownloadClient, DownloadState, DownloadedEpisode, Downloading,
+    Failure, FoundItem, Fulfilling, Grabbed, Identity, Importing, ItemPart, Maintenance,
+    MusicQuality, Pipeline, QualityProfile, QualityReleases, Queue, QueueItem, Queues, Record,
+    RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder, StuckItem, TitleRequest,
+    TraceEvent,
 };
 use lemonfiber_ports::Client;
 
@@ -68,13 +69,30 @@ impl Client for Upstream {
 
 #[async_trait]
 impl Maintenance for Upstream {
-    async fn search_upgrades(&self, kind: Kind) -> Result<(), Failure> {
+    async fn search_upgrades(&self, kind: TitleKind) -> Result<(), Failure> {
         self.tell(format!("upgrades {kind:?}"));
         Ok(())
     }
     async fn wanting(&self) -> Result<bool, Failure> {
         Ok(true)
     }
+    async fn cutoff_unmet(&self, kind: TitleKind) -> Result<CutoffUnmet, Failure> {
+        cutoff_unmet(kind)
+    }
+}
+
+/// How `Upstream` answers `cutoff_unmet`.
+fn cutoff_unmet(kind: TitleKind) -> Result<CutoffUnmet, Failure> {
+    if kind == TitleKind::Books {
+        return Err(Failure::Unsupported {
+            service: SERVICE.to_owned(),
+            detail: "it files no books".to_owned(),
+        });
+    }
+    Ok(CutoffUnmet {
+        items: 3,
+        seconds: 7_200,
+    })
 }
 
 #[async_trait]
