@@ -380,3 +380,39 @@ fn a_pass_travels_in_its_one_parameter_beside_whatever_query_is_there() {
         "/videos/x/live.m3u8?LiveStreamId=ls1&lfpass=p.1.q"
     );
 }
+
+/// A household whose every bundled part is recorded, reached at a recorded address, with
+/// the household's proxy serving `domain` where it names one.
+fn bundled(tag: &str, domain: Option<&str>) -> crate::app::Ctx {
+    let at = Scratch::named(&format!("door-browser-{tag}")).kept();
+    let _ = std::fs::remove_dir_all(&at);
+    let _ = std::fs::create_dir_all(&at);
+    let mut ctx = crate::test_support::a_context().build();
+    ctx.settings.env_file = Some(at.join(".env"));
+    ctx.settings.household_host = Some("192.168.1.20".to_owned());
+    ctx.settings.household_domain = domain.map(str::to_owned);
+    crate::test_support::adapted::parts_recorded(&ctx);
+    ctx
+}
+
+#[test]
+fn a_browser_reaches_the_guard_under_the_households_domain_or_is_told_why_not() {
+    let reached = super::for_a_browser(&bundled("domain", Some("home.lan")));
+    assert!(
+        reached
+            .as_deref()
+            .is_ok_and(|base| base.contains("home.lan")),
+        "{reached:?}"
+    );
+    assert_eq!(
+        crate::screening::browser_origin(&bundled("origin", Some("home.lan"))),
+        reached
+            .ok()
+            .and_then(|base| url::Url::parse(&base).ok())
+            .map(|url| url.origin().ascii_serialization())
+    );
+    assert_eq!(
+        super::for_a_browser(&bundled("no-domain", None)),
+        Err(super::NO_DOMAIN.to_owned())
+    );
+}

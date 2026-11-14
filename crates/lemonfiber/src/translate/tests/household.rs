@@ -593,3 +593,78 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
         }))
     );
 }
+
+/// Each word about watching reaches the core as the one request it names: what is
+/// playing, a member's channels, a channel opened, a stream kept or closed, and a title
+/// in a browser from a new session or a pass; two at once, or neither, is a usage error.
+#[test]
+fn each_word_about_watching_reaches_the_core_as_the_one_request_it_names() {
+    use super::super::watching;
+    use lemonfiber::cli::{RawPlay, RawTune, Watching};
+    use lemonfiber_core::app::{Live, PlayFrom, Viewing};
+
+    let ada = || Some("ada".to_owned());
+    assert!(matches!(
+        watching(Watching::Playing { member: ada() }),
+        Ok(Command::Playing { member }) if member == ada()
+    ));
+    assert!(matches!(
+        watching(Watching::Channels { member: None }),
+        Ok(Command::Viewing(Viewing::Channels { member })) if member.is_empty()
+    ));
+
+    let tune = |channel: Option<&str>, stream: Option<&str>, stop: bool| {
+        watching(Watching::Tune(RawTune {
+            channel: channel.map(str::to_owned),
+            member: ada(),
+            stream: stream.map(str::to_owned),
+            stop,
+        }))
+    };
+    for (asked, live) in [
+        (tune(Some("c1"), None, false), Live::Open("c1".to_owned())),
+        (
+            tune(None, Some("ls1"), false),
+            Live::Renew("ls1".to_owned()),
+        ),
+        (tune(None, Some("ls1"), true), Live::Stop("ls1".to_owned())),
+    ] {
+        assert!(
+            matches!(&asked, Ok(Command::Viewing(Viewing::Tune { member, live: asked, .. }))
+                     if member == "ada" && *asked == live),
+            "{live:?}"
+        );
+    }
+    assert_eq!(tune(Some("c1"), Some("ls1"), false).err(), Some(USAGE));
+    assert_eq!(tune(None, None, false).err(), Some(USAGE));
+
+    let play = |device: Option<&str>, pass: Option<&str>| {
+        watching(Watching::Play(RawPlay {
+            item: "f1".to_owned(),
+            member: None,
+            device: device.map(str::to_owned),
+            pass: pass.map(str::to_owned),
+        }))
+    };
+    for (asked, from) in [
+        (
+            play(Some("a-phone-0123"), None),
+            PlayFrom::Device("a-phone-0123".to_owned()),
+        ),
+        (
+            play(None, Some("a-pass")),
+            PlayFrom::Pass("a-pass".to_owned()),
+        ),
+    ] {
+        assert!(
+            matches!(&asked, Ok(Command::Viewing(Viewing::Play { id, from: asked, member, .. }))
+                     if id == "f1" && *asked == from && member.is_empty()),
+            "a play from a device or a pass"
+        );
+    }
+    assert_eq!(
+        play(Some("a-phone-0123"), Some("a-pass")).err(),
+        Some(USAGE)
+    );
+    assert_eq!(play(None, None).err(), Some(USAGE));
+}

@@ -100,3 +100,6 @@ impl std::fmt::Debug for PlayFrom {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

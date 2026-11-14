@@ -128,3 +128,5 @@ async fn with_nowhere_to_play_it_no_session_is_opened_and_a_member_hears_why_in_
         .iter()
         .any(|request| request.url.ends_with("/signed_in")));
 }
+
+mod playing;

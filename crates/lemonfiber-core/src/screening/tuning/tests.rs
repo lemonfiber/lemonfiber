@@ -43,8 +43,18 @@ fn held_to(
     watchable: &[Channel],
     more: Vec<(&'static str, Answer)>,
 ) -> Arc<Transport> {
+    limited_to(Some(12), unrated, watchable, more)
+}
+
+/// The same server, Ada held to `age_limit`, her unrated content treated as `unrated` says.
+fn limited_to(
+    age_limit: Option<u32>,
+    unrated: Unrated,
+    watchable: &[Channel],
+    more: Vec<(&'static str, Answer)>,
+) -> Arc<Transport> {
     let mut ada = media::member("a7f3", "Ada", true);
-    ada.access.age_limit = Some(12);
+    ada.access.age_limit = age_limit;
     ada.access.unrated = unrated;
     let table: Vec<Certificate> = [("U", 0), ("PG", 8), ("12A", 12), ("18", 18)]
         .into_iter()
@@ -120,6 +130,17 @@ async fn a_channel_showing_nothing_certified_is_held_to_the_members_unrated_poli
         assert_eq!(code(opened).as_deref(), Some("PLAY-2"), "{channel}");
     }
     assert!(!was_asked(&transport, "tune"));
+}
+
+#[tokio::test]
+async fn a_member_no_limit_holds_is_answered_every_channel_their_account_may_watch() {
+    let transport = limited_to(None, Unrated::LetThrough, &evening(), Vec::new());
+    let ctx = ctx_over(transport, "unlimited");
+    let ids: Vec<String> = channels(&ctx, "Ada")
+        .await
+        .map(|report| report.channels.into_iter().map(|one| one.id).collect())
+        .unwrap_or_default();
+    assert_eq!(ids, ["kids", "late", "quiet"]);
 }
 
 #[tokio::test]
@@ -274,3 +295,5 @@ fn a_path_no_live_stream_path_covers_is_given_no_pass() {
     );
     assert_eq!(located(&ready, &ada, &open, 1).transcoded, None);
 }
+
+mod standing;

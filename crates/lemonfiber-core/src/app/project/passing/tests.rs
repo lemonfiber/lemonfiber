@@ -278,3 +278,44 @@ async fn live_paths_that_cannot_be_written_say_why_and_pin_nothing() {
     assert!(!project.join(PINNED).exists());
     assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
 }
+
+/// A renewal is kept where the pass service reads it, under the member it was issued to,
+/// with the key the project keeps for it; a renewal that lapsed is forgotten at the next.
+#[tokio::test]
+async fn a_renewal_is_kept_for_the_pass_service_and_a_lapsed_one_forgotten() {
+    let registry = Registered::publishing(DIGEST);
+    let (ctx, project) = machine("pass-renewed", &registry, true);
+    assert_eq!(readied(&ctx).await, None);
+    let Some(key) = super::key(&ctx) else {
+        unreachable!("the project keeps a key once the pass service is readied");
+    };
+    let renewals = || {
+        held(&project, File::Renewals)
+            .and_then(|text| crate::pass::Renewals::read(&text).ok())
+            .map(|read| read.passes)
+            .unwrap_or_default()
+    };
+    let now = ctx.seconds();
+
+    let lapsing = key.issued("ls1", "a7f3", now);
+    assert!(super::renewed(&ctx, &[lapsing], "a7f3", now));
+    let lasting = key.issued("ls2", "a7f3", now);
+    assert!(super::renewed(&ctx, &[lasting], "a7f3", now + 600));
+
+    let kept = renewals();
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert!(kept
+        .values()
+        .all(|renewed| renewed.member == "a7f3" && renewed.lapses == now + 600));
+}
+
+/// With no project there is no key and nowhere to keep a renewal.
+#[test]
+fn with_no_project_there_is_no_key_and_no_renewal_is_kept() {
+    let ctx = crate::test_support::a_context()
+        .over(crate::test_support::embedded())
+        .build();
+    assert!(super::super::directory(&ctx).is_none());
+    assert!(super::key(&ctx).is_none());
+    assert!(!super::renewed(&ctx, &[], "a7f3", 1));
+}

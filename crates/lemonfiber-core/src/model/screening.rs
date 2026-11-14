@@ -264,3 +264,6 @@ fn withheld(secret: Option<&String>) -> Option<&'static str> {
 
 /// What stands for a secret where it is debugged.
 pub const WITHHELD: &str = "<withheld>";
+
+#[cfg(test)]
+mod tests;

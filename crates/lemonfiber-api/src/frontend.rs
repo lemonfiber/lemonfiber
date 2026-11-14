@@ -207,3 +207,6 @@ fn allowed(response: &mut Response<Body>, front_door: Option<&str>) {
         .headers_mut()
         .insert(header::CONTENT_SECURITY_POLICY, policy);
 }
+
+#[cfg(test)]
+mod tests;
