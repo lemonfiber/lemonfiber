@@ -416,3 +416,6 @@ fn origin(url: &Url) -> String {
         url.port_or_known_default().unwrap_or_default()
     )
 }
+
+#[cfg(test)]
+mod tests;

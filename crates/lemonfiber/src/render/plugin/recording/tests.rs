@@ -84,14 +84,16 @@ fn a_plugin_recording_everything_or_nothing_says_so() {
 
 #[test]
 fn the_machine_form_is_the_report_in_an_envelope() {
-    let said = crate::render::answer(
-        &lemonfiber_core::app::Outcome::PluginRecording(read(
-            vec![taken(Took::Overran { seconds: 5 })],
-            false,
-        )),
-        true,
-    )
-    .text();
+    let overran = read(vec![taken(Took::Overran { seconds: 5 })], false);
+    let outcome = lemonfiber_core::app::Outcome::PluginRecording(overran.clone());
+    assert!(crate::render::answer(&outcome, false)
+        .text()
+        .starts_with(&shown(&overran)));
+    assert_ne!(
+        crate::exit::shown(crate::exit::settled(&outcome)),
+        crate::exit::success()
+    );
+    let said = crate::render::answer(&outcome, true).text();
     assert!(said.contains(r#""kind":"plugin-recording""#), "{said}");
     assert!(said.contains(r#""api_version""#), "{said}");
     assert!(said.contains(r#""outcome":"overran""#), "{said}");

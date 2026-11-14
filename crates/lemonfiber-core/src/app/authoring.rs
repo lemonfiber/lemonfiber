@@ -70,11 +70,10 @@ async fn vouched(ctx: &Ctx, path: &Path, keys: &[PathBuf]) -> Result<Outcome, Bo
 
 /// Each run proof of the plugin at `path`, run and recorded.
 async fn recorded(ctx: &Ctx, path: &Path, taking: &Retaking) -> Result<Outcome, Box<Problem>> {
-    let fresh = || ctx.seams.sessions.opened();
     let recorder = Recorder {
         program: ctx.seams.program.as_ref(),
         serving: ctx.seams.serving.as_ref(),
-        transport: &fresh,
+        transport: ctx.seams.sessions.as_ref(),
         random: ctx.seams.random.as_ref(),
         taking,
         confined: ctx.seams.confined.as_ref(),

@@ -23,7 +23,6 @@ pub(crate) use served::passes as health_passes;
 pub(super) use served::{answering, mountable, settled_as, started};
 
 use std::path::Path;
-use std::sync::Arc;
 
 use lemonfiber_plugin::Manifest;
 use serde::Serialize;
@@ -31,7 +30,7 @@ use serde::Serialize;
 use super::claimed::{sourced, Unreadable};
 use super::installed::{Installed, Placed};
 use crate::doctor::BUNDLED_CHECKS;
-use crate::ports::http::Http;
+use crate::ports::http::Sessions;
 use crate::ports::program::Program;
 use crate::ports::random::Random;
 use crate::ports::serving::Serving;
@@ -70,7 +69,7 @@ pub struct Recorder<'a> {
     /// Serves a service's image, for its requests.
     pub serving: &'a dyn Serving,
     /// A fresh transport, holding no session, for each service's asking.
-    pub transport: &'a (dyn Fn() -> Arc<dyn Http> + Send + Sync),
+    pub transport: &'a dyn Sessions,
     /// Where a credential a first run mints comes from.
     pub random: &'a dyn Random,
     /// Whether what is taken is written or held to what is there.

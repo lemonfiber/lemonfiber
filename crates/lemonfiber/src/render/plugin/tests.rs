@@ -636,8 +636,16 @@ fn what_was_vouched_for_is_carried_in_an_envelope_where_a_script_asked() {
         images: Vec::new(),
         installable: false,
     };
-    let json =
-        crate::render::answer(&lemonfiber_core::app::Outcome::PluginProvenance(read), true).text();
+    let page = super::provenance(&read).text();
+    let outcome = lemonfiber_core::app::Outcome::PluginProvenance(read);
+    assert!(crate::render::answer(&outcome, false)
+        .text()
+        .starts_with(&page));
+    assert_ne!(
+        crate::exit::shown(crate::exit::settled(&outcome)),
+        crate::exit::success()
+    );
+    let json = crate::render::answer(&outcome, true).text();
     assert!(json.contains(r#""kind":"plugin-provenance""#), "{json}");
     assert!(json.contains(r#""id":"komga""#), "{json}");
     assert!(json.contains(r#""installable":false"#), "{json}");

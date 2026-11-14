@@ -254,6 +254,13 @@ pub trait Sessions: Send + Sync {
     fn opened(&self) -> std::sync::Arc<dyn Http>;
 }
 
+/// A function handing out a transport holding no session is where one comes from.
+impl<F: Fn() -> std::sync::Arc<dyn Http> + Send + Sync> Sessions for F {
+    fn opened(&self) -> std::sync::Arc<dyn Http> {
+        self()
+    }
+}
+
 /// A shared handle to a transport is a transport.
 ///
 /// Needed wherever something wraps what is already being shared — a decorator that

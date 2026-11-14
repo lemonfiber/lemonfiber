@@ -93,11 +93,15 @@ fn each_case_is_said_under_its_contract_and_the_whole_is_judged() {
 
     assert!(said(&read(Vec::new(), Vec::new(), true))
         .contains("It speaks no contract, so there is nothing to judge."));
-    let json = crate::render::answer(
-        &lemonfiber_core::app::Outcome::PluginConformance(passing),
-        true,
-    )
-    .text();
+    let outcome = lemonfiber_core::app::Outcome::PluginConformance(passing.clone());
+    assert!(crate::render::answer(&outcome, false)
+        .text()
+        .starts_with(&said(&passing)));
+    assert_eq!(
+        crate::exit::shown(crate::exit::settled(&outcome)),
+        crate::exit::success()
+    );
+    let json = crate::render::answer(&outcome, true).text();
     assert!(json.contains(r#""kind":"plugin-conformance""#), "{json}");
     assert!(json.contains(r#""api_version""#), "{json}");
     assert!(json.contains(r#""conforms":true"#), "{json}");

@@ -312,7 +312,7 @@ impl Asking<'_> {
     /// that failed and why.
     async fn ready(&self) -> Result<Reached, (&'static str, String)> {
         let upstream = Addressed::to(
-            (self.recorder.transport)(),
+            self.recorder.transport.opened(),
             LOOPBACK,
             super::served::inside(self.upstream),
         );
@@ -326,7 +326,7 @@ impl Asking<'_> {
         )
         .await
         .map_err(|why| ("health", why))?;
-        let adapter = (self.recorder.transport)();
+        let adapter = self.recorder.transport.opened();
         let base = self
             .fronting
             .contract
