@@ -1,0 +1,77 @@
+{
+  "fields": {
+    "against": {
+      "type": [
+        "ref:PluginEvidence"
+      ],
+      "required": true
+    },
+    "capabilities": {
+      "type": [
+        "array[ref:Claiming]"
+      ],
+      "required": true
+    },
+    "checks": {
+      "type": [
+        "array[ref:Asserted]"
+      ],
+      "required": true
+    },
+    "contributions": {
+      "type": [
+        "array[ref:Contributed]"
+      ],
+      "required": true
+    },
+    "extension_points_version": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "installable": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "proofs": {
+      "type": [
+        "array[ref:Asserted]"
+      ],
+      "required": true
+    },
+    "refusals": {
+      "type": [
+        "array[ref:Violation]"
+      ],
+      "required": true
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "vocabulary_version": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

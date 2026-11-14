@@ -22,7 +22,7 @@ use clap::Subcommand;
 /// cannot be quietly answered by the other.
 #[derive(Debug, Subcommand)]
 pub enum PluginCommand {
-    /// The five documents, each a word of its own on the command line.
+    /// What a plugin author reads, each a word of its own on the command line.
     #[command(flatten)]
     Authoring(Authoring),
     /// Install a plugin, recording what installing it decided.
@@ -212,16 +212,11 @@ pub enum PluginCommand {
 
 /// What a plugin author can be told, with nothing running.
 ///
-/// Five reads and no verbs. Nothing here installs, removes or changes anything:
-/// three are the documents lemonfiber publishes about what a plugin may claim, where
-/// it may contribute and what shape its manifest takes, the fourth reads a manifest
-/// on a path and says what this build makes of it, and the fifth asks each image's
-/// registry what it holds beside that image.
-///
-/// The first four answer with no network, no catalogue and no stack, and each says
-/// which generation it is reporting — an author comparing two answers needs to know
-/// whether the difference is their build or their manifest. The fifth is the one that
-/// reaches out, which is why it is its own request rather than part of another.
+/// Three are the documents lemonfiber publishes about what a plugin may claim, where it
+/// may contribute and what shape its manifest takes. The others read a plugin's own
+/// source: what it claims, what its recordings say about the contracts it speaks, what
+/// each image's registry holds beside that image, and each run proof run and recorded.
+/// None of them needs a stack.
 #[derive(Debug, Subcommand)]
 pub enum Authoring {
     /// List the capabilities a service can claim, and what claiming one undertakes.

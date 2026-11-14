@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What asking for a capability comes to.\n\nCarried as one word and its subject rather than as three shapes, so a reader of the\nmachine-readable form branches on `answer` and finds the rest where the word says.",
+  "oneOf": [
+    {
+      "description": "Exactly one candidate claims it, and it is what a wiring reaches.",
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string",
+          "const": "by"
+        },
+        "service": {
+          "description": "The service that fills it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "answer",
+        "service"
+      ]
+    },
+    {
+      "description": "More than one does. Refused until the operator chooses, and every one of them\nis named — resolving it by install order, precedence or recency is the thing\nthis answer exists instead of.",
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string",
+          "const": "contested"
+        },
+        "claimants": {
+          "description": "Every candidate, named.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "answer",
+        "claimants"
+      ]
+    },
+    {
+      "description": "Nothing installed claims it, or everything that does has been refuted or is\nunproven.",
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string",
+          "const": "unfilled"
+        }
+      },
+      "required": [
+        "answer"
+      ]
+    }
+  ]
+}

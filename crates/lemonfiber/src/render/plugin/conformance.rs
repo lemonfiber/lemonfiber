@@ -3,21 +3,10 @@
 use lemonfiber_core::plugin::{CaseVerdict, Conformed};
 
 use super::super::Lines;
-use super::{counted, document};
-
-/// What judging a plugin's conformance recordings came to, in whichever form was asked.
-pub(crate) fn conformed(read: &Conformed, json: bool) -> Option<Lines> {
-    if json {
-        return serde_json::to_string_pretty(read)
-            .ok()
-            .as_deref()
-            .map(document);
-    }
-    Some(judged(read))
-}
+use super::counted;
 
 /// Each case under the contract it is of, and what the whole comes to.
-fn judged(read: &Conformed) -> Lines {
+pub(crate) fn judged(read: &Conformed) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
         "{} — what its recordings say about the contracts it speaks",

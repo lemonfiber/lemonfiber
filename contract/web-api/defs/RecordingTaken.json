@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One recording a manifest names, and what taking it came to.",
+  "type": "object",
+  "properties": {
+    "fixture": {
+      "description": "The recording it names.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "named": {
+      "description": "What names it: a proof, a claim's probe or a contributed check.",
+      "type": "string"
+    },
+    "took": {
+      "description": "What taking it came to.",
+      "$ref": "Took.json"
+    }
+  },
+  "required": [
+    "named",
+    "took"
+  ]
+}

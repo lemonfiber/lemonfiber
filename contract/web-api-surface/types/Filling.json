@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "answer": {
+      "type": [
+        "const:\"by\"",
+        "const:\"contested\"",
+        "const:\"unfilled\""
+      ],
+      "required": true
+    },
+    "claimants": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"by\"",
+    "\"contested\"",
+    "\"unfilled\""
+  ]
+}

@@ -292,7 +292,11 @@ async fn asked(
     scrub: &mut Scrub,
 ) -> Result<Vec<Answer>, (String, String)> {
     let served = reaching.served;
-    let plain = Addressed::to((recorder.transport)(), LOOPBACK, inside(reaching.placed));
+    let plain = Addressed::to(
+        recorder.transport.opened(),
+        LOOPBACK,
+        inside(reaching.placed),
+    );
     healthy(
         recorder.serving,
         plain.as_ref(),

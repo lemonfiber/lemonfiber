@@ -18,7 +18,7 @@ use std::sync::Arc;
 use crate::docker::{Engine, EngineVolumes, Images, Locations, Networks};
 use crate::filesystem::{Confined, Eraser, Volume};
 use crate::hosting::Host;
-use crate::http::Http;
+use crate::http::{Http, Sessions};
 use crate::nntp::Nntp;
 use crate::occupancy::Occupancy;
 use crate::process::Runner;
@@ -43,6 +43,8 @@ pub struct Seams {
     pub filesystem: Arc<dyn FileSystem>,
     /// How requests leave this machine.
     pub http: Arc<dyn Http>,
+    /// Where a transport holding no session comes from, for each service a run asks in turn.
+    pub sessions: Arc<dyn Sessions>,
     /// How a container registry is asked what it publishes.
     pub registry: Arc<dyn Registry>,
     /// How the engine is asked what it has pulled.

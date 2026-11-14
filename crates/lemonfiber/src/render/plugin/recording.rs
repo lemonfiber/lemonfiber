@@ -3,22 +3,11 @@
 use lemonfiber_core::plugin::{Recorded, Took};
 
 use super::super::Lines;
-use super::{counted, document};
-
-/// What taking a plugin's recordings again came to, in whichever form was asked.
-pub(crate) fn recorded(read: &Recorded, json: bool) -> Option<Lines> {
-    if json {
-        return serde_json::to_string_pretty(read)
-            .ok()
-            .as_deref()
-            .map(document);
-    }
-    Some(said(read))
-}
+use super::counted;
 
 /// Each recording and what taking it came to, each service that failed, and what the
 /// whole comes to.
-fn said(read: &Recorded) -> Lines {
+pub(crate) fn said(read: &Recorded) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
         "{} — every recording its manifest names, taken again",

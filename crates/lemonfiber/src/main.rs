@@ -292,14 +292,9 @@ async fn main() -> ExitCode {
         Request::Alerts { action } => taken!(translate::alerts(action)),
         Request::Quality { action } => taken!(quality(action)),
         Request::Doctor(asked) => taken!(doctoring(&ctx, asked, cli.json).await),
-        // Two of the words under this one are about this machine and go through
-        // dispatch like any other verb. The five that are not are documents this
-        // build generated at compile time, so they are answered here and never
-        // dispatched: there is no stack to ask, nothing to decide, and a context to
-        // build would be a context nothing reached through.
         Request::Plugin { read } => match taken!(translate::plugin(read)) {
             translate::Under::Dispatched(command) => keyed(&mut ctx, command, cli.json),
-            translate::Under::Published(read) => return for_an_author(&read, cli.json).await,
+            translate::Under::Published(read) => return for_an_author(read, cli.json),
         },
         Request::Trace(asked) => traced(&asked.term, asked.season, asked.search),
         // Narrated for minutes and then one report, so the report goes through
@@ -406,30 +401,9 @@ fn agreed(offer: Option<String>) -> Option<String> {
     offer.filter(|named| !named.trim().is_empty())
 }
 
-/// Put a plugin author's answer in front of them, and end with its code.
-///
-/// The one part of that errand this file keeps: which adapter reaches a registry is
-/// the edge's to choose, and so is writing to a stream. What to say and what to exit
-/// with is decided in [`authoring`], where a test can hold it.
-async fn for_an_author(read: &lemonfiber::cli::Authoring, json: bool) -> ExitCode {
-    let web: std::sync::Arc<dyn lemonfiber_core::ports::http::Http> =
-        std::sync::Arc::new(lemonfiber_adapters::http::Web::new());
-    let asking = lemonfiber_adapters::registry::Oci::new(std::sync::Arc::clone(&web));
-    let engine = lemonfiber_adapters::Daemon::reaching(lemonfiber_adapters::docker_target());
-    let fresh = || -> std::sync::Arc<dyn lemonfiber_core::ports::http::Http> {
-        std::sync::Arc::new(lemonfiber_adapters::http::Web::new())
-    };
-    let taking = authoring::taking(read);
-    let recorder = lemonfiber_core::plugin::Recorder {
-        program: &engine,
-        serving: &engine,
-        transport: &fresh,
-        random: &lemonfiber_adapters::Os,
-        taking: &taking,
-        confined: &lemonfiber_adapters::Disk,
-        patience: lemonfiber_core::app::PATIENCE,
-    };
-    let answered = authoring::published(read, json, &asking, recorder).await;
+/// Put a published document in front of a plugin author, and end with its code.
+fn for_an_author(read: authoring::Document, json: bool) -> ExitCode {
+    let answered = authoring::published(read, json);
     if let Some(fault) = answered.fault {
         complain!("error: {fault}");
     }

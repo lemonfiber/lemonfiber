@@ -24,14 +24,11 @@ use lemonfiber_core::plugin::{
 // to. Its own file because it answers a different question from a different source —
 // this one reads the documents the build publishes, that one reads one machine's
 // record — and because two readers in one file is two files nobody split.
-mod conformance;
+pub(crate) mod conformance;
 mod machine;
-mod recording;
-
-pub(crate) use conformance::conformed;
+pub(crate) mod recording;
 
 pub(crate) use machine::installs;
-pub(crate) use recording::recorded;
 
 use super::Lines;
 
@@ -161,39 +158,13 @@ fn taken(occupied: &[String]) -> String {
     format!("{} — {}", occupied.len(), occupied.join(", "))
 }
 
-/// What one plugin's source claims, in whichever form was asked for.
-///
-/// The machine-readable form is the report as it stands rather than a second shape
-/// written beside it: what an author's CI branches on and what a person reads are the
-/// same answer, and two renderings of one answer is the disagreement this avoids.
-pub(crate) fn claimed(read: &Claimed, json: bool) -> Option<Lines> {
-    if json {
-        return serde_json::to_string_pretty(read)
-            .ok()
-            .as_deref()
-            .map(document);
-    }
-    Some(claims(read))
-}
-
-/// What anybody has said about the images a plugin pins, in whichever form was asked.
-pub(crate) fn vouched(read: &Vouched, json: bool) -> Option<Lines> {
-    if json {
-        return serde_json::to_string_pretty(read)
-            .ok()
-            .as_deref()
-            .map(document);
-    }
-    Some(provenance(read))
-}
-
 /// Three answers, each said as itself.
 ///
 /// The words are the whole point. *Unproven* is not a softer *refused* and not a
 /// quieter *signed*: it is the answer that says nobody has claimed this image, and an
 /// operator deciding whether to go on needs it kept apart from a claim that did not
 /// hold. So each line says which of the three it is before it says anything else.
-fn provenance(read: &Vouched) -> Lines {
+pub(crate) fn provenance(read: &Vouched) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("{} — what its images are vouched for", read.id));
     lines.put(String::new());
@@ -225,7 +196,7 @@ fn provenance(read: &Vouched) -> Lines {
 /// that contradicts what this build publishes is refused outright rather than partly
 /// applied, so reporting what its claims would have come to would be describing an
 /// install that is not going to happen.
-fn claims(read: &Claimed) -> Lines {
+pub(crate) fn claims(read: &Claimed) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!("{} {} — {}", read.id, read.version, read.name));
     lines.put(format!(

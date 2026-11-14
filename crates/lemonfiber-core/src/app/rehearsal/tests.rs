@@ -1,16 +1,17 @@
 use super::refusing::refused;
 use super::{
-    asked, carried, not_taught_yet, verdict, Asked, Rehearsal, A_SEARCH_IS_THE_ANSWER,
-    MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
+    asked, carried, not_taught_yet, verdict, Asked, Rehearsal, A_RECORDING_IS_THE_RUN,
+    A_SEARCH_IS_THE_ANSWER, MATERIAL_IS_MATERIAL, THE_CHECK_IS_THE_DISRUPTION,
+    THE_WALK_IS_THE_OBSERVATION,
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
     MigrateAction, QualityAction, Removing, Setting, Settling,
 };
 use crate::app::engine::Waiting;
-use crate::app::plugins;
 use crate::app::setup::SetupAction;
 use crate::app::Restarting;
+use crate::app::{authoring, plugins};
 use crate::app::{repair, restore, update};
 use crate::app::{
     Command, Diagnosing, Gathering, Inviting, LettingGo, Restoring, Teardown, Tracing,
@@ -147,6 +148,17 @@ fn examining(disruptive: bool) -> Command {
     })
 }
 
+/// A recording of a plugin's run proofs, held to what is there or written.
+fn recording(check: bool) -> Command {
+    Command::Authoring(authoring::Asked::Record {
+        path: "komga".into(),
+        taking: crate::plugin::Retaking {
+            check,
+            ..crate::plugin::Retaking::default()
+        },
+    })
+}
+
 /// A support bundle, written out or only described.
 fn bundling(write: bool) -> Command {
     Command::Support(Gathering {
@@ -156,11 +168,11 @@ fn bundling(write: bool) -> Command {
     })
 }
 
-/// The four that refuse the flag for good say so, the read half of each command
+/// The five that refuse the flag for good say so, the read half of each command
 /// that shares a name with one does not, and the reason reaches the operator.
 ///
 /// Driven rather than read, because the two halves of `trace` and of `doctor` are
-/// one word to an operator and two arms here, and an arm nothing reaches is an arm
+/// one word to an operator and two arms here, as are the two halves of `plugin record`, and an arm nothing reaches is an arm
 /// whose pattern could be wrong in either direction without anything saying so.
 #[test]
 fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
@@ -176,6 +188,8 @@ fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
             false,
         ),
         (bundling(false), false),
+        (recording(true), false),
+        (recording(false), true),
     ] {
         let asked = asked(&command);
         assert!(
@@ -260,6 +274,17 @@ fn reads() -> Vec<Command> {
         Command::Provenance,
         Command::Stored,
         Command::Plugins(plugins::Asked::Installed),
+        Command::Authoring(authoring::Asked::Claims {
+            path: "komga".into(),
+        }),
+        Command::Authoring(authoring::Asked::Conform {
+            path: "komga".into(),
+        }),
+        Command::Authoring(authoring::Asked::Provenance {
+            path: "komga".into(),
+            keys: Vec::new(),
+        }),
+        recording(true),
         Command::Archives,
         Command::Migrate(MigrateAction::Survey),
         Command::Credentials(Asking::Read),
@@ -276,7 +301,7 @@ fn reads() -> Vec<Command> {
     ]
 }
 
-/// The four that refuse the flag for good, each with its own reason.
+/// The five that refuse the flag for good, each with its own reason.
 ///
 /// Listed with their reasons rather than under one verdict, because here the
 /// reason is the whole of the verdict: they differ in nothing else.
@@ -295,6 +320,7 @@ fn refused_for_good() -> Vec<(Command, Rehearsal)> {
             Command::Companion(crate::companion::Asked::Pair),
             Rehearsal::Cannot(MATERIAL_IS_MATERIAL),
         ),
+        (recording(false), Rehearsal::Cannot(A_RECORDING_IS_THE_RUN)),
     ]
 }
 

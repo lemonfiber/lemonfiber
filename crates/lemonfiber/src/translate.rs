@@ -27,13 +27,14 @@ use lemonfiber_core::quality::{self, Preset};
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
 
+use crate::authoring::Document;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
-    HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand,
-    QualityCommand, QueueCommand, RawBandwidth, RawCompanion, RawDownloads, RawKey,
-    RawPushEndpoint, RawRemoval, RawRemoving, RawRestart, UpdateCommand, WiringCommand,
+    AlertCommand, Asked, CompanionCommand, ConfigAction, DownloadsCommand, HostingCommand, Kept,
+    KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand, QualityCommand, QueueCommand,
+    RawBandwidth, RawCompanion, RawDownloads, RawKey, RawPushEndpoint, RawRemoval, RawRemoving,
+    RawRestart, UpdateCommand, WiringCommand,
 };
 use lemonfiber_core::app::Restarting;
 
@@ -456,14 +457,14 @@ pub(crate) enum Under {
     /// A value that arrives once, dispatched like any other verb.
     Dispatched(Command),
     /// A document this build generated at compile time, answered with no stack.
-    Published(Authoring),
+    Published(Document),
 }
 
 /// Which door this word goes through, and the value it goes through it as.
 ///
-/// The five documents answer the same on a machine with nothing installed as on one
-/// running everything, so there is no stack to ask and nothing to decide; the four
-/// verbs are about this machine and go where every other verb goes.
+/// The three published documents answer the same on a machine with nothing installed as
+/// on one running everything, and are printed as they were published; every other word
+/// is a command and goes where every other verb goes.
 ///
 /// # Errors
 ///
@@ -511,7 +512,7 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: consented(offer, approved, &inputs)?,
         },
-        PluginCommand::Authoring(read) => return Ok(Under::Published(read)),
+        PluginCommand::Authoring(read) => return Ok(crate::authoring::authored(read)),
     };
     Ok(Under::Dispatched(Command::Plugins(asked)))
 }

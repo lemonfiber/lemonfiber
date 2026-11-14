@@ -40,8 +40,8 @@ use super::command::{
 };
 use super::disturbance::Situation;
 use super::engine::Waiting;
-use super::plugins;
 use super::setup::SetupAction;
+use super::{authoring, plugins};
 use super::{Command, Ctx, Viewing, Wishing};
 
 /// Why a search cannot be rehearsed.
@@ -68,6 +68,11 @@ const MATERIAL_IS_MATERIAL: &str = "pairing material is the answer itself — a 
 const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observation — \
      what it reports is what this stack actually did with a real item, which cannot be \
      known without asking it to";
+
+/// Why recording a plugin's run proofs cannot be rehearsed.
+const A_RECORDING_IS_THE_RUN: &str = "a recording is what the plugin's services answered \
+     when they were run, which does not exist until they have been — --check holds a \
+     run to what is recorded and writes nothing";
 
 /// What a rehearsal means for one command.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -207,6 +212,22 @@ const fn queued(queueing: Queueing) -> Asked {
     }
 }
 
+/// What a doctor run is.
+///
+/// The killswitch check *is* the disruption. It takes the tunnel's own route down
+/// inside the container and watches what the rest of the stack does, which is the only
+/// way to find out whether anything leaks. A rehearsal of it could report the intent and
+/// nothing about the outcome, and the outcome is the whole of what was asked for.
+const fn diagnosed(diagnosing: &Diagnosing) -> Asked {
+    match diagnosing {
+        Diagnosing {
+            disruptive: true, ..
+        } => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
+        Diagnosing { accept: None, .. } => reads("doctor"),
+        Diagnosing { .. } => reports("doctor --accept", &[kind::DOCTOR]),
+    }
+}
+
 const fn viewed(viewing: &Viewing) -> Asked {
     match viewing {
         Viewing::Title { .. } => reports("title", &[kind::TITLE]),
@@ -281,21 +302,12 @@ pub const fn asked(command: &Command) -> Asked {
         // a rehearsal is one the operator no longer has.
         Command::Trace(tracing) => traced(tracing),
 
-        // The killswitch check *is* the disruption. It takes the tunnel's own route
-        // down inside the container and watches what the rest of the stack does,
-        // which is the only way to find out whether anything leaks. A rehearsal of it
-        // could report the intent and nothing about the outcome, and the outcome is
-        // the whole of what was asked for.
-        Command::Doctor(Diagnosing {
-            disruptive: true, ..
-        }) => cannot("doctor --disruptive", THE_CHECK_IS_THE_DISRUPTION),
-        Command::Doctor(Diagnosing { accept: None, .. }) => reads("doctor"),
-        Command::Doctor(_) => reports("doctor --accept", &[kind::DOCTOR]),
+        Command::Doctor(diagnosing) => diagnosed(diagnosing),
 
-        // Same shape, for the same reason: a walk adds an item, waits for the stack to
-        // do something with it, and reports what actually happened at each stage. What
-        // it would report is what the stack did, and a rehearsal has no stack doing
-        // anything.
+        // The same shape as the disruptive doctor run: a walk adds an item, waits for the
+        // stack to do something with it, and reports what actually happened at each
+        // stage. What it would report is what the stack did, and a rehearsal has no stack
+        // doing anything.
         Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
 
         // Reports. Each of these builds the report it would have filled in and stops
@@ -313,6 +325,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Pull { .. } => reports("pull", LIFECYCLE).disturbing(Situation::Fetching),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         Command::Plugins(asked) => plugin(asked),
+        Command::Authoring(asked) => authored(asked),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
         Command::Settings(Settling::Set { .. }) => reports("settings set", &[kind::SETTINGS]),
         Command::Settings(Settling::Clear { .. }) => reports("settings clear", &[kind::SETTINGS]),
@@ -437,6 +450,19 @@ mod withheld;
 
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
+
+/// What reading a plugin's own source reads and writes: recording writes what it takes,
+/// unless it is holding what it takes to what is there.
+const fn authored(asked: &authoring::Asked) -> Asked {
+    match asked {
+        authoring::Asked::Claims { .. } => reads("plugin claims"),
+        authoring::Asked::Conform { .. } => reads("plugin conform"),
+        authoring::Asked::Provenance { .. } => reads("plugin provenance"),
+        authoring::Asked::Record { taking, .. } if taking.check => reads("plugin record --check"),
+        authoring::Asked::Record { .. } => cannot("plugin record", A_RECORDING_IS_THE_RUN),
+    }
+}
+
 /// What a run of a plugin command reads, writes and disturbs.
 const fn plugin(asked: &plugins::Asked) -> Asked {
     match asked {

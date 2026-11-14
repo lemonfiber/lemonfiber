@@ -44,7 +44,7 @@ pub(crate) const P256_SPKI_PREFIX: &[u8] = &[
 const P256_POINT: usize = 65;
 
 /// What lemonfiber makes of an image's provenance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "provenance", rename_all = "kebab-case")]
 pub enum Provenance {
     /// A signature over a payload naming this digest verified against a held key.
@@ -128,6 +128,9 @@ impl Key {
             named: named.to_owned(),
             why: why.to_owned(),
         };
+        if !pem.lines().any(|line| line.starts_with("-----BEGIN ")) {
+            return Err(refuse("it is not a PEM block"));
+        }
         let body: String = pem
             .lines()
             .filter(|line| !line.starts_with("-----"))
@@ -275,7 +278,7 @@ fn about(payload: &str, digest: &str) -> Result<(), String> {
 }
 
 /// What one of a plugin's images is vouched for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Vouch {
     /// The service the image runs as.
     pub service: String,
@@ -289,7 +292,7 @@ pub struct Vouch {
 }
 
 /// Every image a plugin pins, and what anybody has said about each.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Vouched {
     /// The plugin's id.
     pub id: String,

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "probe": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "verdict": {
+      "type": [
+        "ref:PluginVerdict"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

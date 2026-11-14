@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One capability a plugin's service declares, and what this build makes of it.",
+  "type": "object",
+  "properties": {
+    "filling": {
+      "description": "What asking for it would come to, or nothing where nothing can ask.\n\nA namespaced capability has no answer here rather than an empty one: nothing\nconsumes it, which is what *inert* means, and reporting it as unfilled would be\ndescribing a gap where there is a design.",
+      "anyOf": [
+        {
+          "$ref": "Filling.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "description": "The capability's name.",
+      "type": "string"
+    },
+    "own": {
+      "description": "Whether it is this plugin's own rather than one from the core vocabulary.",
+      "type": "boolean"
+    },
+    "probes": {
+      "description": "Every probe the claim binds, in the order the vocabulary declares them.",
+      "type": "array",
+      "items": {
+        "$ref": "ProbeRan.json"
+      }
+    },
+    "service": {
+      "description": "The service declaring it.",
+      "type": "string"
+    },
+    "shown": {
+      "description": "How far the claim has been shown.",
+      "$ref": "Shown.json"
+    }
+  },
+  "required": [
+    "name",
+    "service",
+    "own",
+    "shown",
+    "probes"
+  ]
+}
