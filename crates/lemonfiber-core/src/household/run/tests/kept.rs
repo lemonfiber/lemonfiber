@@ -67,6 +67,8 @@ async fn a_kept_ask_is_listed_under_whoever_made_it_after_their_other_requests_n
         arrived: None,
         shelf_id: None,
         media: None,
+        kind: None,
+        unit: None,
         state: None,
         waiting_days: None,
         estimate: None,

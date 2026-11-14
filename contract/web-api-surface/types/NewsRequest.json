@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "kind": {
+      "type": [
+        "anyOf(null,ref:TitleKind)"
+      ],
+      "required": false
+    },
     "request": {
       "type": [
         "string"
@@ -21,6 +27,12 @@
     "title": {
       "type": [
         "null|string"
+      ],
+      "required": false
+    },
+    "unit": {
+      "type": [
+        "anyOf(null,ref:TitleUnit)"
       ],
       "required": false
     }

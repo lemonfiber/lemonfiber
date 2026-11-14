@@ -5,7 +5,8 @@ use crate::collected::store::{filed, Ask, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::config::Settings;
 use crate::household::State;
-use crate::ports::service::{Left, MusicUnit};
+use crate::model::{TitleKind, TitleUnit};
+use crate::ports::service::{BookUnit, Left, MusicUnit};
 use crate::test_support::{a_context, a_password, env_at};
 
 const DAY: Duration = Duration::from_secs(86_400);
@@ -328,5 +329,57 @@ fn a_kept_ask_is_listed_by_its_reference_in_the_household_s_words() {
     assert_eq!(
         declined.refused.map(|refused| refused.reason),
         Some("not this one".to_owned())
+    );
+}
+
+#[test]
+fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
+    let now = SystemTime::UNIX_EPOCH + DAY * 20_000;
+    let reasons = crate::asking::Reasons::default();
+    let of = |unit| {
+        let one = listed(
+            &Ask {
+                unit,
+                ..ask("ada", written(now), Standing::Waiting)
+            },
+            &reasons,
+            now,
+        );
+        (one.kind, one.unit)
+    };
+    assert_eq!(
+        of(Unit::Music(MusicUnit::Album)),
+        (Some(TitleKind::Music), Some(TitleUnit::Album))
+    );
+    assert_eq!(
+        of(Unit::Music(MusicUnit::Artist)),
+        (Some(TitleKind::Music), Some(TitleUnit::Artist))
+    );
+    assert_eq!(
+        of(Unit::Books(BookUnit::Book)),
+        (Some(TitleKind::Books), Some(TitleUnit::Book))
+    );
+    assert_eq!(
+        of(Unit::Books(BookUnit::Author)),
+        (Some(TitleKind::Books), Some(TitleUnit::Author))
+    );
+    assert_eq!(
+        of(Unit::Books(BookUnit::Series)),
+        (Some(TitleKind::Books), Some(TitleUnit::Series))
+    );
+    let shape = serde_json::to_value(listed(
+        &ask("ada", written(now), Standing::Waiting),
+        &reasons,
+        now,
+    ))
+    .ok();
+    assert_eq!(
+        shape
+            .as_ref()
+            .map(|one| (one.get("kind").cloned(), one.get("unit").cloned())),
+        Some((
+            Some(serde_json::json!("music")),
+            Some(serde_json::json!("album"))
+        ))
     );
 }
