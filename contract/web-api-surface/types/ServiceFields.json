@@ -18,6 +18,12 @@
       ],
       "required": false
     },
+    "container_hostname": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "env": {
       "type": [
         "object{ref:ServiceValue}"

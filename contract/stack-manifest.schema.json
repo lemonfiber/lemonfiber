@@ -459,6 +459,11 @@
           "default": null
         },
         "config_ro": {"description": "Whether its configuration directory is mounted read-only.", "type": "boolean", "default": false},
+        "container_hostname": {
+          "description": "The name its container knows itself by, where not the engine's own.",
+          "type": ["string", "null"],
+          "default": null
+        },
         "criticality": {"description": "How much its absence costs.", "$ref": "#/$defs/Criticality"},
         "dashboard": {
           "description": "Its entry on the household's dashboard, as the plugin the bundle assembles it\nfrom wires it. A stack directory's service declares none.",

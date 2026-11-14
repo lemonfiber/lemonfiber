@@ -25,6 +25,13 @@
       "description": "Whether its configuration directory is read-only.",
       "type": "boolean"
     },
+    "container_hostname": {
+      "description": "The name its container knows itself by, where it declares one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "env": {
       "description": "Its environment.",
       "type": "object",
