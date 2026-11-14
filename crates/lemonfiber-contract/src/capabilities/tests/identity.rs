@@ -4,7 +4,7 @@
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
     Access, Allowed, Certificate, Failure, Household, Invited, MediaServer, Member, NamedLibrary,
-    Session, Signed, Unrated,
+    Session, SignInCode, Signed, Unrated,
 };
 
 use super::{crosses_alike, source, Upstream, SERVICE};
@@ -124,6 +124,20 @@ impl Household for Upstream {
     async fn signs_devices_in(&self) -> Result<bool, Failure> {
         Ok(true)
     }
+    async fn sign_in_by_code(&self, device: &str) -> Result<SignInCode, Failure> {
+        Ok(SignInCode {
+            id: format!("code-for-{device}"),
+            code: "4XQZ".to_owned(),
+            approve_at: "https://accounts.example/link".to_owned(),
+            lapses_at: lemonfiber_ports::Instant::from_seconds(1_791_533_700),
+        })
+    }
+    async fn signed_by_code(&self, id: &str) -> Result<Option<Signed>, Failure> {
+        Ok((id == "code-for-phone").then(|| Signed {
+            id: "a7f3".to_owned(),
+            token: "token".to_owned(),
+        }))
+    }
 }
 
 /// Every operation of the capability, once, each answer written down.
@@ -164,6 +178,9 @@ async fn script<I: MediaServer + Household>(source: &I) -> Vec<String> {
         format!("{:?}", source.suspend("admin").await),
         format!("{:?}", source.sessions("a7f3").await),
         format!("{:?}", source.signs_devices_in().await),
+        format!("{:?}", source.sign_in_by_code("phone").await),
+        format!("{:?}", source.signed_by_code("code-for-phone").await),
+        format!("{:?}", source.signed_by_code("code-for-tablet").await),
     ]
 }
 

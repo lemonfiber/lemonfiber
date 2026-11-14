@@ -38,6 +38,10 @@ pub(super) struct Filling<'a> {
     /// Where the upstream's container holds the internal certificate written for the run,
     /// and its SHA-256, where one was written.
     pub(super) certificate: Option<(String, String)>,
+    /// Whether the upstream is claimed over `owner.claim` and so holds no administrator:
+    /// a field its `upstream.json` does not hold is filled with a credential minted for
+    /// the case.
+    pub(super) claimed: bool,
 }
 
 impl Filling<'_> {
@@ -97,12 +101,18 @@ impl Filling<'_> {
                 minted.push((field.clone(), fresh.clone()));
                 Ok(fresh)
             }
-            Placeholder::Upstream(field) => self
-                .upstream()?
-                .get(field)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| format!("{UPSTREAM_FILE} holds no {field}")),
+            Placeholder::Upstream(field) => {
+                let held = if self.claimed {
+                    held_upstream(self.held)?.unwrap_or_default()
+                } else {
+                    self.upstream()?
+                };
+                match held.get(field).and_then(Value::as_str) {
+                    Some(value) => Ok(value.to_owned()),
+                    None if self.claimed => self.minted(),
+                    None => Err(format!("{UPSTREAM_FILE} holds no {field}")),
+                }
+            }
             Placeholder::Answered { case, pointer } => {
                 let answered = self
                     .answers
