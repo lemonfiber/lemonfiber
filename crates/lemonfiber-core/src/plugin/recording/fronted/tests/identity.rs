@@ -50,7 +50,7 @@ fn identity_and(
                 (
                     "/sign_in_by_code",
                     vec![json(
-                        "{\"id\": \"c1\", \"code\": \"ABCD\", \"approve_at\": \"https://outside.example/link\", \"lapses_at\": \"2026-11-14T12:00:00Z\"}",
+                        "{\"id\": \"c1\", \"code\": \"ABCD\", \"approve_at\": \"https://outside.example/link\", \"lapses_at\": 1794657600}",
                     )],
                 ),
                 ("/lemonfiber/identity.source/v1/", vec![json("null")]),

@@ -50,8 +50,8 @@ pub struct SignInCode {
     pub code: String,
     /// Where the member approves the code.
     pub approve_at: String,
-    /// When the code lapses, as an RFC 3339 instant.
-    pub lapses_at: String,
+    /// When the code lapses.
+    pub lapses_at: Instant,
 }
 
 /// Making and withdrawing the accounts a household signs in with.

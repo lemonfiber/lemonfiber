@@ -129,7 +129,7 @@ impl Household for Upstream {
             id: format!("code-for-{device}"),
             code: "4XQZ".to_owned(),
             approve_at: "https://accounts.example/link".to_owned(),
-            lapses_at: "2026-10-09T08:15:00Z".to_owned(),
+            lapses_at: lemonfiber_ports::Instant::from_seconds(1_791_533_700),
         })
     }
     async fn signed_by_code(&self, id: &str) -> Result<Option<Signed>, Failure> {
