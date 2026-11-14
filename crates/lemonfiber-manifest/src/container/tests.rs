@@ -295,11 +295,14 @@ fn a_network_is_fenced_or_via_and_never_both_or_neither() {
     assert_eq!(read.ok(), Some(fenced));
 }
 
-/// A service carrying a sibling out of the machine holds nothing: confined, with no
-/// secret, port or data mount, and no other network beside it; and it never carries itself.
+/// A service carrying a sibling out of the machine holds nothing: confined, with no secret,
+/// port, data mount or capability address, and no other network beside it; and it never
+/// carries itself.
 #[test]
 fn an_egress_service_holds_nothing_and_never_carries_itself() {
-    let none = NONE;
+    let constant: BTreeMap<String, Value> = toml::from_str(r#"A = "x""#).unwrap_or_default();
+    let asking: BTreeMap<String, Value> =
+        toml::from_str(r#"E = { url_of = "indexer.search" }"#).unwrap_or_default();
     let egress = Network {
         via: None,
         fenced: true,
@@ -311,7 +314,7 @@ fn an_egress_service_holds_nothing_and_never_carries_itself() {
             .filter(|said| said.contains("network.egress_for: "))
             .collect()
     };
-    let mut holding = plain(&none);
+    let mut holding = plain(&asking);
     holding.network = Some(&egress);
     let held = carried(&holding);
     for what in [
@@ -320,6 +323,7 @@ fn an_egress_service_holds_nothing_and_never_carries_itself() {
         "declares a secret",
         "takes the data mount",
         "publishes a port",
+        "asks the address of a capability",
     ] {
         assert!(
             held.iter().any(|said| said.contains(what)),
@@ -331,7 +335,7 @@ fn an_egress_service_holds_nothing_and_never_carries_itself() {
         fenced: false,
         ..egress.clone()
     };
-    let mut empty = plain(&none);
+    let mut empty = plain(&constant);
     empty.network = Some(&bare);
     empty.posture = Posture::Confined;
     empty.secrets = &[];
