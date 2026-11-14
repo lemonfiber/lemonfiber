@@ -26,15 +26,12 @@
     {
       "name": "pass",
       "type": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/Handed"
-          },
-          {
-            "type": "null"
-          }
-        ],
-        "description": "The pass a browser holds, handed back for a new one around the same session."
+        "default": null,
+        "description": "The pass a browser holds, handed back for a new one around the same session.",
+        "type": [
+          "string",
+          "null"
+        ]
       }
     }
   ],
