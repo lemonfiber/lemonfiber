@@ -26,14 +26,14 @@ Options:
       --device <DEVICE>
           The id the browser keeps for itself: eight to sixty-four letters, digits and dashes
 
-      --pass <PASS>
-          The pass the browser holds, kept for longer around the same session
-
       --dry-run
           Say what would happen, and change nothing
 
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --pass <PASS>
+          The pass the browser holds, kept for longer around the same session
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one

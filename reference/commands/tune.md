@@ -23,17 +23,17 @@ Options:
       --member <MEMBER>
           Who watches it, named the way they sign in
 
-      --stream <STREAM>
-          The live stream to keep or close, as an earlier answer named it
-
-      --stop
-          Close the live stream named rather than keep it
-
       --dry-run
           Say what would happen, and change nothing
 
+      --stream <STREAM>
+          The live stream to keep or close, as an earlier answer named it
+
       --force
           Take the stack from a run that claimed it and did not give it back
+
+      --stop
+          Close the live stream named rather than keep it
 
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
