@@ -109,8 +109,7 @@ struct InWaves;
 impl InWaves {
     /// What it says, as the dashboard would carry it.
     fn said(value: u32) -> Option<Rendered> {
-        use lemonfiber_core::model::{kind, Envelope};
-        Rendered::of(Nature::State, &Envelope::new(kind::DASHBOARD, value))
+        Rendered::of(EventKind::Dashboard, &value)
     }
 }
 
@@ -210,5 +209,20 @@ async fn sources_gathered_together_say_each_in_turn() {
     let said = together.gather(true).await;
 
     assert_eq!(said.len(), 2);
+    assert!(said.iter().all(|one| one.said().contains("202")));
+}
+
+/// Several sources gathered as one in waves hand over what each says early, and answer
+/// with the rest.
+#[tokio::test(start_paused = true)]
+async fn sources_gathered_together_in_waves_hand_over_what_each_says_early() {
+    use super::Gathers as _;
+    let together = crate::events::extending::Together(vec![std::sync::Arc::new(InWaves)]);
+    let (early, mut heard) = super::Early::channel();
+
+    let said = together.waves(true, &early).await;
+
+    assert!(heard.try_recv().is_ok_and(|one| one.said().contains("101")));
+    assert_eq!(said.len(), 1);
     assert!(said.iter().all(|one| one.said().contains("202")));
 }

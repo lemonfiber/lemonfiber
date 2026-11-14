@@ -70,7 +70,7 @@ pub struct Early(mpsc::UnboundedSender<Rendered>);
 
 impl Early {
     /// A way to hand things over early, and the end they are heard at.
-    fn channel() -> (Self, mpsc::UnboundedReceiver<Rendered>) {
+    pub(crate) fn channel() -> (Self, mpsc::UnboundedReceiver<Rendered>) {
         let (said, heard) = mpsc::unbounded_channel();
         (Self(said), heard)
     }

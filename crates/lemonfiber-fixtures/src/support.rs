@@ -6,8 +6,10 @@
 //! not see them.
 
 mod reporting;
+mod slowed;
 
 pub use reporting::{Reporting, Tunnel};
+pub use slowed::Slowed;
 
 use std::sync::Arc;
 

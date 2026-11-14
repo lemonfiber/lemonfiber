@@ -169,10 +169,7 @@ pub(super) async fn assembled(
         egress(vpn.as_ref()),
         &mut conditions,
     );
-    let door = match (&services, last) {
-        (Panel::Pending, Some(was)) => was.door.clone(),
-        _ => front_door(ctx, manifest, &services, &undeclared, named.as_deref()),
-    };
+    let door = front_door(ctx, manifest, &services, &undeclared, named.as_deref());
 
     let storage = if answers.space == Asked::Pending
         && root.is_some()

@@ -106,10 +106,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) ->
     let mut last = dashboard.last.lock().await;
     let gathered = waves(&dashboard.ctx, last.as_ref(), |first| {
         if let Some(early) = early {
-            early.say(Rendered::of(
-                Nature::State,
-                &Envelope::new(kind::DASHBOARD, &first),
-            ));
+            early.say(Rendered::of(EventKind::Dashboard, &first));
         }
     })
     .await;

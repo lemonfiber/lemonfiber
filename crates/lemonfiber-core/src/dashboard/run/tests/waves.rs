@@ -1,52 +1,11 @@
 //! A slow source holds up no panel beside it: what answers within the first wave goes
 //! out at once, and a second snapshot fills in the rest.
 
-use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
-
 use super::*;
 use crate::dashboard::pace::{FIRST_WAVE, PANEL_WITHIN};
 use crate::dashboard::run::{paced, waves};
-use crate::dashboard::Snapshot;
-use crate::ports::docker::{Container, Engine, ExecOutput, Failure, LogLine, LogQuery, Stats};
+use crate::dashboard::{Downloader, Fetching, Snapshot};
 use crate::test_support::guard;
-
-/// An engine that takes `listing` to list the containers and `delay` over every command
-/// run inside one, which is how the tunnel is asked what it is doing.
-struct SlowInside {
-    /// The engine that answers once the delay is over.
-    engine: Reporting,
-    /// How long listing the containers takes.
-    listing: Duration,
-    /// How long each command inside a container takes.
-    delay: Duration,
-}
-
-#[async_trait]
-impl Engine for SlowInside {
-    async fn list(&self, project: &str) -> Result<Vec<Container>, Failure> {
-        tokio::time::sleep(self.listing).await;
-        self.engine.list(project).await
-    }
-
-    async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
-        tokio::time::sleep(self.delay).await;
-        self.engine.exec(container, argv).await
-    }
-
-    async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-        self.engine.stats(project).await
-    }
-
-    async fn logs(
-        &self,
-        project: &str,
-        services: &[String],
-        query: LogQuery,
-    ) -> Result<Receiver<LogLine>, Failure> {
-        self.engine.logs(project, services, query).await
-    }
-}
 
 /// A stack behind a healthy tunnel, its tunnel taking `delay` to answer each question.
 fn tunnel_taking(name: &str, delay: Duration) -> Ctx {
@@ -74,10 +33,10 @@ fn engine_taking(name: &str, tunnel: Tunnel, listing: Duration, delay: Duration)
     let engine = tunnel_engine(true, Some(tunnel)).alongside(guard::running());
     guard::keyed(
         a_context()
-            .engine(Arc::new(SlowInside {
+            .engine(Arc::new(lemonfiber_fixtures::support::Slowed {
                 engine,
                 listing,
-                delay,
+                inside: delay,
             }))
             .settings(settings)
             .build()
@@ -222,7 +181,7 @@ async fn a_first_wave_writes_nothing_down() {
 }
 
 /// An engine slower than the first wave leaves the services and the front door pending in
-/// a first snapshot, or the door the last gather showed where there was one.
+/// a first snapshot, or both as the last gather's services show them where there was one.
 #[tokio::test(start_paused = true)]
 async fn a_slow_engine_leaves_the_services_and_the_door_pending_or_as_they_were() {
     let ctx = engine_taking(
@@ -255,4 +214,55 @@ async fn a_slow_engine_leaves_the_services_and_the_door_pending_or_as_they_were(
             .collect::<Vec<_>>(),
         std::slice::from_ref(&second.snapshot.door)
     );
+}
+
+/// Every source still being asked.
+fn asking() -> super::super::Answers {
+    use super::super::Asked;
+    super::super::Answers {
+        seen: Asked::Pending,
+        tunnel: Asked::Pending,
+        household: Asked::Pending,
+        named: Asked::Pending,
+        moving: Asked::Pending,
+        queued: Asked::Pending,
+        asked: Asked::Pending,
+        space: Asked::Pending,
+        config_space: Asked::Pending,
+        linked: Asked::Pending,
+        forwarded: Asked::Pending,
+    }
+}
+
+/// A first wave with every source still being asked carries the last gather's transfers
+/// with their speeds stale and its download clients as they were, and leaves a storage
+/// panel the last gather could not fill pending.
+#[tokio::test(start_paused = true)]
+async fn a_first_wave_still_asking_carries_the_last_transfers_stale_and_waits_on_the_space() {
+    let ctx = tunnel_taking("waves-still-asking", Duration::ZERO);
+    let mut last = gather(&ctx, None).await;
+    last.transfers = Panel::Ready(vec![a_transfer(Reading::Known(2_048))]);
+    last.downloaders = Panel::Ready(vec![Downloader {
+        client: "qbittorrent".to_owned(),
+        state: Fetching::Fetching,
+    }]);
+    last.storage = Panel::unavailable("the data location could not be read");
+    let previous = super::super::Gathered::after(last.clone());
+    let manifest = super::super::manifest_of(&ctx);
+
+    let first = super::super::assembled(
+        &ctx,
+        Some(&previous),
+        manifest.as_ref(),
+        super::super::Wave::First,
+        asking(),
+    )
+    .await;
+
+    assert_eq!(
+        first.snapshot.transfers,
+        Panel::Ready(vec![a_transfer(Reading::Stale(2_048))])
+    );
+    assert_eq!(first.snapshot.downloaders, last.downloaders);
+    assert_eq!(first.snapshot.storage, Panel::Pending);
 }

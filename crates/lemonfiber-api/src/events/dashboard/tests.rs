@@ -146,3 +146,32 @@ fn with_no_phone_waiting_nothing_is_gathered_for_nobody() {
     let ctx = Arc::new(lemonfiber_testing::a_context().build());
     assert!(!Together::in_a_run(&ctx).wanted_unheard());
 }
+
+/// A dashboard whose engine is slower than the first wave hands what the rest answered
+/// over early, as a dashboard of its own, and says the whole of it once gathered.
+#[tokio::test(start_paused = true)]
+async fn a_slow_engine_hands_the_rest_of_the_dashboard_over_early() {
+    use crate::events::live::{Early, Gathers as _};
+    let engine = lemonfiber_fixtures::support::Slowed {
+        engine: lemonfiber_fixtures::support::Reporting::default(),
+        listing: std::time::Duration::from_secs(30),
+        inside: std::time::Duration::ZERO,
+    };
+    let dashboard = Dashboard::against(Arc::new(
+        lemonfiber_testing::a_context()
+            .engine(Arc::new(engine))
+            .build(),
+    ));
+    let (early, mut heard) = Early::channel();
+
+    let said = dashboard.waves(true, &early).await;
+
+    let first = heard
+        .try_recv()
+        .map(|one| one.said().to_owned())
+        .unwrap_or_default();
+    assert!(first.contains(kind::DASHBOARD.as_str()), "{first}");
+    assert!(said
+        .iter()
+        .any(|one| one.said().contains(kind::DASHBOARD.as_str())));
+}
