@@ -312,3 +312,6 @@ async fn exec(fake: &Fake, container: &str, argv: &[String]) -> Result<ExecOutpu
         }),
     }
 }
+
+#[cfg(test)]
+mod tests;

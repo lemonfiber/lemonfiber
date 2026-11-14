@@ -67,7 +67,10 @@ async fn every_other_question_is_refused() {
     assert!(household.claim("ana", "pw", "device").await.is_err());
     assert!(household.unclaim("a7f3").await.is_err());
     assert!(Household::withdraw(&*household, "a7f3").await.is_err());
-    assert!(household.when_invited("2026-01-01").await.is_err());
+    assert!(household
+        .when_invited(crate::ports::moment(0))
+        .await
+        .is_err());
     assert!(household.libraries().await.is_err());
     assert!(household.ratings().await.is_err());
     assert!(household.country().await.is_err());

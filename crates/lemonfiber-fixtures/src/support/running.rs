@@ -365,3 +365,6 @@ pub fn refused(stderr: &str) -> Output {
         stderr: stderr.to_owned(),
     }
 }
+
+#[cfg(test)]
+mod tests;

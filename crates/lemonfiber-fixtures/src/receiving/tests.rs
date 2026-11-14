@@ -47,6 +47,14 @@ async fn a_service_answering_normally_keeps_what_it_is_given() {
         .set_client_field("101", "tvCategory", Some("shows"))
         .await
         .is_ok());
+    assert!(service
+        .update_download_client("999", &client("elsewhere"))
+        .await
+        .is_ok());
+    assert!(service
+        .set_client_field("999", "tvCategory", None)
+        .await
+        .is_ok());
 
     assert_eq!(
         service.registered().first().map(|held| held.path.clone()),

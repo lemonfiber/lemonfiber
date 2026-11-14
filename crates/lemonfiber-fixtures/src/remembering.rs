@@ -92,3 +92,6 @@ impl Storage for Remembering {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

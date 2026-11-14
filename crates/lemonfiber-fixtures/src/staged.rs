@@ -314,3 +314,6 @@ async fn list(fake: &Machine, project: &str) -> Result<Vec<Container>, EngineFai
         .map(|service| Machine::container(service, health))
         .collect())
 }
+
+#[cfg(test)]
+mod tests;

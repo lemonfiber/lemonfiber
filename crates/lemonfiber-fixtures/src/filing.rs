@@ -1,7 +1,7 @@
 //! A download client holding the folder each category files under.
 
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use async_trait::async_trait;
 use lemonfiber_ports::service::{Failure, Filed, Filing};
@@ -133,10 +133,9 @@ fn file_under(fake: &Filer, folders: &[Filed]) -> Result<(), Failure> {
         });
     }
     if !fake.ignoring {
-        if let Ok(mut held) = fake.held.lock() {
-            for one in folders {
-                held.insert(one.category.clone(), one.folder.clone());
-            }
+        let mut held = fake.held.lock().unwrap_or_else(PoisonError::into_inner);
+        for one in folders {
+            held.insert(one.category.clone(), one.folder.clone());
         }
     }
     Ok(())

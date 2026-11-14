@@ -1,7 +1,7 @@
 //! A curator service the seed driver wires root folders and download clients into, as a
 //! test scripts it.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
@@ -200,10 +200,9 @@ fn update_download_client(
             detail: "HTTP 400: cannot update".to_owned(),
         });
     }
-    if let Ok(mut clients) = fake.clients.lock() {
-        if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
-            existing.category = Some(client.category.clone());
-        }
+    let mut clients = fake.clients.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+        existing.category = Some(client.category.clone());
     }
     Ok(())
 }
@@ -218,13 +217,12 @@ fn set_client_field(
     if matches!(fake.mode, Mode::Down) {
         return Err(down("sonarr"));
     }
-    if let Ok(mut clients) = fake.clients.lock() {
-        if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
-            existing.category = value.map(|value| Category {
-                field: field.to_owned(),
-                value: value.to_owned(),
-            });
-        }
+    let mut clients = fake.clients.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+        existing.category = value.map(|value| Category {
+            field: field.to_owned(),
+            value: value.to_owned(),
+        });
     }
     Ok(())
 }

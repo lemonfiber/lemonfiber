@@ -152,3 +152,42 @@ async fn unreached_says_whether_a_connection_was_made() {
         Some(("operation timed out".to_owned(), true))
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn answers_in_turn_carry_their_headers_and_a_late_one_runs_out_its_deadline() {
+    let fake = Fake::in_turn(vec![
+        Answer::served(200, "application/json", "{}"),
+        Answer::Headed {
+            status: 204,
+            headers: vec![("etag".to_owned(), "v1".to_owned())],
+            body: String::new(),
+        },
+        Answer::Late,
+    ]);
+    let request = Request {
+        deadline: Some(Duration::from_secs(5)),
+        ..asked(Method::Get, "http://x/thing")
+    };
+
+    let served = fake.send(&request).await;
+    let headed = fake.send(&request).await;
+    let late = fake.send(&request).await;
+    let exhausted = fake.send(&request).await;
+
+    assert_eq!(
+        served.map(|answered| answered.headers),
+        Ok(vec![(
+            "content-type".to_owned(),
+            "application/json".to_owned()
+        )])
+    );
+    assert_eq!(
+        headed.map(|answered| (answered.status, answered.headers)),
+        Ok((204, vec![("etag".to_owned(), "v1".to_owned())]))
+    );
+    assert_eq!(late.err().map(|failure| failure.connected), Some(true));
+    assert_eq!(
+        exhausted.err().map(|failure| failure.connected),
+        Some(false)
+    );
+}

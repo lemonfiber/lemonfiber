@@ -64,3 +64,6 @@ impl Upstream {
 fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests;
