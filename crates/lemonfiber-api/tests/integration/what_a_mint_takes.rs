@@ -180,22 +180,23 @@ async fn a_member_signed_in(
     allowed: bool,
     signing: Vec<Reply>,
 ) -> (axum::Router, String, PathBuf, Arc<Fake>) {
-    holding(named, allowed, signing, &household()).await
+    holding(named, allowed, signing, &[household().as_slice()]).await
 }
 
-/// The same, over a media server whose list of its household is `household`.
+/// The same, over a media server listing its household as `households` says, in turn:
+/// the first at Ana's sign-in, the last from then on.
 async fn holding(
     named: &str,
     allowed: bool,
     signing: Vec<Reply>,
-    household: &[Member],
+    households: &[&[Member]],
 ) -> (axum::Router, String, PathBuf, Arc<Fake>) {
     let transport = Fake::by_path_in_turn(vec![
         (media::identity("whoever"), signing),
         (media::identity("standing"), vec![standing()]),
         (
             media::identity("household"),
-            vec![media::answered(&household)],
+            households.iter().map(media::answered).collect(),
         ),
     ]);
     let mut ctx = a_stack(&format!("member-mint-{named}"), transport.clone());
@@ -442,7 +443,13 @@ async fn wrong_passwords_at_a_mint_earn_the_wait_a_sign_in_does() {
 
 #[tokio::test]
 async fn a_member_the_household_no_longer_lists_mints_nothing() {
-    let (router, member, env, _) = holding("unlisted", true, vec![recognised()], &[]).await;
+    let (router, member, env, _) = holding(
+        "unlisted",
+        true,
+        vec![recognised()],
+        &[household().as_slice(), &[]],
+    )
+    .await;
     let (refused, _) = sent(
         router,
         "POST",
