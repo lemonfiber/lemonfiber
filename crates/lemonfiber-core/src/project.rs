@@ -74,6 +74,9 @@ pub struct Reading<'a> {
     pub fence: Option<&'a str>,
     /// The addresses of the engine's host, as the engine last answered them.
     pub host: &'a [IpAddr],
+    /// Whether the engine's containers held the rules a fence installs, as the engine
+    /// last answered.
+    pub nftables: bool,
     /// The user and group owning the stack directory, root's handed to the fallback user,
     /// where that owner can be read.
     pub owner: Option<(u32, u32)>,
@@ -96,6 +99,7 @@ impl Reading<'_> {
             held: &|_| false,
             fence: None,
             host: &[],
+            nftables: false,
             owner: None,
         }
     }

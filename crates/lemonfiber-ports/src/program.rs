@@ -2,8 +2,10 @@
 //!
 //! Every container this starts is new, from the image the caller names by digest, with
 //! no mount but the one directory it is handed, and removed when the run ends whatever it
-//! came to. A proof's run joins no network and pulls no image; the one run that reads the
-//! engine host's own addresses joins the host's network and pulls the image it pins.
+//! came to. A proof's run joins no network and pulls no image. The runs of the fence image
+//! pull the image they pin: the one asking whether the engine's containers can hold a
+//! fence's rules joins no network and is given `NET_ADMIN` back, and the one that reads
+//! the engine host's own addresses joins the host's network and holds no capability.
 
 use std::path::PathBuf;
 use std::time::Duration;

@@ -34,6 +34,8 @@ impl<'a> Fencing<'a> {
                     Unfenced::Taken
                 } else if reading.fence.is_none() {
                     Unfenced::Unpinned
+                } else if !reading.nftables {
+                    Unfenced::Unheld
                 } else if reading.host.is_empty() {
                     Unfenced::Unaddressed
                 } else {
