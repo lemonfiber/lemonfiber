@@ -72,7 +72,7 @@ pub fn watch(
     fetching: &[(String, u8, bool)],
     conditions: &mut Conditions,
     thresholds: Thresholds,
-    now: &str,
+    now: crate::instant::Instant,
 ) -> Watched {
     let unverified: Vec<String> = answers
         .iter()
@@ -120,7 +120,7 @@ pub fn watch(
         // item was added.
         let held = conditions
             .get(&check)
-            .map(|condition| age(condition.since.as_str(), now))
+            .map(|condition| age(condition.since, now))
             .unwrap_or_default();
         if first && !thresholds.within(thresholds.for_stall(*stall), held) {
             stuck.push(Stuck {
@@ -175,16 +175,9 @@ fn sayable(item: &Item) -> Option<Stall> {
     }
 }
 
-/// How long ago a stamp was.
-///
-/// A stamp that cannot be read counts as no time at all, which delays a report
-/// rather than inventing one — the safe direction for a clock nobody can trust.
-fn age(since: &str, now: &str) -> std::time::Duration {
-    let (since, now) = (
-        since.parse::<u64>().unwrap_or_default(),
-        now.parse::<u64>().unwrap_or_default(),
-    );
-    std::time::Duration::from_secs(now.saturating_sub(since))
+/// How long ago an instant was.
+fn age(since: crate::instant::Instant, now: crate::instant::Instant) -> std::time::Duration {
+    std::time::Duration::from_secs(now.since(since))
 }
 
 /// One item per thing in the pipeline, holding both sides of it.

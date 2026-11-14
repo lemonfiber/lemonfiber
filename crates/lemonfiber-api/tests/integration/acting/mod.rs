@@ -3,6 +3,7 @@
 //! A shared module rather than a copy in each file: these settle what an action is
 //! given and what each argument looks like, and two copies of that would answer the
 //! same question differently the first time one of them was updated.
+
 pub(crate) use lemonfiber_api::actions::{
     named, Arguments, Only, Refused, TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE,
     TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS, TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK,
@@ -13,6 +14,7 @@ pub(crate) use lemonfiber_api::actions::{
     TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use lemonfiber_core::app::Command;
+use lemonfiber_core::instant::Instant;
 pub(crate) use std::collections::BTreeSet;
 pub(crate) use std::sync::Arc;
 
@@ -91,7 +93,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         preset: takes(TAKES_PRESET).then(|| "balanced".to_owned()),
         media_type: takes(TAKES_PRESET).then(|| "tv".to_owned()),
         archive: takes(TAKES_ARCHIVE).then(|| ARCHIVE.to_owned()),
-        at: takes(TAKES_RUN).then(|| STAMP.to_owned()),
+        at: takes(TAKES_RUN).then_some(STAMP),
         name: takes(TAKES_NAME).then(|| "ana".to_owned()),
         repoint: takes(TAKES_ARCHIVE),
         write: takes(TAKES_BUNDLING),
@@ -203,7 +205,7 @@ pub(crate) const INPUT: &str = "claim=1234";
 pub(crate) const ARCHIVE: &str = "lemonfiber-full-1700000000.tar.gz";
 
 /// The stamp a history entry carries, as a run is named by.
-pub(crate) const STAMP: &str = "1700000000";
+pub(crate) const STAMP: Instant = Instant::from_seconds(1_700_000_000);
 
 /// A log window that is not the one a bundle takes when nothing is asked for, so a
 /// command carrying the default cannot pass for one carrying what was given.

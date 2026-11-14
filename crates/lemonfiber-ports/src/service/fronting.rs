@@ -15,16 +15,26 @@ use async_trait::async_trait;
 
 use super::Failure;
 
-/// When a key was made and last used, as the server writes each moment.
+use crate::instant::Instant;
+
+/// When a key was made and last used.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[serde(deny_unknown_fields)]
 pub struct Dated {
-    /// When it was made.
-    pub created: Option<String>,
+    /// When it was made, where the server says.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub created: Option<Instant>,
     /// When it was last used, absent where the server says it never was.
-    pub last_used: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub last_used: Option<Instant>,
 }
 
 /// A key or account the server holds under an app's name that its filler did not make, or

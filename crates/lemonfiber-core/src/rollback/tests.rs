@@ -1,9 +1,10 @@
 use super::{everything, setting, standing, together, Reversal};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 
 fn set(operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: operation.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -22,7 +23,7 @@ fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
     let held = vec![
         set("komga", "A", None, "1"),
         Change {
-            at: "2".to_owned(),
+            at: Instant::from_seconds(2),
             ..set("komga", "B", None, "2")
         },
         set("apply", "C", None, "3"),
@@ -34,7 +35,7 @@ fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
         .collect();
     assert_eq!(mine, vec!["A", "B"], "both runs of it, and nothing else");
     assert_eq!(
-        together(&held, "komga", "1").len(),
+        together(&held, "komga", Instant::from_seconds(1)).len(),
         1,
         "where one run of it is one entry"
     );
@@ -44,7 +45,7 @@ fn everything_an_operation_made_is_every_run_of_it_and_nothing_else() {
 /// A resource a service now holds, made by an operation of ours.
 fn created(resource: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "seed".to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Created {
@@ -70,7 +71,7 @@ fn configured(field: &str) -> Change {
 
 fn made(path: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "apply".to_owned(),
         target: path.to_owned(),
         kind: Kind::Made {
@@ -82,7 +83,7 @@ fn made(path: &str) -> Change {
 /// A service moved from one pinned version to another.
 fn pinned(previous: &str, current: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "update".to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Pinned {
@@ -317,7 +318,7 @@ fn only_a_setting_change_names_a_setting() {
 #[test]
 fn the_changes_of_one_run_are_gathered_and_an_earlier_run_of_the_same_kind_is_not() {
     let earlier = |key: &str| Change {
-        at: "0".to_owned(),
+        at: Instant::from_seconds(0),
         ..set("apply", key, None, "1000")
     };
     let changes = [
@@ -326,7 +327,7 @@ fn the_changes_of_one_run_are_gathered_and_an_earlier_run_of_the_same_kind_is_no
         set("reconfigure", "TZ", None, "UTC"),
         set("apply", "UMASK", None, "022"),
     ];
-    let gathered = together(&changes, "apply", "1");
+    let gathered = together(&changes, "apply", Instant::from_seconds(1));
     assert_eq!(gathered.len(), 2, "both changes of the run asked about");
     let keys: Vec<_> = gathered
         .iter()
@@ -386,7 +387,7 @@ fn what_a_service_created_is_refused_because_nothing_removes_it() {
 /// The region a plugin's install wrote into the proxy, holding `body`.
 fn region(body: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "komga".to_owned(),
         target: "/stack/config/caddy/Caddyfile".to_owned(),
         kind: Kind::Region {
@@ -451,7 +452,7 @@ fn a_region_whose_markers_were_edited_is_refused_rather_than_guessed_at() {
 #[test]
 fn a_mint_goes_back_and_a_revoke_does_not() {
     let key = |kind: Kind| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "key".to_owned(),
         target: "ha".to_owned(),
         kind,
@@ -533,7 +534,7 @@ fn a_mint_goes_back_and_a_revoke_does_not() {
 /// A plugin's document a choice of filler wrote over, holding `written` in its place.
 fn rewritten(written: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "substitute".to_owned(),
         target: "/stack/compose/plugins/komga.yml".to_owned(),
         kind: Kind::Rewritten {
@@ -575,7 +576,7 @@ fn a_file_written_over_goes_back_only_while_it_is_lemonfibers() {
 
 fn settled(name: &str, previous: Option<&str>, current: Option<&str>) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "settings".to_owned(),
         target: name.to_owned(),
         kind: Kind::Setting {
@@ -621,7 +622,7 @@ fn a_setting_goes_back_whole_only_while_it_holds_what_was_recorded_and_nothing_l
 #[test]
 fn a_secret_is_judged_whole_and_left_to_the_store_to_check() {
     let change = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "plugin komga".to_owned(),
         target: "komga:token".to_owned(),
         kind: Kind::Secret {
@@ -642,7 +643,7 @@ fn a_secret_is_judged_whole_and_left_to_the_store_to_check() {
 #[test]
 fn a_part_stopped_by_a_choice_goes_back_whole() {
     let ran = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "substitute".to_owned(),
         target: "prowlarr".to_owned(),
         kind: Kind::Ran {
@@ -659,7 +660,7 @@ fn a_part_stopped_by_a_choice_goes_back_whole() {
 #[test]
 fn a_restart_goes_back_whole() {
     let restarted = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "seed".to_owned(),
         target: "recyclarr".to_owned(),
         kind: Kind::Restarted {
@@ -677,7 +678,7 @@ fn a_restart_goes_back_whole() {
 #[test]
 fn a_seeded_file_goes_back_only_while_it_holds_what_was_written() {
     let seeded = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "plugin komga".to_owned(),
         target: "/stack/config/komga/application.yml".to_owned(),
         kind: Kind::Seeded {

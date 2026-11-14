@@ -19,7 +19,10 @@ pub(super) fn proved(proof: &Reproof) -> Lines {
     for kept in &proof.kept {
         lines.put(format!(
             "    kept       {} {} at {}: {}",
-            kept.capability, kept.operation, kept.at, kept.why
+            kept.capability,
+            kept.operation,
+            kept.at.said(),
+            kept.why
         ));
     }
     lines.extend(super::proving(

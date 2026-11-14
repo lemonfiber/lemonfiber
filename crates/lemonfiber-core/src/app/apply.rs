@@ -31,6 +31,7 @@ use crate::config::paths::{Paths, SECRETS};
 use crate::config::store::{self, is_secret};
 use crate::error::codes::setup::{DIR_NOT_MADE, NOT_REVIEWED};
 use crate::error::{Diagnose, Problem, Remedy};
+use crate::instant::Instant;
 use crate::journal::{scrubbed, store_of, Change, Journal, Kind, Seal};
 use crate::ports::filesystem::Confined;
 use crate::ports::random::Random;
@@ -53,7 +54,7 @@ pub struct Applying<'a> {
     /// Where the stack this apply materialises comes from.
     pub source: Source,
     /// The time to stamp the journal with, which the wizard has no clock to do itself.
-    pub stamp: &'a str,
+    pub stamp: Instant,
     /// Where the secret store's key is drawn from, where the store has none yet.
     pub random: &'a dyn Random,
     /// How the stack's files are written into directories containers can write.
@@ -289,7 +290,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
     let held = crate::settings::Settings::at(&settings_at)?;
     let kept = crate::settings::keyed_at(&secrets_at, applying.random)?;
     let changed = |target: &str, kind: Kind| Change {
-        at: applying.stamp.to_owned(),
+        at: applying.stamp,
         operation: crate::wizard::APPLY.to_owned(),
         target: target.to_owned(),
         kind,
@@ -323,7 +324,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
         .map(|(name, value)| (name.as_str(), Some(value.as_str())))
         .collect();
     crate::settings::store::recorded(&settings_at, &changing)?;
-    let at = applying.stamp.parse().unwrap_or_default();
+    let at = applying.stamp.seconds();
     let keeping: Vec<Keeping<'_>> = secrets
         .iter()
         .map(|(name, value)| Keeping {
@@ -347,7 +348,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
 /// Credentials are deliberately left out — a second file holding a password would be
 /// a second file to leak one — and best-effort, like every other record kept beside
 /// the settings: an apply that could not write it still applied.
-fn remembered(paths: &Paths, plan: &Plan, stamp: &str) {
+fn remembered(paths: &Paths, plan: &Plan, stamp: Instant) {
     let path = paths.baseline();
     let mut baseline = match std::fs::read_to_string(&path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Baseline::new(),
@@ -387,10 +388,10 @@ fn made_by(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The journal entry for a directory apply created, so it can be removed again.
-fn made(path: &Path, stamp: &str) -> Change {
+fn made(path: &Path, stamp: Instant) -> Change {
     let path = path.display().to_string();
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: crate::wizard::APPLY.to_owned(),
         target: path.clone(),
         kind: Kind::Made { path },

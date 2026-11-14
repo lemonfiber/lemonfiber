@@ -41,6 +41,7 @@
 // crate's own tests and from its integration tests alike.
 pub use lemonfiber_error as error;
 pub use lemonfiber_ports as ports;
+pub use lemonfiber_ports::instant;
 pub use lemonfiber_ports::service::stage as trace;
 
 pub mod acknowledged;
@@ -81,7 +82,6 @@ pub mod generated;
 pub mod glossary;
 pub mod health;
 pub mod household;
-pub mod instant;
 pub mod invitation;
 pub mod journal;
 pub mod keys;

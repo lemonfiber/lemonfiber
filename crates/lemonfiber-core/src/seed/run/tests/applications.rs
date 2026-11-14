@@ -474,7 +474,7 @@ fn said_with_a_grant(
                     credential: credential.clone(),
                     of: granted.to_owned(),
                     serves: "indexer.search".to_owned(),
-                    at: String::new(),
+                    at: None,
                 });
             }
             one

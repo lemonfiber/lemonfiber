@@ -3,6 +3,7 @@
 use super::common::service::*;
 use super::{a_pre_existing_client, seed_clients_with};
 use lemonfiber_core::baseline::{Baseline, Origin, Record};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
@@ -24,7 +25,12 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
     }];
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
@@ -38,7 +44,7 @@ async fn a_client_at_lemonfibers_old_value_with_a_moved_intent_is_stale() {
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
     .into_iter()
@@ -68,7 +74,12 @@ async fn a_client_both_sides_changed_is_a_conflict() {
     }];
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
@@ -82,7 +93,7 @@ async fn a_client_both_sides_changed_is_a_conflict() {
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
     .into_iter()
@@ -117,7 +128,12 @@ async fn a_category_differing_only_by_whitespace_is_not_drift() {
         }),
     }];
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let (states, _recorded, changes) = seed_clients_with(
         FakeService::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
@@ -159,7 +175,7 @@ async fn a_whitespace_only_difference_with_no_baseline_is_lemonfibers_own() {
         recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
         Some(&Record {
             value: "tv".to_owned(),
-            at: "2".to_owned(),
+            at: Instant::from_seconds(2),
             origin: Origin::Written,
         }),
         "the value is lemonfiber's own, recorded as written not adopted",

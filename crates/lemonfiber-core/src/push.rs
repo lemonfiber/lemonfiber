@@ -45,7 +45,8 @@ pub struct Record {
     /// The phone's `WebPush` secret, in base64url.
     pub auth: String,
     /// When it was registered.
-    pub registered: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub registered: crate::instant::Instant,
     /// How many messages it is owed, at most as many alerts as a returning stream replays.
     #[serde(default)]
     pub owed: usize,
@@ -87,7 +88,7 @@ pub struct Registered {
     /// The `https` address its distributor gave.
     pub endpoint: String,
     /// When it was registered.
-    pub registered: String,
+    pub registered: crate::instant::Instant,
     /// Whether this was a rehearsal: what registering would come to, with nothing kept.
     pub rehearsed: bool,
 }
@@ -101,7 +102,7 @@ pub struct Listed {
     /// The `https` address its distributor gave.
     pub endpoint: String,
     /// When it was registered.
-    pub registered: String,
+    pub registered: crate::instant::Instant,
 }
 
 /// Every push endpoint, and what became of a removal.
@@ -121,7 +122,7 @@ impl From<&Record> for Listed {
         Self {
             name: record.name.clone(),
             endpoint: record.endpoint.clone(),
-            registered: record.registered.clone(),
+            registered: record.registered,
         }
     }
 }

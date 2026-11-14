@@ -284,7 +284,7 @@ fn each_grant_names_its_credential_whose_it_is_and_what_it_is_for_and_how_to_app
         credential: "SONARR_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "media.serve".to_owned(),
-        at: String::new(),
+        at: None,
     }];
 
     let asked = granting(&would, false).text();

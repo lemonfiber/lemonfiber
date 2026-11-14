@@ -3,6 +3,7 @@
 
 mod built;
 mod healing;
+mod keys;
 mod notifying;
 
 use lemonfiber_core::app::Outcome;
@@ -20,6 +21,7 @@ use built::{
     a_setup_part_way, a_shared_line, a_stack, a_substitution, a_walk, a_word, an_update, manifest,
     plan, what_is_installed, what_is_wired, what_leaves, where_this_copy_stands,
 };
+use keys::{a_device_key, a_key_claim, a_minted_key, every_device_key, every_key};
 
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
@@ -42,7 +44,9 @@ fn running() -> Vec<Outcome> {
             supported_schema: vec![1],
             stack: "0.1.0".to_owned(),
             compose: None,
-            attestation_status: Some("2026-10-13T00:45:44Z".to_owned()),
+            attestation_status: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_760_316_344,
+            )),
             changelog: lemonfiber_core::changelog::Notes::unread(),
         }),
         Outcome::Forms(FormsReport { forms: Vec::new() }),
@@ -181,7 +185,9 @@ fn diagnosing() -> Vec<Outcome> {
             }],
             requests: vec![lemonfiber_core::news::NewsRequest {
                 request: "books-12".to_owned(),
-                asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
+                asked: Some(lemonfiber_core::instant::Instant::from_seconds(
+                    1_762_603_200,
+                )),
                 title: Some("Dune".to_owned()),
                 kind: Some(lemonfiber_core::model::TitleKind::Books),
                 unit: Some(lemonfiber_core::model::TitleUnit::Series),
@@ -189,7 +195,7 @@ fn diagnosing() -> Vec<Outcome> {
             }],
             problems: vec![lemonfiber_core::news::NewsProblem {
                 check: "service.sonarr".to_owned(),
-                onset: "1759400000".to_owned(),
+                onset: lemonfiber_core::instant::Instant::from_seconds(1_759_400_000),
                 summary: "Sonarr is stopped".to_owned(),
             }],
             unread: vec![lemonfiber_core::news::NewsKind::Requests],
@@ -245,7 +251,9 @@ fn serving() -> Vec<Outcome> {
             remedy: None,
             address: Some("http://a-machine.local:8096".to_owned()),
             caution: None,
-            issued: Some("2026-09-29T10:00:00Z".to_owned()),
+            issued: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_759_140_000,
+            )),
             quick_connect: true,
             steps: vec!["Open the app on their device.".to_owned()],
             clients: vec![lemonfiber_core::model::HandedClient {
@@ -258,7 +266,9 @@ fn serving() -> Vec<Outcome> {
             sessions: vec![lemonfiber_core::model::HandedSession {
                 device: "Pixel 8".to_owned(),
                 client: "Jellyfin Android".to_owned(),
-                last_seen: Some("2026-09-29T10:05:00Z".to_owned()),
+                last_seen: Some(lemonfiber_core::instant::Instant::from_seconds(
+                    1_759_140_300,
+                )),
             }],
             rehearsed: false,
         }),
@@ -384,109 +394,19 @@ fn keeping() -> Vec<Outcome> {
         Outcome::PushEndpoint(lemonfiber_core::push::Registered {
             name: "pixel".to_owned(),
             endpoint: "https://push.example/abc".to_owned(),
-            registered: "2026-11-07T00:00:00Z".to_owned(),
+            registered: lemonfiber_core::instant::Instant::from_seconds(1_762_473_600),
             rehearsed: false,
         }),
         Outcome::PushEndpoints(lemonfiber_core::push::Listing {
             endpoints: vec![lemonfiber_core::push::Listed {
                 name: "pixel".to_owned(),
                 endpoint: "https://push.example/abc".to_owned(),
-                registered: "2026-11-07T00:00:00Z".to_owned(),
+                registered: lemonfiber_core::instant::Instant::from_seconds(1_762_473_600),
             }],
             removed: Some("tablet".to_owned()),
             rehearsed: false,
         }),
     ]
-}
-
-/// A device key registered from an Android phone's `StrongBox`.
-fn a_device_key() -> lemonfiber_core::device_keys::Registered {
-    lemonfiber_core::device_keys::Registered {
-        name: "pixel".to_owned(),
-        fingerprint: "cd".repeat(32),
-        backing: lemonfiber_core::device_keys::Backing::Strongbox,
-        app: format!("android:app.lemonfiber.companion@{}", "ef".repeat(32)),
-        registered: "2026-10-12T06:00:00".to_owned(),
-    }
-}
-
-/// One device key in use and one revoked, so every optional half is compared.
-fn every_device_key() -> lemonfiber_core::device_keys::Listing {
-    use lemonfiber_core::device_keys::{Backing, Listed, Listing};
-    let listed = |name: &str, backing: Backing| Listed {
-        name: name.to_owned(),
-        fingerprint: "cd".repeat(32),
-        backing,
-        app: "ios:ABCDE12345.app.lemonfiber.companion".to_owned(),
-        registered: "2026-10-12T06:00:00".to_owned(),
-        used: Some("2026-10-12T07:00:00".to_owned()),
-        revoked: None,
-    };
-    let mut gone = listed("old-phone", Backing::Tee);
-    gone.revoked = Some("2026-10-12T08:00:00".to_owned());
-    Listing {
-        keys: vec![listed("iphone", Backing::Enclave), gone],
-        revoked: Some("old-phone".to_owned()),
-        rehearsed: false,
-    }
-}
-
-/// A key just minted, with every optional half present: the address, the pin and a
-/// caution beside them.
-fn a_minted_key() -> lemonfiber_core::keys::Minted {
-    use lemonfiber_core::keys::{Minted, Purpose, Secret};
-    let source = lemonfiber_fixtures::ports::Chance::exactly(Some(vec![7; 32]));
-    let Some(secret) = Secret::mint(&source) else {
-        unreachable!("thirty-two bytes mint a key")
-    };
-    Minted {
-        name: "ha".to_owned(),
-        scope: "act".to_owned(),
-        purpose: Purpose::HomeAssistant,
-        secret,
-        address: Some("https://lemonfiber.local:8443".to_owned()),
-        pin: Some("ab".repeat(32)),
-        caution: Some("Serve it encrypted on your network first.".to_owned()),
-    }
-}
-
-/// A key minted as a claim, with the link that collects it.
-fn a_key_claim() -> lemonfiber_core::keys::Claimed {
-    lemonfiber_core::keys::Claimed {
-        name: "ha".to_owned(),
-        scope: "read".to_owned(),
-        purpose: lemonfiber_core::keys::Purpose::HomeAssistant,
-        link: format!(
-            "lemonfiber://key?address=https%3A%2F%2Flemonfiber.local%3A8443&fingerprint={}&stack=a1b2&expires=1791245400&claim=lfc_{}",
-            "ab".repeat(32),
-            "07".repeat(32)
-        ),
-        lapses: "2026-10-06T00:10:00".to_owned(),
-    }
-}
-
-/// A listing holding a key in use and one revoked, after a revoke.
-fn every_key() -> lemonfiber_core::keys::Listing {
-    use lemonfiber_core::keys::{Listed, Listing, Purpose, State};
-    let listed = |name: &str, state: State| Listed {
-        name: name.to_owned(),
-        scope: "read".to_owned(),
-        purpose: Purpose::Mcp,
-        state,
-        minted: "2026-10-05T06:00:00".to_owned(),
-        used: Some("2026-10-05T07:00:00".to_owned()),
-        revoked: None,
-        member_minted: false,
-        proved_by: Some("pixel".to_owned()),
-    };
-    let mut gone = listed("gone", State::Revoked);
-    gone.revoked = Some("2026-10-05T08:00:00".to_owned());
-    Listing {
-        keys: vec![listed("assistant", State::Active), gone],
-        revoked: Some("gone".to_owned()),
-        purposes: "What a purpose is worth.".to_owned(),
-        rehearsed: false,
-    }
 }
 
 /// A pause one client took and one nothing reached, with the caution a spent cap
@@ -521,14 +441,14 @@ fn a_pairing() -> lemonfiber_core::companion::Pairing {
     let material = lemonfiber_core::companion::Material {
         address: "https://192.168.1.9:8443".to_owned(),
         fingerprint: "ab".repeat(32),
-        expires: 1_790_813_400,
+        expires: lemonfiber_core::instant::Instant::from_seconds(1_790_813_400),
         stack: "000102030405060708090a0b0c0d0e0f".to_owned(),
     };
     lemonfiber_core::companion::Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
         compare: lemonfiber_core::companion::comparable(&material.fingerprint),
         material,
-        until: "2026-10-01T00:10:00".to_owned(),
+        until: lemonfiber_core::instant::Instant::from_seconds(1_790_813_400),
         replacing: "It changes only when somebody replaces it.".to_owned(),
         caution: Some("That address is a number.".to_owned()),
     }
@@ -634,7 +554,9 @@ fn a_search() -> lemonfiber_core::model::AskableReport {
             standing: Standing::WithinQuota,
             films: counted(2, 1),
             television: counted(5, 0),
-            frees_up: Some("2026-11-04T10:00:00Z".to_owned()),
+            frees_up: Some(lemonfiber_core::instant::Instant::from_seconds(
+                1_762_250_400,
+            )),
         },
         approval: "Nothing arrives until whoever runs the house has said yes to it.".to_owned(),
     }

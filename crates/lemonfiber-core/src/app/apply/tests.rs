@@ -1,7 +1,9 @@
+use crate::instant::Instant;
 use crate::test_support::a_fresh_write;
 use std::path::Path;
 
 use lemonfiber_fixtures::ports::Chance;
+use lemonfiber_fixtures::ports::STAMPED;
 
 use super::{apply, Applying, Baseline, SETTINGS};
 use crate::alert::{Appetite, Wants};
@@ -16,7 +18,7 @@ use crate::wizard::{Answer, Guarded, Library, Phase, Vpn, Wizard};
 /// What an apply writes with, over a real directory and a real machine's
 /// randomness — the key the journal's credentials are sealed under is made from
 /// the latter.
-fn applying<'a>(paths: &'a Paths, source: Source, stamp: &'a str) -> Applying<'a> {
+fn applying(paths: &Paths, source: Source, stamp: Instant) -> Applying<'_> {
     Applying {
         paths,
         source,
@@ -35,7 +37,7 @@ static A_MACHINE: Chance = Chance::cycling();
 fn made_dir(path: &Path) -> Change {
     let path = path.display().to_string();
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "apply".to_owned(),
         target: path.clone(),
         kind: Kind::Made { path },
@@ -119,7 +121,7 @@ fn applying_writes_the_settings_makes_the_data_directory_and_finishes_applied() 
     let root = dir.join("data-root");
     let mut wizard = reviewed(&root);
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     // The settings the plan named are on disk, the data directory was created,
     // and the wizard finished applied.
@@ -148,7 +150,7 @@ fn what_setup_wrote_is_remembered_so_a_later_hand_edit_can_be_told_from_it() {
     let paths = layout(&dir);
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     assert_eq!(
         remembering(&paths)
@@ -166,14 +168,14 @@ fn a_record_beside_the_settings_keeps_what_seeding_put_there() {
     let dir = scratch("merged");
     let paths = layout(&dir);
     let mut seeded = Baseline::new();
-    seeded.record("sonarr", "rootfolder", "/data/media/tv", "t");
+    seeded.record("sonarr", "rootfolder", "/data/media/tv", STAMPED);
     let _ = store::write(
         &paths.baseline(),
         &serde_json::to_string(&seeded).unwrap_or_default(),
     );
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let held = remembering(&paths);
     assert!(held.entry("sonarr", "rootfolder").is_some());
@@ -190,7 +192,7 @@ fn a_record_that_cannot_be_opened_at_all_stops_nothing_and_is_left_alone() {
     let _ = std::fs::create_dir_all(paths.baseline());
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     assert!(paths.baseline().is_dir(), "left exactly as it was");
 }
@@ -204,7 +206,7 @@ fn a_record_that_cannot_be_read_is_left_where_it_is() {
     let _ = store::write(&paths.baseline(), "not json at all");
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let text = std::fs::read_to_string(paths.baseline()).unwrap_or_default();
     assert_eq!(text, "not json at all");
@@ -216,7 +218,7 @@ fn the_applied_marker_reaches_disk_so_a_later_run_reads_it() {
     let paths = layout(&dir);
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let saved = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
     assert!(saved.contains("\"applied\""), "phase is persisted: {saved}");
@@ -233,7 +235,7 @@ fn every_write_is_journalled_so_it_can_be_unwound() {
     // directory made, then one Set per setting in plan order over a fresh file —
     // pinned to what should land, not to a recomputation of what apply wrote, so
     // a wrong key, a dropped setting, or a missing directory record is caught.
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let root_shown = root.display().to_string();
     let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
@@ -261,7 +263,7 @@ fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
     let root = parent.join("data");
     let mut wizard = reviewed(&root);
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     assert!(root.is_dir(), "the leaf was made");
     let root_shown = root.display().to_string();
@@ -291,7 +293,7 @@ fn an_existing_data_directory_is_left_alone_and_not_journalled() {
     assert!(std::fs::create_dir_all(&root).is_ok(), "the library exists");
     let mut wizard = reviewed(&root);
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let written = std::fs::read_to_string(paths.journal()).unwrap_or_default();
     assert!(
@@ -313,7 +315,7 @@ fn a_data_directory_that_cannot_be_made_stops_the_apply() {
     let root = blocker.join("data");
     let mut wizard = reviewed(&root);
 
-    let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
+    let stopped = apply(&mut wizard, &applying(&paths, external(), STAMPED));
 
     assert!(matches!(stopped, Err(problem) if problem.code == super::DIR_NOT_MADE));
     let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
@@ -339,7 +341,7 @@ fn the_embedded_stack_is_written_where_compose_reads_it_but_not_journalled() {
 
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), STAMPED)
     )
     .is_ok());
 
@@ -369,7 +371,7 @@ fn an_external_stack_is_left_where_it_is_and_not_written_here() {
     let paths = layout(&dir);
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     // The operator's own stack stays where it is; nothing is written to the
     // location an embedded stack would land in.
@@ -388,7 +390,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     let mut first = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut first,
-        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), STAMPED)
     )
     .is_ok());
 
@@ -402,7 +404,7 @@ fn a_second_apply_leaves_a_stack_file_the_operator_edited_exactly_as_they_set_it
     let mut again = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut again,
-        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), STAMPED)
     )
     .is_ok());
 
@@ -424,7 +426,7 @@ fn an_apply_records_the_checksums_of_what_it_wrote() {
     let mut wizard = reviewed(&dir.join("data-root"));
     assert!(apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t")
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), STAMPED)
     )
     .is_ok());
 
@@ -452,7 +454,7 @@ fn a_stack_that_cannot_be_written_stops_the_apply() {
 
     let stopped = apply(
         &mut wizard,
-        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), "t"),
+        &applying(&paths, Source::Embedded(&crate::stack::BUNDLED), STAMPED),
     );
 
     assert!(stopped.is_err(), "the stack could not be written");
@@ -467,7 +469,7 @@ fn an_unreviewed_wizard_is_refused_and_writes_nothing() {
     // Still gathering answers — apply has nothing settled to write.
     let mut wizard = Wizard::new(Environment::LinuxNative);
 
-    let refused = apply(&mut wizard, &applying(&paths, external(), "t"));
+    let refused = apply(&mut wizard, &applying(&paths, external(), STAMPED));
 
     assert!(matches!(refused, Err(problem) if problem.code == super::NOT_REVIEWED));
     assert!(!paths.env_file().exists(), "nothing was written");
@@ -491,7 +493,7 @@ fn a_stop_partway_through_the_writes_leaves_the_applying_marker_for_recovery() {
     let root = dir.join("data-root");
     let mut wizard = reviewed(&root);
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_err());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_err());
 
     let marker = std::fs::read_to_string(paths.setup_progress()).unwrap_or_default();
     assert!(marker.contains("\"applying\""), "left mid-apply: {marker}");
@@ -510,7 +512,11 @@ fn the_notification_answer_is_written_where_a_later_run_reads_it() {
     let paths = layout(&dir);
     let root = dir.join("data-root");
     let mut wizard = reviewed(&root);
-    assert!(apply(&mut wizard, &applying(&paths, external(), "1000")).is_ok());
+    assert!(apply(
+        &mut wizard,
+        &applying(&paths, external(), Instant::from_seconds(1000))
+    )
+    .is_ok());
 
     let written = std::fs::read_to_string(paths.notifications()).unwrap_or_default();
     assert_eq!(
@@ -537,7 +543,11 @@ fn the_autostart_answer_is_written_where_a_later_run_reads_it() {
         let paths = layout(&dir);
         let mut wizard = answering_autostart(&dir.join("data-root"), asked);
 
-        assert!(apply(&mut wizard, &applying(&paths, external(), "1000")).is_ok());
+        assert!(apply(
+            &mut wizard,
+            &applying(&paths, external(), Instant::from_seconds(1000))
+        )
+        .is_ok());
 
         assert_eq!(kept_autostart(&paths), Some(Wanted::answered(asked)));
     }
@@ -558,7 +568,7 @@ fn an_autostart_answer_that_cannot_be_written_stops_the_apply() {
     );
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
+    let stopped = apply(&mut wizard, &applying(&paths, external(), STAMPED));
 
     assert!(stopped.is_err());
     assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
@@ -577,7 +587,7 @@ fn a_notification_answer_that_cannot_be_written_stops_the_apply() {
     );
     let mut wizard = reviewed(&dir.join("data-root"));
 
-    let stopped = apply(&mut wizard, &applying(&paths, external(), "t"));
+    let stopped = apply(&mut wizard, &applying(&paths, external(), STAMPED));
 
     assert!(stopped.is_err());
     assert_ne!(wizard.phase(), crate::wizard::Phase::Applied);
@@ -597,7 +607,7 @@ fn an_apply_keeps_what_the_journal_already_held() {
     assert!(earlier.is_ok(), "{earlier:?}");
     let mut wizard = reviewed(&dir.join("library"));
 
-    assert!(apply(&mut wizard, &applying(&paths, external(), "t")).is_ok());
+    assert!(apply(&mut wizard, &applying(&paths, external(), STAMPED)).is_ok());
 
     let held = crate::app::recover::journal_at(&paths.journal()).unwrap_or_default();
     assert!(
@@ -621,7 +631,7 @@ fn a_recovery_over_a_journal_that_cannot_be_read_is_refused() {
 
     let refused = crate::app::setup::recovered(
         &mut wizard,
-        &applying(&paths, external(), "t"),
+        &applying(&paths, external(), STAMPED),
         crate::wizard::Choice::RollBack,
     );
     assert!(

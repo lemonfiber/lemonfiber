@@ -25,11 +25,13 @@
       }
     },
     "issued": {
-      "description": "When a code was first issued for them, as an instant. Absent until one is.",
+      "description": "When a code was first issued for them. Absent until one is.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "name": {
       "description": "Who it is for, as the media server spells their account where it holds one, and as\nit was asked for otherwise.",

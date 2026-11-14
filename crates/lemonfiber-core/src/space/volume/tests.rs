@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{Freshness, Role, Volume};
+use crate::instant::Instant;
 use crate::ports::filesystem::{FsKind, StorageFacts};
 use crate::space::level::Level;
 
@@ -22,7 +23,7 @@ fn a_volume_reports_what_would_be_left_once_the_queue_has_landed() {
         Path::new("/srv/media"),
         &facts("/srv", "ext4", 100_000, 400_000),
         30_000,
-        1_700_000_000,
+        Instant::from_seconds(1_700_000_000),
     );
     assert_eq!(measured.free, Some(100_000));
     assert_eq!(measured.limit, Some(400_000));
@@ -38,7 +39,7 @@ fn a_volume_that_could_not_be_read_says_so_rather_than_reading_as_full() {
         Path::new("/srv/media"),
         &facts("", "", 0, 0),
         0,
-        1_700_000_000,
+        Instant::from_seconds(1_700_000_000),
     );
     assert_eq!(measured.free, None);
     assert_eq!(measured.limit, None);
@@ -54,9 +55,12 @@ fn a_reading_off_a_share_carries_the_moment_it_was_taken() {
         Path::new("/mnt/nas/media"),
         &facts("/mnt/nas", "nfs", 100_000, 400_000),
         0,
-        1_700_000_000,
+        Instant::from_seconds(1_700_000_000),
     );
-    assert_eq!(over_the_network.reading, Freshness::AsOf(1_700_000_000));
+    assert_eq!(
+        over_the_network.reading,
+        Freshness::AsOf(Instant::from_seconds(1_700_000_000))
+    );
     assert!(over_the_network.reading.goes_stale());
 }
 
@@ -67,7 +71,7 @@ fn a_reading_off_a_local_disk_is_true_as_it_stands() {
         Path::new("/srv/media"),
         &facts("/srv", "ext4", 100_000, 400_000),
         0,
-        1_700_000_000,
+        Instant::from_seconds(1_700_000_000),
     );
     assert_eq!(local.reading, Freshness::Live);
     assert!(!local.reading.goes_stale());
@@ -80,27 +84,39 @@ fn two_paths_on_one_mount_are_one_volume_and_two_unread_ones_are_not() {
         Path::new("/srv/media"),
         &facts("/srv", "ext4", 100_000, 400_000),
         0,
-        0,
+        Instant::EPOCH,
     );
     let services = Volume::measured(
         Role::Services,
         Path::new("/srv/lemonfiber/config"),
         &facts("/srv", "ext4", 100_000, 400_000),
         0,
-        0,
+        Instant::EPOCH,
     );
     let elsewhere = Volume::measured(
         Role::Services,
         Path::new("/home/op/.local/share/lemonfiber/config"),
         &facts("/home", "ext4", 900, 4_000),
         0,
-        0,
+        Instant::EPOCH,
     );
     assert!(data.shares_with(&services));
     assert!(!data.shares_with(&elsewhere));
 
-    let unread = Volume::measured(Role::Data, Path::new("/a"), &facts("", "", 0, 0), 0, 0);
-    let also_unread = Volume::measured(Role::Services, Path::new("/b"), &facts("", "", 0, 0), 0, 0);
+    let unread = Volume::measured(
+        Role::Data,
+        Path::new("/a"),
+        &facts("", "", 0, 0),
+        0,
+        Instant::EPOCH,
+    );
+    let also_unread = Volume::measured(
+        Role::Services,
+        Path::new("/b"),
+        &facts("", "", 0, 0),
+        0,
+        Instant::EPOCH,
+    );
     assert!(
         !unread.shares_with(&also_unread),
         "two volumes nobody could attribute are not one volume"

@@ -13,6 +13,7 @@ use lemonfiber_plugin::Manifest;
 use super::super::Ctx;
 use super::following::diagnosed;
 use crate::error::Problem;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::plugin::first_party::FirstParty;
 use crate::plugin::Installed;
@@ -29,7 +30,7 @@ pub(super) fn minted(
     ctx: &Ctx,
     would: &Installed,
     manifest: &Manifest,
-    stamp: &str,
+    stamp: Instant,
     trusted: &[FirstParty],
 ) -> Result<(), Box<Problem>> {
     if !manifest.secrets.iter().any(|secret| secret.minted.is()) {
@@ -79,7 +80,7 @@ pub(super) fn minted(
         let changes: Vec<Change> = absent
             .iter()
             .map(|(one, current)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: crate::plugin::owner(plugin),
                 target: one.name.to_owned(),
                 kind: Kind::Secret {

@@ -3,6 +3,7 @@ use crate::app::fixtures::{ctx_at, scratch};
 use crate::condition::{Conditions, Fault};
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Code, Problem, Remedy, Severity};
+use crate::instant::Instant;
 use crate::test_support::a_context;
 
 /// A store with one thing wrong, raised at a fixed moment.
@@ -17,7 +18,7 @@ fn stalled() -> Conditions {
             "nothing is arriving for them",
             "check the indexer is answering",
         )),
-        "1000",
+        Instant::from_seconds(1000),
     );
     conditions
 }
@@ -33,8 +34,8 @@ fn what_one_run_recorded_the_next_one_reads() {
     assert_eq!(
         read_back
             .get("queue.stalled")
-            .map(|condition| condition.since.clone()),
-        Some("1000".to_owned()),
+            .map(|condition| condition.since),
+        Some(Instant::from_seconds(1000)),
         "and when it started survives, which is the whole reason to keep it"
     );
 }
@@ -138,7 +139,7 @@ fn a_check_that_found_nothing_wrong_remembers_nothing() {
 }
 
 /// A store holding the full volume as wrong since a fixed moment.
-fn full_since(at: &str) -> Conditions {
+fn full_since(at: Instant) -> Conditions {
     let mut conditions = Conditions::new();
     conditions.observe(
         "storage.space",
@@ -153,32 +154,29 @@ fn a_finding_in_trouble_carries_when_the_stack_first_saw_it_wrong() {
     // Read back from the store rather than stamped by this run, so the doctor and the
     // health summary name one moment for one check, and a restart does not move it.
     let ctx = ctx_at("dated-standing");
-    save(&ctx, &full_since("1000"));
+    save(&ctx, &full_since(Instant::from_seconds(1000)));
 
     let found = dated(&ctx, vec![found(Verdict::Fail(full()))]);
 
     assert_eq!(
-        found.first().and_then(|one| one.onset.clone()),
-        Some("1000".to_owned())
+        found.first().and_then(|one| one.onset),
+        Some(Instant::from_seconds(1000))
     );
 }
 
 #[test]
 fn a_check_that_came_right_and_went_wrong_again_carries_the_later_time() {
     let ctx = ctx_at("dated-again");
-    let mut conditions = full_since("1000");
-    conditions.observe("storage.space", None, "1500");
+    let mut conditions = full_since(Instant::from_seconds(1000));
+    conditions.observe("storage.space", None, Instant::from_seconds(1500));
     save(&ctx, &conditions);
 
     let found = dated(&ctx, vec![found(Verdict::Fail(full()))]);
 
-    assert_eq!(
-        found.first().and_then(|one| one.onset.clone()),
-        Some(ctx.stamp())
-    );
+    assert_eq!(found.first().and_then(|one| one.onset), Some(ctx.stamp()));
     assert_ne!(
         ctx.stamp(),
-        "1000",
+        Instant::from_seconds(1000),
         "the fixture's clock would hide the difference"
     );
 }
@@ -189,14 +187,11 @@ fn a_finding_first_seen_now_is_dated_now_and_the_next_run_reads_it_back() {
 
     let first = dated(&ctx, vec![found(Verdict::Fail(full()))]);
 
-    assert_eq!(
-        first.first().and_then(|one| one.onset.clone()),
-        Some(ctx.stamp())
-    );
+    assert_eq!(first.first().and_then(|one| one.onset), Some(ctx.stamp()));
     assert_eq!(
         load(&ctx)
             .get("storage.space")
-            .map(|condition| condition.since.clone()),
+            .map(|condition| condition.since),
         Some(ctx.stamp())
     );
 }
@@ -204,11 +199,11 @@ fn a_finding_first_seen_now_is_dated_now_and_the_next_run_reads_it_back() {
 #[test]
 fn a_finding_that_says_nothing_is_wrong_carries_no_onset() {
     let ctx = ctx_at("dated-passing");
-    save(&ctx, &full_since("1000"));
+    save(&ctx, &full_since(Instant::from_seconds(1000)));
 
     let found = dated(&ctx, vec![found(Verdict::Pass { note: None })]);
 
-    assert_eq!(found.first().and_then(|one| one.onset.clone()), None);
+    assert_eq!(found.first().and_then(|one| one.onset), None);
 }
 
 #[test]
@@ -219,7 +214,7 @@ fn a_save_leaves_what_another_run_wrote_meanwhile() {
     let ctx = ctx_at("save-merges");
     let mut held = load(&ctx);
 
-    save(&ctx, &full_since("1000"));
+    save(&ctx, &full_since(Instant::from_seconds(1000)));
     held.observe(
         "queue.stalled",
         Some(&Fault::new(
@@ -229,7 +224,7 @@ fn a_save_leaves_what_another_run_wrote_meanwhile() {
             "nothing is arriving for them",
             "check the indexer is answering",
         )),
-        "2000",
+        Instant::from_seconds(2000),
     );
     save(&ctx, &held);
 
@@ -237,8 +232,8 @@ fn a_save_leaves_what_another_run_wrote_meanwhile() {
     assert_eq!(
         read_back
             .get("storage.space")
-            .map(|condition| condition.since.clone()),
-        Some("1000".to_owned())
+            .map(|condition| condition.since),
+        Some(Instant::from_seconds(1000))
     );
     assert!(read_back.get("queue.stalled").is_some());
 }

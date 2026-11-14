@@ -46,7 +46,7 @@ pub(super) async fn invitations(
     close_taken_up(ctx, accounts, &removed);
     taken_back(ctx, server, &spent, &declined, findings).await;
     let mut expired: BTreeSet<String> = spent.every().map(|gone| gone.member.id.clone()).collect();
-    expired.extend(switched_off_at_lapse(accounts, &offers, &ctx.hours_ago(0)));
+    expired.extend(switched_off_at_lapse(accounts, &offers, ctx.stamp()));
     expired.extend(removed.keys().cloned());
     Invitations {
         expired,
@@ -63,7 +63,7 @@ pub(super) async fn invitations(
 fn switched_off_at_lapse<'a>(
     accounts: &'a [Member],
     offers: &'a Offers,
-    now: &'a str,
+    now: crate::instant::Instant,
 ) -> impl Iterator<Item = String> + 'a {
     accounts
         .iter()
@@ -109,7 +109,7 @@ async fn expired(
     if accounts.iter().all(|account| account.claimed) {
         return Spent::default();
     }
-    let Ok(records) = server.when_invited(&ctx.hours_ago(HOURS_OF_RECORD)).await else {
+    let Ok(records) = server.when_invited(ctx.hours_ago(HOURS_OF_RECORD)).await else {
         findings.push(
             "when the invitations were offered could not be read, so none of them is shown \
              as run out"
@@ -119,7 +119,7 @@ async fn expired(
     };
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
     let waiting = offered(accounts.to_vec(), &records, &offers);
-    run_out(&waiting, &ctx.hours_ago(HOURS_TO_CLAIM))
+    run_out(&waiting, ctx.hours_ago(HOURS_TO_CLAIM))
 }
 
 /// Take back the invitations that have run out, the way an offer sweeps them, and say
@@ -180,7 +180,7 @@ fn close_taken_up(ctx: &Ctx, accounts: &[Member], removed: &BTreeMap<String, Str
     }
     let offers: Offers = crate::app::record::beside(ctx, RECORD);
     let held = offers.len();
-    let mut open = closed(offers.clone(), accounts, &ctx.hours_ago(0));
+    let mut open = closed(offers.clone(), accounts, ctx.stamp());
     for (id, offer) in offers {
         if removed.contains_key(&id) {
             open.entry(id).or_insert(offer);

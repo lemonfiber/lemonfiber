@@ -262,8 +262,8 @@ async fn an_answered_change_is_one_journalled_run_written_after_its_record() {
     assert_eq!(recorded(&machine, MODE).as_deref(), Some("fast"));
     assert!(written.contains("KOMGA_MODE: fast"), "{written}");
     assert!(written.contains("WORKER_MODE: fast"), "{written}");
-    let stamps: std::collections::BTreeSet<&str> =
-        changes.iter().map(|one| one.at.as_str()).collect();
+    let stamps: std::collections::BTreeSet<crate::instant::Instant> =
+        changes.iter().map(|one| one.at).collect();
     assert_eq!(stamps.len(), 1);
     let (run, started): (Vec<&Change>, Vec<&Change>) =
         changes.iter().partition(|one| one.operation == "settings");

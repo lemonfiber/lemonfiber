@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Medium, Reference, Unit};
 use crate::config::store::Failure;
+use crate::instant::Instant;
 
 /// Every ask the core keeps.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,15 +61,24 @@ pub(crate) struct Ask {
     /// The member who asked, by their account's id.
     pub member: String,
     /// When it was asked for.
-    pub asked_at: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub asked_at: Instant,
     /// Where it stands.
     pub standing: Standing,
     /// When it last changed where it stands, where it has.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settled_at: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
+    pub settled_at: Option<Instant>,
     /// When the core first saw the house hold any of it, where it has.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub arrived_at: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::instant::kept_option"
+    )]
+    pub arrived_at: Option<Instant>,
 }
 
 impl Ask {
@@ -97,7 +107,7 @@ pub(crate) struct Asking {
     /// The member asking, by their account's id.
     pub member: String,
     /// When.
-    pub at: String,
+    pub at: Instant,
     /// Where it stands from the start: waiting, or sent.
     pub standing: Standing,
 }
@@ -130,7 +140,7 @@ pub(crate) fn filed(path: &Path, asking: &Asking) -> Result<Reference, Failure> 
             year: asking.year,
             cover: asking.cover.clone(),
             member: asking.member.clone(),
-            asked_at: asking.at.clone(),
+            asked_at: asking.at,
             standing: asking.standing,
             settled_at: None,
             arrived_at: None,
@@ -150,7 +160,7 @@ pub(crate) fn settled(
     path: &Path,
     reference: Reference,
     standing: Standing,
-    at: &str,
+    at: Instant,
 ) -> Result<Option<Ask>, Failure> {
     let mut was = None;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
@@ -161,7 +171,7 @@ pub(crate) fn settled(
         {
             was = Some(ask.clone());
             ask.standing = standing;
-            ask.settled_at = Some(at.to_owned());
+            ask.settled_at = Some(at);
         }
         Ok(())
     })?;
@@ -179,7 +189,7 @@ pub(crate) fn arrived(
     path: &Path,
     reference: Reference,
     held: Standing,
-    at: &str,
+    at: Instant,
 ) -> Result<Option<String>, Failure> {
     let mut first = None;
     crate::settings::kept::changed(path, &mut |kept: &mut Kept| {
@@ -189,10 +199,10 @@ pub(crate) fn arrived(
         }) {
             if ask.standing != held {
                 ask.standing = held;
-                ask.settled_at = Some(at.to_owned());
+                ask.settled_at = Some(at);
             }
             if ask.arrived_at.is_none() {
-                ask.arrived_at = Some(at.to_owned());
+                ask.arrived_at = Some(at);
                 first = Some(ask.member.clone());
             }
         }

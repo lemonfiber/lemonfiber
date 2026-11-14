@@ -6,6 +6,7 @@ use lemonfiber_core::app::support::Bundle;
 use lemonfiber_core::backup::run::Report as Capture;
 use lemonfiber_core::backup::{Manifest, Member, Relocation, Scope, SCHEMA};
 use lemonfiber_core::bundle::{Contents, Piece, Taken, Terms};
+use lemonfiber_core::instant::Instant;
 
 use super::{backup, bundle, kept, restoration};
 
@@ -13,7 +14,7 @@ fn manifest() -> Manifest {
     Manifest {
         schema: SCHEMA,
         product_version: "0.7.0".to_owned(),
-        created_at: "2026-07-30".to_owned(),
+        created_at: Instant::from_seconds(1_785_369_600),
         data_root: "/srv/media".to_owned(),
         scope: Scope::WholeStack,
         sensitive: true,
@@ -212,7 +213,7 @@ fn holding(missing: Vec<String>, revealed: Vec<String>) -> Contents {
         taken: Taken {
             lemonfiber: "0.7.0".to_owned(),
             stack: "1.0.0".to_owned(),
-            at: "2026-07-30T00:00:00Z".to_owned(),
+            at: Instant::from_seconds(1_785_369_600),
         },
         terms: Terms {
             window: "the last 200 lines of each service".to_owned(),

@@ -36,9 +36,9 @@ pub async fn household(ctx: &Ctx) -> Option<Arc<dyn Household>> {
 /// swept the household since.
 #[must_use]
 pub fn vouched_for(ctx: &Ctx, id: &str) -> bool {
-    let now = ctx.hours_ago(0);
+    let now = ctx.stamp();
     let mut offers: Offers = record::beside(ctx, RECORD);
-    if lapsed_unseen(&offers, id, &now) {
+    if lapsed_unseen(&offers, id, now) {
         return false;
     }
     if offers.remove(id).is_some() {
@@ -54,7 +54,7 @@ pub async fn offers_claim(ctx: &Ctx, id: &str, token: &str) -> bool {
     let presented = Some(lemonfiber_sidecar::TokenHash::of(token));
     let carried = offers.get(id).is_some_and(|offer| offer.claim == presented);
     carried
-        && !lapsed_unseen(&offers, id, &ctx.hours_ago(0))
+        && !lapsed_unseen(&offers, id, ctx.stamp())
         && !super::invite::declining::declined(ctx, &offers)
             .await
             .contains(id)

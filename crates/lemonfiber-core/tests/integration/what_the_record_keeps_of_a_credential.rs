@@ -20,6 +20,7 @@ use lemonfiber_core::app::recover::{journal_at, journalled, undo};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::credential::fingerprint;
 use lemonfiber_core::error::codes::setup::{NOT_OPENED, REPLACE_AT_THE_TERMINAL};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Journal, Kind};
 
 /// Where this test's records live, in a scratch directory of its own.
@@ -34,7 +35,7 @@ fn paths(root: &Path) -> Paths {
 /// One setting written by an operation.
 fn set(key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {

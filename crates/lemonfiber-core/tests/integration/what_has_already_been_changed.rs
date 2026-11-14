@@ -17,6 +17,7 @@ use crate::common;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::model::HistoryReport;
 use lemonfiber_core::rollback::Reversal;
@@ -47,7 +48,7 @@ fn ctx(root: &Path) -> Ctx {
 /// One setting written by an operation.
 fn set(operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: operation.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -122,7 +123,7 @@ async fn a_file_written_over_reads_as_which_file_it_was() {
     journalled(
         &root,
         &[Change {
-            at: "2000".to_owned(),
+            at: Instant::from_seconds(2000),
             operation: "wiring".to_owned(),
             target: path.clone(),
             kind: Kind::Rewritten {
@@ -196,7 +197,7 @@ async fn a_change_says_how_many_went_with_it() {
     // Without it a count that gathered every seed ever made would read the same as one
     // that gathered this run's, and this test would pass on both.
     let earlier = |key: &str| Change {
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         ..set("seed", key, None, "1000")
     };
     journalled(
@@ -249,7 +250,7 @@ async fn a_machine_that_changed_nothing_still_states_its_horizon() {
 /// A resource one of the services now holds, made by an operation.
 fn created(resource: &str, id: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "seed".to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Created {
@@ -262,7 +263,7 @@ fn created(resource: &str, id: &str) -> Change {
 /// A change to a key, minted or revoked.
 fn key(kind: Kind) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "key".to_owned(),
         target: "ha".to_owned(),
         kind,
@@ -272,7 +273,7 @@ fn key(kind: Kind) -> Change {
 /// A path lemonfiber itself made on this machine.
 fn made(path: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "apply".to_owned(),
         target: path.to_owned(),
         kind: Kind::Made {
@@ -284,7 +285,7 @@ fn made(path: &str) -> Change {
 /// A service moved from one pinned version to another by an update.
 fn pinned(service: &str, previous: &str, current: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "update".to_owned(),
         target: service.to_owned(),
         kind: Kind::Pinned {
@@ -298,7 +299,7 @@ fn pinned(service: &str, previous: &str, current: &str) -> Change {
 /// One field of one resource a service holds, changed through that service.
 fn configured(field: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "seed".to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Configured {
@@ -481,7 +482,7 @@ async fn a_region_edited_since_is_refused_and_one_that_is_not_can_go_back() {
     let written = lemonfiber_core::region::put("watch {\n}\n", "plugin komga", "komga\n");
     assert!(std::fs::write(&file, &written).is_ok(), "the proxy's file");
     let region = |body: &str| Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: "komga".to_owned(),
         target: file.display().to_string(),
         kind: Kind::Region {

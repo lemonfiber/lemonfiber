@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{Condition, Fault};
 
+use crate::instant::Instant;
+
 /// Every condition this machine has raised, by the check that raised it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Conditions {
@@ -61,7 +63,7 @@ impl Conditions {
     ///
     /// A check that could not be run does not call this at all. Passing `None` for
     /// an unrunnable check would clear a fault nobody proved was gone.
-    pub fn observe(&mut self, check: &str, wrong: Option<&Fault>, now: &str) {
+    pub fn observe(&mut self, check: &str, wrong: Option<&Fault>, now: Instant) {
         self.touched.0.insert(check.to_owned());
         match (wrong, self.by_check.get_mut(check)) {
             (Some(fault), Some(condition)) => condition.raise(fault, now),

@@ -32,6 +32,7 @@ use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_plugin::Manifest;
 
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
 use crate::ports::http::Request;
@@ -67,7 +68,7 @@ pub(crate) async fn started(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
-    stamp: &str,
+    stamp: Instant,
 ) -> Result<(), Box<Problem>> {
     let services: Vec<String> = installed
         .services

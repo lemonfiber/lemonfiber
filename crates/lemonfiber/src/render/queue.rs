@@ -5,7 +5,7 @@ use lemonfiber_core::model::{
     Act, ActOutcome, ActTaken, HealRun, HealingSwitch, QueueHealth, Wedge, Wedged,
 };
 
-use super::news::when;
+use super::news::moment;
 use super::Lines;
 
 /// Whether healing acts, what is wedged and why, what could not be reached, and what the
@@ -27,7 +27,7 @@ pub(super) fn queue(report: &QueueHealth) -> Lines {
         lines.put("This run only said what it would do.");
     }
     match report.classified_at {
-        Some(at) => lines.put(format!("Last looked at {}.", when(&at.to_string()))),
+        Some(at) => lines.put(format!("Last looked at {}.", moment(at))),
         None => lines.put("The queue has not been looked at yet."),
     }
     if report.incomplete {
@@ -72,7 +72,7 @@ fn wedged(lines: &mut Lines, item: &Wedged, needed: u32) {
         item.strikes
     ));
     if let Some(until) = item.in_grace_until {
-        lines.put(format!("    left alone until {}", when(&until.to_string())));
+        lines.put(format!("    left alone until {}", moment(until)));
     }
     match item.next.as_deref() {
         Some([]) => lines.put("    next run: nothing, as no curator holds it by a queue entry"),
@@ -91,7 +91,7 @@ fn wedged(lines: &mut Lines, item: &Wedged, needed: u32) {
 fn ran(lines: &mut Lines, run: &HealRun) {
     lines.put(format!(
         "  {}{}",
-        when(&run.at.to_string()),
+        moment(run.at),
         if run.rehearsed { ", rehearsed" } else { "" }
     ));
     for item in &run.items {

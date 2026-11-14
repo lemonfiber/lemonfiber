@@ -362,8 +362,8 @@ fn versions(report: &VersionReport) -> Lines {
         Some(version) => lines.put(format!("compose {version}")),
         None => lines.put("compose not reachable"),
     }
-    match &report.attestation_status {
-        Some(taken) => lines.put(format!("attestation status list taken {taken}")),
+    match report.attestation_status {
+        Some(taken) => lines.put(format!("attestation status list taken {}", taken.said())),
         None => lines.put("attestation status list unreadable: no Android device key registers"),
     }
     lines.extend(changelog::notes(&report.changelog, &report.binary));

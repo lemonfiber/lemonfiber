@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{digest, minted_as, shaped_as, Purpose};
+use crate::instant::Instant;
 use crate::ports::random::Random;
 
 /// What every claim begins with, so a value shaped like one is told from a secret.
@@ -65,8 +66,9 @@ pub fn claim_shaped(offered: &str) -> bool {
 pub struct Pending {
     /// The SHA-256 of the claim, in lower-case hex.
     pub(super) digest: String,
-    /// When it stops collecting anything, written as every other instant is.
-    pub lapses: String,
+    /// When it stops collecting anything.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub lapses: Instant,
 }
 
 /// What is said instead of a pending claim: when it lapses, and not its digest.
@@ -80,12 +82,9 @@ impl std::fmt::Debug for Pending {
 
 impl Pending {
     /// Whether it has stopped collecting anything by `now`.
-    ///
-    /// A lapse that cannot be read has lapsed: a claim whose window nobody can tell is
-    /// not one to honour.
     #[must_use]
-    pub fn lapsed(&self, now: std::time::SystemTime) -> bool {
-        crate::instant::read(&self.lapses).is_none_or(|lapses| now >= lapses)
+    pub fn lapsed(&self, now: Instant) -> bool {
+        now >= self.lapses
     }
 }
 
@@ -102,8 +101,8 @@ pub struct Claimed {
     /// The key link: `lemonfiber://key` with the address, the certificate fingerprint,
     /// the stack, when the claim lapses and the claim. Shown once, and drawn as a code.
     pub link: String,
-    /// When the claim stops collecting the key, written as every other instant is.
-    pub lapses: String,
+    /// When the claim stops collecting the key.
+    pub lapses: Instant,
 }
 
 /// What is said instead of a key claim: everything but the link, which holds the claim.

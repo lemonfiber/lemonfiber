@@ -35,6 +35,7 @@ use crate::error::codes::key::{
     NOT_FOR_YOURSELF, NO_SUCH_KEY, NO_SUCH_MEMBER, UNLINKABLE,
 };
 use crate::error::Code;
+use crate::instant::Instant;
 use crate::ports::random::Random;
 use crate::secret::render;
 
@@ -186,13 +187,14 @@ pub struct Record {
     /// has collected it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<Pending>,
-    /// When it was minted, written as every other instant this product writes.
-    pub minted: String,
+    /// When it was minted.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub minted: Instant,
     /// Who minted it.
     pub by: Minter,
     /// When it was revoked, where it has been.
-    #[serde(default)]
-    pub revoked: Option<String>,
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub revoked: Option<Instant>,
     /// The device key whose signature proved its mint, where one did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proved_by: Option<String>,
@@ -229,7 +231,7 @@ impl Record {
         scope: Scope,
         purpose: Purpose,
         secret: &Secret,
-        minted: String,
+        minted: Instant,
         by: Minter,
     ) -> Self {
         Self {
@@ -253,8 +255,8 @@ impl Record {
         scope: Scope,
         purpose: Purpose,
         claim: &Claim,
-        lapses: String,
-        minted: String,
+        lapses: Instant,
+        minted: Instant,
         by: Minter,
     ) -> Self {
         Self {
@@ -406,9 +408,9 @@ impl Kept {
 /// Where each key was last used, by name, as the serving surface writes it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Used {
-    /// Name to the instant it was last admitted, written as every other instant is.
-    #[serde(default)]
-    pub at: std::collections::BTreeMap<String, String>,
+    /// Name to the instant it was last admitted.
+    #[serde(default, deserialize_with = "crate::instant::kept_each")]
+    pub at: std::collections::BTreeMap<String, Instant>,
 }
 
 impl Used {

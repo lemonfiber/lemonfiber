@@ -4,19 +4,16 @@ use async_trait::async_trait;
 
 use super::{Decline, DeclineKeyCheck, KeyDates, MARGIN, UNEXPLAINED};
 use crate::doctor::{Category, Check, Verdict};
+use crate::instant::Instant;
 use crate::ports::digest::sha256;
 use crate::ports::service::{Dated, Declined, Lapsed, TakenBack};
 
 /// 2026-10-05T00:00:00Z, in seconds since the Unix epoch.
 const MIDNIGHT: u64 = 1_791_158_400;
 
-/// `seconds` after midnight, as the media server writes a moment.
-fn moment(seconds: u64) -> String {
-    i64::try_from(MIDNIGHT + seconds)
-        .ok()
-        .and_then(|at| jiff::Timestamp::from_second(at).ok())
-        .map(|at| at.to_string())
-        .unwrap_or_default()
+/// `seconds` after midnight.
+const fn moment(seconds: u64) -> Instant {
+    Instant::from_seconds(MIDNIGHT + seconds)
 }
 
 /// A media server that dates the decline keys as given, or will not answer.
@@ -220,49 +217,40 @@ async fn a_second_key_under_the_service_s_name_does_not_hide_the_first_one_s_use
 }
 
 #[tokio::test]
-async fn an_unexplained_use_listed_first_outweighs_every_key_after_it() {
+async fn an_unexplained_use_listed_first_outweighs_an_unused_key_after_it() {
     let decline = recorded(&[], &[3_600]);
     let used_unexplained = key(0, Some(86_400));
-    let undated = Dated {
-        created: Some(moment(0)),
-        last_used: Some("yesterday-ish".to_owned()),
-    };
     let newer_unused = key(90_000, None);
 
-    let said = verdict(
-        decline,
-        Some(Ok(vec![used_unexplained, undated, newer_unused])),
-    )
-    .await;
+    let said = verdict(decline, Some(Ok(vec![used_unexplained, newer_unused]))).await;
 
     assert!(warned_unexplained(&said), "{said:?}");
 }
 
-#[tokio::test]
-async fn an_undated_use_listed_first_is_not_hidden_by_an_unused_key_after_it() {
-    let decline = recorded(&[], &[]);
-    let undated = Dated {
-        created: Some(moment(0)),
-        last_used: Some("yesterday-ish".to_owned()),
-    };
-    let newer_unused = key(90_000, None);
-
-    let said = verdict(decline, Some(Ok(vec![undated, newer_unused]))).await;
-
-    assert!(matches!(said, Verdict::Unverified { .. }), "{said:?}");
+/// The key list as an adapter answering `text` hands it over.
+fn answered(text: &str) -> Result<Vec<Dated>, ()> {
+    serde_json::from_str(text).map_err(|_| ())
 }
 
 #[tokio::test]
 async fn a_last_use_the_server_dates_in_a_form_nobody_reads_is_unverified_never_a_pass() {
     let decline = recorded(&[], &[]);
-    let odd = Dated {
-        created: Some(moment(0)),
-        last_used: Some("yesterday-ish".to_owned()),
-    };
+    let odd = answered(r#"[{"created": 1791158400, "last_used": "yesterday-ish"}]"#);
 
-    let said = verdict(decline, Some(Ok(vec![odd]))).await;
+    let said = verdict(decline, Some(odd)).await;
 
     assert!(matches!(said, Verdict::Unverified { .. }), "{said:?}");
+}
+
+#[tokio::test]
+async fn a_key_dated_in_the_iso_text_a_pinned_adapter_answers_is_still_judged() {
+    let decline = recorded(&[], &[]);
+    let iso =
+        answered(r#"[{"created": "2026-10-05T00:00:00Z", "last_used": "2026-10-06T00:00:00Z"}]"#);
+
+    let said = verdict(decline, Some(iso)).await;
+
+    assert!(warned_unexplained(&said), "{said:?}");
 }
 
 #[tokio::test]

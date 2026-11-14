@@ -4,6 +4,7 @@
 //! a plan is reviewable before anything touches disk.
 
 use super::{Change, EnvFile, Kind};
+use crate::instant::Instant;
 use crate::settings::legacy::held_as;
 
 /// The environment settings a reviewed wizard will write.
@@ -47,10 +48,10 @@ impl Plan {
     /// in the secret store and journalled by its fingerprints instead. The plan has no
     /// clock, so the caller stamps the time.
     #[must_use]
-    pub fn changes(&self, current: &EnvFile, stamp: &str) -> Vec<Change> {
+    pub fn changes(&self, current: &EnvFile, stamp: Instant) -> Vec<Change> {
         self.written()
             .map(|(key, value)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: APPLY.to_owned(),
                 target: ENV_FILE.to_owned(),
                 kind: Kind::Set {

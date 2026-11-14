@@ -1,5 +1,6 @@
 use super::{watch, Answered, Watched};
 use crate::condition::Conditions;
+use crate::instant::Instant;
 use crate::ports::service::Queued;
 use crate::queue::{Stall, Stuck, Thresholds};
 
@@ -30,7 +31,7 @@ fn watched(
     answers: &[(String, Answered)],
     fetching: &[(String, u8, bool)],
     conditions: &mut Conditions,
-    now: &str,
+    now: Instant,
 ) -> Watched {
     watch(
         answers,
@@ -49,10 +50,20 @@ fn a_fault_says_nothing_until_it_has_held_long_enough() {
     let answers = curator(vec![queued("Some.Release", "ok", None)]);
     let fetching = vec![("Some.Release".to_owned(), 42, false)];
 
-    let first = watched(&answers, &fetching, &mut conditions, "1000");
+    let first = watched(
+        &answers,
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
     assert!(first.stuck.is_empty(), "seen once, said nothing");
 
-    let later = watched(&answers, &fetching, &mut conditions, "100000");
+    let later = watched(
+        &answers,
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     let reported: Vec<Stall> = later.stuck.iter().map(|stuck| stuck.stall).collect();
     assert_eq!(reported, vec![Stall::StalledDownload]);
 }
@@ -69,13 +80,13 @@ fn a_stall_that_resolved_itself_is_cleared_rather_than_left_standing() {
         &answers,
         &[("Some.Release".to_owned(), 42, false)],
         &mut conditions,
-        "1000",
+        Instant::from_seconds(1000),
     );
     let moving = watched(
         &answers,
         &[("Some.Release".to_owned(), 60, true)],
         &mut conditions,
-        "100000",
+        Instant::from_seconds(100_000),
     );
 
     assert!(
@@ -102,8 +113,18 @@ fn a_torrent_seeding_after_a_successful_import_is_never_called_an_orphan() {
     // whole feature exists to avoid.
     let mut conditions = Conditions::new();
     let complete = [("Some.Release".to_owned(), 100u8, false)];
-    watched(&curator(Vec::new()), &complete, &mut conditions, "1000");
-    let later = watched(&curator(Vec::new()), &complete, &mut conditions, "9000000");
+    watched(
+        &curator(Vec::new()),
+        &complete,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let later = watched(
+        &curator(Vec::new()),
+        &complete,
+        &mut conditions,
+        Instant::from_seconds(9_000_000),
+    );
     assert!(later.stuck.is_empty(), "{:?}", later.stuck);
 }
 
@@ -113,7 +134,7 @@ fn a_service_that_could_not_be_asked_is_named_rather_than_read_as_empty() {
     // comes to believe a pipeline is idle when it is unreachable.
     let mut conditions = Conditions::new();
     let answers = vec![("sonarr".to_owned(), Answered::Unreachable)];
-    let watched = watched(&answers, &[], &mut conditions, "1000");
+    let watched = watched(&answers, &[], &mut conditions, Instant::from_seconds(1000));
     assert_eq!(watched.unverified, vec!["sonarr".to_owned()]);
     assert!(watched.stuck.is_empty());
 }
@@ -129,8 +150,18 @@ fn a_long_queue_is_summarised_by_category_rather_than_listed() {
     let fetching: Vec<(String, u8, bool)> = (0..20)
         .map(|n| (format!("Release.{n}"), 42, false))
         .collect();
-    watched(&curator(items.clone()), &fetching, &mut conditions, "1000");
-    let later = watched(&curator(items), &fetching, &mut conditions, "100000");
+    watched(
+        &curator(items.clone()),
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let later = watched(
+        &curator(items),
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
 
     assert_eq!(later.stuck.len(), 20);
     assert_eq!(later.by_category(), vec![(Stall::StalledDownload, 20)]);
@@ -149,8 +180,18 @@ fn an_import_the_service_complains_about_once_is_not_yet_called_repeated() {
         Some("Permission denied writing to /data/media"),
     )]);
     let fetching = vec![("Some.Release".to_owned(), 100, false)];
-    watched(&answers, &fetching, &mut conditions, "1000");
-    let later = watched(&answers, &fetching, &mut conditions, "100000");
+    watched(
+        &answers,
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let later = watched(
+        &answers,
+        &fetching,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     let reported: Vec<Stall> = later.stuck.iter().map(|stuck| stuck.stall).collect();
     assert_eq!(reported, vec![Stall::CompletedNotImported]);
 }
@@ -169,13 +210,18 @@ fn an_import_that_has_failed_come_back_and_failed_again_is_structural() {
     // One cycle more than the threshold: the count is read before this pass
     // raises anything, so it is how many times it had come back *before* now.
     for pass in 0..=crate::queue::REPEATED {
-        let at = format!("{}", 1000 + u64::from(pass) * 10);
-        watched(&complaining, &stuck_at_100, &mut conditions, &at);
+        let at = Instant::from_seconds(1000 + u64::from(pass) * 10);
+        watched(&complaining, &stuck_at_100, &mut conditions, at);
         // It leaves the pipeline entirely — imported, gone from both sides —
         // and then comes back, which is what the store counts.
-        watched(&fine, &imported, &mut conditions, &at);
+        watched(&fine, &imported, &mut conditions, at);
     }
-    let again = watched(&complaining, &stuck_at_100, &mut conditions, "100000");
+    let again = watched(
+        &complaining,
+        &stuck_at_100,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     let reported: Vec<Stall> = again.stuck.iter().map(|stuck| stuck.stall).collect();
     assert_eq!(reported, vec![Stall::RepeatedImportFailure]);
 }
@@ -192,7 +238,7 @@ fn a_stall_nothing_explained_says_what_is_usually_behind_it() {
         &answers,
         &[("Some.Release".to_owned(), 42, false)],
         &mut conditions,
-        "1000",
+        Instant::from_seconds(1000),
     );
     let said = conditions
         .get("queue.stalled.Some.Release")
@@ -212,7 +258,7 @@ fn the_condition_a_stuck_item_raises_carries_its_remedies() {
         &answers,
         &[("Some.Release".to_owned(), 42, false)],
         &mut conditions,
-        "1000",
+        Instant::from_seconds(1000),
     );
     let remedies = conditions
         .get("queue.stalled.Some.Release")
@@ -227,8 +273,18 @@ fn a_download_that_started_moving_again_stops_being_reported() {
     let mut conditions = Conditions::new();
     let answers = curator(vec![queued("Some.Release", "ok", None)]);
     let stopped = [("Some.Release".to_owned(), 42u8, false)];
-    watched(&answers, &stopped, &mut conditions, "1000");
-    let reported = watched(&answers, &stopped, &mut conditions, "100000");
+    watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     assert_eq!(
         reported
             .stuck
@@ -239,7 +295,12 @@ fn a_download_that_started_moving_again_stops_being_reported() {
     );
 
     let moving = [("Some.Release".to_owned(), 60u8, true)];
-    let going = watched(&answers, &moving, &mut conditions, "100010");
+    let going = watched(
+        &answers,
+        &moving,
+        &mut conditions,
+        Instant::from_seconds(100_010),
+    );
     assert!(
         going.stuck.is_empty(),
         "the stall is gone and the slow note has not yet held: {:?}",
@@ -253,8 +314,13 @@ fn something_monitored_that_nothing_has_fetched_is_waiting() {
     // stall to report — it is waiting, and the longest rope of all applies.
     let mut conditions = Conditions::new();
     let answers = curator(vec![queued("Some.Film", "ok", None)]);
-    watched(&answers, &[], &mut conditions, "1000");
-    let much_later = watched(&answers, &[], &mut conditions, "9000000");
+    watched(&answers, &[], &mut conditions, Instant::from_seconds(1000));
+    let much_later = watched(
+        &answers,
+        &[],
+        &mut conditions,
+        Instant::from_seconds(9_000_000),
+    );
     let reported: Vec<Stall> = much_later.stuck.iter().map(|stuck| stuck.stall).collect();
     assert_eq!(reported, vec![Stall::WaitingIndefinitely]);
 }
@@ -290,8 +356,18 @@ fn one_cause_stopping_several_downloads_is_reported_once() {
         ("Third.Release".to_owned(), 40u8, false),
     ];
     let mut conditions = Conditions::new();
-    watched(&answers, &stopped, &mut conditions, "1000");
-    let reported = watched(&answers, &stopped, &mut conditions, "100000");
+    watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
 
     let said: Vec<String> = reported.stuck.iter().map(Stuck::said).collect();
     assert_eq!(said.len(), 1, "{said:?}");
@@ -320,8 +396,18 @@ fn one_item_blocked_by_something_is_still_named_by_its_own_name() {
     )]);
     let stopped = [("Only.Release".to_owned(), 40u8, false)];
     let mut conditions = Conditions::new();
-    watched(&answers, &stopped, &mut conditions, "1000");
-    let reported = watched(&answers, &stopped, &mut conditions, "100000");
+    watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     let said: Vec<String> = reported.stuck.iter().map(Stuck::said).collect();
     assert!(
         said.first().is_some_and(
@@ -344,8 +430,18 @@ fn two_items_stopped_by_different_things_stay_two() {
         ("Second.Release".to_owned(), 40u8, false),
     ];
     let mut conditions = Conditions::new();
-    watched(&answers, &stopped, &mut conditions, "1000");
-    let reported = watched(&answers, &stopped, &mut conditions, "100000");
+    watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &stopped,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     assert_eq!(reported.stuck.len(), 2);
 }
 
@@ -357,8 +453,18 @@ fn an_item_fetched_over_and_over_is_reported_as_the_loop_it_is() {
     let answers = curator(vec![grabbed("Some.Release", "ok", None, 3)]);
     let moving = [("Some.Release".to_owned(), 40u8, true)];
     let mut conditions = Conditions::new();
-    watched(&answers, &moving, &mut conditions, "1000");
-    let reported = watched(&answers, &moving, &mut conditions, "100000");
+    watched(
+        &answers,
+        &moving,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &moving,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     assert_eq!(
         reported
             .stuck
@@ -376,8 +482,18 @@ fn an_item_fetched_once_is_not_a_loop() {
     let answers = curator(vec![grabbed("Some.Release", "ok", None, 1)]);
     let moving = [("Some.Release".to_owned(), 40u8, true)];
     let mut conditions = Conditions::new();
-    watched(&answers, &moving, &mut conditions, "1000");
-    let reported = watched(&answers, &moving, &mut conditions, "100000");
+    watched(
+        &answers,
+        &moving,
+        &mut conditions,
+        Instant::from_seconds(1000),
+    );
+    let reported = watched(
+        &answers,
+        &moving,
+        &mut conditions,
+        Instant::from_seconds(100_000),
+    );
     assert!(reported
         .stuck
         .iter()

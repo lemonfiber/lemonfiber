@@ -27,7 +27,7 @@ fn assembled(
             certificates: &[],
             asked: &nothing_asked(),
             quality: &Selection::everywhere(crate::quality::Preset::Balanced),
-            now: SystemTime::UNIX_EPOCH,
+            now: Instant::EPOCH,
             reasons: &crate::asking::Reasons::default(),
             hosted: false,
             expired: &std::collections::BTreeSet::new(),
@@ -135,7 +135,7 @@ fn an_invitation_nobody_has_taken_up_is_listed_as_one() {
         "{report:?}"
     );
     assert_eq!(
-        waiting.and_then(|member| member.last_seen.clone()),
+        waiting.and_then(|member| member.last_seen),
         None,
         "{report:?}"
     );
@@ -469,7 +469,7 @@ async fn a_request_awaiting_approval_is_named_from_the_request_services_own_reco
     let context = ctx_with(
         &Fake {
             requests: request_service::answered(&[HouseholdRequest {
-                made: Some("2026-08-30T09:00:00Z".to_owned()),
+                made: Some(crate::instant::Instant::from_seconds(1_788_080_400)),
                 ..awaiting(1)
             }]),
             film: Some(request_service::answered(&Some(the_matrix(true)))),
@@ -631,7 +631,7 @@ fn a_narrowed_read_names_nobody_else() {
 #[test]
 fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known() {
     let arrived = HouseholdRequest {
-        arrived: Some("2026-10-01T20:00:00.000Z".to_owned()),
+        arrived: Some(crate::instant::Instant::from_seconds(1_790_884_800)),
         shelf_id: Some("f00d".to_owned()),
         ..request(
             "Alex",
@@ -663,18 +663,16 @@ fn a_request_carries_its_year_its_arrival_and_its_shelf_id_where_each_is_known()
         .members
         .iter()
         .flat_map(|member| member.requests.iter())
-        .map(|request| {
-            (
-                request.year,
-                request.arrived.as_deref(),
-                request.shelf_id.as_deref(),
-            )
-        })
+        .map(|request| (request.year, request.arrived, request.shelf_id.as_deref()))
         .collect();
     assert_eq!(
         said,
         vec![
-            (Some(2015), Some("2026-10-01T20:00:00.000Z"), Some("f00d")),
+            (
+                Some(2015),
+                Some(Instant::from_seconds(1_790_884_800)),
+                Some("f00d")
+            ),
             (None, None, None),
             (None, None, None),
         ]

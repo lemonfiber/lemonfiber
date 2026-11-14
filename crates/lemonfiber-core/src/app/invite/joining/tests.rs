@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_fixtures::ports::{stamp, Renamed, DAY};
+use lemonfiber_fixtures::ports::{moment, Renamed, DAY};
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_fixtures::support::FixedRandom;
 use lemonfiber_sidecar::TokenHash;
@@ -10,6 +10,7 @@ use super::{joining, with_claim, written, Joining, UNREADIED};
 use crate::app::Ctx;
 use crate::companion::{served, Material};
 use crate::config::Settings;
+use crate::instant::Instant;
 use crate::invitation::{Offer, Offers, RECORD};
 use crate::model::InvitationStanding;
 use crate::platform::Environment;
@@ -17,7 +18,7 @@ use crate::ports::service::Member;
 use crate::test_support::a_context;
 
 /// The stopped clock's seconds, and forty-eight hours on from them.
-const IN_TWO_DAYS: u64 = lemonfiber_fixtures::ports::TODAY + 48 * 60 * 60;
+const IN_TWO_DAYS: Instant = moment(2 * DAY);
 
 /// The claim token sixteen bytes counting up from zero mint.
 const TOKEN: &str = "000102030405060708090a0b0c0d0e0f";
@@ -26,7 +27,7 @@ fn material() -> Material {
     Material {
         address: "https://den.local:8443".to_owned(),
         fingerprint: "ab".repeat(32),
-        expires: 0,
+        expires: Instant::EPOCH,
         stack: "a1b2".to_owned(),
     }
 }
@@ -71,7 +72,7 @@ fn offered(ctx: &Ctx) {
     let offers: Offers = [(
         "9".to_owned(),
         Offer {
-            offered: ctx.hours_ago(0),
+            offered: ctx.stamp(),
             lapses: ctx.hours_ago(-48),
             decline: None,
             claim: None,
@@ -102,7 +103,7 @@ fn a_link_carries_its_parameters_in_order_each_percent_encoded() {
 
 #[test]
 fn a_link_with_nothing_to_claim_carries_no_claim() {
-    let link = written(&material(), 5, "ana", None);
+    let link = written(&material(), Instant::from_seconds(5), "ana", None);
 
     assert!(link.ends_with("&expires=5&name=ana"), "{link}");
     assert!(!link.contains("claim"), "{link}");
@@ -113,8 +114,8 @@ fn a_claim_is_recorded_as_its_hash_on_an_offer_already_recorded() {
     let offers: Offers = [(
         "9".to_owned(),
         Offer {
-            offered: format!("{}Z", stamp(0)),
-            lapses: format!("{}Z", stamp(2 * DAY)),
+            offered: moment(0),
+            lapses: IN_TWO_DAYS,
             decline: None,
             claim: None,
         },
@@ -130,10 +131,7 @@ fn a_claim_is_recorded_as_its_hash_on_an_offer_already_recorded() {
             .and_then(|(offers, _)| offers.get("9").and_then(|one| one.claim.clone())),
         Some(TokenHash::of("a-token"))
     );
-    assert_eq!(
-        claimed.map(|(_, lapses)| lapses),
-        Some(format!("{}Z", stamp(2 * DAY)))
-    );
+    assert_eq!(claimed.map(|(_, lapses)| lapses), Some(IN_TWO_DAYS));
     assert!(with_claim(offers, "10", "a-token").is_none());
 }
 

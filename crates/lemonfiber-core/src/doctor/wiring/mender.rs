@@ -32,12 +32,12 @@ pub(crate) struct WiringMender {
     /// When a change made here is recorded as happening — the run's own stamp, so every
     /// change one repair makes carries the same one and a reversal can tell them apart
     /// from the repair before.
-    stamp: String,
+    stamp: crate::instant::Instant,
 }
 
 impl WiringMender {
     /// A mender over the wirings given.
-    pub(crate) const fn new(managed: Arc<Vec<Managed>>, stamp: String) -> Self {
+    pub(crate) const fn new(managed: Arc<Vec<Managed>>, stamp: crate::instant::Instant) -> Self {
         Self { managed, stamp }
     }
 
@@ -172,7 +172,7 @@ async fn mended(mender: &WiringMender, repair: &Repair) -> Attempt {
         // alike, and a reversal that took this for a `Set` would write the field's
         // name into the environment file and leave the service exactly as it was.
         Ok(()) => Attempt::recorded(vec![Change {
-            at: mender.stamp.clone(),
+            at: mender.stamp,
             operation: OPERATION.to_owned(),
             target: managed.id.clone(),
             kind: Kind::Configured {

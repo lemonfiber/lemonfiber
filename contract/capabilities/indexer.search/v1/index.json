@@ -23,7 +23,7 @@
     },
     {
       "path": "indexer.search/v1/operations/indexers.json",
-      "sha256": "b325c08d8f980875c2507b5a5bcf786c4cb15b13ee1991e97e72e7886a5c34cd"
+      "sha256": "5aea74d3d5be674eb749ae180053ca004a50994448a7485e8cd3b285139d0b22"
     },
     {
       "path": "indexer.search/v1/operations/aggregators.json",

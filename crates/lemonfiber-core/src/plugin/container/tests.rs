@@ -100,7 +100,7 @@ fn installed(services: Vec<Placed>) -> Installed {
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     }
 }
 

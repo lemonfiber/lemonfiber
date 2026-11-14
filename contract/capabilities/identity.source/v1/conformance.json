@@ -12,7 +12,7 @@
     {"asked":{"name":"conformance-member"},"case":"invite-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"invite","since":0},
     {"asked":{"device":"conformance-claim","name":"conformance-member","password":"{minted}"},"case":"claim-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"claim","since":0},
     {"asked":{"id":"{identity.source@1/invite-answers#/id}"},"case":"unclaim-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"unclaim","since":0},
-    {"asked":{"since":"2000-01-01T00:00:00Z"},"case":"when_invited-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"when_invited","since":0},
+    {"asked":{"since":946684800},"case":"when_invited-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"when_invited","since":0},
     {"asked":{},"case":"libraries-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"libraries","since":0},
     {"asked":{},"case":"ratings-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"ratings","since":0},
     {"asked":{},"case":"country-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"country","since":0},

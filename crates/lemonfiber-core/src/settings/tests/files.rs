@@ -124,7 +124,7 @@ fn a_minted_key_crosses_by_its_secret_name_only_to_a_plugin_granted_it() {
                 credential: (*credential).to_owned(),
                 of: "series-upstream".to_owned(),
                 serves: "library.curate".to_owned(),
-                at: String::new(),
+                at: None,
             })
             .collect();
         finder

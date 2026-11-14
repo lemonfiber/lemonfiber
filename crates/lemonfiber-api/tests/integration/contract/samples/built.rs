@@ -2,6 +2,7 @@
 
 use lemonfiber_core::credential::Inventory;
 use lemonfiber_core::glossary::Term;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{
     FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove,
     SettingRead, SettingsReport, SubstitutionReport, UpdateReport, WalkthroughReport, WiringReport,
@@ -359,7 +360,7 @@ pub(super) fn what_is_installed() -> lemonfiber_core::plugin::Installs {
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     };
     lemonfiber_core::plugin::Installs {
         demand: None,
@@ -471,7 +472,7 @@ pub(super) fn a_reckoning() -> lemonfiber_core::space::Reckoning {
                 total: 400_000_000_000,
             },
             35_000_000_000,
-            1_700_000_000,
+            lemonfiber_core::instant::Instant::from_seconds(1_700_000_000),
         )],
         root: std::path::PathBuf::from("/srv/media"),
         data: {
@@ -744,7 +745,7 @@ pub(super) fn manifest() -> lemonfiber_core::backup::Manifest {
     lemonfiber_core::backup::Manifest {
         schema: lemonfiber_core::backup::SCHEMA,
         product_version: "0.1.0".to_owned(),
-        created_at: "0".to_owned(),
+        created_at: Instant::EPOCH,
         data_root: String::new(),
         scope: lemonfiber_core::backup::Scope::WholeStack,
         sensitive: true,

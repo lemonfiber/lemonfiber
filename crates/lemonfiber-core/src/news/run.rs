@@ -19,7 +19,7 @@ use super::News;
 pub async fn news(ctx: &Ctx) -> News {
     let household = crate::household::run::household(ctx, None).await.ok();
     let known = conditions::load(ctx);
-    let affected = Summary::affected(&known.all(), &ctx.stamp());
+    let affected = Summary::affected(&known.all(), ctx.stamp());
     News::of(Record::carried().as_ref(), household.as_ref(), &affected)
 }
 

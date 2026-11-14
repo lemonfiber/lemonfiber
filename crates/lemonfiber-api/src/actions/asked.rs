@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 
 use lemonfiber_core::app::Waiting;
 use lemonfiber_core::bundle::Filenames;
+use lemonfiber_core::instant::Instant;
 use serde::Deserialize;
 
 /// What an `only` names: one group of checks or one check on a diagnosis, and a list of
@@ -94,8 +95,8 @@ pub struct Arguments {
     pub media_type: Option<String>,
     /// The backup to restore from, by the name it was written under.
     pub archive: Option<String>,
-    /// The stamp of the run to put back, as the history writes it.
-    pub at: Option<String>,
+    /// When the run to put back was made, as the history writes it.
+    pub at: Option<lemonfiber_core::instant::Instant>,
     /// Whether re-pointing to this machine's data root was accepted.
     pub repoint: bool,
     /// Whether to produce the bundle, rather than say what one would hold.
@@ -261,7 +262,7 @@ impl Arguments {
             preset: Some("balanced".to_owned()),
             media_type: Some("tv".to_owned()),
             archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),
-            at: Some("1700000000".to_owned()),
+            at: Some(Instant::from_seconds(1_700_000_000)),
             logs: Some(1),
             reveal: Vec::new(),
             only: Some(Only::One("vpn".to_owned())),

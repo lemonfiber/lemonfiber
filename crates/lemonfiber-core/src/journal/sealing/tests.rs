@@ -2,6 +2,7 @@ use chacha20poly1305::aead::{Aead as _, KeyInit as _};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
 
 use lemonfiber_fixtures::ports::Chance;
+use lemonfiber_fixtures::ports::STAMPED;
 
 use super::{beside, is_sealed, scrubbed, unhex, Change, Kind, Seal, MARKER, NONCE_BYTES};
 use crate::credential::fingerprint;
@@ -35,7 +36,7 @@ fn sealed_beside(journal: &std::path::Path, byte: u8, clear: &str) -> String {
 /// The setting `key` changed from `previous` to `current`.
 fn set(key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "t".to_owned(),
+        at: STAMPED,
         operation: "reconfigure".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {

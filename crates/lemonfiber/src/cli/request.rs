@@ -240,8 +240,8 @@ pub enum Request {
     /// operator agreed to, and the history says beside each entry how many changes
     /// would go with it. Nothing is put back unless all of it can be.
     Undo {
-        /// The stamp of the run to put back, copied from `lemonfiber history`.
-        at: String,
+        /// When the run to put back was made, copied from `lemonfiber history`.
+        at: lemonfiber_core::instant::Instant,
     },
     /// List the items whose downloads are stuck — the landing point for "N stuck", each
     /// named so `lemonfiber trace` follows it on its own.

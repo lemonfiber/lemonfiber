@@ -16,6 +16,7 @@ use lemonfiber_core::app::apply::Applying;
 use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::kind;
 use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::platform::Environment;
@@ -333,12 +334,12 @@ async fn drive(
         Box::new(Flags::new(flags, default_data_location(paths)))
     };
 
-    let at = stamp();
+    let at = Instant::of(ctx.seams.clock.now());
     let guard = core_setup::guard(&ctx);
     let applying = Applying {
         paths,
         source: ctx.stack,
-        stamp: &at,
+        stamp: at,
         random: ctx.seams.random.as_ref(),
         confined: ctx.seams.confined.as_ref(),
         guard: guard.as_ref(),
@@ -384,17 +385,6 @@ async fn drive(
 /// instead.
 fn default_data_location(paths: &Paths) -> PathBuf {
     paths.data_dir().join("media")
-}
-
-/// A timestamp for the change journal — seconds since the epoch, or an empty
-/// string on the absurd clock this reversal has no better answer for.
-fn stamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs().to_string())
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

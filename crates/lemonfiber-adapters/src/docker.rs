@@ -492,11 +492,11 @@ async fn read_into(docker: Docker, container: Container, query: LogQuery, sender
         // fail to send without waiting on anything.
         let text = chunk.to_string();
         for line in text.lines() {
-            let (at, line) = split_timestamp(line);
+            let (stamped, line) = split_timestamp(line);
             let sending = LogLine {
                 service: container.service.clone(),
                 stream,
-                at,
+                stamped,
                 line,
             };
             let _delivered = sender.send(sending).await;

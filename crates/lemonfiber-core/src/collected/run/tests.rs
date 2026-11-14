@@ -1,15 +1,12 @@
-use std::time::{Duration, SystemTime};
-
 use super::{collector, decided, every, expired, kept_at, left, listed};
 use crate::collected::store::{filed, Ask, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
 use crate::config::Settings;
 use crate::household::State;
+use crate::instant::{Instant, DAY};
 use crate::model::{TitleKind, TitleUnit};
 use crate::ports::service::{BookUnit, Left, MusicUnit};
 use crate::test_support::{a_context, a_password, env_at};
-
-const DAY: Duration = Duration::from_secs(86_400);
 
 fn ctx(name: &str) -> crate::app::Ctx {
     a_context()
@@ -20,11 +17,7 @@ fn ctx(name: &str) -> crate::app::Ctx {
         .build()
 }
 
-fn written(at: SystemTime) -> String {
-    crate::instant::written(at).unwrap_or_default()
-}
-
-fn album(member: &str, at: String, standing: Standing) -> Asking {
+fn album(member: &str, at: Instant, standing: Standing) -> Asking {
     Asking {
         unit: Unit::Music(MusicUnit::Album),
         reference: "mbid-1".to_owned(),
@@ -70,10 +63,7 @@ fn standing_of(ctx: &crate::app::Ctx, named: Reference) -> Option<Standing> {
 #[tokio::test]
 async fn a_decline_settles_the_ask_and_keeps_the_reason_by_its_reference() {
     let ctx = ctx("collected-declined");
-    let named = kept(
-        &ctx,
-        &album("ada", written(ctx.seams.clock.now()), Standing::Waiting),
-    );
+    let named = kept(&ctx, &album("ada", ctx.stamp(), Standing::Waiting));
     assert_eq!(named, Some(Reference::Kept(Medium::Music, 1)));
 
     let said = decided(&ctx, Medium::Music, 1, Some("we have it on vinyl")).await;
@@ -95,10 +85,7 @@ async fn a_decline_settles_the_ask_and_keeps_the_reason_by_its_reference() {
 #[tokio::test]
 async fn only_a_waiting_ask_is_ruled_on() {
     let ctx = ctx("collected-not-waiting");
-    let _ = kept(
-        &ctx,
-        &album("ada", written(ctx.seams.clock.now()), Standing::Sent),
-    );
+    let _ = kept(&ctx, &album("ada", ctx.stamp(), Standing::Sent));
     let ruled = decided(&ctx, Medium::Music, 1, Some("no")).await;
     assert_eq!(
         ruled.err().map(|problem| problem.code),
@@ -111,13 +98,10 @@ async fn only_a_waiting_ask_is_ruled_on() {
 #[test]
 fn an_ask_left_waiting_past_the_period_is_closed_with_why_and_no_other() {
     let ctx = ctx("collected-expired");
-    let now = ctx.seams.clock.now();
-    let old = written(now - DAY * 40);
-    let overdue = kept(&ctx, &album("ada", old.clone(), Standing::Waiting));
-    let fresh = kept(
-        &ctx,
-        &album("ada", written(now - DAY * 2), Standing::Waiting),
-    );
+    let now = ctx.stamp();
+    let old = now.earlier(DAY * 40);
+    let overdue = kept(&ctx, &album("ada", old, Standing::Waiting));
+    let fresh = kept(&ctx, &album("ada", now.earlier(DAY * 2), Standing::Waiting));
     let sent = kept(&ctx, &album("ada", old, Standing::Sent));
 
     assert_eq!(expired(&ctx, 30, "nobody ruled on it"), Ok(1));
@@ -144,10 +128,7 @@ async fn a_decline_that_cannot_be_written_fails_and_leaves_the_ask_waiting() {
         ("collected-ask-unsettled", asks_blocked),
     ] {
         let ctx = ctx(tag);
-        let named = kept(
-            &ctx,
-            &album("ada", written(ctx.seams.clock.now()), Standing::Waiting),
-        );
+        let named = kept(&ctx, &album("ada", ctx.stamp(), Standing::Waiting));
         assert!(block(&ctx), "{tag}");
 
         assert!(decided(&ctx, Medium::Music, 1, Some("no")).await.is_err());
@@ -169,7 +150,7 @@ fn closing_asks_that_cannot_be_written_says_why() {
         ("collected-expiry-unsettled", asks_blocked),
     ] {
         let ctx = ctx(tag);
-        let old = written(ctx.seams.clock.now() - DAY * 40);
+        let old = ctx.stamp().earlier(DAY * 40);
         let _ = kept(&ctx, &album("ada", old, Standing::Waiting));
         assert!(block(&ctx), "{tag}");
 
@@ -238,10 +219,7 @@ async fn an_ask_is_not_let_through_onto_a_full_disk() {
         .env_file
         .clone()
         .and_then(|env| env.parent().map(std::path::Path::to_path_buf));
-    let _ = kept(
-        &ctx,
-        &album("ada", written(ctx.seams.clock.now()), Standing::Waiting),
-    );
+    let _ = kept(&ctx, &album("ada", ctx.stamp(), Standing::Waiting));
 
     assert!(decided(&ctx, Medium::Music, 1, None).await.is_err());
     assert_eq!(
@@ -250,7 +228,7 @@ async fn an_ask_is_not_let_through_onto_a_full_disk() {
     );
 }
 
-fn ask(member: &str, asked_at: String, standing: Standing) -> Ask {
+fn ask(member: &str, asked_at: Instant, standing: Standing) -> Ask {
     Ask {
         number: 1,
         unit: Unit::Music(MusicUnit::Album),
@@ -269,27 +247,27 @@ fn ask(member: &str, asked_at: String, standing: Standing) -> Ask {
 
 #[test]
 fn what_is_left_counts_the_member_s_live_asks_of_the_medium_inside_the_period() {
-    let now = SystemTime::UNIX_EPOCH + DAY * 20_000;
+    let now = Instant::from_seconds(DAY * 20_000);
     let films = Left {
         limit: Some(3),
         used: 2,
         days: Some(7),
     };
     let asks = [
-        ask("ada", written(now - DAY), Standing::Waiting),
-        ask("ada", written(now - DAY * 2), Standing::Sent),
-        ask("ada", written(now - DAY * 3), Standing::Declined),
-        ask("ada", written(now - DAY * 3), Standing::Expired),
-        ask("ada", written(now - DAY * 8), Standing::Sent),
-        ask("bea", written(now - DAY), Standing::Sent),
+        ask("ada", now.earlier(DAY), Standing::Waiting),
+        ask("ada", now.earlier(DAY * 2), Standing::Sent),
+        ask("ada", now.earlier(DAY * 3), Standing::Declined),
+        ask("ada", now.earlier(DAY * 3), Standing::Expired),
+        ask("ada", now.earlier(DAY * 8), Standing::Sent),
+        ask("bea", now.earlier(DAY), Standing::Sent),
     ];
     let music = left(&asks, films, "ada", Medium::Music, now);
     assert_eq!((music.limit, music.used, music.days), (Some(3), 2, Some(7)));
     assert_eq!(music.remaining(), Some(1));
     assert_eq!(left(&asks, films, "ada", Medium::Books, now).used, 0);
     let held = [
-        ask("ada", written(now - DAY), Standing::Here),
-        ask("ada", written(now - DAY), Standing::PartlyHere),
+        ask("ada", now.earlier(DAY), Standing::Here),
+        ask("ada", now.earlier(DAY), Standing::PartlyHere),
     ];
     assert_eq!(left(&held, films, "ada", Medium::Music, now).used, 2);
     let unlimited = Left {
@@ -305,10 +283,10 @@ fn what_is_left_counts_the_member_s_live_asks_of_the_medium_inside_the_period() 
 
 #[test]
 fn a_kept_ask_is_listed_by_its_reference_in_the_household_s_words() {
-    let now = SystemTime::UNIX_EPOCH + DAY * 20_000;
+    let now = Instant::from_seconds(DAY * 20_000);
     let mut reasons = crate::asking::Reasons::default();
     let waiting = listed(
-        &ask("ada", written(now - DAY * 3), Standing::Waiting),
+        &ask("ada", now.earlier(DAY * 3), Standing::Waiting),
         &reasons,
         now,
     );
@@ -319,11 +297,11 @@ fn a_kept_ask_is_listed_by_its_reference_in_the_household_s_words() {
     assert_eq!(waiting.waiting_days, Some(3));
 
     assert_eq!(
-        listed(&ask("ada", written(now), Standing::Sent), &reasons, now).state,
+        listed(&ask("ada", now, Standing::Sent), &reasons, now).state,
         Some(State::Getting)
     );
     reasons.keep(Reference::Kept(Medium::Music, 1), "not this one", None);
-    let declined = listed(&ask("ada", written(now), Standing::Declined), &reasons, now);
+    let declined = listed(&ask("ada", now, Standing::Declined), &reasons, now);
     assert_eq!(declined.state, Some(State::Declined));
     assert_eq!(declined.waiting_days, None);
     assert_eq!(
@@ -334,13 +312,13 @@ fn a_kept_ask_is_listed_by_its_reference_in_the_household_s_words() {
 
 #[test]
 fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
-    let now = SystemTime::UNIX_EPOCH + DAY * 20_000;
+    let now = Instant::from_seconds(DAY * 20_000);
     let reasons = crate::asking::Reasons::default();
     let of = |unit| {
         let one = listed(
             &Ask {
                 unit,
-                ..ask("ada", written(now), Standing::Waiting)
+                ..ask("ada", now, Standing::Waiting)
             },
             &reasons,
             now,
@@ -367,12 +345,8 @@ fn a_kept_ask_lists_the_kind_and_the_unit_it_asks_for() {
         of(Unit::Books(BookUnit::Series)),
         (Some(TitleKind::Books), Some(TitleUnit::Series))
     );
-    let shape = serde_json::to_value(listed(
-        &ask("ada", written(now), Standing::Waiting),
-        &reasons,
-        now,
-    ))
-    .ok();
+    let shape =
+        serde_json::to_value(listed(&ask("ada", now, Standing::Waiting), &reasons, now)).ok();
     assert_eq!(
         shape
             .as_ref()

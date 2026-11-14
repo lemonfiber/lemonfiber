@@ -1,6 +1,7 @@
 //! The household's identity source, and what the operator switched on or off.
 
 use super::*;
+use crate::instant::Instant;
 
 /// Both halves of the identity step, as a run takes them on a stack without the gate.
 async fn identity(
@@ -569,7 +570,7 @@ async fn a_telling_the_operator_switched_off_is_reported_rather_than_overruled()
         "seerr",
         crate::seed::TELLING,
         &crate::seed::said(&crate::seed::wanted_telling()),
-        "2026-08-28T00:00:00Z",
+        Instant::from_seconds(1_787_875_200),
     );
 
     let (wirings, records) = identity(&ctx, &[media_server_svc(), requests_svc()], &baseline).await;

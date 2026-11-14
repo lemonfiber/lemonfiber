@@ -15,7 +15,7 @@ pub struct MemberRequest {
     pub id: String,
     /// When it was asked for, where the request service or the core says.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub asked: Option<String>,
+    pub asked: Option<crate::instant::Instant>,
     /// What it is called: from the library of the service filing it, where it has been
     /// told about it and that library could be read, and otherwise from the request
     /// service's own record of the title. Absent where neither names it.
@@ -24,10 +24,10 @@ pub struct MemberRequest {
     /// not null, otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<u16>,
-    /// When the title arrived on the media server, as the request service timestamps it.
-    /// Absent, not null, until it is there.
+    /// When the title arrived on the media server, as the request service says. Absent,
+    /// not null, until it is there.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arrived: Option<String>,
+    pub arrived: Option<crate::instant::Instant>,
     /// The identifier the media server holds the title under, which is the one the held
     /// read names it by, so a request that has arrived can be found on the shelf. Absent,
     /// not null, until it is there.
@@ -209,9 +209,9 @@ pub struct HouseholdMember {
     pub requests: Vec<MemberRequest>,
     /// What they may watch.
     pub access: MemberAccess,
-    /// When the media server last saw them, as it timestamps it. Absent where nobody
-    /// has ever signed in, which is exactly the unclaimed invitations.
-    pub last_seen: Option<String>,
+    /// When the media server last saw them. Absent where nobody has ever signed in,
+    /// which is exactly the unclaimed invitations.
+    pub last_seen: Option<crate::instant::Instant>,
     /// Whether somebody has set a password on the account. False is an invitation
     /// nobody has taken up rather than a member who is not here.
     pub claimed: bool,

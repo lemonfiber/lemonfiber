@@ -10,6 +10,7 @@ use super::{
     canonical_root, observe_or_skip, same_path, wire_one, BTreeMap, Client, Journal, Naming,
     RootFolder, State, Wiring,
 };
+use crate::instant::Instant;
 use crate::ports::filesystem::FileSystem;
 
 /// What a wanted root folder is judged against before it may be written: the paths
@@ -79,7 +80,7 @@ pub async fn wire_root_folders(
     wanted: &[RootFolder],
     placing: Placing<'_>,
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
     rehearsing: bool,
 ) -> Vec<Wiring> {
     let existing = match observe_or_skip(client.root_folders().await, wanted, |folder| {

@@ -1,6 +1,7 @@
 //! Proving, keeping or skipping an indexer key and a Usenet provider.
 
 use super::*;
+use lemonfiber_fixtures::ports::STAMPED;
 
 /// A key pasted with whitespace around it is trimmed before it is proven and
 /// before it is kept, so the value tested is the value stored.
@@ -30,7 +31,7 @@ async fn a_pasted_key_is_trimmed_before_it_is_proven_and_before_it_is_kept() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
     assert!(matches!(outcome, Ok(Outcome::Applied)));
@@ -75,7 +76,7 @@ async fn a_credential_proven_is_kept_and_recorded_as_validated() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -116,7 +117,7 @@ async fn a_credential_that_fails_then_passes_on_retry_is_kept() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -144,7 +145,7 @@ async fn a_credential_kept_unverified_records_that_it_was_not_proven() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -174,7 +175,7 @@ async fn a_credential_skipped_leaves_the_indexer_unset() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -201,7 +202,7 @@ async fn no_indexer_is_a_supported_end_and_persists_nothing_before_a_test() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -244,7 +245,7 @@ async fn a_usenet_provider_proven_is_kept_and_recorded_as_validated() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -283,7 +284,7 @@ async fn a_provider_that_fails_then_passes_on_retry_is_kept() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -311,7 +312,7 @@ async fn a_provider_kept_unverified_records_that_it_was_not_proven() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -339,7 +340,7 @@ async fn a_provider_skipped_leaves_usenet_unset() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -374,7 +375,7 @@ async fn a_library_only_run_is_never_asked_for_a_credential() {
         (&prompt, None),
         &ProbeFs::links(),
         &validator,
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 

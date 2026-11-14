@@ -70,9 +70,9 @@ pub(super) fn not_a_purpose(purpose: &str) -> Problem {
 
 /// Another key holds the name.
 pub(super) fn name_taken(held: &Record) -> Problem {
-    let standing = held.revoked.as_deref().map_or_else(
+    let standing = held.revoked.map_or_else(
         || "and it is active".to_owned(),
-        |when| format!("revoked {when}"),
+        |when| format!("revoked {}", when.said()),
     );
     Problem::new(
         NAME_TAKEN,
@@ -80,7 +80,7 @@ pub(super) fn name_taken(held: &Record) -> Problem {
         format!(
             "It was minted {} with the scope {}, {standing}. A name identifies one key, so an \
              alert or a journal entry naming it means the same key for good.",
-            held.minted,
+            held.minted.said(),
             held.scope.written()
         ),
         Remedy::new("Mint it under another name"),
@@ -148,8 +148,8 @@ pub(super) fn not_for_yourself() -> Problem {
 
 /// No active key holds the name.
 pub(super) fn no_such_key(name: &str, held: Option<&Record>) -> Problem {
-    let meaning = match held.and_then(|record| record.revoked.as_deref()) {
-        Some(when) => format!("The key named {name} was already revoked {when}."),
+    let meaning = match held.and_then(|record| record.revoked) {
+        Some(when) => format!("The key named {name} was already revoked {}.", when.said()),
         None => format!("No key is named {name}."),
     };
     Problem::new(

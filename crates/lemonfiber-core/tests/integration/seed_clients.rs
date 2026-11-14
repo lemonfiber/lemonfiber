@@ -8,9 +8,11 @@ use common::service::*;
 
 use crate::common;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, DownloadClient, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
+use lemonfiber_fixtures::ports::STAMPED;
 
 // ---- Download clients: the same driver, matched by endpoint not label. ----
 
@@ -33,7 +35,7 @@ async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<S
             reset: false,
             rehearsing: false,
         },
-        "t",
+        STAMPED,
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
@@ -62,7 +64,7 @@ async fn seed_clients_recording(
             reset: false,
             rehearsing: false,
         },
-        "t",
+        STAMPED,
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
@@ -92,7 +94,7 @@ async fn seed_clients_with(
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();

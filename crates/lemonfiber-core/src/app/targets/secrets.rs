@@ -6,6 +6,7 @@
 
 use crate::app::Ctx;
 use crate::config::store;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::settings::legacy::held_as;
 use crate::settings::{Keeping, Source};
@@ -139,7 +140,7 @@ pub(crate) fn record_secret(
                     one.previous.clone(),
                     one.current.clone(),
                     operation,
-                    &stamp,
+                    stamp,
                 )
             })
             .collect();
@@ -177,7 +178,7 @@ pub(crate) fn forget_secret(ctx: &Ctx, key: &str, operation: &str) -> Result<(),
     }
     let previous =
         crate::settings::keyed_at(&secrets, ctx.seams.random.as_ref())?.fingerprint(&name);
-    let change = secret_changed(&name, previous, None, operation, &ctx.stamp());
+    let change = secret_changed(&name, previous, None, operation, ctx.stamp());
     crate::app::recover::journalled(&journal, &[change])?;
     crate::settings::dropped(&secrets, &[name])
 }
@@ -208,10 +209,10 @@ fn secret_changed(
     previous: Option<String>,
     current: Option<String>,
     operation: &str,
-    stamp: &str,
+    stamp: Instant,
 ) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: operation.to_owned(),
         target: name.to_owned(),
         kind: Kind::Secret {

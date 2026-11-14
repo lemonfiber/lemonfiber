@@ -9,6 +9,7 @@ use std::net::IpAddr;
 
 use lemonfiber_api::admission::Keyring;
 use lemonfiber_api::guard::Arrived;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope, Secret};
 
 use crate::door::*;
@@ -54,7 +55,7 @@ pub(crate) fn keeping_keys(named: &str) -> Keys {
             scope,
             Purpose::Other,
             secret,
-            "2026-10-05T06:00:00".to_owned(),
+            Instant::from_seconds(1_791_180_000),
             Minter::Operator,
         )
     };
@@ -67,7 +68,7 @@ pub(crate) fn keeping_keys(named: &str) -> Keys {
         member: a_secret(4),
     };
     let mut gone = record("gone", Scope::Read, &keys.revoked);
-    gone.revoked = Some("2026-10-05T07:00:00".to_owned());
+    gone.revoked = Some(Instant::from_seconds(1_791_183_600));
     let kept = Kept {
         keys: vec![
             record("reader", Scope::Read, &keys.read),
@@ -422,7 +423,7 @@ async fn a_member_keys_stream_ends_once_the_key_is_revoked() {
         };
         for record in &mut kept.keys {
             if matches!(record.scope, Scope::Member { .. }) {
-                record.revoked = Some("2026-10-05T08:00:00".to_owned());
+                record.revoked = Some(Instant::from_seconds(1_791_187_200));
             }
         }
         assert!(kept.keep(&keys.kept).is_ok());

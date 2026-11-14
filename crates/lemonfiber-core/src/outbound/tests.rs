@@ -136,7 +136,7 @@ fn the_git_sources_of_installed_plugins_are_where_fetching_one_goes() {
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     };
     let installed = [
         from("https://example.org/plugin-komga"),

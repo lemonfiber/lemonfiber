@@ -68,8 +68,14 @@
                   "description": "One notable event in an item's history: what happened and when. The forward-moving\noutcomes — a grab, an import — mark how far the item got; the rest — a failed\ndownload, a removal — are the history of what has been tried, shown even though they\nadvance no stage.",
                   "properties": {
                     "at": {
-                      "description": "When it happened, as the service reported it.",
-                      "type": "string"
+                      "default": null,
+                      "description": "When it happened, where the service reported it.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     },
                     "outcome": {
                       "$ref": "#/$defs/TraceOutcome",
@@ -85,8 +91,7 @@
                     }
                   },
                   "required": [
-                    "outcome",
-                    "at"
+                    "outcome"
                   ],
                   "type": "object"
                 },

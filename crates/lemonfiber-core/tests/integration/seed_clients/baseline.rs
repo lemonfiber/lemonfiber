@@ -3,6 +3,7 @@
 use super::common::service::*;
 use super::seed_clients_recording;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
@@ -67,7 +68,12 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
     }];
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
@@ -81,7 +87,7 @@ async fn an_operators_re_filed_client_is_not_recorded_as_the_baseline() {
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
     .into_iter()

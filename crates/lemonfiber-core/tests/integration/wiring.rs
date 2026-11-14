@@ -18,6 +18,7 @@ use lemonfiber_core::doctor::wiring::{Managed, Wired, WiringCheck};
 use lemonfiber_core::doctor::{Category, Check, Finding, Verdict};
 use lemonfiber_core::error::codes::wiring::DRIFTED;
 use lemonfiber_core::error::Problem;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::ports::service::{
     ClientProbe, Credential, DownloadClient, Protocol, RegisteredClient,
@@ -49,7 +50,7 @@ fn want() -> DownloadClient {
 fn recorded(value: &str, origin: Origin) -> Record {
     Record {
         value: value.to_owned(),
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         origin,
     }
 }
@@ -112,14 +113,14 @@ fn reaching(category: Option<&str>, reachable: bool) -> Arc<Fake> {
 
 /// The check over one managed wiring, against the given transport.
 fn checking(recorded: Option<Record>, http: Arc<Fake>) -> WiringCheck {
-    WiringCheck::new(vec![managed(recorded, http)], "2000".to_owned())
+    WiringCheck::new(vec![managed(recorded, http)], Instant::from_seconds(2000))
 }
 
 /// The check over one managed wiring whose curator cannot be asked.
 fn unasked(recorded: Option<Record>) -> WiringCheck {
     let mut held = managed(recorded, Fake::silent());
     held.asked = None;
-    WiringCheck::new(vec![held], "2000".to_owned())
+    WiringCheck::new(vec![held], Instant::from_seconds(2000))
 }
 
 /// What the check made of one arrangement of the three values.
@@ -417,7 +418,7 @@ async fn a_carried_repair_records_enough_to_be_put_back() {
     assert_eq!(
         changes(attempt.as_ref()).and_then(<[Change]>::first),
         Some(&Change {
-            at: "2000".to_owned(),
+            at: Instant::from_seconds(2000),
             operation: OPERATION.to_owned(),
             target: "sonarr".to_owned(),
             kind: Kind::Configured {

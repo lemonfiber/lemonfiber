@@ -2,6 +2,7 @@ use super::{
     digest, names_a_key, shaped, Kept, Minter, Purpose, Record, Scope, Secret, Unkept, Used,
     LONGEST_NAME, PREFIX,
 };
+use crate::instant::Instant;
 use lemonfiber_fixtures::ports::Chance;
 
 /// A source that answers with thirty-two of the same byte.
@@ -17,7 +18,7 @@ fn a_key(name: &str, byte: u8) -> (Record, Secret) {
         Scope::Read,
         Purpose::HomeAssistant,
         &secret,
-        "2026-10-05T06:00:00".to_owned(),
+        Instant::from_seconds(1_791_180_000),
         Minter::Operator,
     );
     (record, secret)
@@ -94,7 +95,7 @@ fn a_key_is_found_by_its_secret_and_by_nothing_else() {
 #[test]
 fn a_revoked_key_is_still_found_so_it_can_be_refused_as_revoked() {
     let (mut record, secret) = a_key("gone", 4);
-    record.revoked = Some("2026-10-05T07:00:00".to_owned());
+    record.revoked = Some(Instant::from_seconds(1_791_183_600));
     let kept = Kept { keys: vec![record] };
     assert!(kept
         .holding(secret.as_str())

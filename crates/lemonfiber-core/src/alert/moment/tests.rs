@@ -1,6 +1,7 @@
 use super::{Alert, Moment};
 use crate::condition::{Condition, Fault};
 use crate::error::Severity;
+use crate::instant::Instant;
 
 /// What a check reports, with what it costs and something to do about it.
 fn wrong(severity: Severity, summary: &str) -> Fault {
@@ -18,7 +19,7 @@ fn raised() -> Condition {
     Condition::raised(
         "queue.stalled",
         &wrong(Severity::Warning, "two downloads have not moved"),
-        "1000",
+        Instant::from_seconds(1000),
     )
 }
 
@@ -44,7 +45,7 @@ fn a_resolution_carries_the_same_three_parts_as_its_onset() {
     // Good news said in fewer parts than bad news is how the resolution reads
     // as an afterthought rather than as the other half of what was said.
     let mut condition = raised();
-    condition.clear("1100");
+    condition.clear(Instant::from_seconds(1100));
     let told = Alert::of(&condition, Some(0)).map(|alert| {
         (
             alert.moment,
@@ -78,7 +79,7 @@ fn a_resolution_is_news_to_whoever_heard_the_onset() {
     // Told a disk filled up and never told it was fixed, an operator goes on
     // believing it.
     let mut condition = raised();
-    condition.clear("1000");
+    condition.clear(Instant::from_seconds(1000));
     let alert = Alert::of(&condition, Some(0));
     assert_eq!(alert.as_ref().map(|a| a.moment), Some(Moment::Resolved));
     assert_eq!(
@@ -93,7 +94,7 @@ fn a_resolution_nobody_heard_the_onset_of_says_nothing() {
     // Something that broke and fixed itself between two runs never reached them,
     // and "it is better now" about a thing they never knew was worse is noise.
     let mut condition = raised();
-    condition.clear("1000");
+    condition.clear(Instant::from_seconds(1000));
     assert_eq!(Alert::of(&condition, None), None);
 }
 
@@ -109,9 +110,9 @@ fn a_resolution_carries_the_weight_of_what_resolved() {
             "this connection's address is visible to every peer",
             "look at it",
         ),
-        "1000",
+        Instant::from_seconds(1000),
     );
-    condition.clear("later");
+    condition.clear(Instant::from_seconds(2000));
     assert_eq!(
         Alert::of(&condition, Some(0)).map(|a| a.severity),
         Some(Severity::Critical)
@@ -129,13 +130,13 @@ fn only_a_critical_onset_interrupts_someone_who_asked_for_quiet() {
             "this connection's address is visible to every peer",
             "look at it",
         ),
-        "1000",
+        Instant::from_seconds(1000),
     );
     assert!(Alert::of(&critical, None).is_some_and(|a| a.overrides_quiet()));
 
     // Good news can wait for morning.
     let mut over = critical.clone();
-    over.clear("later");
+    over.clear(Instant::from_seconds(2000));
     assert!(Alert::of(&over, Some(0)).is_some_and(|a| !a.overrides_quiet()));
 
     // And a warning is not an emergency however new it is.
@@ -147,7 +148,7 @@ fn an_alert_carries_the_exit_code_beside_its_summary() {
     let condition = Condition::raised(
         "service.sonarr",
         &wrong(Severity::Error, "sonarr stopped with an error").exited(Some(137)),
-        "1000",
+        Instant::from_seconds(1000),
     );
     let carried = Alert::of(&condition, None).map(|alert| (alert.summary, alert.exit));
     assert_eq!(
@@ -162,11 +163,11 @@ fn an_alert_carries_the_exit_code_beside_its_summary() {
 fn an_onset_and_its_resolution_share_a_name_and_a_recurrence_does_not() {
     let mut condition = raised();
     let onset = Alert::of(&condition, None).and_then(|alert| alert.id);
-    condition.clear("1100");
+    condition.clear(Instant::from_seconds(1100));
     let resolved = Alert::of(&condition, Some(0)).and_then(|alert| alert.id);
     condition.raise(
         &wrong(Severity::Warning, "two downloads have not moved"),
-        "1200",
+        Instant::from_seconds(1200),
     );
     let again = Alert::of(&condition, Some(0)).and_then(|alert| alert.id);
 

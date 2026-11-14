@@ -17,13 +17,14 @@ pub mod identifier;
 pub mod served;
 
 use std::path::Path;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde::Serialize;
 
 use crate::app::Ctx;
 use crate::error::codes::pair::{NOT_SERVED, NOWHERE, NO_ADDRESS, NO_CERTIFICATE, UNNAMED};
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::PRODUCT;
 
 /// What was asked of pairing.
@@ -76,8 +77,8 @@ pub struct Material {
     /// The certificate that address presents: SHA-256 over its DER encoding, in
     /// lower-case hex. Not the digest of its public key.
     pub fingerprint: String,
-    /// When the material stops being good, in seconds since the Unix epoch.
-    pub expires: u64,
+    /// When the material stops being good.
+    pub expires: Instant,
     /// The stack's own identifier: opaque, minted once from nothing and kept, and the
     /// same across every issue of the material, a change of address and a replacement of
     /// the certificate. Not the stack's name and not its version, and it carries nothing
@@ -96,8 +97,8 @@ pub struct Pairing {
     /// The fingerprint in the short form a person compares with what the phone shows
     /// after typing the line in, as [`comparable`] derives it.
     pub compare: String,
-    /// When it stops being good, as a date and a time of day.
-    pub until: String,
+    /// When it stops being good.
+    pub until: Instant,
     /// What would make every paired phone refuse this machine, said now rather than
     /// discovered then. In words any surface can show: how the certificate is replaced
     /// is each surface's own to say, so this names no command.
@@ -133,7 +134,12 @@ const CONSEQUENCE: &str = "Every phone paired with this machine refuses it from 
 /// A link the companion or another program opens: `at`, then the material's address,
 /// fingerprint and stack, `expires`, and `rest`, in that order, each percent-encoded.
 #[must_use]
-pub(crate) fn linked(at: &str, material: &Material, expires: u64, rest: &[(&str, &str)]) -> String {
+pub(crate) fn linked(
+    at: &str,
+    material: &Material,
+    expires: Instant,
+    rest: &[(&str, &str)],
+) -> String {
     let expires = expires.to_string();
     let said = [
         ("address", material.address.as_str()),
@@ -169,20 +175,18 @@ pub async fn paired(ctx: &Ctx) -> Result<Pairing, Box<Problem>> {
         .ok_or_else(|| Box::new(no_address()))?;
     let stack = identifier::kept_or_minted(directory, ctx.seams.random.as_ref())
         .map_err(|why| Box::new(unnamed(&why.to_string())))?;
-    let expiring = ctx.seams.clock.now() + LASTS;
+    let expiring = ctx.stamp().later(LASTS.as_secs());
     let material = Material {
         address: encrypted(&reached.url),
         fingerprint: held.fingerprint,
-        expires: expiring
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |since| since.as_secs()),
+        expires: expiring,
         stack,
     };
     Ok(Pairing {
         written: serde_json::to_string(&material).unwrap_or_default(),
         compare: comparable(&material.fingerprint),
         material,
-        until: crate::instant::written(expiring).unwrap_or_default(),
+        until: expiring,
         replacing: format!(
             "The certificate this address presents was made by {PRODUCT} and nothing renews \
              it. It changes only when somebody replaces it. {CONSEQUENCE}"

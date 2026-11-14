@@ -1,5 +1,6 @@
 use super::{assessed, edited, record, recorded, refusal, Edited, Findings, SETTINGS};
 use crate::config::{Settings, DATA_ROOT_KEY, PROVIDER_PASS_KEY};
+use crate::instant::Instant;
 use crate::test_support::{a_context, env_without_password};
 
 /// A context over a given environment file, so the baseline this writes is read
@@ -87,7 +88,12 @@ fn an_edited_credential_is_reported_from_neither_side() {
     // operator needs is that somebody changed it, not what they changed it to.
     let ctx = ctx("edited-credential");
     let mut baseline = crate::baseline::Baseline::new();
-    baseline.record(SETTINGS, PROVIDER_PASS_KEY, "the-one-we-wrote", "1");
+    baseline.record(
+        SETTINGS,
+        PROVIDER_PASS_KEY,
+        "the-one-we-wrote",
+        Instant::from_seconds(1),
+    );
     super::super::seed::save_baseline(&ctx, &baseline);
     assert_eq!(
         edited(&ctx, PROVIDER_PASS_KEY, Some("theirs"), "another"),

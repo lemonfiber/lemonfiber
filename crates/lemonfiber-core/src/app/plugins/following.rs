@@ -25,6 +25,7 @@ use crate::error::codes::plugin::{
 };
 use crate::error::Diagnose;
 use crate::error::{Came, Problem, Remedy, State, Stepped};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::plugin::running::{run, Ran, Reaching, Running};
 use crate::plugin::Installed;
@@ -217,7 +218,7 @@ pub(super) async fn followed(
     would: &Installed,
     services: &[lemonfiber_manifest::Service],
     consent: &Consent,
-    stamp: &str,
+    stamp: Instant,
 ) -> Result<Vec<Ran>, Unfollowed> {
     following(
         ctx,
@@ -242,7 +243,7 @@ pub(super) struct Following<'a> {
     /// Every service the stack declares.
     pub(super) services: &'a [lemonfiber_manifest::Service],
     /// The stamp what is kept is journalled under.
-    pub(super) stamp: &'a str,
+    pub(super) stamp: Instant,
 }
 
 /// Run `recipes` in order under `consent`, and keep what they capture.
@@ -457,7 +458,7 @@ pub(super) fn kept(
     would: &Installed,
     manifest: &Manifest,
     captured: &BTreeMap<String, String>,
-    stamp: &str,
+    stamp: Instant,
 ) -> Result<(), Box<Problem>> {
     let keeping = keeping(&would.plugin, manifest, captured);
     if keeping.is_empty() {
@@ -482,7 +483,7 @@ pub(super) fn kept(
             .iter()
             .zip(replaced)
             .map(|(one, replacing)| Change {
-                at: stamp.to_owned(),
+                at: stamp,
                 operation: crate::plugin::owner(&would.plugin),
                 target: one.name.to_owned(),
                 kind: Kind::Secret {

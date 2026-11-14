@@ -67,6 +67,7 @@ use std::collections::BTreeMap;
 use std::future::Future;
 
 use crate::baseline::Baseline;
+use crate::instant::Instant;
 use crate::journal::{Change, Journal, Kind};
 use crate::ports::random::Random;
 use crate::ports::service::{
@@ -111,7 +112,7 @@ async fn wire_one<T>(
     landed: impl FnOnce(&[T]) -> Option<String>,
     naming: Naming<'_>,
     journal: &mut Journal,
-    at: &str,
+    at: Instant,
     would: Option<State>,
 ) -> State {
     if let Some(would) = would {
@@ -127,7 +128,7 @@ async fn wire_one<T>(
     match landed(&registered) {
         Some(id) => {
             journal.record(Change {
-                at: at.to_owned(),
+                at,
                 operation: OPERATION.to_owned(),
                 target: naming.service.to_owned(),
                 kind: Kind::Created {

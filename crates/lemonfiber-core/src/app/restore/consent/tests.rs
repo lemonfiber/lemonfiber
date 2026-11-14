@@ -6,7 +6,7 @@ fn listed(now: &str) -> Preview {
     let manifest = Manifest {
         schema: crate::backup::SCHEMA,
         product_version: "0.8.0".to_owned(),
-        created_at: "2026-08-21T00:00:00Z".to_owned(),
+        created_at: crate::instant::Instant::from_seconds(1_787_270_400),
         data_root: "/srv/media".to_owned(),
         scope: Scope::WholeStack,
         sensitive: true,

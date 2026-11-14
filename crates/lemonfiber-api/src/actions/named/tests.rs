@@ -1,4 +1,5 @@
 use lemonfiber_core::app::Command;
+use lemonfiber_core::instant::Instant;
 
 use super::{carried, KEY_CALLABLE, OFFERED};
 use crate::actions::{Arguments, TAKES_AGREEMENT};
@@ -34,7 +35,7 @@ fn everything(confirm: bool) -> Arguments {
         preset: Some("balanced".to_owned()),
         media_type: Some("tv".to_owned()),
         archive: Some("lemonfiber-full-1700000000.tar.gz".to_owned()),
-        at: Some("1700000000".to_owned()),
+        at: Some(Instant::from_seconds(1_700_000_000)),
         repoint: true,
         write: true,
         logs: Some(12),

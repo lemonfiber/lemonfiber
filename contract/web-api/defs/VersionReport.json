@@ -6,9 +6,11 @@
     "attestation_status": {
       "description": "When the snapshot of Google's attestation status list this build carries was\ntaken, which an Android device key's chain is checked against; nothing where it\ndoes not read.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "binary": {
       "description": "The running binary's version.",

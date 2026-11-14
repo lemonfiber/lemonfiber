@@ -4,18 +4,22 @@
   "type": "object",
   "properties": {
     "arrived": {
-      "description": "When the title arrived on the media server, as the request service timestamps it.\nAbsent, not null, until it is there.",
+      "description": "When the title arrived on the media server, as the request service says. Absent,\nnot null, until it is there.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "asked": {
       "description": "When it was asked for, where the request service or the core says.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "estimate": {
       "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of.",

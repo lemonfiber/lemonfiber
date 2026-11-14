@@ -4,6 +4,7 @@
 //! to leave, and which to refuse. No service, no fake — the decisions alone.
 
 use lemonfiber_core::baseline::{Origin, Record};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::seed::{
     intent, reconcile, Assessment, Intent, Observed, Report, State, Wiring,
 };
@@ -33,12 +34,12 @@ fn the_three_way_comparison_reads_every_row_of_the_merge_table() {
     // The expected leg carries a value and where it came from; a helper builds each.
     let written = |value: &str| Record {
         value: value.to_owned(),
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         origin: Origin::Written,
     };
     let adopted = |value: &str| Record {
         value: value.to_owned(),
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         origin: Origin::Adopted,
     };
     // Actual already at desired: in sync, whoever moved it there.

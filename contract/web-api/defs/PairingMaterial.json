@@ -8,7 +8,7 @@
       "type": "string"
     },
     "expires": {
-      "description": "When the material stops being good, in seconds since the Unix epoch.",
+      "description": "When the material stops being good.",
       "type": "integer",
       "format": "uint64",
       "minimum": 0

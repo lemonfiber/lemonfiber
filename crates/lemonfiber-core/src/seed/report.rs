@@ -7,6 +7,8 @@
 use super::{client_field, Baselines, DownloadClient, Failure};
 use serde::Serialize;
 
+use crate::instant::Instant;
+
 /// How one connection turned out after a seed pass.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case")]
@@ -422,7 +424,7 @@ pub(super) fn record_outcome(
     state: &State,
     adopting: bool,
     found: Option<&String>,
-    at: &str,
+    at: Instant,
 ) {
     let field = client_field(want);
     let records_ours = if baselines.reset {

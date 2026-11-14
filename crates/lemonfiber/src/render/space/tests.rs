@@ -33,7 +33,7 @@ fn volume(role: Role, at: &str, available: u64, kind: &str, committed: u64) -> V
             total: 1_000_000_000_000,
         },
         committed,
-        1_700_000_000,
+        lemonfiber_core::instant::Instant::from_seconds(1_700_000_000),
     )
 }
 
@@ -174,7 +174,10 @@ fn a_reading_across_a_share_is_dated_rather_than_presented_as_now() {
     measured.volumes = vec![volume(Role::Data, "/mnt/nas", 40_000_000_000, "nfs", 0)];
     let text = said(&reckon(&measured));
     assert!(text.contains("across a network share"), "{text}");
-    assert!(text.contains("1700000000"), "{text}");
+    assert!(
+        text.contains("as it stood at 2023-11-14T22:13:20 UTC"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -191,7 +194,7 @@ fn a_volume_nobody_could_read_says_so_rather_than_showing_a_figure() {
             total: 0,
         },
         0,
-        0,
+        lemonfiber_core::instant::Instant::EPOCH,
     )];
     let text = said(&reckon(&measured));
     assert!(text.contains("could not be read"), "{text}");

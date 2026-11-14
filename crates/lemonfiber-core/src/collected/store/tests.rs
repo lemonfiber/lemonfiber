@@ -1,5 +1,6 @@
 use super::{arrived, filed, kept, settled, Asking, Standing};
 use crate::collected::{Medium, Reference, Unit};
+use crate::instant::Instant;
 use crate::ports::service::{BookUnit, MusicUnit};
 
 fn path(name: &str) -> std::path::PathBuf {
@@ -18,10 +19,13 @@ fn asking(unit: Unit, standing: Standing) -> Asking {
         year: Some(1959),
         cover: None,
         member: "ada".to_owned(),
-        at: "2026-11-08T22:00:00Z".to_owned(),
+        at: Instant::from_seconds(1_794_175_200),
         standing,
     }
 }
+
+/// When the asks these tests settle were settled.
+const LATER: Instant = Instant::from_seconds(2_000);
 
 #[test]
 fn nothing_kept_reads_as_no_asks() {
@@ -67,25 +71,22 @@ fn only_a_waiting_ask_is_settled_and_only_once() {
     assert_eq!(waiting.ok(), Some(Reference::Kept(Medium::Music, 2)));
     let sent = Reference::Kept(Medium::Music, 1);
     assert_eq!(
-        settled(&at, sent, Standing::Declined, "later").ok(),
+        settled(&at, sent, Standing::Declined, LATER).ok(),
         Some(None)
     );
     let named = Reference::Kept(Medium::Music, 2);
-    let was = settled(&at, named, Standing::Declined, "later");
+    let was = settled(&at, named, Standing::Declined, LATER);
     assert_eq!(
         was.ok().flatten().map(|ask| ask.standing),
         Some(Standing::Waiting)
     );
-    assert_eq!(
-        settled(&at, named, Standing::Sent, "later").ok(),
-        Some(None)
-    );
+    assert_eq!(settled(&at, named, Standing::Sent, LATER).ok(), Some(None));
     let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
     assert_eq!(
         asks.iter()
-            .map(|ask| (ask.standing, ask.settled_at.as_deref()))
+            .map(|ask| (ask.standing, ask.settled_at))
             .collect::<Vec<_>>(),
-        [(Standing::Sent, None), (Standing::Declined, Some("later"))]
+        [(Standing::Sent, None), (Standing::Declined, Some(LATER))]
     );
 }
 
@@ -100,7 +101,7 @@ fn asks_kept_where_no_file_can_be_written_are_refused() {
         &at,
         Reference::Kept(Medium::Music, 1),
         Standing::Sent,
-        "2026-11-09"
+        Instant::from_seconds(1_794_182_400)
     )
     .is_err());
 }
@@ -115,24 +116,44 @@ fn a_sent_ask_arrives_once_and_keeps_when_it_was_first_seen_held() {
         unreachable!("the asks were not kept");
     };
 
-    let first = arrived(&at, named, Standing::PartlyHere, "2026-11-09T10:00:00Z");
-    let again = arrived(&at, named, Standing::PartlyHere, "2026-11-09T11:00:00Z");
-    let whole = arrived(&at, named, Standing::Here, "2026-11-09T12:00:00Z");
-    let never = arrived(&at, waiting, Standing::Here, "2026-11-09T12:00:00Z");
+    let first = arrived(
+        &at,
+        named,
+        Standing::PartlyHere,
+        Instant::from_seconds(1_794_218_400),
+    );
+    let again = arrived(
+        &at,
+        named,
+        Standing::PartlyHere,
+        Instant::from_seconds(1_794_222_000),
+    );
+    let whole = arrived(
+        &at,
+        named,
+        Standing::Here,
+        Instant::from_seconds(1_794_225_600),
+    );
+    let never = arrived(
+        &at,
+        waiting,
+        Standing::Here,
+        Instant::from_seconds(1_794_225_600),
+    );
 
     assert!(first.is_ok() && again.is_ok() && whole.is_ok() && never.is_ok());
     let asks = kept(&at).map(|kept| kept.asks).unwrap_or_default();
     let read = |reference: Reference| {
         asks.iter()
             .find(|ask| ask.named() == reference)
-            .map(|ask| (ask.standing, ask.arrived_at.clone(), ask.settled_at.clone()))
+            .map(|ask| (ask.standing, ask.arrived_at, ask.settled_at))
     };
     assert_eq!(
         read(named),
         Some((
             Standing::Here,
-            Some("2026-11-09T10:00:00Z".to_owned()),
-            Some("2026-11-09T12:00:00Z".to_owned())
+            Some(Instant::from_seconds(1_794_218_400)),
+            Some(Instant::from_seconds(1_794_225_600))
         ))
     );
     assert_eq!(read(waiting), Some((Standing::Waiting, None, None)));

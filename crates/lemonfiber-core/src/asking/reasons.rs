@@ -23,6 +23,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::collected::Reference;
+use crate::instant::Instant;
 
 /// What was said when one request was turned down.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -30,11 +31,9 @@ pub struct Refused {
     /// Why, in the words it was turned down in.
     pub reason: String,
     /// When it was turned down, so somebody reading it later knows which answer this
-    /// was rather than assuming it is the newest.
-    ///
-    /// Absent where the machine's clock could not be written as a date, which is a
-    /// refusal worth keeping the words of and not worth losing them over.
-    pub at: Option<String>,
+    /// was rather than assuming it is the newest. Absent on a record kept without one.
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub at: Option<crate::instant::Instant>,
     /// Whether the words have been carried to whoever asked, and where to.
     ///
     /// Absent until the one attempt has been made. **This is what makes a second one
@@ -64,8 +63,9 @@ pub struct Passed {
     /// The services they reached, by the names the member knows them by. Empty where
     /// there was nowhere this could send.
     pub to: Vec<String>,
-    /// When the attempt was made, absent where the clock could not be written down.
-    pub at: Option<String>,
+    /// When the attempt was made, absent on a record kept without one.
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    pub at: Option<crate::instant::Instant>,
 }
 
 /// Every reason this machine holds, by the reference the request is named by: the
@@ -89,7 +89,7 @@ impl Reasons {
     }
 
     /// Write down why an operator turned this one down.
-    pub fn keep(&mut self, request: Reference, reason: &str, at: Option<String>) {
+    pub fn keep(&mut self, request: Reference, reason: &str, at: Option<Instant>) {
         self.written(request, reason, at, false);
     }
 
@@ -106,7 +106,7 @@ impl Reasons {
     /// silence, and a record rewritten here would owe it afresh to somebody who has
     /// already had it. So what stops a household hearing this twice is this line, rather
     /// than the request service having moved the request out of the clock's reach.
-    pub fn closed(&mut self, request: Reference, reason: &str, at: Option<String>) {
+    pub fn closed(&mut self, request: Reference, reason: &str, at: Option<Instant>) {
         if self.given.get(&request).is_some_and(|kept| kept.expired) {
             return;
         }
@@ -118,7 +118,7 @@ impl Reasons {
     /// The reason is trimmed on the way in because it is trimmed on the way past the
     /// check that refuses a blank one, and a record holding the untrimmed spelling would
     /// disagree with the line the operator was shown.
-    fn written(&mut self, request: Reference, reason: &str, at: Option<String>, expired: bool) {
+    fn written(&mut self, request: Reference, reason: &str, at: Option<Instant>, expired: bool) {
         self.given.insert(
             request,
             Refused {
@@ -146,7 +146,7 @@ impl Reasons {
     /// Written even where nothing was reached, because what this records is that the
     /// one attempt happened. Nothing for a request no reason is held for — there was
     /// nothing to carry, so there is nothing to say was carried.
-    pub(crate) fn passed_on(&mut self, request: Reference, to: Vec<String>, at: Option<String>) {
+    pub(crate) fn passed_on(&mut self, request: Reference, to: Vec<String>, at: Option<Instant>) {
         if let Some(kept) = self.given.get_mut(&request) {
             kept.told = Some(Passed { to, at });
         }

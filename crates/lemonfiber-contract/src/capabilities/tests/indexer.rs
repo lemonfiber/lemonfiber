@@ -5,6 +5,7 @@
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use lemonfiber_ports::instant::Instant;
 use lemonfiber_ports::service::{
     Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, Cookie, Failure,
     IndexerUse, Indexers, KnownAggregator, Limits, Protocol, PullsIndexers, RegisteredApplication,
@@ -58,7 +59,7 @@ impl Indexers for Upstream {
                 grabs: None,
                 window: Duration::from_secs(86_400),
             }),
-            searched_from: Some(now),
+            searched_from: Some(Instant::of(now)),
             grabbed_from: None,
         }])
     }

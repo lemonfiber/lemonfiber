@@ -7,6 +7,8 @@ use super::{
     curators, load_baseline, project_directory, reading, save_baseline, wanted_clients, Ctx, Loaded,
 };
 
+use crate::instant::Instant;
+
 /// Revert every drifted service connection to lemonfiber's own — or, unconfirmed, report
 /// which would be. The connection side of a full reset: for each curator, a download-client
 /// category the operator changed is written back through the update op (on confirm) or
@@ -47,7 +49,7 @@ pub(crate) async fn reset_connections(ctx: &Ctx, confirm: bool) -> Vec<crate::se
                 confirm,
                 &baseline,
                 &mut records,
-                &at,
+                at,
             )
             .await,
         );
@@ -72,7 +74,7 @@ pub(super) async fn reset_curator_connections(
     confirm: bool,
     baseline: &crate::baseline::Baseline,
     records: &mut crate::baseline::Baseline,
-    at: &str,
+    at: Instant,
 ) -> Vec<crate::seed::Wiring> {
     if confirm {
         let mut journal = crate::journal::Journal::new();

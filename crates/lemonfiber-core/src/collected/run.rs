@@ -11,6 +11,7 @@ use crate::config::store::Failure;
 use crate::error::codes::quota::UNREACHABLE;
 use crate::error::{Diagnose, Problem, Remedy};
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::{MemberRequest, TitleKind, TitleUnit};
 use crate::ports::service::{CandidateState, Left};
 
@@ -71,7 +72,7 @@ pub(crate) async fn decided(
             "{said} — rehearsed, and nothing was sent or decided"
         ));
     }
-    let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
+    let at = ctx.stamp();
     let standing = match reason {
         None => {
             let curator = collector(ctx, medium)
@@ -82,12 +83,12 @@ pub(crate) async fn decided(
         }
         Some(reason) => {
             let mut reasons = crate::app::refusals::load(ctx);
-            reasons.keep(named, reason, Some(at.clone()));
+            reasons.keep(named, reason, Some(at));
             crate::app::refusals::keep(ctx, &reasons)?;
             Standing::Declined
         }
     };
-    store::settled(&path, named, standing, &at).map_err(|why| Box::new(why.problem()))?;
+    store::settled(&path, named, standing, at).map_err(|why| Box::new(why.problem()))?;
     Ok(said)
 }
 
@@ -103,14 +104,14 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
     let Some(path) = crate::app::targets::beside_env(ctx, ASKS) else {
         return Ok(0);
     };
-    let now = ctx.seams.clock.now();
+    let now = ctx.stamp();
     let overdue: Vec<Reference> = store::kept(&path)
         .map_err(|why| why.to_string())?
         .asks
         .iter()
         .filter(|ask| ask.standing == Standing::Waiting)
         .filter(|ask| {
-            crate::asking::waiting_for(Some(&ask.asked_at), now)
+            crate::asking::waiting_for(Some(ask.asked_at), now)
                 .is_some_and(|days| days >= u64::from(after))
         })
         .map(Ask::named)
@@ -118,11 +119,10 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
     if ctx.dry_run || overdue.is_empty() {
         return Ok(overdue.len());
     }
-    let at = crate::instant::written(now).unwrap_or_default();
     let mut reasons = crate::app::refusals::load(ctx);
     for named in &overdue {
-        store::settled(&path, *named, Standing::Expired, &at).map_err(|why| why.to_string())?;
-        reasons.closed(*named, reason, Some(at.clone()));
+        store::settled(&path, *named, Standing::Expired, now).map_err(|why| why.to_string())?;
+        reasons.closed(*named, reason, Some(now));
     }
     crate::app::refusals::keep(ctx, &reasons).map_err(|why| why.summary)?;
     Ok(overdue.len())
@@ -131,13 +131,7 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
 /// What the member `member` may still ask for of `medium`: the limit and period `films`,
 /// what the household holds them to for a film, give, each ask they made of `medium`
 /// inside that period counted once, and none that was turned down or closed.
-pub(crate) fn left(
-    kept: &[Ask],
-    films: Left,
-    member: &str,
-    medium: Medium,
-    now: std::time::SystemTime,
-) -> Left {
+pub(crate) fn left(kept: &[Ask], films: Left, member: &str, medium: Medium, now: Instant) -> Left {
     let used = films.days.map_or(0, |days| {
         kept.iter()
             .filter(|ask| ask.member == member && ask.unit.medium() == medium)
@@ -148,7 +142,7 @@ pub(crate) fn left(
                 )
             })
             .filter(|ask| {
-                crate::asking::waiting_for(Some(&ask.asked_at), now)
+                crate::asking::waiting_for(Some(ask.asked_at), now)
                     .is_some_and(|age| age < u64::from(days))
             })
             .count()
@@ -193,8 +187,8 @@ pub(crate) async fn arrivals(ctx: &Ctx) {
                 }
                 _ => continue,
             };
-            let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
-            if let Ok(Some(member)) = store::arrived(&path, ask.named(), held, &at) {
+            let at = ctx.stamp();
+            if let Ok(Some(member)) = store::arrived(&path, ask.named(), held, at) {
                 crate::notify::fanning::ready(ctx, &member);
                 crate::push::telling::ready(ctx, &member);
             }
@@ -221,11 +215,7 @@ pub(crate) async fn sent(
 
 /// `ask` as a line of the household list, with the reason it was turned down where
 /// `reasons` holds one.
-pub(crate) fn listed(
-    ask: &Ask,
-    reasons: &crate::asking::Reasons,
-    now: std::time::SystemTime,
-) -> MemberRequest {
+pub(crate) fn listed(ask: &Ask, reasons: &crate::asking::Reasons, now: Instant) -> MemberRequest {
     let state = match ask.standing {
         Standing::Waiting => State::WaitingForApproval,
         Standing::Sent => State::Getting,
@@ -235,17 +225,17 @@ pub(crate) fn listed(
     };
     MemberRequest {
         id: ask.named().to_string(),
-        asked: Some(ask.asked_at.clone()),
+        asked: Some(ask.asked_at),
         title: Some(ask.name.clone()),
         year: ask.year,
-        arrived: ask.arrived_at.clone(),
+        arrived: ask.arrived_at,
         shelf_id: None,
         media: Some(ask.unit.noun().to_owned()),
         kind: Some(TitleKind::from(ask.unit.medium())),
         unit: Some(TitleUnit::from(ask.unit)),
         state: Some(state),
         waiting_days: (state == State::WaitingForApproval)
-            .then(|| crate::asking::waiting_for(Some(&ask.asked_at), now))
+            .then(|| crate::asking::waiting_for(Some(ask.asked_at), now))
             .flatten(),
         estimate: None,
         refused: reasons.of(ask.named()).cloned(),

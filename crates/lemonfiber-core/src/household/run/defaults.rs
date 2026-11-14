@@ -52,7 +52,7 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
             every_library: true,
             ..MemberAccess::default()
         },
-        asking: asking.map(|asking| allowance::reported(&held(asking), &[], ctx.seams.clock.now())),
+        asking: asking.map(|asking| allowance::reported(&held(asking), &[], ctx.stamp())),
         claimed: true,
         ..HouseholdMember::default()
     };

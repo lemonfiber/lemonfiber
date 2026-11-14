@@ -194,6 +194,5 @@ pub fn no_challenge() -> Problem {
 /// How a device key stands, as a refusal naming it says.
 fn standing(held: &Record) -> String {
     held.revoked
-        .as_deref()
-        .map_or_else(String::new, |when| format!(" and revoked {when}"))
+        .map_or_else(String::new, |when| format!(" and revoked {}", when.said()))
 }

@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use super::{Purpose, Secret};
 
+use crate::instant::Instant;
+
 /// A key minted, with everything a client on another machine needs to use it.
 ///
 /// The only document that ever carries the secret. Every surface that renders it does so
@@ -62,11 +64,11 @@ pub struct Listed {
     /// Where it stands.
     pub state: State,
     /// When it was minted.
-    pub minted: String,
+    pub minted: Instant,
     /// When it was last admitted, where it has been.
-    pub used: Option<String>,
+    pub used: Option<Instant>,
     /// When it was revoked, where it has been.
-    pub revoked: Option<String>,
+    pub revoked: Option<Instant>,
     /// Whether a household member minted it for themselves.
     pub member_minted: bool,
     /// The device key whose signature proved its mint, absent where none did.

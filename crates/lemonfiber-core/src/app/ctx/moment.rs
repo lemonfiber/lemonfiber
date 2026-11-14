@@ -1,8 +1,8 @@
 //! What time it is, as the context answers it.
 //!
 //! Four readings of one port, kept together because they are one question asked in
-//! the four shapes the things above need it in: a stamp to write down, a number to
-//! subtract, an instant a media server would recognise, and a day the manifest's
+//! the four shapes the things above need it in: an instant to write down, a number to
+//! subtract, a stamp a media server would recognise, and a day the manifest's
 //! date rules can be checked against. Split out of [`super`] for the reason the
 //! length rule exists — the context was accreting concerns — and this is the one
 //! that comes away whole: it touches a single field, and nothing else here reads
@@ -13,45 +13,34 @@
 //! machine an operator is trying to run a stack on, and refusing every dated check
 //! because of it would be the worse answer.
 
+use crate::instant::Instant;
+
 use super::Ctx;
 
 impl Ctx {
-    /// The moment now, as the opaque stamp durable records carry.
+    /// The moment now, as the instant durable records carry.
     ///
-    /// Seconds since the epoch, read through the clock port rather than from the
-    /// system directly, so a test can say what time it is and a record written on
-    /// one run can be compared with one written on another.
-    pub(crate) fn stamp(&self) -> String {
-        self.seconds().to_string()
+    /// Read through the clock port rather than from the system directly, so a test can
+    /// say what time it is and a record written on one run can be compared with one
+    /// written on another. A clock that will not answer reads as the epoch, which is a
+    /// machine that has waited long enough for anything.
+    pub(crate) fn stamp(&self) -> Instant {
+        Instant::of(self.seams.clock.now())
     }
 
-    /// The same moment as a number, for the records that compare two of them.
-    ///
-    /// Beside the stamp rather than parsed back out of one: what reads this asks
-    /// whether enough time has passed since the last run, and two strings cannot be
-    /// subtracted. A clock that will not answer reads as the epoch, which is a machine
-    /// that has waited long enough for anything.
+    /// The same moment as a number of seconds, for the records that subtract two.
     pub(crate) fn seconds(&self) -> u64 {
-        self.seams
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_secs())
-            .unwrap_or_default()
+        self.stamp().seconds()
     }
 
-    /// The moment a given number of hours ago, written as the media server writes
-    /// its own records: an ISO-8601 instant ending in `Z`, through [`instant`].
-    pub(crate) fn hours_ago(&self, hours: i64) -> String {
-        let now = self
-            .seams
-            .clock
-            .now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| i64::try_from(elapsed.as_secs()).ok())
-            .unwrap_or_default();
-        instant(now.saturating_sub(hours.saturating_mul(3600)))
+    /// The moment a given number of hours ago, or hence where `hours` is negative.
+    pub(crate) fn hours_ago(&self, hours: i64) -> Instant {
+        let span = hours.unsigned_abs().saturating_mul(crate::instant::HOUR);
+        if hours < 0 {
+            self.stamp().later(span)
+        } else {
+            self.stamp().earlier(span)
+        }
     }
 
     /// Today, as the manifest's date rules mean it.

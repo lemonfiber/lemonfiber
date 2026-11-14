@@ -111,7 +111,7 @@ async fn run(
         manifest: &manifest,
         would: installed,
         services: &stack.services,
-        stamp: &stamp,
+        stamp,
     };
     let ran = following(ctx, against, &recipes, &given)
         .await

@@ -19,6 +19,7 @@ use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::doctor::{Category, Narrowing};
 use lemonfiber_core::error::withheld::REDACTED;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::repair::run::retract;
 use lemonfiber_core::repair::OPERATION;
@@ -56,7 +57,7 @@ fn ctx(root: &Path, http: Arc<Fake>) -> Ctx {
 /// A repair that changed one field inside the curator.
 fn configured() -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: OPERATION.to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Configured {
@@ -72,7 +73,7 @@ fn configured() -> Change {
 /// A repair that put a credential back into lemonfiber's own environment file.
 fn a_credential_was_set() -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: OPERATION.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -89,7 +90,7 @@ fn a_credential_was_set() -> Change {
 /// A repair that changed a setting in lemonfiber's own environment file.
 fn a_setting_was_set() -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: OPERATION.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -107,7 +108,7 @@ fn a_setting_was_set() -> Change {
 /// the next producer will not think to ask.
 fn a_secret_field_was_configured() -> Change {
     Change {
-        at: "2000".to_owned(),
+        at: Instant::from_seconds(2000),
         operation: OPERATION.to_owned(),
         target: "sonarr".to_owned(),
         kind: Kind::Configured {
@@ -307,7 +308,7 @@ async fn a_dispatched_reversal_answers_under_its_own_kind_and_says_what_went_bac
     journalled(
         &root,
         &[Change {
-            at: "3000".to_owned(),
+            at: Instant::from_seconds(3000),
             operation: OPERATION.to_owned(),
             target: "qbittorrent".to_owned(),
             kind: Kind::Set {
@@ -377,7 +378,7 @@ async fn what_a_reversal_reports_withholds_a_setting_named_like_a_credential() {
     journalled(
         &root,
         &[Change {
-            at: "2000".to_owned(),
+            at: Instant::from_seconds(2000),
             operation: OPERATION.to_owned(),
             target: ".env".to_owned(),
             kind: Kind::Set {

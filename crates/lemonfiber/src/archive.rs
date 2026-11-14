@@ -22,6 +22,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use lemonfiber_core::archive::{Archive, Fault, Reader, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
+use lemonfiber_core::instant::Instant;
 
 /// Where the manifest rides inside the archive.
 const MANIFEST: &str = "manifest.json";
@@ -225,16 +226,12 @@ fn listed(dir: &Path) -> Result<Vec<Existing>, Fault> {
         }
         // Ordered by the file's own modified time, rendered fixed-width so the
         // strings sort in the same order the times do — the freshest last.
-        let seconds = entry
+        let created_at = entry
             .metadata()
             .ok()
             .and_then(|meta| meta.modified().ok())
-            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-            .map_or(0, |elapsed| elapsed.as_secs());
-        backups.push(Existing {
-            name,
-            created_at: format!("{seconds:020}"),
-        });
+            .map_or(Instant::EPOCH, Instant::of);
+        backups.push(Existing { name, created_at });
     }
     Ok(backups)
 }

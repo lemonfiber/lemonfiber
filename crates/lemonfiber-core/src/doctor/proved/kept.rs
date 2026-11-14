@@ -60,7 +60,8 @@ pub(crate) struct Kept {
     /// What it came to.
     pub(crate) verdict: Verdict,
     /// When it was reached, in whole seconds since the epoch.
-    pub(crate) reached: String,
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub(crate) reached: crate::instant::Instant,
 }
 
 /// Every verdict kept at `at`, or none where nothing is or what is there cannot be read,

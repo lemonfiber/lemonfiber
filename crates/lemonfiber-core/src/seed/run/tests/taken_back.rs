@@ -2,6 +2,7 @@
 //! everything through the gate.
 
 use crate::app::gating::PORT;
+use crate::instant::Instant;
 use crate::ports::digest::sha256;
 use async_trait::async_trait;
 use lemonfiber_ports::filesystem::{Fault, FileSystem, Identity, Ownership, StorageFacts};
@@ -272,7 +273,7 @@ fn curator_key(ctx: &Ctx) -> Option<String> {
 /// A baseline owing the curator's key.
 fn owing() -> Baseline {
     let mut baseline = Baseline::new();
-    baseline.record("seerr", OWED_CURATOR, "owed", "1");
+    baseline.record("seerr", OWED_CURATOR, "owed", Instant::from_seconds(1));
     baseline
 }
 
@@ -393,7 +394,7 @@ async fn a_plugins_request_service_owes_nothing_and_is_asked_nothing() {
         crate::test_support::CONTRACTED_REQUESTS,
         OWED_CURATOR,
         "owed",
-        "1",
+        Instant::from_seconds(1),
     );
 
     let wiring =
@@ -630,7 +631,7 @@ async fn an_owed_key_of_a_curator_the_stack_no_longer_runs_is_forgotten() {
     );
     let (ctx, project) = taking("gone", &http, false);
     let mut baseline = owing();
-    baseline.record("seerr", "held-key:radarr", "owed", "1");
+    baseline.record("seerr", "held-key:radarr", "owed", Instant::from_seconds(1));
     let (state, baseline) = taken(&ctx, &gated(), &project, baseline).await;
     assert_eq!(
         baseline.expected("seerr", "held-key:radarr"),

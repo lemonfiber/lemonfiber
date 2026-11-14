@@ -2,6 +2,7 @@ use super::super::notices::tests::NOT_FOR_THE_HOUSEHOLD;
 use super::to_hand_over;
 use crate::asking::{Estimate, Policy, Refused, Standing};
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::{Counted, HouseholdMember, MemberAsking, MemberRequest};
 use crate::quality::Preset;
 
@@ -26,7 +27,7 @@ fn asking(limit: Option<u32>) -> MemberAsking {
             remaining: None,
             period: None,
         },
-        frees_up: limit.map(|_| "2026-08-24T21:04:09".to_owned()),
+        frees_up: limit.map(|_| Instant::from_seconds(1_787_605_449)),
     }
 }
 
@@ -47,7 +48,7 @@ fn request(id: i64, state: State, refused: Option<&str>) -> MemberRequest {
         estimate: Some(Estimate::film(Preset::Balanced)),
         refused: refused.map(|reason| Refused {
             reason: reason.to_owned(),
-            at: (id != 2).then(|| "2026-08-17T21:04:09".to_owned()),
+            at: (id != 2).then_some(Instant::from_seconds(1_787_000_649)),
             // What became of the words does not reach this message. It is written
             // to the member, and telling somebody how they were told is a sentence
             // for the operator rather than for them.

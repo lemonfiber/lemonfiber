@@ -1,6 +1,7 @@
 //! An update, a removal, and an install put back.
 
 use super::*;
+use lemonfiber_core::instant::Instant;
 
 /// Each of the three ways an update can read leads with which version the machine is
 /// on, because that is the one thing an operator reading it must not have to work out.
@@ -615,7 +616,7 @@ fn a_grant_put_back_is_said_by_its_credential_and_plugin() {
                     credential: "SONARR_API_KEY".to_owned(),
                     of: "sonarr".to_owned(),
                     serves: "media.serve".to_owned(),
-                    at: "1".to_owned(),
+                    at: Some(Instant::from_seconds(1)),
                 },
                 give,
             },

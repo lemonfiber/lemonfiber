@@ -46,7 +46,7 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 38,
-      "sha256": "3e1801c64de62c26a61237846a60be9966777ccac1961bed78915f8ee8cf61b4"
+      "sha256": "234a2606523a32de1dff8dd1f96a64b0a7076566e3ef617e9fb1348073b95773"
     },
     {
       "capability": "indexer.search",
@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "8ee74c4dfc4919c9c9595be68f7e6c43cdaa0daaf12a1e9f7e5f5949be88b6e9"
+      "sha256": "3bcedd73b8553524c58e9c9e25598d9c57b70eb50fa65ebb6d4173c609790c14"
     },
     {
       "capability": "indexer.pull",
@@ -106,7 +106,7 @@
       ],
       "openapi": "request.intake/v1/openapi.json",
       "operations": 32,
-      "sha256": "492f3aa2d5a786aef5034fffdfda839f82a9c24511f9f050800cfee5897edba9"
+      "sha256": "abb67b51328aeceb83affd9a775b3513ce566ce668b1921e9481f8467f9665f7"
     },
     {
       "capability": "identity.source",
@@ -118,7 +118,7 @@
       ],
       "openapi": "identity.source/v1/openapi.json",
       "operations": 19,
-      "sha256": "7e2885c8a3fa915ebdd587ae529a4217863d4a0cb27c4205ab08fe249cc10248"
+      "sha256": "142b10b8561fdc459f4a431db90573d26420c52d5b8a2c9f50795ff4d404e44d"
     },
     {
       "capability": "media.serve",
@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 29,
-      "sha256": "ea809dc33b9e19ce9435bf2948792b6b6f7187dc98664a30df1957b3fcd8d148"
+      "sha256": "b23219f3d2e6a4e8ff9e77722e806731d03ff446da94bf19d8cc27ba566ed047"
     },
     {
       "capability": "proxy.front",

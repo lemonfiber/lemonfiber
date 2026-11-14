@@ -181,15 +181,15 @@ fn level(word: &str) -> Option<Level> {
 pub fn interleaved(lines: Vec<LogLine>) -> Vec<LogLine> {
     let mut stamped: Vec<LogLine> = lines
         .iter()
-        .filter(|line| line.at.is_some())
+        .filter(|line| line.stamped.is_some())
         .cloned()
         .collect();
-    stamped.sort_by(|one, other| one.at.cmp(&other.at));
+    stamped.sort_by(|one, other| one.stamped.cmp(&other.stamped));
 
     let mut stamped = stamped.into_iter();
     lines
         .into_iter()
-        .map(|line| match line.at {
+        .map(|line| match line.stamped {
             Some(_) => stamped.next().unwrap_or(line),
             None => line,
         })

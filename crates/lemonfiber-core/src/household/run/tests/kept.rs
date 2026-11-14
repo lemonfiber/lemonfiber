@@ -6,6 +6,7 @@ use crate::collected::store::{filed, Asking, Standing};
 use crate::collected::Unit;
 use crate::config::Settings;
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::{HouseholdMember, HouseholdReport, MemberRequest};
 use crate::ports::service::{BookUnit, MusicUnit};
 use crate::test_support::{a_context, a_password, env_at};
@@ -19,7 +20,7 @@ fn asking(unit: Unit, member: &str, name: &str, standing: Standing) -> Asking {
         year: None,
         cover: None,
         member: member.to_owned(),
-        at: "2026-11-08T22:00:00Z".to_owned(),
+        at: Instant::from_seconds(1_794_175_200),
         standing,
     }
 }

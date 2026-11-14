@@ -4,8 +4,13 @@
   "type": "object",
   "properties": {
     "at": {
-      "description": "When the operator approved it, as the record stamps every change.",
-      "type": "string"
+      "description": "When the operator approved it, as the record stamps every change.\nAbsent on an offer's account of a grant, which nobody has approved yet.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "credential": {
       "description": "The setting the credential is held under, as the credentials read names it.",
@@ -24,7 +29,6 @@
   "required": [
     "credential",
     "of",
-    "for",
-    "at"
+    "for"
   ]
 }

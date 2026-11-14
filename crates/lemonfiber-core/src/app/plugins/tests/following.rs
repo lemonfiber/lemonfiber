@@ -4,6 +4,7 @@
 use super::*;
 use crate::error::Diagnose as _;
 use crate::error::{Came, Problem};
+use crate::instant::Instant;
 use crate::plugin::running::{Ran, StepRan};
 use crate::ports::asking::Nobody;
 use crate::test_support::Typing;
@@ -489,7 +490,8 @@ fn a_captured_secret_an_adapter_hands_its_upstream_is_written_into_upstream_json
     assert!(manifest.is_ok());
 
     let kept = manifest.map(|manifest| {
-        super::super::following::kept(&ctx, &would, &manifest, &captured, "1").is_ok()
+        super::super::following::kept(&ctx, &would, &manifest, &captured, Instant::from_seconds(1))
+            .is_ok()
     });
 
     assert_eq!(kept.ok(), Some(true));

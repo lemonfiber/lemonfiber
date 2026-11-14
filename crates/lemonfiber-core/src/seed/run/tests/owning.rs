@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::baseline::Baseline;
+use crate::instant::Instant;
 use crate::test_support::{contracted, first_party};
 
 /// An upstream nothing is asked to start again.
@@ -72,7 +73,7 @@ fn recorded() -> Baseline {
         SERVICE,
         super::super::owning::FIELD,
         "ours",
-        "2026-10-25T00:00:00Z",
+        Instant::from_seconds(1_792_886_400),
     );
     baseline
 }

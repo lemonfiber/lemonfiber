@@ -9,6 +9,7 @@ use crate::autostart::Returning;
 use crate::condition::Fault;
 use crate::config::{Protocols, Settings};
 use crate::error::{Problem, Severity};
+use crate::instant::Instant;
 use crate::model::LifecycleReport;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::machine::{Power, Started, Supply};
@@ -674,7 +675,7 @@ fn failing(name: &str) -> Ctx {
             "nothing has been running since",
             "Run lemonfiber up",
         )),
-        "1000",
+        Instant::from_seconds(1000),
     );
     crate::app::conditions::save(&ctx, &conditions);
     ctx

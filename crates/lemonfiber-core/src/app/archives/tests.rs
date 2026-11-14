@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use super::{archives, Listing, NOT_LISTED, NOWHERE_KEPT};
 use crate::app::fixtures::FakeArchive;
+use crate::instant::Instant;
 use crate::test_support::a_context;
 
 /// A run that keeps the archives a fake holds.
@@ -40,9 +41,9 @@ async fn a_directory_that_will_not_be_read_is_a_refusal_and_not_an_empty_list() 
 #[tokio::test]
 async fn the_archives_are_listed_newest_first() {
     let vault = Arc::new(FakeArchive::keeping_backups(&[
-        ("lemonfiber-full-2.tar.gz", "00000000000000000002"),
-        ("lemonfiber-full-1.tar.gz", "00000000000000000001"),
-        ("lemonfiber-full-3.tar.gz", "00000000000000000003"),
+        ("lemonfiber-full-2.tar.gz", Instant::from_seconds(2)),
+        ("lemonfiber-full-1.tar.gz", Instant::from_seconds(1)),
+        ("lemonfiber-full-3.tar.gz", Instant::from_seconds(3)),
     ]));
     let listed = archives(&keeping(&vault)).await.ok();
     assert_eq!(
@@ -60,8 +61,8 @@ async fn the_archives_are_listed_newest_first() {
 #[tokio::test]
 async fn two_archives_taken_in_the_same_second_are_listed_the_same_way_twice() {
     let vault = Arc::new(FakeArchive::keeping_backups(&[
-        ("lemonfiber-sonarr-1.tar.gz", "00000000000000000001"),
-        ("lemonfiber-full-1.tar.gz", "00000000000000000001"),
+        ("lemonfiber-sonarr-1.tar.gz", Instant::from_seconds(1)),
+        ("lemonfiber-full-1.tar.gz", Instant::from_seconds(1)),
     ]));
     let listed = archives(&keeping(&vault)).await.ok();
     assert_eq!(

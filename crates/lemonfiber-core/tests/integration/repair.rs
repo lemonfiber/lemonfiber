@@ -20,6 +20,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::doctor::{Category, Check, Finding, Mend, Verdict};
 use lemonfiber_core::error::{Code, Problem, Remedy};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::repair::run::{mend, mending, Confirm, Consent, Report};
 use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance, Writing};
 
@@ -651,7 +652,7 @@ impl Check for Offering {
 async fn a_repair_whose_change_cannot_be_recorded_is_stopped_saying_so() {
     let changed = || Attempt::Carried {
         changes: vec![lemonfiber_core::journal::Change {
-            at: "1".to_owned(),
+            at: Instant::from_seconds(1),
             operation: lemonfiber_core::repair::OPERATION.to_owned(),
             target: ".env".to_owned(),
             kind: lemonfiber_core::journal::Kind::Set {

@@ -29,6 +29,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 
 use crate::plugin::{Installed, Installs, Register};
 
@@ -360,7 +361,7 @@ async fn reversing(
     ctx: &Ctx,
     would: &Installed,
     stack: &Path,
-    stamp: &str,
+    stamp: Instant,
 ) -> super::putting_back::Reversal {
     let off = proving::removed(ctx, would, stack).await;
     let mut back = super::putting_back::undo(ctx, Some(stamp))

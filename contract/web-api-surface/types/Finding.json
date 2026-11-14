@@ -26,7 +26,7 @@
     },
     "onset": {
       "type": [
-        "null|string"
+        "integer|null/uint64"
       ],
       "required": false
     },

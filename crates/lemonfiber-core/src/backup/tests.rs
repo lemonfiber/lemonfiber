@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 
+use lemonfiber_fixtures::ports::STAMPED;
+
 use super::{
     area, plan, relocation, Compatibility, Existing, Item, Manifest, Member, Pace, Plan, Retention,
     Scope, SCHEMA,
 };
 use crate::config::paths::Paths;
+use crate::instant::Instant;
 use crate::version::Version;
 
 fn paths() -> Paths {
@@ -185,10 +188,15 @@ fn restore_writes_each_area_back_to_where_the_capture_read_it() {
 #[test]
 fn a_manifest_describes_the_plan_it_was_built_from() {
     let plan = whole_stack_plan();
-    let manifest = Manifest::describe(&plan, "0.3.0", "2026-07-30T00:00:00Z", "/srv/media");
+    let manifest = Manifest::describe(
+        &plan,
+        "0.3.0",
+        Instant::from_seconds(1_785_369_600),
+        "/srv/media",
+    );
     assert_eq!(manifest.schema, SCHEMA);
     assert_eq!(manifest.product_version, "0.3.0");
-    assert_eq!(manifest.created_at, "2026-07-30T00:00:00Z");
+    assert_eq!(manifest.created_at, Instant::from_seconds(1_785_369_600));
     assert_eq!(manifest.data_root, "/srv/media");
     assert_eq!(manifest.scope, Scope::WholeStack);
     assert!(manifest.sensitive);
@@ -216,7 +224,7 @@ fn a_manifest_round_trips_through_json() {
         },
         &[],
     );
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let line = serde_json::to_string(&manifest).unwrap_or_default();
     let read = serde_json::from_str::<Manifest>(&line).ok();
     assert_eq!(read.as_ref(), Some(&manifest), "{line}");
@@ -250,7 +258,7 @@ fn a_version_that_is_not_three_numbers_does_not_parse() {
 }
 
 fn manifest_of(version: &str, schema: u32) -> Manifest {
-    let mut manifest = Manifest::describe(&whole_stack_plan(), version, "t", "/srv/media");
+    let mut manifest = Manifest::describe(&whole_stack_plan(), version, STAMPED, "/srv/media");
     manifest.schema = schema;
     manifest
 }
@@ -364,7 +372,7 @@ fn a_clean_single_service_manifest_escapes_nothing() {
         },
         &[],
     );
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     assert!(manifest.escapes().is_empty());
 }
 
@@ -392,23 +400,23 @@ fn a_single_service_name_that_is_more_than_one_segment_is_caught() {
         },
         &[],
     );
-    let manifest = Manifest::describe(&plan, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     assert_eq!(manifest.escapes(), vec!["a/b".to_owned()]);
 }
 
-fn taken(name: &str, at: &str) -> Existing {
+fn taken(name: &str, at: Instant) -> Existing {
     Existing {
         name: name.to_owned(),
-        created_at: at.to_owned(),
+        created_at: at,
     }
 }
 
 #[test]
 fn retention_prunes_the_oldest_beyond_the_keep_count() {
     let existing = vec![
-        taken("c", "2026-07-03"),
-        taken("a", "2026-07-01"),
-        taken("b", "2026-07-02"),
+        taken("c", Instant::from_seconds(1_783_036_800)),
+        taken("a", Instant::from_seconds(1_782_864_000)),
+        taken("b", Instant::from_seconds(1_782_950_400)),
     ];
     let pruned = Retention::keeping(2).prune(existing);
     // Sorted oldest-first, keeping two leaves only the eldest to prune, named
@@ -421,7 +429,10 @@ fn retention_prunes_the_oldest_beyond_the_keep_count() {
 
 #[test]
 fn retention_keeps_everything_when_there_is_no_surplus() {
-    let existing = vec![taken("a", "2026-07-01"), taken("b", "2026-07-02")];
+    let existing = vec![
+        taken("a", Instant::from_seconds(1_782_864_000)),
+        taken("b", Instant::from_seconds(1_782_950_400)),
+    ];
     assert!(Retention::keeping(5).prune(existing).is_empty());
 }
 
@@ -429,7 +440,7 @@ fn retention_keeps_everything_when_there_is_no_surplus() {
 fn retention_never_prunes_the_last_remaining_backup() {
     // A keep of zero would delete the only recovery there is; it is raised to
     // one, so a lone backup is always kept.
-    let only = vec![taken("a", "2026-07-01")];
+    let only = vec![taken("a", Instant::from_seconds(1_782_864_000))];
     assert!(Retention::keeping(0).prune(only).is_empty());
 }
 
@@ -519,7 +530,7 @@ fn the_existing_area_is_not_somewhere_a_restore_can_write() {
 fn an_archive_of_a_setup_we_do_not_manage_is_refused_with_its_paths_named() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
     let made = plan(&paths(), &scope, &[]);
-    let manifest = Manifest::describe(&made, "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&made, "0.3.0", STAMPED, "/srv/media");
 
     assert_eq!(
         Compatibility::assess(&manifest, "0.3.0", SCHEMA),
@@ -535,11 +546,11 @@ fn an_archive_of_a_setup_we_do_not_manage_is_refused_with_its_paths_named() {
 #[test]
 fn a_foreign_archive_is_refused_even_where_every_version_agrees() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
-    let manifest = Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", "t", "/srv/media");
+    let manifest = Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", STAMPED, "/srv/media");
     let whole = Manifest::describe(
         &plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
-        "t",
+        STAMPED,
         "/srv/media",
     );
 
@@ -562,7 +573,8 @@ fn a_foreign_archive_is_refused_even_where_every_version_agrees() {
 #[test]
 fn a_foreign_archive_in_an_unreadable_format_is_refused_for_the_format() {
     let scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
-    let mut manifest = Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", "t", "/srv/media");
+    let mut manifest =
+        Manifest::describe(&plan(&paths(), &scope, &[]), "0.3.0", STAMPED, "/srv/media");
     manifest.schema = SCHEMA + 1;
 
     assert_eq!(

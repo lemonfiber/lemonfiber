@@ -1,5 +1,6 @@
 use super::telling::{said, tell_the_household, wanted_telling, TELLING};
 use crate::baseline::Baseline;
+use crate::instant::Instant;
 use crate::ports::service::{Occasion, Telling};
 use crate::seed::drift::{intent, Intent, Observed};
 use crate::seed::State;
@@ -35,9 +36,19 @@ fn service(held: Answer, told: Answer) -> (contract::Adapter, Arc<Fake>) {
 fn recorded(value: &str, adopted: bool) -> Baseline {
     let mut baseline = Baseline::new();
     if adopted {
-        baseline.adopt("seerr", TELLING, value, "2026-08-28T00:00:00Z");
+        baseline.adopt(
+            "seerr",
+            TELLING,
+            value,
+            Instant::from_seconds(1_787_875_200),
+        );
     } else {
-        baseline.record("seerr", TELLING, value, "2026-08-28T00:00:00Z");
+        baseline.record(
+            "seerr",
+            TELLING,
+            value,
+            Instant::from_seconds(1_787_875_200),
+        );
     }
     baseline
 }

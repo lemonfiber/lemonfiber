@@ -1,17 +1,19 @@
 use super::{decoded, encoded, Backing, Kept, Record};
 
+use crate::instant::Instant;
+
 /// A device key named `name` with the fingerprint `fingerprint`.
-fn record(name: &str, fingerprint: &str, revoked: Option<&str>) -> Record {
+fn record(name: &str, fingerprint: &str, revoked: Option<Instant>) -> Record {
     Record {
         name: name.to_owned(),
         public_key: String::new(),
         fingerprint: fingerprint.to_owned(),
         backing: Backing::Tee,
         app: String::new(),
-        registered: "2026-10-12T06:00:00Z".to_owned(),
+        registered: Instant::from_seconds(1_791_784_800),
         under: String::new(),
         used: None,
-        revoked: revoked.map(str::to_owned),
+        revoked,
     }
 }
 
@@ -19,7 +21,7 @@ fn record(name: &str, fingerprint: &str, revoked: Option<&str>) -> Record {
 fn a_name_finds_its_device_key_revoked_or_not_and_only_an_active_one_stands() {
     let kept = Kept {
         keys: vec![
-            record("old", "aa", Some("2026-10-12T07:00:00Z")),
+            record("old", "aa", Some(Instant::from_seconds(1_791_788_400))),
             record("new", "bb", None),
         ],
     };
@@ -86,10 +88,10 @@ fn an_ios_attestation_that_does_not_read_or_cover_the_key_vouches_for_nothing() 
 fn a_challenge_handed_over_says_when_it_lapses_and_not_the_challenge() {
     let challenged = super::Challenged {
         challenge: "the-challenge".to_owned(),
-        expires: "2026-10-13T00:01:00Z".to_owned(),
+        expires: Instant::from_seconds(1_791_849_660),
     };
     let said = format!("{challenged:?}");
-    assert!(said.contains("2026-10-13T00:01:00Z"));
+    assert!(said.contains("1791849660"));
     assert!(!said.contains("the-challenge"));
 }
 

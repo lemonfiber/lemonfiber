@@ -9,19 +9,13 @@ use serde::Serialize;
 /// One change lemonfiber made, and whether it could be put back.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ChangeReport {
-    /// When it was made, as whole seconds since the Unix epoch, written in decimal.
-    ///
-    /// A string of digits rather than a number, because it is the stamp the record keeps
-    /// and a stamp is compared and stored as text; what it counts is stated here so a
-    /// reader can turn it into a time without guessing at a format.
+    /// When it was made, in whole seconds since the Unix epoch.
     ///
     /// **`0` means the clock was unreadable when the change was written**, not that it
     /// was made at the epoch: it is how a machine whose clock would not answer stamps a
-    /// change. It is not an instant, so two changes both stamped `0` were not made at
-    /// the same moment, and a reader showing it as a date in 1970 would be inventing
-    /// one.
-    #[schemars(regex(pattern = r"^[0-9]+$"))]
-    pub at: String,
+    /// change. Two changes both stamped `0` were not made at the same moment, and a
+    /// reader showing it as a date in 1970 would be inventing one.
+    pub at: crate::instant::Instant,
     /// The operation that made it — a seed, a reconfigure, an applied fix — so a
     /// history reads as what happened rather than as bare diffs.
     pub operation: String,

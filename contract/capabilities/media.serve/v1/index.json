@@ -63,7 +63,7 @@
     },
     {
       "path": "media.serve/v1/operations/dated.json",
-      "sha256": "7b26ff6b3f7d6ad1bd041d0f25cc896d924a16d89b1283d52a34a895927f8c31"
+      "sha256": "630a14d1edf3d8df375477f9475a381cbeb297e993deeb184fc5315ca8985ad0"
     },
     {
       "path": "media.serve/v1/operations/answers_to.json",

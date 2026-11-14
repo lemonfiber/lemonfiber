@@ -106,7 +106,7 @@ async fn sync(ctx: &Ctx, syncing: &Syncing<'_>, only: Option<&str>) -> Vec<crate
         &asker.name,
         &wanted,
         &mut journal,
-        &ctx.stamp(),
+        ctx.stamp(),
         ctx.dry_run,
     )
     .await;

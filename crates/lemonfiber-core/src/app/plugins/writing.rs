@@ -14,6 +14,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 
 use crate::error::Diagnose as _;
 use crate::journal::{Change, Kind};
@@ -51,7 +52,7 @@ use super::{NOWHERE, UNWRITABLE};
 pub(crate) fn carry_out(
     ctx: &Ctx,
     plugin: &str,
-    stamp: &str,
+    stamp: Instant,
     planned: &[crate::plugin::Write],
 ) -> Result<(), Box<Problem>> {
     // Where the record of these writes goes. A machine that cannot say where its own
@@ -168,7 +169,7 @@ pub(crate) fn unlinked(ctx: &Ctx, installed: &Installed, stack: &Path) -> Result
 fn made_whole(
     ctx: &Ctx,
     plugin: &str,
-    stamp: &str,
+    stamp: Instant,
     journal: &Path,
     (path, within): (&Path, &Path),
     content: Option<&[u8]>,
@@ -188,7 +189,7 @@ fn made_whole(
 /// reversal has to remove. Recorded parent-first and so unwound child-first, exactly as an
 /// apply records the data root it makes.
 pub(super) fn recorded_making(
-    (plugin, stamp, journal): (&str, &str, &Path),
+    (plugin, stamp, journal): (&str, Instant, &Path),
     path: &Path,
     directory: bool,
 ) -> Result<(), Box<Problem>> {
@@ -205,7 +206,7 @@ pub(super) fn recorded_making(
 fn keyed(
     ctx: &Ctx,
     plugin: &str,
-    stamp: &str,
+    stamp: Instant,
     journal: &Path,
     (path, within): (&Path, &Path),
 ) -> Result<(), Box<Problem>> {
@@ -253,7 +254,7 @@ pub(crate) struct Overwrite {
 }
 
 impl Overwrite {
-    pub(crate) fn journalled(&self, operation: &str, at: &str) -> Change {
+    pub(crate) fn journalled(&self, operation: &str, at: Instant) -> Change {
         super::super::project::change(
             &self.path,
             Some(self.previous.clone()),
@@ -419,10 +420,10 @@ fn missing_from(path: &Path, directory: bool) -> Vec<PathBuf> {
 ///
 /// The plugin's own operation, so a plugin's changes sit in the same record as every
 /// other change and read there as that plugin's own.
-fn made(plugin: &str, path: &Path, stamp: &str) -> Change {
+fn made(plugin: &str, path: &Path, stamp: Instant) -> Change {
     let path = path.display().to_string();
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: crate::plugin::owner(plugin),
         target: path.clone(),
         kind: Kind::Made { path },

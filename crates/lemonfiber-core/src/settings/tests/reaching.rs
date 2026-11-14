@@ -411,9 +411,9 @@ async fn an_entered_secret_and_its_undo_each_reach_the_file_that_reads_it() {
     let last =
         crate::app::recover::journal_at(&machine.env.with_file_name(crate::config::paths::JOURNAL))
             .ok()
-            .and_then(|journal| journal.changes().last().map(|change| change.at.clone()))
+            .and_then(|journal| journal.changes().last().map(|change| change.at))
             .unwrap_or_default();
-    let undone = crate::app::putting_back::undo(&machine.ctx, Some(&last)).await;
+    let undone = crate::app::putting_back::undo(&machine.ctx, Some(last)).await;
 
     assert!(undone.is_ok(), "{undone:?}");
     assert!(holds("recipe-key"));

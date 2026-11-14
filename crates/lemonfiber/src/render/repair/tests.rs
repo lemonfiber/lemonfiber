@@ -1,4 +1,5 @@
 use lemonfiber_core::error::Remedy;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::repair::run::{Beyond, Mended, Report};
 use lemonfiber_core::repair::{agreement, Outcome, Repair};
 
@@ -333,7 +334,7 @@ fn a_grant_put_back_is_said_by_its_credential_and_plugin() {
                 credential: "SONARR_API_KEY".to_owned(),
                 of: "sonarr".to_owned(),
                 serves: "media.serve".to_owned(),
-                at: "1".to_owned(),
+                at: Some(Instant::from_seconds(1)),
             },
             give,
         },

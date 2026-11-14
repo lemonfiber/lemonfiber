@@ -9,6 +9,7 @@ use lemonfiber_fixtures::proving::Proving;
 
 use crate::app::plugins::Asked;
 use crate::app::Ctx;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::plugin::Installs;
 use crate::ports::docker::{Health, Lifecycle};
@@ -428,7 +429,7 @@ async fn installing_another_plugin_moves_the_guards_once_it_lands() {
 }
 
 /// The stamp of the run that moved `guard`.
-fn moved_at(ctx: &Ctx, guard: &str) -> String {
+fn moved_at(ctx: &Ctx, guard: &str) -> Instant {
     journalled(ctx)
         .into_iter()
         .find(
@@ -495,7 +496,7 @@ async fn undoing_a_move_is_refused_naming_the_release() {
     let at = moved_at(&ctx, GATE);
 
     for asking in [ctx.clone().rehearsing(), ctx.clone()] {
-        let undone = crate::app::putting_back::undo(&asking, Some(&at)).await;
+        let undone = crate::app::putting_back::undo(&asking, Some(at)).await;
 
         let said = refused(&undone);
         assert_eq!(

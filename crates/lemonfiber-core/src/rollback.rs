@@ -11,6 +11,7 @@
 //! disk.
 
 use crate::config::store::is_secret;
+use crate::instant::Instant;
 use crate::journal::{is_sealed, Change, Kind};
 
 /// How far a change can be put back.
@@ -490,7 +491,7 @@ fn depended_on(key: &str, later: &[Change]) -> bool {
 /// gather every apply this machine has ever made into one unit; the surface stamps one
 /// time for a whole run, so the pair is what tells two of them apart.
 #[must_use]
-pub fn together<'a>(changes: &'a [Change], operation: &str, at: &str) -> Vec<&'a Change> {
+pub fn together<'a>(changes: &'a [Change], operation: &str, at: Instant) -> Vec<&'a Change> {
     changes
         .iter()
         .filter(|change| change.operation == operation && change.at == at)

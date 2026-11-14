@@ -28,6 +28,7 @@ use crate::error::codes::wire::{
     ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
 };
 use crate::error::Code;
+use crate::instant::Instant;
 
 mod carrying;
 mod chosen;
@@ -420,10 +421,10 @@ pub fn recorded_why(
     substitution: &Substitution,
     previous: Option<&str>,
     current: Option<&str>,
-    at: &str,
+    at: Instant,
 ) -> crate::journal::Change {
     crate::journal::Change {
-        at: at.to_owned(),
+        at,
         operation: OPERATION.to_owned(),
         target: substitution.capability.clone(),
         kind: crate::journal::Kind::Set {
@@ -450,10 +451,10 @@ fn asks_for(wired: &Wired, capability: &str) -> bool {
 pub fn recorded(
     substitution: &Substitution,
     previous: Option<&str>,
-    at: &str,
+    at: Instant,
 ) -> crate::journal::Change {
     crate::journal::Change {
-        at: at.to_owned(),
+        at,
         operation: OPERATION.to_owned(),
         target: substitution.capability.clone(),
         kind: crate::journal::Kind::Set {
@@ -468,14 +469,14 @@ pub fn recorded(
 /// choice's own so that putting the run back restores the choice first and the parts
 /// after it.
 #[must_use]
-pub fn parted(substitution: &Substitution, at: &str) -> Vec<crate::journal::Change> {
+pub fn parted(substitution: &Substitution, at: Instant) -> Vec<crate::journal::Change> {
     substitution
         .stops
         .iter()
         .map(|part| (part, false))
         .chain(substitution.starts.iter().map(|part| (part, true)))
         .map(|(part, running)| crate::journal::Change {
-            at: at.to_owned(),
+            at,
             operation: OPERATION.to_owned(),
             target: part.clone(),
             kind: crate::journal::Kind::Ran {
