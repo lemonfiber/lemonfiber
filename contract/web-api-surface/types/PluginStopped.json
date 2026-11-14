@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "recipe": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "step": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

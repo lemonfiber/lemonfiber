@@ -12,6 +12,8 @@
 
 mod asking;
 mod evidence;
+mod health;
+mod reach;
 mod recipe;
 
 use lemonfiber_manifest::container::Container;
@@ -25,7 +27,9 @@ pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
 };
+pub use health::{Health, HealthKind};
 pub use lemonfiber_manifest::container::{Secret, Shape};
+pub use reach::Reach;
 pub use recipe::{
     Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
     CALL_DEADLINE, HEADER, LARGEST_ANSWER, LONGEST_WAIT, MOST_RETRIES, RUN,
@@ -67,6 +71,10 @@ pub struct Manifest {
     /// The ordered calls that configure what it installed.
     #[serde(default, rename = "recipe")]
     pub recipes: Vec<Recipe>,
+    /// What stops working where the operator refuses a host its recipes reach, in its
+    /// author's words.
+    #[serde(default, rename = "reach")]
+    pub reaches: Vec<Reach>,
     /// Every value it will hold.
     #[serde(default, rename = "secret")]
     pub secrets: Vec<Secret>,
@@ -511,34 +519,6 @@ impl Criticality {
             Self::Optional => "optional",
         }
     }
-}
-
-/// How to tell a plugin's service has started.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[schemars(rename = "PluginHealth")]
-pub struct Health {
-    /// Which kind of probe to use.
-    pub kind: HealthKind,
-    /// HTTP path, for `http` probes.
-    #[serde(default)]
-    pub path: Option<String>,
-    /// How long to wait before calling it unhealthy.
-    #[serde(default)]
-    pub timeout_s: Option<u32>,
-}
-
-/// The kinds of health probe a plugin's service can declare.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-#[schemars(rename = "PluginHealthKind")]
-pub enum HealthKind {
-    /// Fetch a path on the service's port.
-    Http,
-    /// Open a connection to the service's port.
-    Tcp,
-    /// Trust the container's own reported state.
-    Container,
 }
 
 mod speaking;

@@ -407,6 +407,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         let problem = super::super::following::Unfollowed::Failed(vec![ran(vec![
             step(Came::Answered, true),
             step(Came::Skipped, false),
+            step(Came::Declined, false),
             step(came, false),
             step(Came::NotReached, false),
         ])])
@@ -415,7 +416,7 @@ fn the_step_that_ended_a_run_names_its_code() {
         assert_eq!(problem.meaning, "put back");
         assert!(problem.detail.as_deref().is_some_and(|detail| detail
             .contains("already landed and not put back from here: adopt claim to sonarr")));
-        assert_eq!(problem.steps.len(), 4);
+        assert_eq!(problem.steps.len(), 5);
     }
     let nowhere =
         super::super::following::Unfollowed::Failed(vec![ran(vec![step(Came::Unexpected, false)])])
@@ -767,4 +768,65 @@ fn what_an_update_put_back_says_what_the_machine_holds() {
     assert!(said(&left, true, true).ends_with(
         "Still standing from the new version: komga — its container could not be taken off."
     ));
+}
+
+/// A recipe that also describes the library at a host outside the stack.
+const DESCRIBING: &str = r#"
+[[recipe.step]]
+id   = "describe"
+call = { method = "GET", to = "metadata.example", path = "/series" }
+"#;
+
+/// A host the operator refused before the install is asked nothing, and the install's
+/// recipe holds with the step calling it declined.
+#[tokio::test]
+async fn an_install_asks_nothing_of_a_host_the_operator_refused() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let http = claiming(200, r#"{"token":"t0k3n"}"#);
+    let ctx = proving("refused-reach", runner, http);
+    let env = ctx.settings.env_file.clone().unwrap_or_default();
+    let refusing =
+        std::collections::BTreeMap::from([("plugin.komga.reach.metadata.example", Some("off"))]);
+    assert!(crate::settings::store::recorded(
+        &env.with_file_name(crate::config::paths::SETTINGS),
+        &refusing
+    )
+    .is_ok());
+    let manifest = format!("{}{DESCRIBING}", reciped());
+    let source = crate::plugin::Source::Path(source("refused-reach", &manifest));
+    let reading = plugins(
+        &ctx,
+        &Asked::Install {
+            source: source.clone(),
+            consent: super::super::Consent::default(),
+        },
+    )
+    .await;
+    let consent = super::super::Consent {
+        agreement: reading.map(|one| one.agreement).unwrap_or_default(),
+        approved: Vec::new(),
+        inputs: super::super::Inputs::of(std::collections::BTreeMap::from([(
+            "claim".to_owned(),
+            "1234".to_owned(),
+        )])),
+    };
+    let shown = report(plugins(&ctx, &Asked::Install { source, consent }).await);
+
+    let ran: Vec<(String, Came)> = shown
+        .and_then(|one| one.install)
+        .map(|one| {
+            one.recipes_ran
+                .into_iter()
+                .flat_map(|ran| ran.steps)
+                .map(|step| (step.step, step.came))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        ran,
+        [
+            ("claim".to_owned(), Came::Answered),
+            ("describe".to_owned(), Came::Declined),
+        ]
+    );
 }

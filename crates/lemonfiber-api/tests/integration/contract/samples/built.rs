@@ -443,6 +443,9 @@ pub(super) fn what_leaves() -> lemonfiber_core::outbound::Leaving {
             plugin: "comics".to_owned(),
             destination: "metadata.example".to_owned(),
             purpose: "a destination this plugin's recipes declare".to_owned(),
+            allowed: false,
+            switch: "plugin.comics.reach.metadata.example".to_owned(),
+            cost: "New series arrive undescribed. Not asked: Describe series (tell).".to_owned(),
         }],
         theirs: vec![lemonfiber_core::outbound::Elsewhere {
             service: "prowlarr".to_owned(),

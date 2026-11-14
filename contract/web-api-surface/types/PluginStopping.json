@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "host": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "steps": {
+      "type": [
+        "array[ref:PluginStopped]"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

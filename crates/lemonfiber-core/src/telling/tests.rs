@@ -31,6 +31,7 @@ fn a_message_goes_only_where_the_enumeration_names() {
         &[],
         &[],
         &crate::outbound::Noted::default(),
+        &|_| None,
     )
     .ours
     .into_iter()

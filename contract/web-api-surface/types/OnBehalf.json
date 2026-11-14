@@ -1,5 +1,17 @@
 {
   "fields": {
+    "allowed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "cost": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
     "destination": {
       "type": [
         "string"
@@ -13,6 +25,12 @@
       "required": true
     },
     "purpose": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "switch": {
       "type": [
         "string"
       ],

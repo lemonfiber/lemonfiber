@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One recipe step refusing a host stops.",
+  "type": "object",
+  "properties": {
+    "recipe": {
+      "description": "The recipe's id.",
+      "type": "string"
+    },
+    "step": {
+      "description": "The step's id.",
+      "type": "string"
+    },
+    "title": {
+      "description": "What the recipe accomplishes, in its author's words.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "recipe",
+    "title",
+    "step"
+  ]
+}
