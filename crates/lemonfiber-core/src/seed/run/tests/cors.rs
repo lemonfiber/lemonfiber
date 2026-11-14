@@ -51,10 +51,15 @@ fn unmoved_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     }
 }
 
-/// A media server whose allow-list reads as `held`, taking a write where `takes`.
+/// A media server whose allow-list reads as `held`, taking no list and one origin where
+/// `takes`.
 fn serving(held: &[&str], takes: bool) -> Arc<Fake> {
     Fake::by_path(vec![
         (media::serve("allowed_origins"), media::answered(&held)),
+        (
+            media::serve("allow_origins"),
+            media::refused(lemonfiber_contract::wire::Kind::Unsupported),
+        ),
         (
             media::serve("allow_only"),
             if takes {
@@ -310,4 +315,28 @@ async fn a_strangers_door_never_puts_its_origin_on_the_allow_list() {
         "a stranger's origin was offered for the allow-list"
     );
     assert_eq!(written, vec![DOOR.to_owned()]);
+}
+
+/// A media server taking a list is handed every origin the household reaches it from, and
+/// is asked for no single origin.
+#[tokio::test]
+async fn a_server_taking_a_list_is_handed_the_list() {
+    let http = Fake::by_path(vec![
+        (
+            media::serve("allowed_origins"),
+            media::answered(&["http://192.168.1.9:5055"]),
+        ),
+        (media::serve("allow_origins"), media::taken()),
+    ]);
+    let ctx = cors_ctx("cors-listed", true, http.clone());
+
+    let (state, written) = seeded_cors(&ctx, &http).await;
+    let listed: Vec<serde_json::Value> = media::served(&http.requests(), "allow_origins");
+
+    assert_eq!(state, Some(State::Wired));
+    assert!(written.is_empty(), "{written:?}");
+    assert!(
+        listed.iter().any(|asked| asked.to_string().contains(DOOR)),
+        "{listed:?}"
+    );
 }

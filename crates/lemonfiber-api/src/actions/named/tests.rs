@@ -419,3 +419,52 @@ fn a_wake_confirmed_without_its_endpoint_or_its_id_is_refused_by_what_it_lacks()
         Some(missing("id"))
     );
 }
+
+/// A channel beside a stream or a stop, and a device beside a pass, each name two requests,
+/// so the pair is refused before either command is looked for.
+#[test]
+fn a_live_or_browser_request_naming_two_at_once_is_refused() {
+    let id = || Some("0123456789abcdef0123456789abcdef".to_owned());
+    for (action, given, argument, alongside) in [
+        (
+            "tune",
+            Arguments {
+                id: id(),
+                stream: id(),
+                ..Arguments::default()
+            },
+            "id",
+            "stream",
+        ),
+        (
+            "tune",
+            Arguments {
+                id: id(),
+                stop: Some(true),
+                ..Arguments::default()
+            },
+            "id",
+            "stop",
+        ),
+        (
+            "play",
+            Arguments {
+                id: id(),
+                device: Some("a-phone-0123".to_owned()),
+                pass: Some(Handed("a-pass".to_owned())),
+                ..Arguments::default()
+            },
+            "device",
+            "pass",
+        ),
+    ] {
+        assert_eq!(
+            crate::actions::named(action, given).err(),
+            Some(crate::actions::Refused::Together {
+                action: action.to_owned(),
+                argument: argument.to_owned(),
+                alongside: alongside.to_owned(),
+            })
+        );
+    }
+}

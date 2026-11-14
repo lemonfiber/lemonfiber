@@ -522,6 +522,9 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
     if let Some(refused) = unwanted(action, given, OFFERED) {
         return Some(refused);
     }
+    if let Some(refused) = viewing::alongside(action, given) {
+        return Some(refused);
+    }
     // Two arguments, two requests. A teardown that waits and a stop of named services are
     // different things to ask for, as are a start answering an install and a start of named
     // services, which installs nothing, and a run given both would have to drop one of them.

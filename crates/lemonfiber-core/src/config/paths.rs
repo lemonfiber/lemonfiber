@@ -377,6 +377,12 @@ impl Paths {
         self.config.join(GRANTS)
     }
 
+    /// Each live stream the core opened for a member, until it is closed.
+    #[must_use]
+    pub fn tuned(&self) -> PathBuf {
+        self.config.join(TUNED)
+    }
+
     /// What is wrong, since when, and whether the operator was told.
     #[must_use]
     pub fn conditions(&self) -> PathBuf {

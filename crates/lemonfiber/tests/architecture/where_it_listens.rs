@@ -85,7 +85,7 @@ const ENCRYPTS: &[(&str, &str)] = &[
         "handing each connection to that certificate before anything is read from it",
     ),
     (
-        "crates/lemonfiber/src/ui.rs",
+        "crates/lemonfiber/src/ui/holding.rs",
         "carrying what the first hands over to the second",
     ),
 ];

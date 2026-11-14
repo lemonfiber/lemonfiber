@@ -20,6 +20,22 @@ pub(super) fn about_viewing(action: &str) -> bool {
     ADDRESSED.contains(&action)
 }
 
+/// A pair of arguments that names two requests of one of them at once: a channel and a
+/// stream to tune, a channel and a stop, or a device and a pass to play on.
+pub(super) fn alongside(action: &str, given: &Arguments) -> Option<Refused> {
+    let (argument, alongside) = match action {
+        "tune" if given.id.is_some() && given.stream.is_some() => ("id", "stream"),
+        "tune" if given.id.is_some() && given.stop == Some(true) => ("id", "stop"),
+        "play" if given.device.is_some() && given.pass.is_some() => ("device", "pass"),
+        _ => return None,
+    };
+    Some(Refused::Together {
+        action: action.to_owned(),
+        argument: argument.to_owned(),
+        alongside: alongside.to_owned(),
+    })
+}
+
 /// The command one of them names, or why it names none.
 pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refused> {
     let Arguments {
@@ -38,11 +54,6 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         action: action.to_owned(),
         argument: argument.to_owned(),
     };
-    let together = |argument: &str, alongside: &str| Refused::Together {
-        action: action.to_owned(),
-        argument: argument.to_owned(),
-        alongside: alongside.to_owned(),
-    };
     let viewing = match action {
         "grant" => Viewing::Grant {
             member,
@@ -51,9 +62,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
         "tune" => Viewing::Tune {
             member,
             live: match (id, stream, stop.unwrap_or(false)) {
-                (Some(_), Some(_), _) => return Err(together("id", "stream")),
-                (Some(_), None, true) => return Err(together("id", "stop")),
-                (Some(channel), None, false) => Live::Open(channel),
+                (Some(channel), _, _) => Live::Open(channel),
                 (None, Some(stream), false) => Live::Renew(stream),
                 (None, Some(stream), true) => Live::Stop(stream),
                 (None, None, _) => return Err(missing("id")),
@@ -64,8 +73,7 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
             member,
             id: id.ok_or_else(|| missing("id"))?,
             from: match (device, pass) {
-                (Some(_), Some(_)) => return Err(together("device", "pass")),
-                (Some(device), None) => PlayFrom::Device(device),
+                (Some(device), _) => PlayFrom::Device(device),
                 (None, Some(Handed(pass))) => PlayFrom::Pass(pass),
                 (None, None) => return Err(missing("device")),
             },
