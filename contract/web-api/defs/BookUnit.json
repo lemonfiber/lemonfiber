@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a member asks a curator of books for.",
+  "oneOf": [
+    {
+      "description": "One book: a work.",
+      "type": "string",
+      "const": "book"
+    },
+    {
+      "description": "A whole author: every book, and those that come later.",
+      "type": "string",
+      "const": "author"
+    },
+    {
+      "description": "A series: every book of it, and those that come later.",
+      "type": "string",
+      "const": "series"
+    }
+  ]
+}

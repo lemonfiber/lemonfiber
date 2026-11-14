@@ -459,6 +459,39 @@
       ]
     },
     {
+      "description": "Ask a curator to remove what a member asked it for, and take the ask the core\nkeeps for it off the household list; nothing where the curator held some of it\nbefore.",
+      "type": "object",
+      "properties": {
+        "does": {
+          "type": "string",
+          "const": "unask"
+        },
+        "kept": {
+          "description": "The ask the core keeps for it, by its reference.",
+          "type": "string"
+        },
+        "reference": {
+          "description": "The curator's reference for it.",
+          "type": "string"
+        },
+        "unit": {
+          "description": "What was asked for.",
+          "$ref": "Unit.json"
+        },
+        "whole": {
+          "description": "Whether the curator held none of it before.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "does",
+        "unit",
+        "reference",
+        "kept",
+        "whole"
+      ]
+    },
+    {
       "description": "Give a grant back to a plugin, or end one it was given.",
       "type": "object",
       "properties": {

@@ -76,7 +76,13 @@ fn engine() -> Reporting {
 }
 
 pub(super) fn ctx(transport: &Arc<Transport>, tag: &str) -> Ctx {
-    let ctx = ctx_engine(Arc::clone(transport), &format!("collect-{tag}"), engine());
+    let mut ctx = ctx_engine(Arc::clone(transport), &format!("collect-{tag}"), engine());
+    ctx.settings.stack_dir = ctx
+        .settings
+        .env_file
+        .as_deref()
+        .and_then(std::path::Path::parent)
+        .map(|dir| dir.join("stack"));
     speaking(&ctx);
     ctx
 }
@@ -534,4 +540,133 @@ async fn an_ask_with_nowhere_to_be_kept_asks_the_curator_nothing() {
     assert!(is(&refused, NOT_WORKING), "{refused:?}");
     assert_eq!(sent(&transport, "candidate"), 0);
     assert_eq!(sent(&transport, "request"), 0);
+}
+
+pub(super) fn journalled(ctx: &Ctx) -> Vec<crate::journal::Change> {
+    crate::app::targets::layout(ctx)
+        .and_then(|paths| crate::app::recover::journal_at(&paths.journal()).ok())
+        .map(|journal| journal.changes().to_vec())
+        .unwrap_or_default()
+}
+
+/// How many of `changes` undoing them put back, and what it could not reach; nothing
+/// where the stack has no manifest.
+async fn undone(ctx: &Ctx, changes: &[crate::journal::Change]) -> Option<(usize, Vec<String>)> {
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
+    let undos: Vec<_> = changes.iter().map(crate::journal::Change::undo).collect();
+    let reached = crate::app::recover::reconfigured(ctx, &undos, &manifest).await;
+    Some((reached.put_back.len(), reached.unreached))
+}
+
+#[tokio::test]
+async fn an_album_sent_to_the_curator_is_journalled_as_undone_by_removing_it() {
+    let transport = the_house(vec![
+        call("requesting", account(true)),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::MayAsk))),
+        ),
+        curator("remove", crate::test_support::adapted::taken()),
+    ]);
+    let ctx = ctx(&transport, "asked-journalled");
+
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+    let changes = journalled(&ctx);
+    let undone = undone(&ctx, &changes).await;
+
+    assert_eq!(
+        changes
+            .iter()
+            .map(|change| change.kind.clone())
+            .collect::<Vec<_>>(),
+        [crate::journal::Kind::Asked {
+            unit: ALBUM,
+            reference: KIND_OF_BLUE.to_owned(),
+            kept: "music-1".to_owned(),
+            whole: true,
+        }]
+    );
+    assert_eq!(
+        changes.first().map(|change| change.operation.as_str()),
+        Some(crate::collected::run::OPERATION)
+    );
+    assert_eq!(undone, Some((1, Vec::new())));
+    assert_eq!(sent(&transport, "remove"), 1);
+    assert!(kept(&ctx).is_empty());
+}
+
+#[tokio::test]
+async fn the_rest_of_an_album_held_in_part_is_journalled_with_nothing_to_undo() {
+    let transport = the_house(vec![
+        call("requesting", account(true)),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::PartlyHere))),
+        ),
+    ]);
+    let ctx = ctx(&transport, "asked-partly-journalled");
+
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+
+    assert!(matches!(
+        journalled(&ctx).first().map(|change| &change.kind),
+        Some(crate::journal::Kind::Asked { whole: false, .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_ask_that_waits_journals_nothing_until_it_is_sent() {
+    let transport = the_house(vec![curator(
+        "candidate",
+        answered(&Some(candidate(CandidateState::MayAsk))),
+    )]);
+    let ctx = ctx(&transport, "asked-waiting-journalled");
+
+    let _ = asked(&ctx, "Ada", ARTIST).await;
+
+    assert!(journalled(&ctx).is_empty());
+}
+
+#[tokio::test]
+async fn an_ask_is_not_undone_at_a_curator_other_than_the_one_it_was_sent_to() {
+    let transport = the_house(vec![
+        call("requesting", account(true)),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::MayAsk))),
+        ),
+    ]);
+    let ctx = ctx(&transport, "unasked-elsewhere");
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+
+    let undone =
+        crate::collected::run::unasked(&ctx, "another-curator", (ALBUM, KIND_OF_BLUE, "music-1"))
+            .await;
+
+    assert!(undone.is_err());
+    assert_eq!(sent(&transport, "remove"), 0);
+    assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
+}
+
+#[tokio::test]
+async fn an_ask_the_curator_will_not_remove_stays_on_the_list() {
+    let transport = the_house(vec![
+        call("requesting", account(true)),
+        curator(
+            "candidate",
+            answered(&Some(candidate(CandidateState::MayAsk))),
+        ),
+        curator("remove", crate::test_support::adapted::refusing()),
+    ]);
+    let ctx = ctx(&transport, "unasked-refused");
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+    let changes = journalled(&ctx);
+
+    let undone = undone(&ctx, &changes).await;
+
+    assert_eq!(
+        undone.map(|(put_back, unreached)| (put_back, unreached.len())),
+        Some((0, 1))
+    );
+    assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Sent)]);
 }

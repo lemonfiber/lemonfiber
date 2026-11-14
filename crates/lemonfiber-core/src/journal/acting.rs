@@ -202,6 +202,19 @@ pub enum Action {
         /// The release's fingerprint.
         release: String,
     },
+    /// Ask a curator to remove what a member asked it for, and take the ask the core
+    /// keeps for it off the household list; nothing where the curator held some of it
+    /// before.
+    Unask {
+        /// What was asked for.
+        unit: crate::collected::Unit,
+        /// The curator's reference for it.
+        reference: String,
+        /// The ask the core keeps for it, by its reference.
+        kept: String,
+        /// Whether the curator held none of it before.
+        whole: bool,
+    },
     /// Give a grant back to a plugin, or end one it was given.
     Regrant {
         /// The plugin the grant is of.

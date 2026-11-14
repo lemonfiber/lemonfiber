@@ -737,6 +737,15 @@ fn a_device_key_is_named_as_a_key_is() {
         })),
         "the drop of a stuck download"
     );
+    assert_eq!(
+        described(&change(Kind::Asked {
+            unit: crate::collected::Unit::Music(crate::ports::service::MusicUnit::Album),
+            reference: "mbid-kind-of-blue".to_owned(),
+            kept: "music-1".to_owned(),
+            whole: true,
+        })),
+        "the ask music-1"
+    );
 }
 
 #[test]

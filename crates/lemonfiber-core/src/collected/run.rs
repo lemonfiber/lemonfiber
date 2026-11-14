@@ -23,19 +23,100 @@ pub(crate) fn kept_at(ctx: &Ctx) -> Result<PathBuf, Box<Problem>> {
     crate::app::targets::beside_env(ctx, ASKS).ok_or_else(|| Box::new(Failure::Nowhere.problem()))
 }
 
-/// Every ask kept, and none where nothing is kept or nowhere is configured to keep it.
+/// Every ask kept but those withdrawn, and none where nothing is kept or nowhere is
+/// configured to keep it.
 pub(crate) fn every(ctx: &Ctx) -> Vec<Ask> {
     crate::app::targets::beside_env(ctx, ASKS)
         .and_then(|path| store::kept(&path).ok())
-        .map(|kept| kept.asks)
+        .map(|kept| {
+            kept.asks
+                .into_iter()
+                .filter(|ask| ask.standing != Standing::Withdrawn)
+                .collect()
+        })
         .unwrap_or_default()
 }
 
+/// The operation an ask sent to a curator is journalled under.
+pub(crate) const OPERATION: &str = "asking a curator for a member";
+
 /// The curator answering for `medium` in the stack as it stands.
 pub(crate) async fn collector(ctx: &Ctx, medium: Medium) -> Option<Collector> {
+    named_collector(ctx, medium)
+        .await
+        .map(|(_, collector)| collector)
+}
+
+/// The curator answering for `medium` in the stack as it stands, with the id of the
+/// service it fronts.
+pub(crate) async fn named_collector(ctx: &Ctx, medium: Medium) -> Option<(String, Collector)> {
     let manifest = ctx.stack.checked_manifest(ctx.today()).ok()?;
     let fillers = crate::app::targets::fillers_here(ctx, &manifest);
     crate::app::targets::collector(ctx, &fillers, medium).await
+}
+
+/// Journal that the curator `service` was asked for the `unit` `reference` names, kept as
+/// `kept`, holding none of it before where `whole`.
+///
+/// # Errors
+///
+/// The refusal for a journal that could not be written: the ask stands, unrecorded.
+pub(crate) fn journalled(
+    ctx: &Ctx,
+    service: &str,
+    unit: Unit,
+    reference: &str,
+    kept: Reference,
+    whole: bool,
+) -> Result<(), Box<Problem>> {
+    let change = crate::journal::Change {
+        at: ctx.stamp(),
+        operation: OPERATION.to_owned(),
+        target: service.to_owned(),
+        kind: crate::journal::Kind::Asked {
+            unit,
+            reference: reference.to_owned(),
+            kept: kept.to_string(),
+            whole,
+        },
+    };
+    let written = crate::app::targets::layout(ctx).map_or(Err(Failure::Nowhere), |paths| {
+        crate::app::recover::journalled(&paths.journal(), std::slice::from_ref(&change))
+    });
+    written.map_err(|failure| {
+        Box::new(crate::app::recover::unrecorded(
+            &format!("Asking for {kept}"),
+            &failure,
+        ))
+    })
+}
+
+/// Take the ask `undo` names back from the curator it was sent to, and off the household
+/// list, as undoing it asks.
+///
+/// # Errors
+///
+/// What stood in the way, in the words a reversal reports it in.
+pub(crate) async fn unasked(
+    ctx: &Ctx,
+    target: &str,
+    (unit, reference, kept): (Unit, &str, &str),
+) -> Result<(), String> {
+    let gone = || format!("the ask {kept} at {target}");
+    let named: Reference = kept.parse().map_err(|_| gone())?;
+    let (service, curator) = named_collector(ctx, unit.medium())
+        .await
+        .filter(|(service, _)| service == target)
+        .ok_or_else(gone)?;
+    curator
+        .remove(unit, reference)
+        .await
+        .map_err(|_| format!("the ask {kept} at {service}"))?;
+    let path = kept_at(ctx).map_err(|_| gone())?;
+    let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
+    store::withdrawn(&path, named, &at)
+        .map(|_| ())
+        .map_err(|_| gone())
 }
 
 /// Let the waiting ask `medium`-`number` through, asking its curator for it, or turn it
@@ -72,12 +153,20 @@ pub(crate) async fn decided(
         ));
     }
     let at = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
+    let mut whole = None;
     let standing = match reason {
         None => {
-            let curator = collector(ctx, medium)
+            let (service, curator) = named_collector(ctx, medium)
                 .await
                 .ok_or_else(|| Box::new(unreached(NOTHING_DECIDED)))?;
+            let held = curator
+                .candidate(waiting.unit, &waiting.reference)
+                .await
+                .ok()
+                .flatten()
+                .map(|found| found.state);
             sent(&curator, waiting.unit, &waiting.reference).await?;
+            whole = Some((service, held == Some(CandidateState::MayAsk)));
             Standing::Sent
         }
         Some(reason) => {
@@ -88,6 +177,16 @@ pub(crate) async fn decided(
         }
     };
     store::settled(&path, named, standing, &at).map_err(|why| Box::new(why.problem()))?;
+    if let Some((service, whole)) = whole {
+        journalled(
+            ctx,
+            &service,
+            waiting.unit,
+            &waiting.reference,
+            named,
+            whole,
+        )?;
+    }
     Ok(said)
 }
 
@@ -231,7 +330,7 @@ pub(crate) fn listed(
         Standing::Sent => State::Getting,
         Standing::PartlyHere => State::PartlyHere,
         Standing::Here => State::Here,
-        Standing::Declined | Standing::Expired => State::Declined,
+        Standing::Declined | Standing::Expired | Standing::Withdrawn => State::Declined,
     };
     MemberRequest {
         id: ask.named().to_string(),

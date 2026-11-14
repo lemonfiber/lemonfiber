@@ -346,6 +346,18 @@ pub enum Kind {
         /// The release's fingerprint.
         release: String,
     },
+    /// A curator was asked for what a household member asked for of music or books.
+    /// Undoing removes it from the curator, where the curator held none of it before.
+    Asked {
+        /// What was asked for.
+        unit: crate::collected::Unit,
+        /// The curator's reference for it.
+        reference: String,
+        /// The ask the core keeps for it, by its reference.
+        kept: String,
+        /// Whether the curator held none of it before.
+        whole: bool,
+    },
     /// A service was started again so it takes up what its adapter applied.
     Restarted {
         /// The service.

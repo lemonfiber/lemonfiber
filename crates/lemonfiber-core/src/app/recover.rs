@@ -53,42 +53,51 @@ pub(crate) async fn reconfigured(
     let fillers = super::targets::fillers_here(ctx, manifest);
     let mut reached = Reached::default();
     for undo in undos {
-        if let Action::Regrab {
-            kind,
-            title,
-            release,
-        } = &undo.action
-        {
-            regrabbing::regrabbed(ctx, &fillers, undo, (*kind, *title, release), &mut reached)
-                .await;
-            continue;
-        }
-        let Action::Reconfigure {
-            resource,
-            id,
-            field,
-            value,
-        } = &undo.action
-        else {
-            reached.left.push(undo.clone());
-            continue;
-        };
-        let open = super::targets::target_named(ctx, &fillers, &undo.target)
-            .await
-            .and_then(|target| target.asked);
-        let put_back = match open {
-            Some(client) => client
-                .set_client_field(id, field, value.as_deref())
+        match &undo.action {
+            Action::Regrab {
+                kind,
+                title,
+                release,
+            } => {
+                regrabbing::regrabbed(ctx, &fillers, undo, (*kind, *title, release), &mut reached)
+                    .await;
+            }
+            Action::Unask {
+                unit,
+                reference,
+                kept,
+                whole: true,
+            } => match crate::collected::run::unasked(ctx, &undo.target, (*unit, reference, kept))
                 .await
-                .is_ok(),
-            None => false,
-        };
-        if put_back {
-            reached.put_back.push(undo.clone());
-        } else {
-            reached
-                .unreached
-                .push(format!("{resource} in {}", undo.target));
+            {
+                Ok(()) => reached.put_back.push(undo.clone()),
+                Err(unreached) => reached.unreached.push(unreached),
+            },
+            Action::Reconfigure {
+                resource,
+                id,
+                field,
+                value,
+            } => {
+                let open = super::targets::target_named(ctx, &fillers, &undo.target)
+                    .await
+                    .and_then(|target| target.asked);
+                let put_back = match open {
+                    Some(client) => client
+                        .set_client_field(id, field, value.as_deref())
+                        .await
+                        .is_ok(),
+                    None => false,
+                };
+                if put_back {
+                    reached.put_back.push(undo.clone());
+                } else {
+                    reached
+                        .unreached
+                        .push(format!("{resource} in {}", undo.target));
+                }
+            }
+            _ => reached.left.push(undo.clone()),
         }
     }
     reached
@@ -311,6 +320,11 @@ fn carry_out(confined: &dyn Confined, action: &Action, env_file: &Path) -> Resul
         ))),
         Action::Unmoved { service } => Ok(Step::BeyondReach(format!("{service} on its plugin"))),
         Action::Regrab { .. } => Ok(Step::BeyondReach("a stuck download dropped".to_owned())),
+        Action::Unask { kept, whole, .. } => Ok(Step::BeyondReach(if *whole {
+            format!("the ask {kept}")
+        } else {
+            format!("the ask {kept}, for the rest of what the house held in part")
+        })),
         Action::Resettle {
             name,
             value,
