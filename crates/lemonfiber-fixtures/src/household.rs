@@ -121,7 +121,7 @@ impl Household for Recognising {
         unasked()
     }
 
-    async fn when_invited(&self, _: &str) -> Result<Vec<Invited>, Failure> {
+    async fn when_invited(&self, _: lemonfiber_ports::Instant) -> Result<Vec<Invited>, Failure> {
         unasked()
     }
 

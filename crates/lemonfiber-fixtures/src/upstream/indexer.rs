@@ -55,7 +55,7 @@ impl Indexers for Upstream {
                 grabs: None,
                 window: Duration::from_secs(86_400),
             }),
-            searched_from: Some(now),
+            searched_from: Some(lemonfiber_ports::Instant::of(now)),
             grabbed_from: None,
         }])
     }
