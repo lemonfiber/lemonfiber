@@ -13,18 +13,22 @@ use super::targets::{curator_targets, fillers_here};
 use super::Ctx;
 use crate::doctor::credentials::Target;
 use crate::error::{Diagnose, Problem};
-use crate::model::{Triggered, UpgradeMedia, UpgradeReport};
-use crate::ports::media::{Kind, TitleKind};
+use crate::model::{Total, Triggered, UpgradeMedia, UpgradeReport};
+use crate::ports::media::TitleKind;
+use crate::ports::service::Failure;
+use crate::quality::Selection;
+
+/// Seconds in an hour, which a rate per hour is divided by.
+const AN_HOUR: u128 = 3_600;
 
 /// State the cost of upgrading existing content to the chosen quality, per media
-/// type, and — only when confirmed — ask each resolution curator to re-search its
-/// library for upgrades.
+/// type, and — only when confirmed — ask each curator to re-search its library for
+/// upgrades.
 ///
-/// The cost is stated per media type because each carries its own preset: film at
-/// maximum and television at space-saving are upgraded to different bars. Only the
-/// resolution curators present in the stack are covered; a music or index service is
-/// not a resolution preset's concern, so it is left out rather than sent a command
-/// it has no equivalent for.
+/// The cost is stated per media type because each carries its own preset or format: film
+/// at maximum and television at space-saving are upgraded to different bars. It is what
+/// the curator holds below its cutoff, re-fetched at that bar. Books have no quality to
+/// upgrade to, so a curator of books is left out.
 pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, Box<Problem>> {
     let selection = super::quality::recorded_selection(ctx);
     let manifest = ctx
@@ -42,10 +46,9 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
 
     let mut media = Vec::new();
     for target in curator_targets(ctx, &fillers_here(ctx, &manifest)).await {
-        let Some(kind) = target.kind.and_then(TitleKind::video) else {
+        let Some((kind, preset, rate)) = target.kind.and_then(|kind| bar(&selection, kind)) else {
             continue;
         };
-        let preset = selection.for_type(kind.media_type());
         // Unconfirmed states the cost and touches nothing — the deliberate gate a
         // large, bandwidth-expensive operation sits behind.
         let outcome = if confirm {
@@ -55,8 +58,8 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
         };
         media.push(UpgradeMedia {
             media_type: kind.media_type().to_owned(),
-            preset: preset.label().to_owned(),
-            size_per_hour: preset.consequence().size_per_hour.to_owned(),
+            preset: preset.to_owned(),
+            total: total(kind, rate, &target).await,
             outcome,
         });
     }
@@ -67,10 +70,51 @@ pub(crate) async fn upgrade(ctx: &Ctx, confirm: bool) -> Result<UpgradeReport, B
     })
 }
 
-/// Ask one resolution curator to re-search its existing content for an upgrade, and read
-/// what it said. The curator searches against its own current cutoff — whatever the last
-/// applied preset set — so what actually upgrades is what sits below that bar.
-async fn trigger(kind: Kind, target: &Target) -> Triggered {
+/// The bar `kind` is upgraded to, by its label, and the bytes an hour of it takes there;
+/// nothing for books, which have none.
+fn bar(selection: &Selection, kind: TitleKind) -> Option<(TitleKind, &'static str, u64)> {
+    match kind.video() {
+        Some(video) => {
+            let preset = selection.for_type(video.media_type());
+            Some((kind, preset.label(), preset.bytes_per_hour()))
+        }
+        None if kind == TitleKind::Music => {
+            let format = selection.music();
+            Some((kind, format.label(), format.bytes_per_hour()))
+        }
+        None => None,
+    }
+}
+
+/// What re-fetching what `target` holds of `kind` below its cutoff takes at `rate` bytes an
+/// hour, or why that could not be worked out.
+async fn total(kind: TitleKind, rate: u64, target: &Target) -> Total {
+    let Some(service) = &target.asked else {
+        return Total::Unknown(format!(
+            "{} has not finished starting, so what it holds below its cutoff could not be read",
+            target.name
+        ));
+    };
+    match service.cutoff_unmet(kind).await {
+        Ok(below) => Total::Bytes(
+            u64::try_from(u128::from(below.seconds) * u128::from(rate) / AN_HOUR)
+                .unwrap_or(u64::MAX),
+        ),
+        Err(Failure::Unsupported { .. }) => Total::Unknown(format!(
+            "{}'s adapter does not say what it holds below its cutoff",
+            target.name
+        )),
+        Err(failure) => Total::Unknown(format!(
+            "what {} holds below its cutoff could not be read: {failure}",
+            target.name
+        )),
+    }
+}
+
+/// Ask one curator to re-search its existing content for an upgrade, and read what it said.
+/// The curator searches against its own current cutoff — whatever the last applied preset
+/// set — so what actually upgrades is what sits below that bar.
+async fn trigger(kind: TitleKind, target: &Target) -> Triggered {
     match &target.asked {
         None => Triggered::NotStarted,
         Some(service) => match service.search_upgrades(kind).await {

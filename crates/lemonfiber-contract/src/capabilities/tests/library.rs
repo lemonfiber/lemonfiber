@@ -7,10 +7,10 @@ use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::stage::Stage;
 use lemonfiber_ports::service::{
     AddPlan, Added, Carried, Carrying, Catalogue, CatalogueEntry, Category, ClientProbe,
-    Credential, CuratedSeason, CuratedTitle, DownloadClient, DownloadState, DownloadedEpisode,
-    Downloading, Failure, FoundItem, Fulfilling, Grabbed, Identity, Importing, ItemPart,
-    Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases, Queue,
-    QueueItem, Queues, Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder,
+    Credential, CuratedSeason, CuratedTitle, CutoffUnmet, DownloadClient, DownloadState,
+    DownloadedEpisode, Downloading, Failure, FoundItem, Fulfilling, Grabbed, Identity, Importing,
+    ItemPart, Maintenance, MusicQuality, Pipeline, Protocol, QualityProfile, QualityReleases,
+    Queue, QueueItem, Queues, Record, RegisteredClient, RegisteredFolder, ReleaseProbe, RootFolder,
     StuckItem, TitleRequest, TraceEvent,
 };
 use lemonfiber_ports::Client;
@@ -68,12 +68,24 @@ impl Client for Upstream {
 
 #[async_trait]
 impl Maintenance for Upstream {
-    async fn search_upgrades(&self, kind: Kind) -> Result<(), Failure> {
+    async fn search_upgrades(&self, kind: TitleKind) -> Result<(), Failure> {
         self.tell(format!("upgrades {kind:?}"));
         Ok(())
     }
     async fn wanting(&self) -> Result<bool, Failure> {
         Ok(true)
+    }
+    async fn cutoff_unmet(&self, kind: TitleKind) -> Result<CutoffUnmet, Failure> {
+        if kind == TitleKind::Books {
+            return Err(Failure::Unsupported {
+                service: SERVICE.to_owned(),
+                detail: "it files no books".to_owned(),
+            });
+        }
+        Ok(CutoffUnmet {
+            items: 3,
+            seconds: 7_200,
+        })
     }
 }
 
@@ -371,8 +383,12 @@ where
         format!("{:?}", curator.root_folders().await),
         format!("{:?}", curator.download_clients().await),
         format!("{:?}", curator.quality_profiles().await),
-        format!("{:?}", curator.search_upgrades(Kind::Tv).await),
+        format!("{:?}", curator.search_upgrades(TitleKind::Tv).await),
+        format!("{:?}", curator.search_upgrades(TitleKind::Music).await),
         format!("{:?}", curator.wanting().await),
+        format!("{:?}", curator.cutoff_unmet(TitleKind::Movies).await),
+        format!("{:?}", curator.cutoff_unmet(TitleKind::Music).await),
+        format!("{:?}", curator.cutoff_unmet(TitleKind::Books).await),
         format!("{:?}", curator.hardlinks().await),
         format!("{:?}", curator.set_hardlinks(false).await),
         format!("{:?}", curator.records(Record::Indexer).await),
@@ -451,6 +467,7 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
             "set",
             "set",
             "folder",
+            "upgrades",
             "upgrades",
             "hardlinks",
             "carry",

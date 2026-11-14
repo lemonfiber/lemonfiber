@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What upgrading one kind of media costs in total, or why that could not be worked out.",
+  "oneOf": [
+    {
+      "description": "The bytes re-fetching what its curator holds below the cutoff would take.",
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "bytes"
+      ]
+    },
+    {
+      "description": "Why the total could not be worked out, in the operator's words.",
+      "type": "object",
+      "properties": {
+        "unknown": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unknown"
+      ]
+    }
+  ]
+}

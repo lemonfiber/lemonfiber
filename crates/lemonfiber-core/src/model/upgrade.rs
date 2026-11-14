@@ -22,6 +22,16 @@ pub enum Triggered {
     },
 }
 
+/// What upgrading one kind of media costs in total, or why that could not be worked out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Total {
+    /// The bytes re-fetching what its curator holds below the cutoff would take.
+    Bytes(u64),
+    /// Why the total could not be worked out, in the operator's words.
+    Unknown(String),
+}
+
 /// One media type an upgrade covers: its chosen quality, that quality's cost, and —
 /// once confirmed — what became of asking its service to re-search.
 ///
@@ -30,12 +40,13 @@ pub enum Triggered {
 /// upgraded to different bars, and a single number would misstate one of them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct UpgradeMedia {
-    /// The media type — `tv` or `movies`.
+    /// The media type: `tv`, `movies` or `music`.
     pub media_type: String,
-    /// The preset in force for it.
+    /// The preset in force for it, or for music the format.
     pub preset: String,
-    /// Roughly what an hour of it costs at that preset.
-    pub size_per_hour: String,
+    /// What upgrading it costs in total: the runtime its curator holds below the cutoff
+    /// times the bytes an hour takes at that preset or format.
+    pub total: Total,
     /// What became of the re-search, or `None` where the upgrade was not confirmed
     /// and only the cost was stated.
     pub outcome: Option<Triggered>,

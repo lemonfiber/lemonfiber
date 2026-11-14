@@ -45,8 +45,8 @@
         1
       ],
       "openapi": "library.curate/v1/openapi.json",
-      "operations": 38,
-      "sha256": "3e1801c64de62c26a61237846a60be9966777ccac1961bed78915f8ee8cf61b4"
+      "operations": 39,
+      "sha256": "15523ff013caf05aaf3aac294760f8a736bbccbdb05637293882b75486c533c1"
     },
     {
       "capability": "indexer.search",
