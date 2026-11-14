@@ -115,6 +115,19 @@ fn live_stream_paths_that_do_not_compile_or_place_no_stream_are_refused() {
     }
 }
 
+#[test]
+fn a_live_stream_path_named_by_a_parameter_that_does_not_compile_is_refused_naming_it() {
+    let live = Paths::of(
+        vec![LivePath {
+            pattern: "^/live/(".to_owned(),
+            parameter: Some("channel".to_owned()),
+            stream: "^.+$".to_owned(),
+        }],
+        Vec::new(),
+    );
+    assert_eq!(Watching::of(&live).err().as_deref(), Some("^/live/("));
+}
+
 const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
 #[test]
