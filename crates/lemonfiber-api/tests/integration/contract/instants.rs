@@ -11,7 +11,7 @@ use super::samples::samples;
 const CARRIED: &[(&str, &[&str])] = &[
     ("version", &["/data/attestation_status"]),
     (
-        "news",
+        "news-items",
         &["/data/requests/0/asked", "/data/problems/0/onset"],
     ),
     ("handoff", &["/data/issued", "/data/sessions/0/last_seen"]),

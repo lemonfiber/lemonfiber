@@ -58,7 +58,7 @@
       ],
       "openapi": "indexer.search/v1/openapi.json",
       "operations": 7,
-      "sha256": "8ee74c4dfc4919c9c9595be68f7e6c43cdaa0daaf12a1e9f7e5f5949be88b6e9"
+      "sha256": "3bcedd73b8553524c58e9c9e25598d9c57b70eb50fa65ebb6d4173c609790c14"
     },
     {
       "capability": "indexer.pull",
@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 29,
-      "sha256": "243af596322d307ef9f417ccf8060322d064c050b543e44490d630497093b070"
+      "sha256": "61f1030d6e568875051920c0755a3d30925359d3a48b1e0729da13fb6036214f"
     },
     {
       "capability": "proxy.front",

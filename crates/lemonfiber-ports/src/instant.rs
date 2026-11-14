@@ -33,6 +33,9 @@ pub const HOUR: u64 = 3_600;
 /// Seconds in a minute.
 pub const MINUTE: u64 = 60;
 
+/// What reading a value that holds no instant is refused with.
+const NOT_AN_INSTANT: &str = "not an instant";
+
 /// The day the epoch counts from, which is how a date becomes a count of days.
 const EPOCH: Date = Date {
     year: 1970,
@@ -171,7 +174,29 @@ enum Kept {
     Text(String),
 }
 
+/// What an adapter may answer where an instant is asked for: what a file holds, or the
+/// object a system clock serialises to, whose fraction is dropped.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Answered {
+    Kept(Kept),
+    Clock { secs_since_epoch: u64 },
+}
+
 impl Kept {
+    /// The instant `kept` holds where it holds one: absent for nothing or the empty text,
+    /// refused where present and unreadable.
+    fn present<E: serde::de::Error>(kept: Option<Self>) -> Result<Option<Instant>, E> {
+        match kept {
+            None => Ok(None),
+            Some(Self::Text(text)) if text.is_empty() => Ok(None),
+            Some(kept) => kept
+                .instant()
+                .map(Some)
+                .ok_or_else(|| E::custom(NOT_AN_INSTANT)),
+        }
+    }
+
     /// The instant it holds; the empty text an earlier build wrote for a clock it could
     /// not place reads as the epoch, as [`Instant::of`] reads that clock now.
     fn instant(&self) -> Option<Instant> {
@@ -195,7 +220,7 @@ impl Kept {
 pub fn kept<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Instant, D::Error> {
     Kept::deserialize(deserializer)?
         .instant()
-        .ok_or_else(|| serde::de::Error::custom("not an instant"))
+        .ok_or_else(|| serde::de::Error::custom(NOT_AN_INSTANT))
 }
 
 /// An instant kept in a file on disk, where one may be absent: [`kept`], or null, or the
@@ -207,27 +232,34 @@ pub fn kept<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Instant, D::Er
 pub fn kept_option<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Instant>, D::Error> {
-    match Option::<Kept>::deserialize(deserializer)? {
-        None => Ok(None),
-        Some(Kept::Text(text)) if text.is_empty() => Ok(None),
-        Some(kept) => kept
-            .instant()
-            .map(Some)
-            .ok_or_else(|| serde::de::Error::custom("not an instant")),
-    }
+    Kept::present(Option::<Kept>::deserialize(deserializer)?)
 }
 
-/// An instant an adapter answered with, where it answered one: whole seconds, or the ISO
-/// text the adapters the catalogue pins still answer with, read as [`kept_option`] reads
-/// a file.
+/// An instant an adapter answered with, where it answered one: whole seconds, or what the
+/// adapters the catalogue pins still answer with — ISO text, read as [`kept_option`] reads
+/// a file, or a system clock's `secs_since_epoch` object. ISO text dated before the epoch
+/// is the moment a .NET service writes for never, and reads as none.
 ///
 /// # Errors
 ///
-/// Where a value is present and is neither.
+/// Where a value is present and is none of these.
 pub fn until_adapters_answer_integers<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Instant>, D::Error> {
-    kept_option(deserializer)
+    match Option::<Answered>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(Answered::Clock { secs_since_epoch }) => Ok(Some(Instant(secs_since_epoch))),
+        Some(Answered::Kept(Kept::Text(text))) if before_the_epoch(&text) => Ok(None),
+        Some(Answered::Kept(kept)) => Kept::present(Some(kept)),
+    }
+}
+
+/// Whether `stamp` is ISO text dated before the epoch.
+fn before_the_epoch(stamp: &str) -> bool {
+    stamp
+        .split_once('T')
+        .and_then(|(day, _)| Date::parse(day))
+        .is_some_and(|date| date < EPOCH)
 }
 
 /// Instants kept in a file on disk by name, each read as [`kept`] reads one.
@@ -243,7 +275,7 @@ pub fn kept_each<'de, D: Deserializer<'de>>(
         .map(|(name, kept)| {
             kept.instant()
                 .map(|instant| (name, instant))
-                .ok_or_else(|| serde::de::Error::custom("not an instant"))
+                .ok_or_else(|| serde::de::Error::custom(NOT_AN_INSTANT))
         })
         .collect()
 }

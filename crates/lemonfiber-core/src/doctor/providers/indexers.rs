@@ -11,11 +11,11 @@
 //! reporting the same symptom eight times and leaving the operator to notice the
 //! pattern.
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use crate::doctor::{Category, Finding, Verdict};
 use crate::error::{Problem, Remedy, State};
-use crate::instant;
+use crate::instant::Instant;
 use crate::plural;
 use crate::ports::service::IndexerUse;
 use crate::provider::Allowance;
@@ -97,7 +97,7 @@ struct Spent {
     allowance: Allowance,
     /// When the oldest call still counted against it was made, where the aggregator's
     /// own records place one.
-    from: Option<SystemTime>,
+    from: Option<Instant>,
     /// How long the window it is counted over is.
     window: Duration,
 }
@@ -227,8 +227,8 @@ fn capped(spent: &Spent) -> Problem {
 fn frees_up(spent: &Spent) -> String {
     let at = spent
         .from
-        .and_then(|from| from.checked_add(spent.window))
-        .and_then(instant::written);
+        .map(|from| from.later(spent.window.as_secs()))
+        .and_then(Instant::calendar);
     match at {
         Some(at) => format!("; the first of them ages out at {at}"),
         None => "; when it frees up depends on when those calls were made, which the aggregator does not record".to_owned(),
@@ -241,7 +241,10 @@ fn frees_up(spent: &Spent) -> String {
 fn rested(indexer: &IndexerUse) -> Problem {
     let account = match &indexer.rested_until {
         Some(until) => {
-            format!("its aggregator has stopped querying it until {until} after repeated failures")
+            format!(
+                "its aggregator has stopped querying it until {} after repeated failures",
+                until.said()
+            )
         }
         None => format!(
             "every one of its {} searches in the window failed",

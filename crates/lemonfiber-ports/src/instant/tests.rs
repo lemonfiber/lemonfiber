@@ -1,4 +1,7 @@
-use super::{kept, kept_option, read, written, Duration, Instant, SystemTime, DAY, UNIX_EPOCH};
+use super::{
+    kept, kept_option, read, until_adapters_answer_integers, written, Duration, Instant,
+    SystemTime, DAY, UNIX_EPOCH,
+};
 
 /// A moment with every field in it, so a formatter that dropped one would show.
 const STAMPED: &str = "2026-08-17T21:04:09";
@@ -149,6 +152,48 @@ fn a_kept_instant_refuses_what_is_none_of_them() {
     assert_eq!(record(r#"{"at": "yesterday"}"#), None);
     assert_eq!(record(r#"{"at": "2026-08-17T00:00:00+02:00"}"#), None);
     assert_eq!(record(r#"{"at": true}"#), None);
+    assert_eq!(record(r#"{"at": "0001-01-01T00:00:00Z"}"#), None);
+    assert_eq!(record(r#"{"at": -1}"#), None);
+    assert_eq!(record(r#"{"at": 0, "seen": "0001-01-01T00:00:00Z"}"#), None);
+}
+
+#[derive(serde::Deserialize)]
+struct Answer {
+    #[serde(default, deserialize_with = "until_adapters_answer_integers")]
+    at: Option<Instant>,
+}
+
+fn answered(text: &str) -> Result<Option<Instant>, String> {
+    serde_json::from_str::<Answer>(text)
+        .map(|answer| answer.at)
+        .map_err(|error| error.to_string())
+}
+
+#[test]
+fn an_adapter_instant_reads_seconds_iso_text_and_a_system_clock() {
+    let moment = Ok(Some(Instant::from_seconds(1_786_924_800)));
+    assert_eq!(answered(r#"{"at": 1786924800}"#), moment);
+    assert_eq!(answered(r#"{"at": "2026-08-17T00:00:00Z"}"#), moment);
+    assert_eq!(
+        answered(r#"{"at": {"secs_since_epoch": 1786924800, "nanos_since_epoch": 250000000}}"#),
+        moment
+    );
+    assert_eq!(answered("{}"), Ok(None));
+    assert_eq!(answered(r#"{"at": null}"#), Ok(None));
+    assert_eq!(answered(r#"{"at": ""}"#), Ok(None));
+    assert_eq!(
+        answered(r#"{"at": "0001-01-01T00:00:00.0000000Z"}"#),
+        Ok(None)
+    );
+}
+
+#[test]
+fn an_adapter_instant_refuses_what_is_none_of_them() {
+    assert!(answered(r#"{"at": "yesterday"}"#).is_err());
+    assert!(answered(r#"{"at": {"nanos_since_epoch": 0}}"#).is_err());
+    assert!(answered(r#"{"at": true}"#).is_err());
+    assert!(answered(r#"{"at": -1}"#).is_err());
+    assert!(answered(r#"{"at": {"secs_since_epoch": -1}}"#).is_err());
 }
 
 #[test]
