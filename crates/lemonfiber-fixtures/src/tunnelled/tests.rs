@@ -31,3 +31,53 @@ fn a_dropped_device_carries_no_default_route_until_it_is_back_up() {
         "default via 10.8.0.1 dev tun0 proto static"
     );
 }
+
+/// An image with no `ip` answers as a missing program, a device that will not move refuses
+/// to go down, and a restore that fails refuses to come back up.
+#[test]
+fn a_missing_ip_a_fixed_device_and_a_failing_restore_each_refuse() {
+    let argv = |args: &[&str]| args.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let vpn = || vec![Behavior::up("vpn", Some("10.8.0.2"))];
+
+    let unlinked = Fake::new(vpn());
+    assert_eq!(
+        unlinked.answer_ip(&argv(&["ip", "route"])).status,
+        Some(127)
+    );
+
+    let fixed = Fake::linked(
+        vpn(),
+        Link {
+            movable: false,
+            ..Link::holding()
+        },
+    );
+    assert_eq!(
+        fixed
+            .answer_ip(&argv(&["ip", "link", "set", "tun0", "down"]))
+            .status,
+        Some(2)
+    );
+    assert!(!fixed.was_dropped());
+
+    let stuck = Fake::linked(
+        vpn(),
+        Link {
+            restore: Restore::Fails,
+            ..Link::holding()
+        },
+    );
+    assert_eq!(
+        stuck
+            .answer_ip(&argv(&["ip", "link", "set", "tun0", "down"]))
+            .status,
+        Some(0)
+    );
+    assert_eq!(
+        stuck
+            .answer_ip(&argv(&["ip", "link", "set", "tun0", "up"]))
+            .status,
+        Some(2)
+    );
+    assert!(stuck.is_dropped() && stuck.was_dropped());
+}
