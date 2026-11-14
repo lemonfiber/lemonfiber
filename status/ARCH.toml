@@ -18,6 +18,7 @@ requirement = [
   { id = "ARCH-R19", state = "done", evidence = ["crates/lemonfiber/src/carried.rs", "crates/lemonfiber/tests/integration/what_this_binary_carries.rs", "crates/lemonfiber-core/tests/fixtures/frontend/index.html"] },
   { id = "ARCH-R20", state = "done", evidence = [".github/dependabot.yml", ".github/labeler.yml", ".github/workflows/awaiting-maintainer.yml", ".github/workflows/build.yml"] },
   { id = "ARCH-R23", state = "done", evidence = ["crates/lemonfiber-core/src/stack/closure.rs"] },
+  { id = "ARCH-R25", state = "done", evidence = ["crates/lemonfiber-core/src/dashboard/run.rs", "crates/lemonfiber-core/src/dashboard/run/waves.rs", "crates/lemonfiber-core/src/dashboard/run/tests/waves.rs::a_slow_tunnel_is_pending_in_the_first_wave_and_the_summary_is_never_healthy", "crates/lemonfiber-core/src/dashboard/run/tests/waves.rs::a_one_shot_read_waits_for_both_waves", "crates/lemonfiber-api/src/events/live/tests.rs::what_a_source_hands_over_early_is_heard_before_the_rest_of_its_gather"] },
   { id = "ARCH-R27", state = "done", evidence = ["crates/lemonfiber/src/context.rs", "crates/lemonfiber-core/src/platform.rs"] },
   { id = "ARCH-R35", state = "partial", evidence = ["crates/lemonfiber-core/src/platform.rs", "crates/lemonfiber-core/src/config/store.rs"] },
   { id = "ARCH-R36", state = "partial" },

@@ -60,6 +60,7 @@ pub(super) fn front_door(
     let running = match services {
         Panel::Ready(running) => running,
         Panel::Unavailable { reason } => return Panel::unavailable(reason.clone()),
+        Panel::Pending => return Panel::Pending,
     };
     // A record of what is installed that will not read leaves the stack's own services
     // to answer for the door, as the command that shows it does.
@@ -98,7 +99,7 @@ pub(super) fn downloading(transfers: &Panel<Vec<Transfer>>) -> Vec<(String, u8, 
                 (transfer.name.clone(), transfer.progress, moving)
             })
             .collect(),
-        Panel::Unavailable { .. } => Vec::new(),
+        Panel::Unavailable { .. } | Panel::Pending => Vec::new(),
     }
 }
 
@@ -123,7 +124,11 @@ pub(super) fn summarise(
     }
     // Everything the store knows, not only what is raised: a fault that has been
     // flapping is not called fixed the moment it blinks off.
-    Summary::of(reach, &conditions.all(), &now)
+    let summary = Summary::of(reach, &conditions.all(), &now);
+    if egress == Egress::Awaited {
+        return summary.unsettled();
+    }
+    summary
 }
 
 /// What one download's speed was last time it was seen, where it was.
@@ -168,6 +173,7 @@ pub(super) fn egress(vpn: Option<&Panel<Vpn>>) -> Egress {
     match vpn {
         None => Egress::NotApplicable,
         Some(Panel::Unavailable { .. }) => Egress::Unreadable,
+        Some(Panel::Pending) => Egress::Awaited,
         Some(Panel::Ready(vpn)) if vpn.egress_matches => Egress::Behind,
         Some(Panel::Ready(_)) => Egress::Leaking,
     }
@@ -186,7 +192,7 @@ pub(super) fn download_rate(transfers: &Panel<Vec<Transfer>>) -> u64 {
                 Reading::Stale(_) | Reading::Unknown => None,
             })
             .sum(),
-        Panel::Unavailable { .. } => 0,
+        Panel::Unavailable { .. } | Panel::Pending => 0,
     }
 }
 

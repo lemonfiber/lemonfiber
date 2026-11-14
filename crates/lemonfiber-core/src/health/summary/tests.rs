@@ -433,3 +433,24 @@ fn an_acknowledged_item_is_shown_as_acknowledged_and_still_counted() {
         .collect();
     assert_eq!(acknowledged, [("vpn.leak", true), ("disk.full", false)]);
 }
+
+#[test]
+fn a_summary_still_waiting_on_a_source_is_unknown_unless_something_critical_is_known() {
+    let leak = wrong(
+        "vpn.egress",
+        Severity::Critical,
+        "traffic is leaving the tunnel",
+    );
+    assert_eq!(
+        Summary::of(Reach::Running, &[], SETTLED)
+            .unsettled()
+            .standing,
+        Standing::Unknown
+    );
+    assert_eq!(
+        Summary::of(Reach::Running, &[&leak], SETTLED)
+            .unsettled()
+            .standing,
+        Standing::Critical
+    );
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "A panel's content, or the reason its source could not fill it.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live.",
+  "description": "A panel's content, the reason its source could not fill it, or that its source\nis still being read.\n\nThe difference between \"this panel is up to date\" and \"this panel's source is\nunreachable\" is the whole of degrading honestly: an unavailable panel says so,\nin its own words, rather than showing stale data as current or blank data as\nzero — and the panels beside it stay live. A pending panel is neither: its source\nhas not answered within the first wave of a gather, and the second fills it in.",
   "oneOf": [
     {
       "description": "The source answered; here is the panel.",
@@ -46,6 +46,19 @@
       "required": [
         "panel",
         "data"
+      ]
+    },
+    {
+      "description": "The source has not answered yet; a snapshot that follows fills the panel.",
+      "type": "object",
+      "properties": {
+        "panel": {
+          "type": "string",
+          "const": "pending"
+        }
+      },
+      "required": [
+        "panel"
       ]
     }
   ]

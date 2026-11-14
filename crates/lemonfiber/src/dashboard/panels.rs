@@ -102,6 +102,7 @@ pub(super) fn vpn(panel: Option<&Panel<Vpn>>, room: usize) -> Vec<Line<'static>>
     let vpn = match panel {
         Panel::Ready(vpn) => vpn,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     let port = vpn.forwarded_port.map_or_else(
         || Span::styled("no forwarded port", quiet()),
@@ -131,6 +132,7 @@ pub(super) fn transfers(panel: &Panel<Vec<Transfer>>, room: usize) -> Vec<Line<'
     let transfers = match panel {
         Panel::Ready(transfers) => transfers,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     if transfers.is_empty() {
         return vec![Line::styled("nothing is downloading", quiet())];
@@ -226,6 +228,7 @@ pub(super) fn queues(panel: &Panel<Vec<Queue>>, room: usize) -> Vec<Line<'static
     let queues = match panel {
         Panel::Ready(queues) => queues,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     if queues.is_empty() {
         return vec![Line::styled("no service reported a queue", quiet())];
@@ -263,6 +266,7 @@ pub(super) fn storage(panel: &Panel<Storage>, room: usize) -> Vec<Line<'static>>
     let storage = match panel {
         Panel::Ready(storage) => storage,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     let free = match &storage.free {
         Reading::Known(bytes) => Span::raw(format!("{} free", size(*bytes))),
@@ -292,6 +296,7 @@ pub(super) fn services(panel: &Panel<Vec<Service>>, room: usize) -> Vec<Line<'st
     let services = match panel {
         Panel::Ready(services) => services,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     if services.is_empty() {
         return vec![Line::styled("no services are running", quiet())];
@@ -350,6 +355,11 @@ fn unavailable(reason: &str, room: usize) -> Vec<Line<'static>> {
     )]
 }
 
+/// A panel whose source has not answered yet, which the next snapshot fills in.
+fn pending() -> Vec<Line<'static>> {
+    vec![Line::styled("waiting for an answer", quiet())]
+}
+
 /// How many columns a line has taken so far.
 fn width(line: &Line<'static>) -> usize {
     line.spans
@@ -372,6 +382,7 @@ pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Lin
     let report = match panel {
         Panel::Ready(report) => report,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     let phrase = standing(report.standing);
     let mut lines = vec![match &report.service {
@@ -406,6 +417,7 @@ pub(super) fn household(panel: &Panel<HouseholdReport>, room: usize) -> Vec<Line
     let report = match panel {
         Panel::Ready(report) => report,
         Panel::Unavailable { reason } => return unavailable(reason, room),
+        Panel::Pending => return pending(),
     };
     if !report.available {
         // The household is unread when the *media server* would not say who holds an
@@ -461,13 +473,13 @@ fn line(who: &str, title: Option<&str>, state: Option<State>, room: usize) -> Li
 /// What the header reads to say the screen is degraded rather than live — and it
 /// is the panels themselves that decide it, so the two cannot disagree.
 pub(super) fn any_panel_down(snapshot: &Snapshot) -> bool {
-    !snapshot.transfers.is_available()
-        || !snapshot.queue.is_available()
-        || !snapshot.storage.is_available()
-        || !snapshot.services.is_available()
-        || !snapshot.door.is_available()
-        || !snapshot.household.is_available()
-        || snapshot.vpn.as_ref().is_some_and(|vpn| !vpn.is_available())
+    snapshot.transfers.is_unavailable()
+        || snapshot.queue.is_unavailable()
+        || snapshot.storage.is_unavailable()
+        || snapshot.services.is_unavailable()
+        || snapshot.door.is_unavailable()
+        || snapshot.household.is_unavailable()
+        || snapshot.vpn.as_ref().is_some_and(Panel::is_unavailable)
 }
 
 #[cfg(test)]
