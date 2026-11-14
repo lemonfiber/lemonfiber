@@ -1,27 +1,10 @@
 //! `subtitles.fetch` across its contract: one script run against a subtitle finder in
 //! process and through the contract, which must answer alike and be told alike.
 
-use async_trait::async_trait;
 use lemonfiber_ports::media::Kind;
-use lemonfiber_ports::service::{Failure, Subtitles, Watched, Watching};
+use lemonfiber_ports::service::{Subtitles, Watched};
 
-use super::{crosses_alike, fetch, Upstream};
-
-#[async_trait]
-impl Subtitles for Upstream {
-    async fn watching(&self, which: Kind) -> Result<Watching, Failure> {
-        Ok(Watching {
-            enabled: which == Kind::Tv,
-            host: which.media_type().to_owned(),
-            port: 8989,
-            keyed: true,
-        })
-    }
-    async fn watch(&self, watched: &Watched) -> Result<(), Failure> {
-        self.tell(format!("watch {watched:?}"));
-        Ok(())
-    }
-}
+use super::{crosses_alike, fetch};
 
 /// Every operation of the capability, each answer written down.
 async fn script<S: Subtitles>(finder: &S) -> Vec<String> {

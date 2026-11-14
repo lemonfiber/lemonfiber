@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::serving::Serves;
 
 use super::{adapter, failed_at, filing, json_at, posted, read_through, source, FRONTED};
-use crate::ports::http::{Http, Request, Response, Unreachable};
+use crate::ports::http::{Http as _, Response};
 
 fn serving_media() -> String {
     filing(FRONTED, "movies")
@@ -23,45 +22,44 @@ fn serving_media() -> String {
 /// it restarts, where it is handed the path the upstream's container holds it at and the
 /// upstream's copy holds an internal certificate that reads, and everything else as `fake`
 /// does.
-struct Serving {
-    fake: Arc<Fake>,
-    serving: Arc<Serves>,
-}
-
-#[async_trait]
-impl Http for Serving {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if !request.url.ends_with("/serve_tls") {
-            return self.fake.send(request).await;
-        }
-        let held = self
-            .serving
-            .asked()
-            .first()
-            .and_then(|upstream| {
-                upstream
-                    .binds
-                    .iter()
-                    .find(|bound| bound.target == "/config")
+fn serving_tls(fake: &Arc<Fake>, serving: &Arc<Serves>) -> Arc<Fake> {
+    let fake = Arc::clone(fake);
+    let serving = Arc::clone(serving);
+    Fake::handing(move |request| {
+        let fake = Arc::clone(&fake);
+        let serving = Arc::clone(&serving);
+        Box::pin(async move {
+            if !request.url.ends_with("/serve_tls") {
+                return fake.send(&request).await;
+            }
+            let held = serving
+                .asked()
+                .first()
+                .and_then(|upstream| {
+                    upstream
+                        .binds
+                        .iter()
+                        .find(|bound| bound.target == "/config")
+                })
+                .and_then(|bound| {
+                    crate::certificate::internal::kept(&lemonfiber_adapters::Disk, &bound.source)
+                        .ok()
+                        .flatten()
+                });
+            let handed = request
+                .body
+                .as_deref()
+                .and_then(|body| serde_json::from_str::<serde_json::Value>(body).ok())
+                .and_then(|asked| asked.get("path").cloned());
+            let answered = held.is_some()
+                && handed == Some(serde_json::json!("/config/lemonfiber/internal.p12"));
+            Ok(Response {
+                status: if answered { 205 } else { 500 },
+                headers: Vec::new(),
+                body: String::new(),
             })
-            .and_then(|bound| {
-                crate::certificate::internal::kept(&lemonfiber_adapters::Disk, &bound.source)
-                    .ok()
-                    .flatten()
-            });
-        let handed = request
-            .body
-            .as_deref()
-            .and_then(|body| serde_json::from_str::<serde_json::Value>(body).ok())
-            .and_then(|asked| asked.get("path").cloned());
-        let answered =
-            held.is_some() && handed == Some(serde_json::json!("/config/lemonfiber/internal.p12"));
-        Ok(Response {
-            status: if answered { 205 } else { 500 },
-            headers: Vec::new(),
-            body: String::new(),
         })
-    }
+    })
 }
 
 #[tokio::test]
@@ -89,11 +87,7 @@ async fn a_media_server_is_handed_a_throwaway_internal_certificate_where_its_con
         ),
         ("/lemonfiber/media.serve/v1/", vec![json("null")]),
     ]);
-    let http = Arc::new(Serving {
-        fake: Arc::clone(&fake),
-        serving: Arc::clone(&serving),
-    });
-    let read = read_through(&at, &serving, http, Some(7)).await;
+    let read = read_through(&at, &serving, serving_tls(&fake, &serving), Some(7)).await;
     let Ok(read) = read else {
         unreachable!("the plugin reads: {read:?}");
     };

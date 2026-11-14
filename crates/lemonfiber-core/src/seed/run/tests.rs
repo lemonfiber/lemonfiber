@@ -111,7 +111,7 @@ fn seed_ctx(reachable: bool, bytes: Option<Vec<u8>>, env: Option<std::path::Path
         .build()
         .with_http(Fake::silent())
         .with_random(Arc::new(FixedRandom(bytes)));
-    ctx.seams.confined = crate::test_support::media::Keyed::holding(
+    ctx.seams.confined = crate::test_support::media::holding_keys(
         Arc::clone(&ctx.seams.confined),
         &[crate::test_support::media::ADAPTER, REQUESTS.adapter],
     );
@@ -224,10 +224,8 @@ fn curating(ctx: Ctx, keyed: bool) -> Ctx {
     );
     if keyed {
         let adapters: Vec<&str> = ALL.iter().map(|curator| curator.adapter).collect();
-        ctx.seams.confined = crate::test_support::adapted::Keyed::holding(
-            Arc::clone(&ctx.seams.confined),
-            &adapters,
-        );
+        ctx.seams.confined =
+            crate::test_support::adapted::holding_keys(Arc::clone(&ctx.seams.confined), &adapters);
     }
     ctx
 }

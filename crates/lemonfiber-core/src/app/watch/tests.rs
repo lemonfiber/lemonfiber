@@ -1,41 +1,14 @@
-use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-
-use async_trait::async_trait;
 
 use super::{assess, supervise, Availability, Loss, ALREADY_GONE, NOTHING_TO_WATCH};
 use crate::app::Ctx;
 use crate::config::{Protocols, Settings};
 use crate::error::Problem;
 use crate::model::SupervisionReport;
-use crate::ports::filesystem::{Presence, Volume};
+use crate::ports::filesystem::Presence;
 use crate::ports::process::{Failure, Output};
 use crate::test_support::{a_context, spoke, Reporting, Scripted};
-
-/// A volume that answers each check with the next reading a test scripted,
-/// then stays gone once the script runs out.
-struct Drive {
-    readings: Vec<Presence>,
-    cursor: AtomicUsize,
-}
-
-impl Drive {
-    fn playing(readings: Vec<Presence>) -> Self {
-        Self {
-            readings,
-            cursor: AtomicUsize::new(0),
-        }
-    }
-}
-
-#[async_trait]
-impl Volume for Drive {
-    async fn presence(&self, _path: &Path) -> Presence {
-        let at = self.cursor.fetch_add(1, Ordering::Relaxed);
-        self.readings.get(at).copied().unwrap_or(Presence::Gone)
-    }
-}
+use lemonfiber_fixtures::mounted::Drive;
 
 /// A context whose runner answers the stop with `result`, watching the given
 /// data location.
@@ -196,11 +169,7 @@ async fn a_rehearsed_watch_says_what_it_would_guard_and_never_takes_a_second_loo
     .await
     .ok();
 
-    assert_eq!(
-        drive.cursor.load(Ordering::Relaxed),
-        1,
-        "it looked twice, which is watching"
-    );
+    assert_eq!(drive.looked(), 1, "it looked twice, which is watching");
     let would = report.and_then(|report| report.would);
     assert_eq!(
         would

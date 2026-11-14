@@ -1,5 +1,7 @@
 //! Taking a plugin off, and what goes with it.
 
+use lemonfiber_fixtures::heard::Heard;
+
 use super::*;
 
 /// A rehearsed removal on a machine with no stack is refused by the layer that looks
@@ -55,20 +57,9 @@ async fn a_removal_the_disk_refuses_partway_leaves_the_plugin_recorded() {
 
 /// A narrator that notes, as it hears each line, whether the container had already
 /// been taken off by then — which is the whole of what *before* means here.
-struct Heard {
-    runner: Arc<Recording>,
-    said: std::sync::Mutex<Vec<(String, bool)>>,
-}
-
-#[async_trait::async_trait]
-impl crate::ports::Narrator for Heard {
-    async fn say(&self, said: &str) {
-        let already = self.runner.ran("rm");
-        let _ = self
-            .said
-            .lock()
-            .map(|mut heard| heard.push((said.to_owned(), already)));
-    }
+fn heard_beside(runner: &Arc<Recording>) -> Arc<Heard> {
+    let runner = Arc::clone(runner);
+    Arc::new(Heard::watching(move || runner.ran("rm")))
 }
 
 /// What stops is named before anything does, and named by service. The report of a
@@ -82,10 +73,7 @@ async fn what_a_removal_stops_is_said_before_it_stops_it() {
         counted(installing(&ctx, &source("interrupting", PROVING)).await),
         Some(1)
     );
-    let heard = Arc::new(Heard {
-        runner: runner.clone(),
-        said: std::sync::Mutex::new(Vec::new()),
-    });
+    let heard = heard_beside(&runner);
     ctx.narrator = heard.clone();
 
     let gone = removal(removing(&ctx, "komga").await);
@@ -95,13 +83,8 @@ async fn what_a_removal_stops_is_said_before_it_stops_it() {
         Some(vec!["komga".to_owned()]),
         "the report names the service it took away"
     );
-    let said = heard
-        .said
-        .lock()
-        .map(|heard| heard.clone())
-        .unwrap_or_default();
     assert_eq!(
-        said,
+        heard.said_while(),
         vec![(
             "removing komga stops komga — for good, since nothing is left to start again"
                 .to_owned(),
@@ -122,10 +105,7 @@ async fn a_rehearsed_removal_names_what_it_would_stop_and_says_nothing_aloud() {
         counted(installing(&ctx, &source("interrupting-rehearsed", PROVING)).await),
         Some(1)
     );
-    let heard = Arc::new(Heard {
-        runner,
-        said: std::sync::Mutex::new(Vec::new()),
-    });
+    let heard = heard_beside(&runner);
     ctx.narrator = heard.clone();
     ctx.dry_run = true;
 
@@ -136,7 +116,7 @@ async fn a_rehearsed_removal_names_what_it_would_stop_and_says_nothing_aloud() {
         Some(vec!["komga".to_owned()])
     );
     assert_eq!(
-        heard.said.lock().map_or(1, |heard| heard.len()),
+        heard.said().len(),
         0,
         "nothing is said aloud about a stop that is not happening"
     );

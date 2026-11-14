@@ -1,12 +1,8 @@
 //! Installing from a git source: resolved to one commit, fetched as data, recorded.
 
-use std::sync::Mutex;
-
-use async_trait::async_trait;
-
 use super::*;
 use crate::plugin::Source;
-use crate::ports::process::{Failure, Output, Runner};
+use crate::ports::process::Failure;
 
 /// The commit the source's default branch points at.
 const HEAD: &str = "8fa05ba718f70624f2c122f8c0371d47e6c90d0e";
@@ -15,113 +11,7 @@ const HEAD: &str = "8fa05ba718f70624f2c122f8c0371d47e6c90d0e";
 const TAG_OBJECT: &str = "1111111111111111111111111111111111111111";
 const TAGGED: &str = "2222222222222222222222222222222222222222";
 
-/// A git source that serves `MANIFEST`, and everything else answered the way the
-/// default runner answers it.
-pub(super) struct Serving {
-    /// What `git ls-remote` answers, or how it fails.
-    listed: Result<String, String>,
-    /// How the fetch fails, where it does.
-    fetch: Option<String>,
-    /// Every git command it was asked, without the leading `git -c …`.
-    asked: Mutex<Vec<Vec<String>>>,
-    /// The environment each was run with.
-    environments: Mutex<Vec<Vec<(String, String)>>>,
-}
-
-impl Serving {
-    pub(super) fn listing(listed: &str) -> Self {
-        Self {
-            listed: Ok(listed.to_owned()),
-            fetch: None,
-            asked: Mutex::new(Vec::new()),
-            environments: Mutex::new(Vec::new()),
-        }
-    }
-
-    /// The environment each command was run with.
-    fn environments(&self) -> Vec<Vec<(String, String)>> {
-        self.environments
-            .lock()
-            .map(|environments| environments.clone())
-            .unwrap_or_default()
-    }
-
-    pub(super) fn asked(&self) -> Vec<Vec<String>> {
-        self.asked
-            .lock()
-            .map(|asked| asked.clone())
-            .unwrap_or_default()
-    }
-    /// Every directory a commit was checked out into, in the order they were made.
-    pub(super) fn checkouts(&self) -> Vec<std::path::PathBuf> {
-        self.asked()
-            .iter()
-            .filter_map(|one| match one.as_slice() {
-                [init, quiet, at] if init == "init" && quiet == "--quiet" => Some(at.into()),
-                _ => None,
-            })
-            .collect()
-    }
-
-    /// Whether a commit was checked out, and every directory it was checked out into is
-    /// gone.
-    pub(super) fn left_nothing(&self) -> bool {
-        let made = self.checkouts();
-        !made.is_empty() && made.iter().all(|at| !at.exists())
-    }
-}
-
-#[async_trait]
-impl Runner for Serving {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if argv.first().map(String::as_str) != Some("git") {
-            return Ok(spoke(""));
-        }
-        let rest = asked_of(argv);
-        if let Ok(mut asked) = self.asked.lock() {
-            asked.push(rest.clone());
-        }
-        let words: Vec<&str> = rest.iter().map(String::as_str).collect();
-        Ok(match words.as_slice() {
-            ["ls-remote", ..] => match &self.listed {
-                Ok(listed) => spoke(listed),
-                Err(why) => engine_refused(why),
-            },
-            ["init", "--quiet", at] => {
-                let _ = std::fs::create_dir_all(at);
-                spoke("")
-            }
-            ["-C", _, "fetch", ..] => match &self.fetch {
-                Some(why) => engine_refused(why),
-                None => spoke(""),
-            },
-            ["-C", at, "checkout", ..] => {
-                let _ = std::fs::write(Path::new(at).join("plugin.toml"), MANIFEST);
-                spoke("")
-            }
-            _ => spoke(""),
-        })
-    }
-
-    async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
-        if let Ok(mut environments) = self.environments.lock() {
-            environments.push(env.to_vec());
-        }
-        self.run(argv).await
-    }
-}
-
-/// What git was asked, without `git` and the `-c` pairs every command carries.
-pub(super) fn asked_of(argv: &[String]) -> Vec<String> {
-    let mut rest = argv.get(1..).unwrap_or_default();
-    while let [flag, _, after @ ..] = rest {
-        if flag != "-c" {
-            break;
-        }
-        rest = after;
-    }
-    rest.to_vec()
-}
+pub(super) use lemonfiber_fixtures::git::Remote as Serving;
 
 /// A context whose runner is `serving`.
 pub(super) fn served(name: &str, serving: &Arc<Serving>) -> Ctx {
@@ -149,7 +39,7 @@ pub(super) async fn from_git(
 /// and the record keeps the source and that commit.
 #[tokio::test]
 async fn a_git_source_is_installed_at_the_commit_it_serves_and_recorded() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let ctx = served("git-head", &serving);
 
     let installed = report(from_git(&ctx, "https://example.org/plugin-komga").await)
@@ -190,9 +80,10 @@ async fn a_git_source_is_installed_at_the_commit_it_serves_and_recorded() {
 /// A tag is installed at the commit it points at, not at the tag's own object.
 #[tokio::test]
 async fn a_tag_is_installed_at_the_commit_it_points_at() {
-    let serving = Arc::new(Serving::listing(&format!(
-        "{TAG_OBJECT}\trefs/tags/v1.2.0\n{TAGGED}\trefs/tags/v1.2.0^{{}}\n"
-    )));
+    let serving = Arc::new(Serving::listing(
+        &format!("{TAG_OBJECT}\trefs/tags/v1.2.0\n{TAGGED}\trefs/tags/v1.2.0^{{}}\n"),
+        MANIFEST,
+    ));
     let ctx = served("git-tag", &serving);
 
     let installed = report(from_git(&ctx, "https://example.org/plugin-komga@v1.2.0").await)
@@ -204,7 +95,7 @@ async fn a_tag_is_installed_at_the_commit_it_points_at() {
 /// A whole commit needs no asking: nothing is listed, and that commit is fetched.
 #[tokio::test]
 async fn a_whole_commit_is_fetched_without_asking() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = served("git-commit", &serving);
 
     let installed = report(
@@ -226,7 +117,7 @@ async fn a_whole_commit_is_fetched_without_asking() {
 /// A revision the source does not hold is refused before anything is fetched.
 #[tokio::test]
 async fn a_revision_the_source_does_not_hold_is_refused() {
-    let serving = Arc::new(Serving::listing(""));
+    let serving = Arc::new(Serving::listing("", MANIFEST));
     let ctx = served("git-no-revision", &serving);
 
     assert_eq!(
@@ -242,12 +133,7 @@ async fn a_revision_the_source_does_not_hold_is_refused() {
 /// A source that will not answer is refused, and says what git said.
 #[tokio::test]
 async fn a_source_that_will_not_answer_is_refused_with_what_git_said() {
-    let serving = Arc::new(Serving {
-        listed: Err("fatal: repository not found".to_owned()),
-        fetch: None,
-        asked: Mutex::new(Vec::new()),
-        environments: Mutex::new(Vec::new()),
-    });
+    let serving = Arc::new(Serving::unlisted("fatal: repository not found", MANIFEST));
     let ctx = served("git-unreachable", &serving);
 
     let refused = from_git(&ctx, "https://example.org/nothing").await.err();
@@ -265,12 +151,10 @@ async fn a_source_that_will_not_answer_is_refused_with_what_git_said() {
 /// A commit that will not be handed over is refused, and nothing is left behind.
 #[tokio::test]
 async fn a_commit_that_will_not_be_fetched_is_refused_and_leaves_nothing() {
-    let serving = Arc::new(Serving {
-        listed: Ok(format!("{HEAD}\tHEAD\n")),
-        fetch: Some("fatal: couldn't find remote ref".to_owned()),
-        asked: Mutex::new(Vec::new()),
-        environments: Mutex::new(Vec::new()),
-    });
+    let serving = Arc::new(
+        Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST)
+            .unfetched("fatal: couldn't find remote ref"),
+    );
     let ctx = served("git-unfetched", &serving);
 
     assert_eq!(
@@ -299,7 +183,7 @@ async fn a_git_that_cannot_run_is_a_source_that_could_not_be_fetched() {
 /// Fetching from a git source switched off refuses before anything is asked.
 #[tokio::test]
 async fn a_git_source_switched_off_is_refused_before_anything_is_asked() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = served("git-off", &serving);
     ctx.settings.reaching =
         crate::config::Reaching::without(crate::config::REACH_PLUGIN_SOURCE_KEY);
@@ -314,7 +198,7 @@ async fn a_git_source_switched_off_is_refused_before_anything_is_asked() {
 /// A rehearsal of a git install fetches to say what it would do, and leaves nothing.
 #[tokio::test]
 async fn a_rehearsed_git_install_records_nothing_and_leaves_nothing() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = served("git-rehearsed", &serving);
     ctx.dry_run = true;
 
@@ -360,7 +244,7 @@ async fn standings(ctx: &Ctx) -> Vec<crate::plugin::Fetchable> {
 /// and the listing says what asking it said.
 #[tokio::test]
 async fn a_git_source_is_asked_whether_it_still_answers_when_plugins_are_listed() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = served("git-listed", &serving);
     assert_eq!(
         counted(from_git(&ctx, "https://example.org/plugin-komga").await),
@@ -372,12 +256,7 @@ async fn a_git_source_is_asked_whether_it_still_answers_when_plugins_are_listed(
         vec![crate::plugin::Fetchable::Reachable]
     );
 
-    let gone = Arc::new(Serving {
-        listed: Err("fatal: repository not found".to_owned()),
-        fetch: None,
-        asked: Mutex::new(Vec::new()),
-        environments: Mutex::new(Vec::new()),
-    });
+    let gone = Arc::new(Serving::unlisted("fatal: repository not found", MANIFEST));
     ctx.seams.runner = gone.clone();
     assert_eq!(
         standings(&ctx).await,
@@ -395,7 +274,7 @@ async fn a_git_source_is_asked_whether_it_still_answers_when_plugins_are_listed(
 /// says so rather than calling the source unreachable.
 #[tokio::test]
 async fn a_git_source_switched_off_is_not_asked_when_plugins_are_listed() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = served("git-listed-off", &serving);
     assert_eq!(
         counted(from_git(&ctx, "https://example.org/plugin-komga").await),
@@ -403,7 +282,7 @@ async fn a_git_source_switched_off_is_not_asked_when_plugins_are_listed() {
     );
     ctx.settings.reaching =
         crate::config::Reaching::without(crate::config::REACH_PLUGIN_SOURCE_KEY);
-    let quiet = Arc::new(Serving::listing(""));
+    let quiet = Arc::new(Serving::listing("", MANIFEST));
     ctx.seams.runner = quiet.clone();
 
     assert!(matches!(
@@ -456,7 +335,7 @@ async fn a_record_naming_no_source_is_not_asked() {
 /// out into a directory of its own and each removes only its own.
 #[tokio::test]
 async fn two_installs_of_one_commit_at_once_never_share_a_checkout() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = served("git-together", &serving);
     ctx.dry_run = true;
 
@@ -501,7 +380,7 @@ fn a_checkout_is_made_under_lemonfibers_own_data_directory() {
 /// Where the checkout cannot be made, nothing is fetched and the refusal says so.
 #[tokio::test]
 async fn a_checkout_that_cannot_be_made_is_refused_before_anything_is_fetched() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let ctx = served("git-unmade", &serving);
     let data = crate::app::targets::layout(&ctx).map(|paths| paths.data_dir().to_path_buf());
     // A file where the directory checkouts are made in would go.
@@ -523,7 +402,7 @@ async fn a_checkout_that_cannot_be_made_is_refused_before_anything_is_fetched() 
 /// A machine not set up has no data directory to check anything out in.
 #[tokio::test]
 async fn a_machine_not_set_up_has_nowhere_to_check_out() {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
     let mut ctx = a_context().build();
     ctx.seams.runner = serving.clone();
 
@@ -531,32 +410,6 @@ async fn a_machine_not_set_up_has_nowhere_to_check_out() {
         refusal(from_git(&ctx, "https://example.org/plugin-komga").await),
         "CONFIG-3"
     );
-}
-
-/// A git that takes a while to answer, counting how many are asked at once.
-#[derive(Default)]
-struct Slow {
-    /// How many are being asked now.
-    now: std::sync::atomic::AtomicUsize,
-    /// The most that were ever asked at once.
-    most: std::sync::atomic::AtomicUsize,
-}
-
-#[async_trait]
-impl Runner for Slow {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        use std::sync::atomic::Ordering::SeqCst;
-        let now = self.now.fetch_add(1, SeqCst) + 1;
-        self.most.fetch_max(now, SeqCst);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        self.now.fetch_sub(1, SeqCst);
-        let url = asked_of(argv).get(2).cloned().unwrap_or_default();
-        Ok(if url.ends_with("gone") {
-            engine_refused("fatal: repository not found")
-        } else {
-            spoke("")
-        })
-    }
 }
 
 /// Listing what is installed asks the sources a few at a time rather than one after
@@ -584,7 +437,8 @@ async fn sources_are_asked_a_few_at_a_time_and_answered_in_order() {
             })
         })
         .collect();
-    let slow = Arc::new(Slow::default());
+    let slow =
+        Arc::new(Serving::listing("", MANIFEST).slow(std::time::Duration::from_secs(1), "gone"));
     let mut ctx = ctx;
     ctx.seams.runner = slow.clone();
 
@@ -601,9 +455,6 @@ async fn sources_are_asked_a_few_at_a_time_and_answered_in_order() {
         said.get(4).map(|one| &one.standing),
         Some(crate::plugin::Fetchable::Unreachable { .. })
     ));
-    assert_eq!(
-        slow.most.load(std::sync::atomic::Ordering::SeqCst),
-        super::super::git::AT_ONCE
-    );
+    assert_eq!(slow.most(), super::super::git::AT_ONCE);
     assert!(started.elapsed() < std::time::Duration::from_secs(6));
 }

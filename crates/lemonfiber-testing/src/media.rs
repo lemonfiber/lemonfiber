@@ -16,7 +16,9 @@ use lemonfiber_core::ports::service::{Access, Certificate, Invited, Member, Name
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
-pub use super::adapted::{answered, refused, refusing, taken, unavailable, Keyed, KEY, PORT};
+pub use super::adapted::{
+    answered, holding_keys, refused, refusing, taken, unavailable, KEY, PORT,
+};
 use super::adapted::{asked_at, path_of, Adapted};
 
 /// The plugin the media server moved into.

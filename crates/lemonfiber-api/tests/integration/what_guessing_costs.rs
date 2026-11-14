@@ -213,7 +213,7 @@ async fn the_door_counts_each_device_by_where_it_connected_from() {
 #[tokio::test]
 async fn a_member_signing_in_from_a_guessing_device_still_waits_at_the_operators_door() {
     let path = keeping("member-guessing");
-    let (router, _, _) = door_with(Some(path), AHousehold::knowing("ana-id"), not_the_token());
+    let (router, _, _) = door_with(Some(path), Recognising::knowing("ana-id"), not_the_token());
     let wrong = offering(&chosen().to_uppercase());
 
     for _ in 0..3u8 {
@@ -234,7 +234,7 @@ async fn a_member_signing_in_from_a_guessing_device_still_waits_at_the_operators
 #[tokio::test]
 async fn a_member_back_at_their_own_door_signs_in_while_strangers_are_guessing() {
     let path = keeping("member-during-guessing");
-    let (router, _, _) = door_with(Some(path), AHousehold::knowing("ana-id"), not_the_token());
+    let (router, _, _) = door_with(Some(path), Recognising::knowing("ana-id"), not_the_token());
     let first = offered_from(router.clone(), a_device(2), &offering_as("ana", &hers())).await;
     assert_eq!(first.status, StatusCode::OK, "{}", first.body);
 

@@ -454,7 +454,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
 async fn a_member_the_household_knows_is_let_in_as_that_member() {
     let path = keeping("member-in");
     let (router, _token, admitting) =
-        door_with(Some(path), AHousehold::knowing("a7f3"), Chance::cycling());
+        door_with(Some(path), Recognising::knowing("a7f3"), Chance::cycling());
 
     let answer = asked(
         router,
@@ -485,7 +485,7 @@ async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
     // Two doors and nothing chooses between them. The one that needs no network
     // answers first, so a household that is down cannot keep the operator out.
     let path = keeping("operator-first");
-    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
+    let (router, _, _) = door_with(Some(path), Recognising::unreachable(), Chance::cycling());
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
@@ -502,7 +502,7 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
     // The safe direction, and the honest one: nothing proved anything, so nobody
     // is let in on it.
     let path = keeping("household-down");
-    let (router, _, _) = door_with(Some(path), AHousehold::unreachable(), Chance::cycling());
+    let (router, _, _) = door_with(Some(path), Recognising::unreachable(), Chance::cycling());
 
     let answer = asked(
         router,
@@ -520,7 +520,7 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
 #[tokio::test]
 async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong() {
     let path = keeping("member-unknown");
-    let (router, _, _) = door_with(Some(path), AHousehold::knowing_nobody(), Chance::cycling());
+    let (router, _, _) = door_with(Some(path), Recognising::knowing_nobody(), Chance::cycling());
 
     let stranger = asked(
         router.clone(),
@@ -549,7 +549,7 @@ async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong
 #[tokio::test]
 async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
     let path = keeping("member-withdrawn");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
 
     let answer = asked(
@@ -591,7 +591,7 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
 #[tokio::test]
 async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
     let path = keeping("member-password-changed");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
     let answer = asked(
         router,
@@ -629,7 +629,7 @@ async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
 #[tokio::test]
 async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
     let path = keeping("member-unasked");
-    let household = AHousehold::knowing("a7f3");
+    let household = Recognising::knowing("a7f3");
     let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
     let answer = asked(
         router,

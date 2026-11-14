@@ -29,7 +29,7 @@ async fn a_pasted_key_is_trimmed_before_it_is_proven_and_before_it_is_kept() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -74,7 +74,7 @@ async fn a_credential_proven_is_kept_and_recorded_as_validated() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -115,7 +115,7 @@ async fn a_credential_that_fails_then_passes_on_retry_is_kept() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -143,7 +143,7 @@ async fn a_credential_kept_unverified_records_that_it_was_not_proven() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -173,7 +173,7 @@ async fn a_credential_skipped_leaves_the_indexer_unset() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -200,7 +200,7 @@ async fn no_indexer_is_a_supported_end_and_persists_nothing_before_a_test() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -243,7 +243,7 @@ async fn a_usenet_provider_proven_is_kept_and_recorded_as_validated() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -282,7 +282,7 @@ async fn a_provider_that_fails_then_passes_on_retry_is_kept() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -310,7 +310,7 @@ async fn a_provider_kept_unverified_records_that_it_was_not_proven() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -338,7 +338,7 @@ async fn a_provider_skipped_leaves_usenet_unset() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )
@@ -373,7 +373,7 @@ async fn a_library_only_run_is_never_asked_for_a_credential() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &validator,
         &applying(&paths, STAMPED),
     )

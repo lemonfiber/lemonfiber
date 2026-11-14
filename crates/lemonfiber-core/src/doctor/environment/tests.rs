@@ -1,59 +1,31 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use async_trait::async_trait;
+use lemonfiber_fixtures::support::Keyed;
 
 use super::{
     docker_version, parse_version, Category, Check, EnvironmentCheck, Verdict, API_MISMATCH,
     COMPOSE_UNUSABLE, DAEMON_DOWN, DOCKER_ABSENT,
 };
 use crate::ports::docker::{Origin, Target};
-use crate::ports::process::{Failure, Output, Runner};
+use crate::ports::process::{Failure, Output};
 
-/// A runner that answers each argv with whatever the test scripted for it,
-/// keyed by the program-plus-subcommand so `docker version` and `docker
-/// compose version` can be answered differently in one run.
+/// What each of the two commands this check runs answers, keyed by the program and
+/// subcommand so `docker version` and `docker compose version` can be answered apart in
+/// one run; a command nothing scripted is a program that is not there.
 #[derive(Default)]
 struct Bench {
-    answers: HashMap<String, Result<Output, Failure>>,
+    answers: Vec<(&'static str, Result<Output, Failure>)>,
 }
 
 impl Bench {
-    /// The key an argv is filed under: enough of it to tell the two commands
-    /// this check runs apart.
-    fn key(argv: &[String]) -> String {
-        argv.iter().take(2).cloned().collect::<Vec<_>>().join(" ")
-    }
-
     /// Script the Docker client's answer.
     fn docker(mut self, answer: Result<Output, Failure>) -> Self {
-        self.answers.insert("docker version".to_owned(), answer);
+        self.answers.push(("docker version", answer));
         self
     }
 
     /// Script the Compose plugin's answer.
     fn compose(mut self, answer: Result<Output, Failure>) -> Self {
-        self.answers.insert("docker compose".to_owned(), answer);
+        self.answers.push(("docker compose", answer));
         self
-    }
-}
-
-#[async_trait]
-impl Runner for Bench {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        match self.answers.get(&Self::key(argv)) {
-            Some(Ok(output)) => Ok(output.clone()),
-            Some(Err(Failure::NotFound { program })) => Err(Failure::NotFound {
-                program: program.clone(),
-            }),
-            Some(Err(Failure::Unusable { program, reason })) => Err(Failure::Unusable {
-                program: program.clone(),
-                reason: reason.clone(),
-            }),
-            None => Err(Failure::NotFound {
-                program: argv.first().cloned().unwrap_or_default(),
-            }),
-        }
     }
 }
 
@@ -74,7 +46,9 @@ fn refused(stderr: &str) -> Output {
 }
 
 async fn run(bench: Bench) -> Vec<super::Finding> {
-    EnvironmentCheck::new(Arc::new(bench)).run().await
+    EnvironmentCheck::new(Keyed::by_command(bench.answers, None))
+        .run()
+        .await
 }
 
 /// The verdict for one of the check's two findings, absent only if the check

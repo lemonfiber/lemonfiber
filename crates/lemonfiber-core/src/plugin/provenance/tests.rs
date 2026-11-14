@@ -1,3 +1,4 @@
+use lemonfiber_fixtures::registered::Registered;
 use lemonfiber_ports::registry::{Image, Offered, Unanswerable};
 use ring::rand::SystemRandom;
 use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
@@ -222,26 +223,6 @@ fn one_signature_that_holds_among_several_is_enough() {
     assert!(read.as_ref().is_some_and(Provenance::is_signed), "{read:?}");
 }
 
-/// A registry with one answer, so a whole plugin can be asked about.
-///
-/// One rather than a script: every case here pins a single image, and a script
-/// needs an arm for running out that no case would ever reach.
-struct Answering(Result<Vec<Offered>, Unanswerable>);
-
-#[async_trait::async_trait]
-impl lemonfiber_ports::registry::Registry for Answering {
-    async fn signatures(&self, _image: &Image) -> Result<Vec<Offered>, Unanswerable> {
-        self.0.clone()
-    }
-
-    async fn digest(
-        &self,
-        _tagged: &lemonfiber_ports::registry::Tagged,
-    ) -> Result<Option<String>, Unanswerable> {
-        Ok(None)
-    }
-}
-
 /// A manifest pinning one image, in the shape a plugin's source takes.
 fn manifest() -> Option<lemonfiber_plugin::Manifest> {
     let text = format!(
@@ -279,7 +260,7 @@ criticality = "important"
 async fn read(
     shape: impl FnOnce(&mut lemonfiber_plugin::Manifest),
     keys: &[Key],
-    asking: &Answering,
+    asking: &Registered,
 ) -> Option<Vouched> {
     let mut one = manifest()?;
     shape(&mut one);
@@ -288,7 +269,7 @@ async fn read(
 
 #[tokio::test]
 async fn an_image_nobody_signed_does_not_stop_an_install() {
-    let asking = Answering(Ok(Vec::new()));
+    let asking = Registered::offering(Ok(Vec::new()));
     let read = read(|_| (), &[], &asking).await;
 
     assert_eq!(
@@ -308,7 +289,7 @@ async fn an_image_nobody_signed_does_not_stop_an_install() {
 /// The fixture plugin read against a registry offering one signature we made.
 async fn offered_for(about: &str) -> Option<Vouched> {
     let (key, signature) = signed(about)?;
-    let asking = Answering(Ok(offering(about, signature)));
+    let asking = Registered::offering(Ok(offering(about, signature)));
     read(|_| (), &[key], &asking).await
 }
 
@@ -331,7 +312,7 @@ async fn an_image_whose_signature_does_not_hold_stops_one() {
 /// nothing.
 #[tokio::test]
 async fn a_plugin_that_pins_no_image_is_not_read_as_one_nobody_objects_to() {
-    let asking = Answering(Ok(Vec::new()));
+    let asking = Registered::offering(Ok(Vec::new()));
     let read = read(|one| one.services.clear(), &[], &asking).await;
 
     assert_eq!(read.as_ref().map(|one| one.images.is_empty()), Some(true));

@@ -1,66 +1,20 @@
 //! Where a git source is fetched from: over https, from a host out on the internet,
 //! held to the addresses that were checked.
 
-use std::sync::Mutex;
-
-use async_trait::async_trait;
 use lemonfiber_fixtures::ports::Resolving;
 
 use super::fetching::{from_git, served, Serving};
 use super::*;
-use crate::ports::process::{Failure, Output, Runner};
 
 /// The commit the source's default branch points at.
 const HEAD: &str = "8fa05ba718f70624f2c122f8c0371d47e6c90d0e";
 
-/// A git source, with every command it was run with kept whole, settings included.
-struct Seen {
-    /// The source that answers.
-    serving: Arc<Serving>,
-    /// Every command, as it was run.
-    ran: Mutex<Vec<Vec<String>>>,
-}
-
-impl Seen {
-    /// Seeing every command `serving` answers.
-    fn of(serving: Arc<Serving>) -> Arc<Self> {
-        Arc::new(Self {
-            serving,
-            ran: Mutex::new(Vec::new()),
-        })
-    }
-
-    /// Every command run so far, whole.
-    fn ran(&self) -> Vec<Vec<String>> {
-        self.ran.lock().map(|ran| ran.clone()).unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Runner for Seen {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if let Ok(mut ran) = self.ran.lock() {
-            ran.push(argv.to_vec());
-        }
-        self.serving.run(argv).await
-    }
-
-    async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
-        if let Ok(mut ran) = self.ran.lock() {
-            ran.push(argv.to_vec());
-        }
-        self.serving.run_with(argv, env).await
-    }
-}
-
 /// A context over a git source that serves `HEAD`, resolving every name as `resolving`
 /// says, with every command seen whole.
-fn reaching(name: &str, resolving: &Arc<Resolving>) -> (Ctx, Arc<Seen>, Arc<Serving>) {
-    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n")));
-    let seen = Seen::of(serving.clone());
-    let mut ctx = served(name, &serving).with_resolver(resolving.clone());
-    ctx.seams.runner = seen.clone();
-    (ctx, seen, serving)
+fn reaching(name: &str, resolving: &Arc<Resolving>) -> (Ctx, Arc<Serving>) {
+    let serving = Arc::new(Serving::listing(&format!("{HEAD}\tHEAD\n"), MANIFEST));
+    let ctx = served(name, &serving).with_resolver(resolving.clone());
+    (ctx, serving)
 }
 
 /// A source written with any scheme but https is refused naming it, before a setting is
@@ -68,7 +22,7 @@ fn reaching(name: &str, resolving: &Arc<Resolving>) -> (Ctx, Arc<Seen>, Arc<Serv
 #[tokio::test]
 async fn a_source_not_fetched_over_https_is_refused_naming_its_scheme() {
     let resolving = Resolving::anywhere();
-    let (mut ctx, seen, _) = reaching("reach-scheme", &resolving);
+    let (mut ctx, seen) = reaching("reach-scheme", &resolving);
     ctx.settings.reaching =
         crate::config::Reaching::without(crate::config::REACH_PLUGIN_SOURCE_KEY);
 
@@ -98,7 +52,7 @@ async fn a_source_not_fetched_over_https_is_refused_naming_its_scheme() {
 #[tokio::test]
 async fn a_source_standing_for_an_address_here_is_refused_and_git_is_not_run() {
     let resolving = Resolving::standing_for(&[std::net::IpAddr::from([169, 254, 169, 254])]);
-    let (ctx, seen, _) = reaching("reach-here", &resolving);
+    let (ctx, seen) = reaching("reach-here", &resolving);
 
     let refused = from_git(&ctx, "https://metadata.example/plugin-komga").await;
 
@@ -112,7 +66,7 @@ async fn a_source_standing_for_an_address_here_is_refused_and_git_is_not_run() {
 #[tokio::test]
 async fn every_command_an_install_runs_is_held_to_the_addresses_checked() {
     let resolving = Resolving::anywhere();
-    let (ctx, seen, serving) = reaching("reach-pinned", &resolving);
+    let (ctx, serving) = reaching("reach-pinned", &resolving);
 
     let installed = from_git(&ctx, "https://example.org/plugin-komga").await;
 
@@ -121,7 +75,7 @@ async fn every_command_an_install_runs_is_held_to_the_addresses_checked() {
         "http.curloptResolve=example.org:443:{}",
         lemonfiber_fixtures::ports::ANYWHERE
     );
-    let ran: Vec<Vec<String>> = seen
+    let ran: Vec<Vec<String>> = serving
         .ran()
         .into_iter()
         .filter(|argv| argv.first().map(String::as_str) == Some("git"))
@@ -150,7 +104,7 @@ async fn every_command_an_install_runs_is_held_to_the_addresses_checked() {
 #[tokio::test]
 async fn listing_what_is_installed_resolves_nothing() {
     let resolving = Resolving::anywhere();
-    let (ctx, _, _) = reaching("reach-listed", &resolving);
+    let (ctx, _) = reaching("reach-listed", &resolving);
     assert_eq!(
         counted(from_git(&ctx, "https://example.org/plugin-komga").await),
         Some(1)

@@ -32,7 +32,7 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
     );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
-        &FakeService::with_clients(Mode::Normal, existing),
+        &Receiving::with_clients(Mode::Normal, existing),
         "sonarr",
         &[client("qBittorrent", "qbittorrent", 8080)],
         &mut journal,
@@ -88,7 +88,7 @@ async fn seed_clients_probed(
         Instant::from_seconds(1),
     );
     let mut records = Baseline::new();
-    let base = FakeService::with_clients(Mode::Normal, existing);
+    let base = Receiving::with_clients(Mode::Normal, existing);
     let service = match probes {
         Some(probes) => base.probing(probes),
         None => base,

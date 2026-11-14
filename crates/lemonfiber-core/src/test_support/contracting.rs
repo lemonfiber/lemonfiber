@@ -36,9 +36,7 @@ pub(crate) fn gated(
 ) -> crate::app::Ctx {
     let ctx = contracted_beside(ctx, project, crate::app::gating::SERVICE);
     let http = std::sync::Arc::clone(&ctx.seams.http);
-    ctx.with_http(std::sync::Arc::new(
-        guards::Serving::beside(http).gate(gate),
-    ))
+    ctx.with_http(guards::Serving::beside(http).gate(gate).transport())
 }
 
 /// `ctx` reaching `decline` as [`super::a_contracted_decline`] does: its key written in
@@ -51,9 +49,7 @@ pub(crate) fn declined(
 ) -> crate::app::Ctx {
     let ctx = contracted_beside(ctx, project, crate::app::invite::declining::SERVICE);
     let http = std::sync::Arc::clone(&ctx.seams.http);
-    ctx.with_http(std::sync::Arc::new(
-        guards::Serving::beside(http).decline(decline),
-    ))
+    ctx.with_http(guards::Serving::beside(http).decline(decline).transport())
 }
 
 /// `ctx` with `service` keyed in `project` and running on loopback [`CONTRACTED_PORT`]
@@ -64,10 +60,9 @@ fn contracted_beside(
     service: &str,
 ) -> crate::app::Ctx {
     contracted_key(project, service);
-    ctx.seams.engine = std::sync::Arc::new(guards::Alongside::new(
-        std::sync::Arc::clone(&ctx.seams.engine),
-        contracted_engine(&[service]),
-    ));
+    ctx.seams.engine = std::sync::Arc::new(
+        contracted_engine(&[service]).over(std::sync::Arc::clone(&ctx.seams.engine)),
+    );
     ctx
 }
 
