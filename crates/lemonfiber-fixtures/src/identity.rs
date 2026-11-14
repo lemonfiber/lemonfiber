@@ -253,13 +253,7 @@ fn establish(fake: &RequestSetup, _source: &IdentitySource) -> Result<(), Failur
 
 /// How `RequestSetup` answers `initialized`.
 fn initialized(fake: &RequestSetup) -> Result<bool, Failure> {
-    let count = match fake.calls.lock() {
-        Ok(mut calls) => {
-            *calls += 1;
-            *calls
-        }
-        Err(_) => 0,
-    };
+    let count = crate::counted(&fake.calls);
     if count <= 1 {
         RequestSetup::reading(&fake.gate)
     } else {

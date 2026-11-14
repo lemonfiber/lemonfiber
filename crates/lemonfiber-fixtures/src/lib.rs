@@ -17,6 +17,14 @@
 //! Every test double of a port lives here; an architecture test refuses one written
 //! anywhere else.
 
+/// One more call counted into `counter`, answering the count, or 0 where its lock is poisoned.
+pub(crate) fn counted(counter: &std::sync::Mutex<u32>) -> u32 {
+    counter.lock().map_or(0, |mut calls| {
+        *calls += 1;
+        *calls
+    })
+}
+
 /// Record one thing a fake was asked to do, where the lock is still good.
 ///
 /// A poisoned lock means a test already failed somewhere else and is unwinding; a

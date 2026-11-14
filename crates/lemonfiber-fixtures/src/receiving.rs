@@ -231,13 +231,7 @@ fn set_client_field(
 
 /// How `Receiving` answers `download_clients`.
 fn download_clients(fake: &Receiving) -> Result<Vec<RegisteredClient>, Failure> {
-    let count = match fake.reads.lock() {
-        Ok(mut reads) => {
-            *reads += 1;
-            *reads
-        }
-        Err(_) => 0,
-    };
+    let count = crate::counted(&fake.reads);
     match fake.mode {
         Mode::Down => Err(down("sonarr")),
         Mode::RefusesList => Err(Failure::Unauthorised {
@@ -276,13 +270,7 @@ fn register_root_folder(fake: &Receiving, folder: &RootFolder) -> Result<(), Fai
 
 /// How `Receiving` answers `root_folders`.
 fn root_folders(fake: &Receiving) -> Result<Vec<RegisteredFolder>, Failure> {
-    let count = match fake.reads.lock() {
-        Ok(mut reads) => {
-            *reads += 1;
-            *reads
-        }
-        Err(_) => 0,
-    };
+    let count = crate::counted(&fake.reads);
     match fake.mode {
         Mode::Down => Err(down("sonarr")),
         Mode::RefusesList => Err(Failure::Unauthorised {

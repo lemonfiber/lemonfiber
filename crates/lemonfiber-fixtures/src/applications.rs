@@ -149,13 +149,7 @@ fn rekey_application(
 
 /// How `Applications` answers `applications`.
 fn applications(fake: &Applications) -> Result<Vec<RegisteredApplication>, Failure> {
-    let count = match fake.reads.lock() {
-        Ok(mut reads) => {
-            *reads += 1;
-            *reads
-        }
-        Err(_) => 0,
-    };
+    let count = crate::counted(&fake.reads);
     match fake.mode {
         Mode::Down => Err(down("prowlarr")),
         Mode::RefusesList => Err(Failure::Unauthorised {
