@@ -788,8 +788,10 @@
             "type": "string"
           },
           "until": {
-            "description": "When it stops being one, written as every other instant this product writes.",
-            "type": "string"
+            "description": "When it stops being one.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -886,7 +888,9 @@
           },
           "onset": {
             "description": "When the stack first saw it wrong since it last saw it right, in whole\nseconds since the epoch.\n\nThe condition's own stamp, kept between runs, so every surface that reports\nthe check names the same moment and a restart does not make an old fault new.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "remedies": {
             "description": "What to do about it, most likely first.",
@@ -1498,8 +1502,10 @@
         "description": "The record written inside an archive, and read back to decide a restore.\n\nEverything a restore needs to know before it overwrites anything: what made\nthe archive, when, what data root it was taken against, what it covers, whether\nit is sensitive, and the contents to list. Round-trips through JSON so the same\nvalue the capture wrote is the value the restore reads.",
         "properties": {
           "created_at": {
-            "description": "When it was taken. Opaque here; the surface stamps it from the clock.",
-            "type": "string"
+            "description": "When it was taken.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "data_root": {
             "description": "The data root it was taken against, to notice a restore to a different one.",
@@ -2306,9 +2312,10 @@
             "type": "integer"
           },
           "at": {
-            "description": "When it was made, as whole seconds since the Unix epoch, written in decimal.\n\nA string of digits rather than a number, because it is the stamp the record keeps\nand a stamp is compared and stored as text; what it counts is stated here so a\nreader can turn it into a time without guessing at a format.\n\n**`0` means the clock was unreadable when the change was written**, not that it\nwas made at the epoch: it is how a machine whose clock would not answer stamps a\nchange. It is not an instant, so two changes both stamped `0` were not made at\nthe same moment, and a reader showing it as a date in 1970 would be inventing\none.",
-            "pattern": "^[0-9]+$",
-            "type": "string"
+            "description": "When it was made, in whole seconds since the Unix epoch.\n\n**`0` means the clock was unreadable when the change was written**, not that it\nwas made at the epoch: it is how a machine whose clock would not answer stamps a\nchange. Two changes both stamped `0` were not made at the same moment, and a\nreader showing it as a date in 1970 would be inventing one.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "because": {
             "description": "Why it could not go further, where it could not.",
@@ -3197,8 +3204,13 @@
         "description": "A credential of another service granted to a third-party plugin, named by the setting it\nis held under and never by its value.",
         "properties": {
           "at": {
-            "description": "When the operator approved it.",
-            "type": "string"
+            "description": "When the operator approved it, where the record says.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "credential": {
             "description": "The setting the credential is held under, as the inventory names it.",
@@ -3221,8 +3233,7 @@
           "plugin",
           "credential",
           "of",
-          "for",
-          "at"
+          "for"
         ],
         "type": "object"
       },
@@ -3597,7 +3608,9 @@
           },
           "expires": {
             "description": "When it stops standing, one minute after it was issued.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -4782,8 +4795,10 @@
           },
           "onset": {
             "description": "When the stack first saw this check wrong since it last saw it right, in whole\nseconds since the epoch.\n\nSet after the run from the store of conditions, like [`Self::said`], so it is\nthe moment the health summary names for the same check and a restart does not\nmove it. Absent where the finding says nothing is wrong, and where the checks\nran for something other than a diagnosis.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -5033,7 +5048,7 @@
             "type": "object"
           },
           {
-            "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, in seconds since the epoch, so a figure\nnobody can refresh is at least dated.",
+            "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, so a figure nobody can refresh is at least\ndated.",
             "properties": {
               "as": {
                 "const": "as_of",
@@ -5537,9 +5552,11 @@
             "type": "array"
           },
           "issued": {
-            "description": "When a code was first issued for them, as an instant. Absent until one is.",
+            "description": "When a code was first issued for them. Absent until one is.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -5616,8 +5633,10 @@
           },
           "last_seen": {
             "description": "When the media server last heard from it, where it says.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           }
@@ -6217,9 +6236,11 @@
             "type": "boolean"
           },
           "last_seen": {
-            "description": "When the media server last saw them, as it timestamps it. Absent where nobody\nhas ever signed in, which is exactly the unclaimed invitations.",
+            "description": "When the media server last saw them. Absent where nobody has ever signed in,\nwhich is exactly the unclaimed invitations.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -6900,8 +6921,10 @@
         "description": "A key minted as a claim: the link that collects it, and no secret.",
         "properties": {
           "lapses": {
-            "description": "When the claim stops collecting the key, written as every other instant is.",
-            "type": "string"
+            "description": "When the claim stops collecting the key.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "link": {
             "description": "The key link: `lemonfiber://key` with the address, the certificate fingerprint,\nthe stack, when the claim lapses and the claim. Shown once, and drawn as a code.",
@@ -7620,19 +7643,25 @@
           },
           "registered": {
             "description": "When it was registered.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "revoked": {
             "description": "When it was revoked, where it has been.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
           "used": {
             "description": "When it last proved a mint, where it has.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           }
@@ -7655,7 +7684,9 @@
           },
           "minted": {
             "description": "When it was minted.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "name": {
             "description": "The name it was minted under.",
@@ -7674,8 +7705,10 @@
           },
           "revoked": {
             "description": "When it was revoked, where it has been.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -7689,8 +7722,10 @@
           },
           "used": {
             "description": "When it was last admitted, where it has been.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           }
@@ -7718,7 +7753,9 @@
           },
           "registered": {
             "description": "When it was registered.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -7826,13 +7863,6 @@
       "LogLine": {
         "description": "One line of output from one service, and how bad it says it is.\n\nWhat a machine-readable surface hands on, rather than the engine's line alone, so\na consumer can mark the lines that say they failed, or find the first of them,\nwithout reading the text for itself — a second reading of severity would be a\nsecond answer, and the two would disagree about some service's spelling.",
         "properties": {
-          "at": {
-            "description": "When the container itself says it wrote the line, where it said so.\n\nKept verbatim and unparsed. Containers disagree with the host clock and\nwith each other, and the only defensible ordering is each container's own\naccount of itself — which a reader can only apply if it is carried\nrather than replaced by an arrival time.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "level": {
             "anyOf": [
               {
@@ -7851,6 +7881,13 @@
           "service": {
             "description": "The Compose service it came from.",
             "type": "string"
+          },
+          "stamped": {
+            "description": "The container's own text stamped on the line, where it stamped one: not one\nof lemonfiber's instants.\n\nKept verbatim and unparsed. Containers disagree with the host clock and\nwith each other, and the only defensible ordering is each container's own\naccount of itself — which a reader can only apply if it is carried\nrather than replaced by an arrival time.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "stream": {
             "$ref": "#/components/schemas/Stream",
@@ -7997,8 +8034,10 @@
           },
           "frees_up": {
             "description": "When the count next lets go of something, so one more becomes possible.\n\nAbsent where nothing limits them, and where the request service's own dates\ncould not be read — an invented one would be a promise about a day on which\nnothing happens. The period is a window that rolls rather than a month that\nends, so this is the moment their earliest counted request ages out.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -8027,16 +8066,20 @@
         "description": "One thing a household member asked for, and where it stands in their words.",
         "properties": {
           "arrived": {
-            "description": "When the title arrived on the media server, as the request service timestamps it.\nAbsent, not null, until it is there.",
+            "description": "When the title arrived on the media server, as the request service says. Absent,\nnot null, until it is there.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
           "asked": {
             "description": "When it was asked for, where the request service or the core says.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -8680,7 +8723,9 @@
           },
           "onset": {
             "description": "When the stack first saw it wrong since it last saw it right, in whole seconds\nsince the epoch.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -8718,7 +8763,9 @@
           },
           "onset": {
             "description": "When the stack first saw it wrong since it last saw it right, in whole seconds\nsince the epoch: the same moment the health summary names for it.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "summary": {
             "description": "What is wrong, in one line.",
@@ -8737,8 +8784,10 @@
         "properties": {
           "asked": {
             "description": "When it was asked for, where that is known.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -9757,8 +9806,10 @@
             "type": "string"
           },
           "until": {
-            "description": "When it stops being good, as a date and a time of day.",
-            "type": "string"
+            "description": "When it stops being good.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "written": {
             "description": "The material as the one line a code carries and a person types.",
@@ -9782,7 +9833,7 @@
             "type": "string"
           },
           "expires": {
-            "description": "When the material stops being good, in seconds since the Unix epoch.",
+            "description": "When the material stops being good.",
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
@@ -10368,9 +10419,12 @@
         "description": "Where a refusal's words were carried, and when.",
         "properties": {
           "at": {
-            "description": "When the attempt was made, absent where the clock could not be written down.",
+            "default": null,
+            "description": "When the attempt was made, absent on a record kept without one.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -11060,8 +11114,13 @@
         "description": "A credential of another service the operator granted a third-party plugin, named by\nthe setting it is held under and never by its value.",
         "properties": {
           "at": {
-            "description": "When the operator approved it, as the record stamps every change.",
-            "type": "string"
+            "description": "When the operator approved it, as the record stamps every change.\nAbsent on an offer's account of a grant, which nobody has approved yet.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "credential": {
             "description": "The setting the credential is held under, as the credentials read names it.",
@@ -11079,8 +11138,7 @@
         "required": [
           "credential",
           "of",
-          "for",
-          "at"
+          "for"
         ],
         "type": "object"
       },
@@ -11297,9 +11355,13 @@
             "type": "array"
           },
           "installed_at": {
-            "default": "",
-            "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
-            "type": "string"
+            "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Absent where the record predates\nit, and on an offer's account of what installing would record, which is not yet\nstamped.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "manifest": {
             "default": "",
@@ -11516,8 +11578,10 @@
         "description": "One answer a plugin's adapter gave outside a contract it speaks.",
         "properties": {
           "at": {
-            "description": "When it answered so, as RFC 3339.",
-            "type": "string"
+            "description": "When it answered so.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "capability": {
             "description": "The capability it was asked as.",
@@ -14185,9 +14249,12 @@
         "description": "What was said when one request was turned down.",
         "properties": {
           "at": {
-            "description": "When it was turned down, so somebody reading it later knows which answer this\nwas rather than assuming it is the newest.\n\nAbsent where the machine's clock could not be written as a date, which is a\nrefusal worth keeping the words of and not worth losing them over.",
+            "default": null,
+            "description": "When it was turned down, so somebody reading it later knows which answer this\nwas rather than assuming it is the newest. Absent on a record kept without one.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -14239,7 +14306,9 @@
           },
           "registered": {
             "description": "When it was registered.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -14264,7 +14333,9 @@
           },
           "registered": {
             "description": "When it was registered.",
-            "type": "string"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "rehearsed": {
             "description": "Whether this was a rehearsal: what registering would come to, with nothing kept.",
@@ -18640,8 +18711,10 @@
         "description": "What a reader needs to know before reading a word of the bundle.\n\nAn operator pasting last week's bundle into this week's thread is the commonest way one\nof those threads goes wrong, and nothing in the contents tells either of them.",
         "properties": {
           "at": {
-            "description": "When, as a service writes a moment.",
-            "type": "string"
+            "description": "When it was written.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
           "lemonfiber": {
             "description": "The lemonfiber that wrote it.",
@@ -19263,8 +19336,13 @@
         "description": "One moment in a traced item's history: what happened and when. Where [`TraceStage`]\nis the linear progress, this is the log a curator kept — the grabs, the failed\ndownloads, the import and any later removal — so a repeated attempt is seen as the\npattern it is rather than flattened to a single furthest stage.",
         "properties": {
           "at": {
-            "description": "When the service reported it.",
-            "type": "string"
+            "description": "When it happened, where the service reported it.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "outcome": {
             "$ref": "#/components/schemas/TraceOutcome",
@@ -19272,8 +19350,7 @@
           }
         },
         "required": [
-          "outcome",
-          "at"
+          "outcome"
         ],
         "type": "object"
       },
@@ -19388,8 +19465,10 @@
         "properties": {
           "at": {
             "description": "When it happened, as the service reported it — absent for a stage inferred\nrather than timed, such as being monitored.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -20702,8 +20781,10 @@
         "properties": {
           "attestation_status": {
             "description": "When the snapshot of Google's attestation status list this build carries was\ntaken, which an Android device key's chain is checked against; nothing where it\ndoes not read.",
+            "format": "uint64",
+            "minimum": 0,
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -29919,9 +30000,11 @@
                 "properties": {
                   "at": {
                     "default": null,
-                    "description": "The stamp of the run to put back, as the history writes it.",
+                    "description": "When the run to put back was made, as the history writes it.",
+                    "format": "uint64",
+                    "minimum": 0,
                     "type": [
-                      "string",
+                      "integer",
                       "null"
                     ]
                   }
