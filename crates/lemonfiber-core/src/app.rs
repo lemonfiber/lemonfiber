@@ -243,12 +243,8 @@ async fn reclaimed(ctx: &Ctx, asked: Reclaiming) -> Result<Outcome, Box<Problem>
 }
 
 /// What letting one completed download go costs, and what became of letting it.
-async fn letting(
-    ctx: &Ctx,
-    download: String,
-    agreement: Option<String>,
-) -> Result<Outcome, Box<Problem>> {
-    letting::stop_seeding(ctx, download, agreement)
+async fn letting(ctx: &Ctx, asked: LettingGo) -> Result<Outcome, Box<Problem>> {
+    letting::stop_seeding(ctx, asked.download, asked.agreement)
         .await
         .map(Outcome::StopSeeding)
 }
@@ -273,13 +269,8 @@ async fn traced(ctx: &Ctx, tracing: Tracing) -> Result<Outcome, Box<Problem>> {
 }
 
 /// The bundle a support request asks for, gathered and put where it was asked for.
-async fn bundled(
-    ctx: &Ctx,
-    wanted: crate::bundle::run::Wanted,
-    write_it: bool,
-    dest: crate::app::support::Destination,
-) -> Result<Outcome, Box<Problem>> {
-    support::run(ctx, &wanted, write_it, &dest)
+async fn bundled(ctx: &Ctx, asked: Gathering) -> Result<Outcome, Box<Problem>> {
+    support::run(ctx, &asked.wanted, asked.write, &asked.dest)
         .await
         .map(Outcome::Bundle)
 }
@@ -475,10 +466,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // answered by the offer's own name. Apart from the account rather than an
         // argument to it, because a yes to reclaiming what costs nothing is not a yes
         // to losing a ratio a tracker keeps somebody's account on.
-        Command::StopSeeding(LettingGo {
-            download,
-            agreement,
-        }) => letting(ctx, download, agreement).await,
+        Command::StopSeeding(asked) => letting(ctx, asked).await,
         // And the same shape over the line rather than the disk: asked nothing it
         // reads, asked for a limit it declares one and tells every client.
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
@@ -500,11 +488,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // touches nothing; confirmed it takes those steps behind a backup.
         Command::Update(asked) => update::update(ctx, asked).await.map(Outcome::Update),
         Command::Backup { service } => backup::backup(ctx, service).await.map(Outcome::Backup),
-        Command::Support(Gathering {
-            write,
-            wanted,
-            dest,
-        }) => bundled(ctx, wanted, write, dest).await,
+        Command::Support(asked) => bundled(ctx, asked).await,
         Command::Archives => archives::archives(ctx).await.map(Outcome::Archives),
         Command::Restore(restoring) => restored(ctx, restoring).await,
     }

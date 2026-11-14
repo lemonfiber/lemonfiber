@@ -92,19 +92,6 @@ pub(crate) struct Lines {
 
 impl Lines {
     /// Lines for something that will parse them, which go out exactly as produced.
-    ///
-    /// Neither made plain nor folded. Both of those are decisions about what a
-    /// person's terminal can show, and there is no person here — and both of them
-    /// damage this: the fold writes a curly quote as `"`, which inside a JSON string
-    /// is not a character but the end of it, so a release name containing one would
-    /// arrive as something that will not parse at all.
-    ///
-    /// What made it safe was said to be the serialising, on the grounds that JSON escapes
-    /// every control character. It escapes the ones below a space. The C1 controls, the
-    /// line separators, the bidirectional overrides and the zero-widths are carried raw,
-    /// and each of those is an instruction to the terminal these lines are commonly
-    /// printed to — so [`say::emitted`](crate::say) writes them out on the way through,
-    /// which changes what a terminal reads and not what a parser does.
     pub(crate) fn for_a_parser() -> Self {
         Self {
             said: Vec::new(),
@@ -528,15 +515,6 @@ fn verdict(review: &Review, rehearsed: bool) -> Vec<String> {
 }
 
 /// One log line, as it should reach a terminal.
-///
-/// A log line is the least trustworthy text this product shows: it is written by somebody else's
-/// container, verbatim, and a container that emits `\x1b[2J` clears the operator's screen.
-/// Everything else rendered here goes through [`Lines::put`] and is made plain on the way; a stream
-/// has no report to build, so it would otherwise be the one line that skipped it.
-///
-/// The service is made plain before it is padded rather than after, so a container
-/// whose name carries control characters cannot push the column out of true — the
-/// width has to be counted on what will actually be drawn.
 pub(crate) fn logged(service: &str, line: &str) -> String {
     format!(
         "{:<12} {}",

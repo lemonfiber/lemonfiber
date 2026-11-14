@@ -208,12 +208,6 @@ pub const STORED: &str = "/api/stored";
 pub const UPDATE: &str = "/api/update";
 
 /// Every credential this stack holds, with none of their values.
-///
-/// The reading half of the word and nothing else: the two things that can be asked
-/// of a line of it — replacing one, printing one — are not offered here at all. A
-/// reveal over this door would put a credential through a browser, a proxy log and
-/// whatever is caching in between, which is exactly the disclosure the inventory
-/// itself is shaped to make impossible.
 pub const CREDENTIALS: &str = "/api/credentials";
 
 /// What the operator is told about, and what each preset means.
@@ -299,15 +293,6 @@ pub(crate) const BACKUPS: &str = "/api/backups";
 pub const LOGS: &str = "/api/logs";
 
 /// One support bundle this run kept, handed over whole.
-///
-/// The other read with no command below, and for a plainer reason than the logs
-/// have: what it answers with is a file rather than a value, and no envelope holds
-/// one. Which file is the core's to decide, from the name in this path and the
-/// directory it keeps bundles in.
-///
-/// The name is a path segment rather than a parameter, so a browser saving the
-/// answer reads the name off the address it asked at — and this surface never has
-/// to quote a name a request supplied into a header.
 pub const BUNDLE: &str = "/api/bundle/{name}";
 
 /// The reads a name reaches, in the order the endpoints declare them.
@@ -428,10 +413,6 @@ impl Wanted {
 }
 
 /// What a read was given, or why the request cannot be read as it stands.
-///
-/// The one door a query string goes through. Which parameters a read takes is
-/// [`asked`]'s, named by the path the read is served at, so a read that takes none
-/// refuses a parameter by the same rule as one that takes three.
 ///
 /// # Errors
 ///
