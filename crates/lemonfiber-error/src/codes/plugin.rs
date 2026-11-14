@@ -1,9 +1,11 @@
 pub mod authoring;
 pub mod conforming;
+pub mod forming;
 pub mod pinned;
 
 pub use authoring::*;
 pub use conforming::*;
+pub use forming::*;
 pub use pinned::*;
 
 codes! {
@@ -537,16 +539,5 @@ codes! {
             the message names both.",
         remedy: "Remove the other plugin first, or install a version of this one whose was \
             names the variable its own setting was kept under.",
-    }
-    /// Raised when a plugin's manifest names a form the stack does not declare.
-    UNDECLARED_FORM = "PLUGIN-52" {
-        severity: Error,
-        status: 400,
-        since: "0.18.0",
-        meaning: "A plugin's services join the forms its manifest names, and it names one or \
-            more this stack does not declare, so they would join nothing there. Nothing was \
-            written; the message names each form and the ones the stack declares.",
-        remedy: "Install a version of the plugin whose forms are among the ones this stack \
-            declares, which lemonfiber forms lists.",
     }
 }
