@@ -23,6 +23,9 @@ use crate::config::Protocols;
 use crate::error::codes::form::{FORMS_CONFLICT, NOTHING_TO_RUN, NO_FORM_NAMED, NO_SUCH_FORM};
 use crate::error::{Code, Diagnose, Problem, Remedy, State};
 
+mod joining;
+pub use joining::{joined, Joining, Vanished};
+
 /// Every refusal naming the forms a run starts answers with, which a client names by its
 /// code.
 pub const REFUSALS: [Code; 3] = [NO_FORM_NAMED, NO_SUCH_FORM, FORMS_CONFLICT];
@@ -65,6 +68,10 @@ pub struct Plan {
     #[serde(skip_serializing_if = "Running::unasked")]
     #[schemars(with = "Option<Vec<String>>")]
     pub running: Running,
+    /// Each installed plugin naming a form this stack no longer declares, with those
+    /// forms: a plugin that joins none of the rest does not run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vanished: Vec<Vanished>,
 }
 
 /// Which of a plan's services are already running, as far as anything asked.
@@ -200,6 +207,7 @@ impl Plan {
             filtered: Vec::new(),
             footprint: Footprint::default(),
             running: Running::Unasked,
+            vanished: Vec::new(),
         }
     }
 
@@ -361,6 +369,7 @@ fn planned(
         services,
         dropped,
         running: Running::Unasked,
+        vanished: Vec::new(),
     })
 }
 

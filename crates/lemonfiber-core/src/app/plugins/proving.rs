@@ -23,6 +23,7 @@
 mod declaring;
 mod healthy;
 mod restarting;
+mod waiting;
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -39,6 +40,7 @@ use crate::ports::http::Request;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 pub(in crate::app::plugins) use restarting::Restarted;
+pub(crate) use waiting::waiting;
 
 use super::super::putting_back::Reversal;
 use super::super::Ctx;
@@ -171,6 +173,7 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
         filtered: Vec::new(),
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
+        vanished: Vec::new(),
     };
     build(&plan, &ctx.settings, stack, action, ctx.environment)
 }

@@ -1,9 +1,11 @@
 pub mod authoring;
 pub mod conforming;
+pub mod forming;
 pub mod pinned;
 
 pub use authoring::*;
 pub use conforming::*;
+pub use forming::*;
 pub use pinned::*;
 
 codes! {

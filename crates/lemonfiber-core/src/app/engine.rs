@@ -54,7 +54,7 @@ pub use streaming::{logs, pull_progress, start_progress, started};
 // separate question from what happens to a finding that does.
 #[cfg(test)]
 pub(crate) use diagnosis::quoted;
-pub(crate) use status::status;
+pub(crate) use status::{active, status};
 pub(crate) use switch::switch;
 
 /// Whether the machine the engine runs on has what the stack mounts, where the stack
@@ -520,6 +520,7 @@ pub(super) fn resolved(
         resolve(&manifest, forms, ctx.settings.protocols)
     }
     .map_err(|err| Box::new(err.problem()))?;
+    plan = crate::stack::closure::joined(plan, &manifest, &inflight::joining(ctx));
     let replaced = super::targets::replaced_parts(ctx, &manifest);
     plan.services.retain(|service| !replaced.contains(service));
     Ok((manifest, plan))

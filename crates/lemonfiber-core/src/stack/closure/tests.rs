@@ -534,6 +534,7 @@ fn a_plan_says_what_is_running_only_where_it_was_asked() {
             services: vec!["sonarr".to_owned()],
             dropped: Vec::new(),
             filtered: Vec::new(),
+            vanished: Vec::new(),
             footprint: super::Footprint::default(),
             running,
         };
@@ -550,3 +551,4 @@ fn a_plan_says_what_is_running_only_where_it_was_asked() {
 }
 
 mod beside;
+mod joining;

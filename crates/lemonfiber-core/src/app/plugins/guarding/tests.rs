@@ -376,6 +376,7 @@ fn act(plugin: &str, landed: bool) -> Installs {
             asks: Vec::new(),
             contests: Vec::new(),
             recipes_ran: Vec::new(),
+            awaits: Vec::new(),
             taking: Vec::new(),
             granting: Vec::new(),
             sharing: Vec::new(),

@@ -1,8 +1,8 @@
 //! The environment file Compose reads beside the project, holding only what plain Compose
 //! needs to run there as lemonfiber does: the profiles to start, those of the stack's last
-//! start, which hold the services of the plugins the bundle installs too,
-//! and every other installed plugin's own, and the files to read, the project and the
-//! operator's overlay after it where they wrote one.
+//! start, which hold the services of the first-party plugins too, and the own profile of
+//! every other installed plugin joining a form that start ran, and the files to read, the
+//! project and the operator's overlay after it where they wrote one.
 //!
 //! lemonfiber names its own environment file, its files and its profiles on every
 //! invocation, so Compose never reads this one for lemonfiber. It is what `docker compose
@@ -34,8 +34,8 @@ pub(crate) fn started(ctx: &Ctx, started: &BTreeSet<String>, text: &str) -> Resu
     written(ctx, started, text)
 }
 
-/// Write the profiles of the last start beside the project `text`, with every plugin's
-/// it now holds.
+/// Write the stack's profiles of the last start beside the project `text`, with the own
+/// profile of every installed plugin joining a form that start ran.
 ///
 /// # Errors
 ///
@@ -44,22 +44,40 @@ pub(crate) fn kept(ctx: &Ctx, text: &str) -> Result<(), Failure> {
     let last = super::held_as(ctx, FILE)
         .map(|held| read(&held))
         .unwrap_or_default();
-    written(ctx, &last, text)
+    let stack = last
+        .into_iter()
+        .filter(|profile| !crate::plugin::is_a_plugins(profile))
+        .chain(joining(ctx))
+        .collect();
+    written(ctx, &stack, text)
 }
 
-/// Write the stack's profiles among `stack` and every plugin's own profile in `text`.
+/// The own profile of every installed plugin joining a form the last start ran, none where
+/// the stack was stopped since.
+fn joining(ctx: &Ctx) -> Vec<String> {
+    let returning = crate::autostart::run::load(ctx);
+    let (Some(manifest), Ok(register)) = (
+        (!returning.halted())
+            .then(|| ctx.stack.checked_manifest(ctx.today()).ok())
+            .flatten(),
+        crate::app::plugins::read(ctx),
+    ) else {
+        return Vec::new();
+    };
+    crate::plugin::joining(register.installed())
+        .into_iter()
+        .filter(|plugin| plugin.runs_with(returning.last_run(), &manifest))
+        .map(|plugin| plugin.profile)
+        .collect()
+}
+
+/// Write each profile of `stack` that `text` declares or that is no plugin's.
 fn written(ctx: &Ctx, stack: &BTreeSet<String>, text: &str) -> Result<(), Failure> {
+    let declared = crate::project::document::profiles(text);
     let profiles: Vec<String> = stack
         .iter()
-        .filter(|profile| !crate::plugin::is_a_plugins(profile))
+        .filter(|profile| !crate::plugin::is_a_plugins(profile) || declared.contains(*profile))
         .cloned()
-        .chain(
-            crate::project::document::profiles(text)
-                .into_iter()
-                .filter(|profile| crate::plugin::is_a_plugins(profile)),
-        )
-        .collect::<BTreeSet<String>>()
-        .into_iter()
         .collect();
     let read = std::iter::once(PathBuf::from(crate::project::FILE)).chain(
         ctx.settings

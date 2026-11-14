@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "forms": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "plugin": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

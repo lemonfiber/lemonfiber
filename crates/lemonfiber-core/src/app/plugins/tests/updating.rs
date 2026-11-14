@@ -19,6 +19,11 @@ async fn an_update_that_holds_leaves_the_machine_on_the_new_version() {
 
     assert_eq!(done.as_ref().map(|one| one.install.recorded), Some(true));
     assert_eq!(
+        done.as_ref().map(|one| one.install.awaits.clone()),
+        Some(vec!["library".to_owned()]),
+        "none of its forms runs here, so the new version waits for them"
+    );
+    assert_eq!(
         done.as_ref()
             .map(|one| (one.from.as_str(), one.to.as_str())),
         Some(("1.2.0", "1.3.0"))

@@ -21,6 +21,13 @@
         "$ref": "Wired.json"
       }
     },
+    "awaits": {
+      "description": "The forms it joins, where none of them was running once it was installed: its\nservices were stopped then, and start with the first of these that is started.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "changes": {
       "description": "Every change it makes to the machine, in the order it makes them.",
       "type": "array",
