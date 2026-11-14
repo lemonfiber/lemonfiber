@@ -69,6 +69,14 @@ fn walked(report: &lemonfiber_core::model::WalkthroughReport) -> ExitCode {
     }
 }
 
+fn handed_off(state: HandoffState) -> ExitCode {
+    match state {
+        HandoffState::Failed => ExitCode::from(FAILURE),
+        HandoffState::Unprovisioned => ExitCode::from(VALIDATION),
+        HandoffState::Ready | HandoffState::Pending | HandoffState::Connected => ExitCode::SUCCESS,
+    }
+}
+
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -172,13 +180,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // right. Waiting on the person's device is not a failure: it is where every
         // hand-off stands between the code and the sign-in, and a script polling for the
         // sign-in reads the state rather than the code.
-        Outcome::Handoff(report) => match report.state {
-            HandoffState::Failed => ExitCode::from(FAILURE),
-            HandoffState::Unprovisioned => ExitCode::from(VALIDATION),
-            HandoffState::Ready | HandoffState::Pending | HandoffState::Connected => {
-                ExitCode::SUCCESS
-            }
-        },
+        Outcome::Handoff(report) => handed_off(report.state),
         Outcome::Walkthrough(report) => walked(report),
         // A trace, a stuck-item listing, the household's requests or where the
         // household begins is a query — it answers where things are; asking is never a
