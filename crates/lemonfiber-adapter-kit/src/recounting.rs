@@ -248,7 +248,8 @@ impl Recounter {
                     .await
             }
         };
-        let key = std::fs::read_to_string(shared.configuration.join(EVENTS_KEY_FILE))
+        let key = tokio::fs::read_to_string(shared.configuration.join(EVENTS_KEY_FILE))
+            .await
             .map(|key| key.trim().to_owned())
             .unwrap_or_default();
         let Some(told) = Told::new(&kept.address, &kept.pin, &key) else {
