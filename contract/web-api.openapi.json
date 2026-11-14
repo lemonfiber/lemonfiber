@@ -7272,6 +7272,50 @@
         ],
         "type": "object"
       },
+      "Location": {
+        "description": "Where something a service keeps is on this machine, or why that is not said.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "The host path it is mounted from.",
+            "properties": {
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "at"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "It could not be read, and why, in the operator's words.",
+            "properties": {
+              "unread": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "unread"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "The service keeps none, and why, in the operator's words.",
+            "properties": {
+              "none": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "none"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "LogLevel": {
         "description": "How bad a line says it is.\n\nOrdered, so a filter can ask for \"warnings and worse\" without a table of which\nlevel outranks which. Deliberately coarse: these six are what services agree\non, and a seventh that only one of them writes would be a level nobody could filter\nby across the stack.",
         "oneOf": [
@@ -7539,6 +7583,17 @@
             "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), or `music-<n>` or `books-<n>` for an ask\nfor music or books the core keeps itself.",
             "type": "string"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TitleKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The kind of title it asks for: a series, a film, music or books. Absent, not\nnull, where the request service names a kind this build does not know."
+          },
           "media": {
             "description": "What kind of thing it is — a series, a film — in the household's own words.\nAbsent where the request service names a kind this build does not know.",
             "type": [
@@ -7581,6 +7636,17 @@
               "string",
               "null"
             ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TitleUnit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What an ask for music or books asks for: one album or book, or a whole artist,\nauthor or series. Absent, not null, on a series or a film."
           },
           "waiting_days": {
             "description": "How many whole days it has been waiting on somebody, where it is waiting at all\nand the service's own date could be read.\n\nOnly on the ones nobody has ruled on. A request already answered has not been\nwaiting since it was made, and a figure beside one would be counting the wrong\nthing.",
@@ -8193,6 +8259,17 @@
             "description": "Who asked for it, by the name the media server holds them under.",
             "type": "string"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TitleKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The kind of title it asks for, as the household list names it."
+          },
           "request": {
             "description": "The reference the household list names it with: the request service's number\n(`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.",
             "type": "string"
@@ -8203,6 +8280,17 @@
               "string",
               "null"
             ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TitleUnit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What an ask for music or books asks for, as the household list names it."
           }
         },
         "required": [
@@ -8770,6 +8858,14 @@
             "description": "Whether lemonfiber knows this service and could take it over as it stands.",
             "type": "boolean"
           },
+          "config": {
+            "$ref": "#/components/schemas/Location",
+            "description": "Where it reads its configuration from on this machine."
+          },
+          "library": {
+            "$ref": "#/components/schemas/Location",
+            "description": "Where its library is on this machine."
+          },
           "ports": {
             "description": "Every host port it publishes, lowest first.",
             "items": {
@@ -8793,7 +8889,9 @@
           "service",
           "running",
           "ports",
-          "adoptable"
+          "adoptable",
+          "config",
+          "library"
         ],
         "type": "object"
       },
@@ -15633,6 +15731,33 @@
         ],
         "type": "object"
       },
+      "ServiceUser": {
+        "description": "The user and group the stack's services run as.",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/UserFrom",
+            "description": "Where the two come from."
+          },
+          "gid": {
+            "description": "The group id.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "uid": {
+            "description": "The user id.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "uid",
+          "gid",
+          "from"
+        ],
+        "type": "object"
+      },
       "ServiceUserMode": {
         "description": "A user mode a manifest writes by name.",
         "oneOf": [
@@ -15686,6 +15811,26 @@
           }
         ],
         "description": "One environment variable's value."
+      },
+      "SetUp": {
+        "description": "Whether this stack is set up.",
+        "oneOf": [
+          {
+            "const": "none",
+            "description": "Nothing is configured and no setup has begun.",
+            "type": "string"
+          },
+          {
+            "const": "part-way",
+            "description": "A setup has begun and not finished: answers are being gathered, are waiting for\nreview, or an apply stopped part-way.",
+            "type": "string"
+          },
+          {
+            "const": "done",
+            "description": "The stack is configured and no setup is part-way through.",
+            "type": "string"
+          }
+        ]
       },
       "SettingChange": {
         "description": "A change to one or more settings, made in one act.",
@@ -16117,6 +16262,36 @@
             "type": "object"
           }
         ]
+      },
+      "SettledReport": {
+        "description": "What setup settled, read from the configuration as it stands, and whether this stack\nis set up.",
+        "properties": {
+          "data_root": {
+            "description": "Where the library is kept, a path on this machine or an NFS export as `DATA_ROOT`\nnames it, or nothing where no data root is configured.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "protocols": {
+            "$ref": "#/components/schemas/Protocols",
+            "description": "Which ways of downloading are configured."
+          },
+          "service_user": {
+            "$ref": "#/components/schemas/ServiceUser",
+            "description": "The user and group the stack's services run as."
+          },
+          "setup": {
+            "$ref": "#/components/schemas/SetUp",
+            "description": "Whether this stack is set up."
+          }
+        },
+        "required": [
+          "setup",
+          "protocols",
+          "service_user"
+        ],
+        "type": "object"
       },
       "SetupGuarded": {
         "additionalProperties": false,
@@ -19327,6 +19502,26 @@
         ],
         "type": "object"
       },
+      "UserFrom": {
+        "description": "Where the user the services run as comes from.",
+        "oneOf": [
+          {
+            "const": "set",
+            "description": "The operator set both `PUID` and `PGID`.",
+            "type": "string"
+          },
+          {
+            "const": "part-set",
+            "description": "The operator set one of `PUID` and `PGID`, and the other is the stack\ndirectory's owner's.",
+            "type": "string"
+          },
+          {
+            "const": "stack-owner",
+            "description": "The operator set neither, so both are the stack directory's owner's, or 1000\nwhere that owner is root or cannot be read.",
+            "type": "string"
+          }
+        ]
+      },
       "Validation": {
         "description": "What proving a credential against its live service established — never the\ninput, only the outcome.\n\nRead back as well as built. A surface that is not in this process asks setup to\nprove a credential and is told what came of it, so the four outcomes are tagged\nby name rather than distinguished by which field is present — the same reason an\nanswer carries the step it belongs to.",
         "oneOf": [
@@ -21322,6 +21517,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-settings"
+          },
+          {
+            "$ref": "#/components/schemas/kind-settled"
           },
           {
             "$ref": "#/components/schemas/kind-setup"
@@ -24168,6 +24366,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/SettingsReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-settled": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SettledReport",
             "description": "The payload."
           },
           "host": {
@@ -30681,6 +30919,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/kind-settings"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/settled": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-settled"
                 }
               }
             },
