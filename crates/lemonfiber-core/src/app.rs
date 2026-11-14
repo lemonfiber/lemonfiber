@@ -309,6 +309,10 @@ pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Proble
     rehearsal::permitted(&command, ctx)?;
     if !matches!(command, Command::Authoring(_)) {
         stack_first(&command, ctx).await;
+        // Last, so that the sentence nearest the acting is the one about what acting
+        // costs: what a failed restart left is news from a run nobody saw; this is
+        // about the run the operator is in the middle of asking for.
+        disturbance::said(&command, ctx).await;
     }
     Box::pin(routed(rehearsal::carried(command, ctx), ctx))
         .await
@@ -332,10 +336,6 @@ async fn stack_first(command: &Command, ctx: &Ctx) {
     if !matches!(command, Command::AtBoot) {
         boot::reported(ctx).await;
     }
-    // Last, so that the sentence nearest the acting is the one about what acting
-    // costs. The line above is news from a run nobody saw; this one is about the
-    // run the operator is in the middle of asking for.
-    disturbance::said(command, ctx).await;
     crate::settings::filing::everything(ctx).await;
     // Before anything signs in with a credential lemonfiber minted: a rotation that
     // stopped part-way left its replacement beside it, and which of the two the

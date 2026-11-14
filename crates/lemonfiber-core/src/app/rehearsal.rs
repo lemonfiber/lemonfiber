@@ -71,7 +71,7 @@ const THE_WALK_IS_THE_OBSERVATION: &str = "a walkthrough is an end-to-end observ
 
 /// Why recording a plugin's run proofs cannot be rehearsed.
 const A_RECORDING_IS_THE_RUN: &str = "a recording is what the plugin's services answered \
-     when they were run, which does not exist until they have been — `--check` holds a \
+     when they were run, which does not exist until they have been — --check holds a \
      run to what is recorded and writes nothing";
 
 /// What a rehearsal means for one command.

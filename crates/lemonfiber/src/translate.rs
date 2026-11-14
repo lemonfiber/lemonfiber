@@ -6,8 +6,8 @@
 //! everything that happens to it afterwards.
 
 use lemonfiber_core::alert::Appetite;
+use lemonfiber_core::app::plugins;
 use lemonfiber_core::app::support::Destination;
-use lemonfiber_core::app::{authoring, plugins};
 use lemonfiber_core::app::{
     AlertAction, BandwidthAsked, Command, Diagnosing, Filling, Gathering, Hostable, Keeping,
     LettingGo, Linking, MigrateAction, QualityAction, Queueing, Removing, Setting, Tracing,
@@ -31,10 +31,10 @@ use crate::authoring::Document;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
-    AlertCommand, Asked, Authoring, CompanionCommand, ConfigAction, DownloadsCommand,
-    HostingCommand, Kept, KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand,
-    QualityCommand, QueueCommand, RawBandwidth, RawCompanion, RawDownloads, RawKey,
-    RawPushEndpoint, RawRemoval, RawRemoving, RawRestart, UpdateCommand, WiringCommand,
+    AlertCommand, Asked, CompanionCommand, ConfigAction, DownloadsCommand, HostingCommand, Kept,
+    KeyCommand, MigrateCommand, PluginCommand, PushEndpointCommand, QualityCommand, QueueCommand,
+    RawBandwidth, RawCompanion, RawDownloads, RawKey, RawPushEndpoint, RawRemoval, RawRemoving,
+    RawRestart, UpdateCommand, WiringCommand,
 };
 use lemonfiber_core::app::Restarting;
 
@@ -512,36 +512,9 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: consented(offer, approved, &inputs)?,
         },
-        PluginCommand::Authoring(read) => return Ok(authored(read)),
+        PluginCommand::Authoring(read) => return Ok(crate::authoring::authored(read)),
     };
     Ok(Under::Dispatched(Command::Plugins(asked)))
-}
-
-/// Which door a word an author asks goes through: a document is published, and a read
-/// of the author's own source is a command.
-fn authored(read: Authoring) -> Under {
-    let asked = match read {
-        Authoring::Schema => return Under::Published(Document::Schema),
-        Authoring::ExtensionPoints => return Under::Published(Document::ExtensionPoints),
-        Authoring::Capabilities => return Under::Published(Document::Capabilities),
-        Authoring::Claims { path } => authoring::Asked::Claims { path },
-        Authoring::Conform { path } => authoring::Asked::Conform { path },
-        Authoring::Provenance { path, keys } => authoring::Asked::Provenance { path, keys },
-        Authoring::Record {
-            path,
-            check,
-            adapter,
-            built,
-        } => authoring::Asked::Record {
-            path,
-            taking: lemonfiber_core::plugin::Retaking {
-                check,
-                adapter,
-                built,
-            },
-        },
-    };
-    Under::Dispatched(Command::Authoring(asked))
 }
 
 /// The yes an act on a plugin was given: the offer it answers, what it approves, and

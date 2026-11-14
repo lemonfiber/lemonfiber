@@ -177,8 +177,13 @@ fn the_machine_readable_form_carries_what_the_report_says() {
     // Walked rather than indexed, because a document that is missing a step answers
     // with what is there instead of ending the run — which is the difference between a
     // test that says what the shape was and one that says it panicked.
+    assert_eq!(
+        read.get("kind").map(ToString::to_string).as_deref(),
+        Some("\"plugin-claims\""),
+        "{said}"
+    );
     let at = |steps: &[&str]| -> String {
-        let mut here = &read;
+        let mut here = read.get("data").unwrap_or(&serde_json::Value::Null);
         for step in steps {
             here = match step.parse::<usize>() {
                 Ok(index) => here.get(index).unwrap_or(&serde_json::Value::Null),

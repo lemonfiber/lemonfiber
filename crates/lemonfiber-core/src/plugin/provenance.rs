@@ -128,6 +128,9 @@ impl Key {
             named: named.to_owned(),
             why: why.to_owned(),
         };
+        if !pem.lines().any(|line| line.starts_with("-----BEGIN ")) {
+            return Err(refuse("it is not a PEM block"));
+        }
         let body: String = pem
             .lines()
             .filter(|line| !line.starts_with("-----"))
