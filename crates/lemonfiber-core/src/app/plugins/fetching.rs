@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use futures_util::StreamExt as _;
+use lemonfiber_platform::fs;
 
 use crate::app::Ctx;
 use crate::config::REACH_PLUGIN_SOURCE_KEY;
@@ -314,23 +315,6 @@ pub(super) fn checkout(ctx: &Ctx, commit: &str) -> Option<PathBuf> {
 /// is refused rather than fetched into.
 pub(super) fn made_fresh(into: &Path) -> std::io::Result<()> {
     let _ = std::fs::remove_dir_all(into);
-    private_dir(into.parent().unwrap_or(into), true)?;
-    private_dir(into, false)
-}
-
-/// Create the directory `at` owner-only, with its parents where `parents`; failing where
-/// `at` is already there and `parents` is not asked for.
-#[cfg(unix)]
-fn private_dir(at: &Path, parents: bool) -> std::io::Result<()> {
-    use std::os::unix::fs::DirBuilderExt as _;
-    std::fs::DirBuilder::new()
-        .recursive(parents)
-        .mode(0o700)
-        .create(at)
-}
-
-/// Where the platform tracks no mode, an ordinary create.
-#[cfg(not(unix))]
-fn private_dir(at: &Path, parents: bool) -> std::io::Result<()> {
-    std::fs::DirBuilder::new().recursive(parents).create(at)
+    fs::private_directory(into.parent().unwrap_or(into), true)?;
+    fs::private_directory(into, false)
 }

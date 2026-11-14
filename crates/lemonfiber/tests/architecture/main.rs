@@ -32,6 +32,7 @@ mod plain_language;
 mod seeding_names_nothing_that_fills_an_ask;
 mod surface_parity;
 mod the_one_way_out;
+mod the_platform_is_asked_in_one_place;
 mod what_a_check_can_see;
 mod what_a_comment_may_be;
 mod what_a_form_holds;

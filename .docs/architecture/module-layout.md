@@ -44,12 +44,13 @@ crates/
 ├── lemonfiber-core/      lib — all logic, no UI, no terminal
 │   ├── app/              the one entry point: command in, outcome out
 │   ├── model/            the values surfaces render, and serialise
-│   ├── platform.rs       the only cfg!(target_os)
+│   ├── platform.rs       the core's vocabulary handed to lemonfiber-platform
 │   └── …                 one directory per subsystem — doctor, seed, config, …
 │
 ├── lemonfiber-fixtures/  lib — the fakes for the ports' traits, and the scratch
 │                              directories tests write into, reachable from both
-│                              in-crate tests and `tests/`. Depends on ports only.
+│                              in-crate tests and `tests/`. Depends on ports and
+│                              the platform only.
 │
 ├── lemonfiber-testing/   lib — the context a test drives a command through,
 │                              built from one of two starting points. The core's
@@ -62,6 +63,12 @@ crates/
 ├── lemonfiber-ports/     lib — the traits the outside world is reached through,
 │                              and the vocabulary that crosses them. Depends on
 │                              nothing of ours but the manifest and the error model.
+│
+├── lemonfiber-platform/  lib — which operating system and environment this is,
+│                              and every operation that differs by platform: modes,
+│                              owners, an open that refuses a link, the walk beneath
+│                              a directory through each step's handle. The only crate
+│                              with a platform `cfg`. Depends on nothing of ours.
 │
 ├── lemonfiber-error/     lib — Problem and Code, the withholding a problem's
 │                              detail passes through, retry wording, plurals.
@@ -156,7 +163,8 @@ The file name is the question; the tests inside it are the ways of asking:
 | File | Enforces |
 |------|----------|
 | `what_the_build_forbids.rs` | The core cannot render and cannot reach the network; the ports and fixtures crates depend on nothing of ours that would make them a cycle. Read from the manifests, where a dependency is actually enforced |
-| `where_the_outside_world_is_reached.rs` | Each external crate appears in exactly one file, and no `target_os` outside `platform.rs` |
+| `where_the_outside_world_is_reached.rs` | Each external crate appears in exactly one file |
+| `the_platform_is_asked_in_one_place.rs` | No `cfg(unix)`, `cfg(windows)` or `cfg(target_os …)`, nor a target-only dependency, outside `lemonfiber-platform`; a test may ask only what its register names |
 | `what_a_source_file_may_not_say.rs` | No `#[allow(…)]` anywhere in `src/`, and no spec or area identifier in a comment |
 | `how_long_a_file_may_be.rs` | 550 lines a source file and 800 a test file, counted over the whole file, and a source file's tests kept beside it rather than inline |
 | `the_one_way_out.rs` | Output leaves through `say.rs`, treated on the way; a failure lands on stderr; what a parser reads is never folded for a person |

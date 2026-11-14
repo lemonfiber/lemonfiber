@@ -1,0 +1,23 @@
+[package]
+name = "lemonfiber-platform"
+description = "Which machine this is, and every operation that differs from one platform to the next."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+# Never published: it is the one place the workspace asks what it runs on, and nothing
+# outside this workspace codes against it.
+publish = false
+
+# The standard library, and beneath it on Unix the platform's own flags and the
+# directory-handle calls. Nothing of ours, so every crate of the workspace may reach it.
+[target.'cfg(unix)'.dependencies]
+# The flags that refuse to open a file through a link or to wait on a pipe.
+libc = { workspace = true }
+# Making, opening and renaming beneath a directory through its own handle.
+rustix = { workspace = true }
+
+[lints]
+workspace = true

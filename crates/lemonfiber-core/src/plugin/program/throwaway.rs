@@ -5,12 +5,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use lemonfiber_platform::fs;
+
 use crate::ports::random::Random;
 use crate::project::entry::CONFIGURATION_TREE;
-
-mod modes;
-
-use modes::{opened, owner_only};
 
 /// The most starting files one service may ship.
 pub(crate) const MOST_FILES: usize = 64;
@@ -148,7 +146,8 @@ impl Throwaway {
                     root: root.clone(),
                     minted,
                 };
-                let filled = opened(&made.root, 0o700).and_then(|()| made.filled(&files));
+                let filled = fs::set_mode_at(&made.root, fs::OWNER_DIRECTORY)
+                    .and_then(|()| made.filled(&files));
                 filled.map(|()| made)
             })
             .map_err(|why| unmade(&root, &why))
@@ -181,7 +180,7 @@ impl Throwaway {
     pub(crate) fn emptied(&self, named: &Path) -> Result<PathBuf, String> {
         let at = self.beside(named);
         std::fs::create_dir(&at)
-            .and_then(|()| opened(&at, 0o777))
+            .and_then(|()| fs::set_mode_at(&at, fs::SHARED_DIRECTORY))
             .map(|()| at.clone())
             .map_err(|why| unmade(&at, &why))
     }
@@ -196,7 +195,7 @@ impl Throwaway {
             reopened(directory, 0o755)?;
             between = directory.parent();
         }
-        reopened(&at, 0o644)
+        reopened(&at, fs::SHARED_FILE)
     }
 
     /// `text` held at `named` directly beneath the copy, readable by its owner alone,
@@ -205,25 +204,17 @@ impl Throwaway {
         use std::io::Write as _;
         let at = self.copy.join(named);
         let _ = std::fs::remove_file(&at);
-        owner_only()
+        fs::owner_only(std::fs::File::options().write(true).create_new(true))
             .open(&at)
             .and_then(|mut file| file.write_all(text.as_bytes()))
             .map_err(|why| unmade(&at, &why))
     }
 
-    /// The uid and gid that own the copy, which is whoever made it.
-    #[cfg(unix)]
+    /// The uid and gid that own the copy, which is whoever made it; nobody where the
+    /// platform names no owner.
     pub(crate) fn owner(&self) -> Option<(u32, u32)> {
-        use std::os::unix::fs::MetadataExt as _;
-        std::fs::metadata(&self.root)
-            .ok()
-            .map(|made| (made.uid(), made.gid()))
-    }
-
-    /// Nobody, where the platform names no owner.
-    #[cfg(not(unix))]
-    pub(crate) fn owner(&self) -> Option<(u32, u32)> {
-        None
+        let made = std::fs::metadata(&self.root).ok()?;
+        fs::owned(&made).map(|owned| (owned.uid, owned.gid))
     }
 
     /// A file at `relative` beneath the copy, as whatever ran with it left it: read
@@ -259,7 +250,7 @@ impl Throwaway {
     /// Every file written beneath the copy, every directory open to whoever the run is.
     fn filled(&self, files: &[(String, Vec<u8>)]) -> std::io::Result<()> {
         std::fs::create_dir(&self.copy)
-            .and_then(|()| opened(&self.copy, 0o777))
+            .and_then(|()| fs::set_mode_at(&self.copy, fs::SHARED_DIRECTORY))
             .and_then(|()| {
                 files
                     .iter()
@@ -279,9 +270,11 @@ impl Throwaway {
         }
         made.iter()
             .rev()
-            .try_for_each(|dir| std::fs::create_dir(dir).and_then(|()| opened(dir, 0o777)))
+            .try_for_each(|dir| {
+                std::fs::create_dir(dir).and_then(|()| fs::set_mode_at(dir, fs::SHARED_DIRECTORY))
+            })
             .and_then(|()| std::fs::write(&at, bytes))
-            .and_then(|()| opened(&at, 0o666))
+            .and_then(|()| fs::set_mode_at(&at, 0o666))
     }
 }
 
@@ -322,7 +315,7 @@ fn unmade(at: &Path, why: &std::io::Error) -> String {
 
 /// `at` given `mode`, or why it could not be, as a copy that could not be made says it.
 fn reopened(at: &Path, mode: u32) -> Result<(), String> {
-    opened(at, mode).map_err(|why| unmade(at, &why))
+    fs::set_mode_at(at, mode).map_err(|why| unmade(at, &why))
 }
 
 /// Every file of a service's starting files, with its path beneath their directory,
@@ -457,7 +450,9 @@ fn read(at: &Path, top: &Path, named: &str, room: u64) -> Result<Vec<u8>, String
             std::fs::canonicalize(top).and_then(|inside| {
                 std::fs::canonicalize(at).and_then(|resolved| {
                     std::fs::metadata(&resolved).map(|named_kind| {
-                        kind.is_file() && resolved.starts_with(inside) && same(&kind, &named_kind)
+                        kind.is_file()
+                            && resolved.starts_with(inside)
+                            && fs::same_file(&kind, &named_kind)
                     })
                 })
             })
@@ -482,33 +477,10 @@ fn read(at: &Path, top: &Path, named: &str, room: u64) -> Result<Vec<u8>, String
     })
 }
 
-/// Whether two readings are of the one file.
-#[cfg(unix)]
-fn same(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt as _;
-    one.dev() == other.dev() && one.ino() == other.ino()
-}
-
-/// Whether two readings are of the one file, where the platform names none.
-#[cfg(not(unix))]
-fn same(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    one.len() == other.len()
-}
-
-/// `at`, opened for reading, refusing a link at its name and refusing to wait.
-#[cfg(unix)]
+/// `at`, opened for reading, refusing a link at its name and refusing to wait where the
+/// platform has flags for either.
 fn unfollowed(at: &Path) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    std::fs::File::options()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(at)
-}
-
-/// `at`, opened for reading, where the platform has no flag refusing a link.
-#[cfg(not(unix))]
-fn unfollowed(at: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::File::open(at)
+    fs::unfollowed_unwaiting(std::fs::File::options().read(true)).open(at)
 }
 
 /// Why the starting files could not be read.

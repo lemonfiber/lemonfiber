@@ -21,6 +21,8 @@ publish = false
 lemonfiber-ports = { workspace = true }
 lemonfiber-outward = { workspace = true }
 lemonfiber-error = { workspace = true }
+# Every file operation that differs by platform; reached from the filesystem module.
+lemonfiber-platform = { workspace = true }
 async-trait = { workspace = true }
 bollard = { workspace = true }
 futures-util = { workspace = true }
@@ -41,13 +43,6 @@ sysinfo = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true, features = ["net"] }
 tokio-stream = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-# The flags that refuse to open a file through a link or to wait on a pipe; confined to
-# the filesystem module.
-libc = { workspace = true }
-# Making a directory one step at a time from the handle of the one above it.
-rustix = { workspace = true }
 
 [dev-dependencies]
 lemonfiber-fixtures = { workspace = true }

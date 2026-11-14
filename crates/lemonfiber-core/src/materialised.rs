@@ -60,33 +60,11 @@ impl Seen {
         let meta = std::fs::symlink_metadata(path).ok()?;
         Some(Self {
             length: meta.len(),
-            written: changed(&meta)?,
+            written: lemonfiber_platform::fs::changed(&meta)?,
             from,
             regions,
         })
     }
-}
-
-/// When a file last changed, in nanoseconds since the epoch: its change time, which
-/// every write moves and nothing can set.
-#[cfg(unix)]
-fn changed(meta: &std::fs::Metadata) -> Option<u128> {
-    use std::os::unix::fs::MetadataExt as _;
-    let seconds = u128::try_from(meta.ctime()).ok()?;
-    let nanos = u128::try_from(meta.ctime_nsec()).ok()?;
-    Some(seconds * 1_000_000_000 + nanos)
-}
-
-/// Where the platform keeps no change time, when the file was last written.
-#[cfg(not(unix))]
-fn changed(meta: &std::fs::Metadata) -> Option<u128> {
-    let written = meta.modified().ok()?;
-    Some(
-        written
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()?
-            .as_nanos(),
-    )
 }
 
 impl Materialised {

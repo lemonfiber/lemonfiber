@@ -11,13 +11,17 @@
 //! moment between a look and a use for it to change under.
 //!
 //! A move is made the same way: every step to either end is reached through no link.
+//! How each step is reached on this platform is `lemonfiber_platform::beneath`'s; what a
+//! refusal means for the port is decided here.
 //!
 //! Synchronous, because the stack's own files are written out by code with nothing to
 //! await; the asynchronous read runs the same function on a thread that may block.
 
 use std::io::{Read as _, Write as _};
-use std::path::{Component, Path};
+use std::path::Path;
 
+use lemonfiber_platform::beneath::{self, Kept, Lies, Refusal};
+use lemonfiber_platform::fs;
 use lemonfiber_ports::filesystem::{Beneath, Confined, Fault, Lying, Readable, READ_LIMIT};
 
 use super::Disk;
@@ -42,15 +46,19 @@ impl Confined for Disk {
     }
 
     fn lies(&self, path: &Path, within: &Path) -> Lying {
-        lies(path, within)
+        match beneath::lies(path, within) {
+            Lies::Plain => Lying::Plain,
+            Lies::Absent => Lying::Absent,
+            Lies::Escaped => Lying::Escaped,
+        }
     }
 
     fn moved(&self, from: &Path, to: &Path, within: &Path) -> Result<(), Fault> {
-        moving::moved(from, to, within)
+        beneath::moved(from, to, within).map_err(|refusal| fault(refusal, to, within))
     }
 
     fn made(&self, path: &Path, within: &Path, readable: Readable) -> Result<(), Fault> {
-        replacing::made(path, within, readable)
+        beneath::made(path, within, kept(readable)).map_err(|refusal| fault(refusal, path, within))
     }
 
     fn replaced(
@@ -60,15 +68,16 @@ impl Confined for Disk {
         contents: &[u8],
         readable: Readable,
     ) -> Result<(), Fault> {
-        replacing::replaced(path, within, contents, readable)
+        beneath::replaced(path, within, contents, kept(readable))
+            .map_err(|refusal| fault(refusal, path, within))
     }
 
     fn bytes(&self, path: &Path, within: &Path) -> Result<Option<Vec<u8>>, Fault> {
-        replacing::bytes(path, within)
+        beneath::bytes(path, within, READ_LIMIT).map_err(|refusal| fault(refusal, path, within))
     }
 
     fn removed(&self, path: &Path, within: &Path) -> Result<(), Fault> {
-        replacing::removed(path, within)
+        beneath::removed(path, within).map_err(|refusal| fault(refusal, path, within))
     }
 }
 
@@ -132,202 +141,16 @@ pub(super) fn written(
     contents: &[u8],
     readable: Readable,
 ) -> Result<(), Fault> {
-    let file = created(path, within, readable)?;
+    let file = beneath::created(path, within, kept(readable).file)
+        .map_err(|refusal| fault(refusal, path, within))?;
     if standing(&file, path, within) != Standing::Plain {
         return Err(Fault::escaped(path, within));
     }
     landed(
-        kept_to(&file, readable)
+        fs::set_mode(&file, kept(readable).file)
             .and_then(|()| file.set_len(0))
             .and_then(|()| (&file).write_all(contents)),
     )
-}
-
-/// `path` opened to write, made new readable as `readable` says where it is not there,
-/// through the handle of the directory it is in, every step to which was reached through
-/// no link, and refusing a link at its own name.
-#[cfg(unix)]
-fn created(path: &Path, within: &Path, readable: Readable) -> Result<std::fs::File, Fault> {
-    use rustix::fs::{openat, Mode, OFlags};
-    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
-        return Err(Fault::escaped(path, within));
-    };
-    let here = made(parent, within)?;
-    let flags =
-        OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
-    let made_as = match readable {
-        Readable::Owner | Readable::Private => Mode::RUSR | Mode::WUSR,
-        Readable::Shared => Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::ROTH,
-    };
-    openat(&here, name, flags, made_as)
-        .map(std::fs::File::from)
-        .map_err(|error| match error {
-            rustix::io::Errno::LOOP => Fault::escaped(path, within),
-            error => Fault::new(error.to_string()),
-        })
-}
-
-/// `path` opened to write, made where it is not there with every directory above it.
-/// Windows has no flag that refuses a link on the way, so what was opened is held to
-/// `within` afterwards.
-#[cfg(windows)]
-fn created(path: &Path, within: &Path, _readable: Readable) -> Result<std::fs::File, Fault> {
-    if let Some(parent) = path.parent() {
-        make(parent, within)?;
-    }
-    options(Use::Write)
-        .open(path)
-        .map_err(|error| Fault::new(error.to_string()))
-}
-
-/// The mode a file readable as `readable` says is held to.
-#[cfg(unix)]
-const fn mode(readable: Readable) -> u32 {
-    match readable {
-        Readable::Owner | Readable::Private => 0o600,
-        Readable::Shared => 0o644,
-    }
-}
-
-/// `file` held to the mode `readable` names, through its own handle, whatever it was made
-/// with.
-#[cfg(unix)]
-fn kept_to(file: &std::fs::File, readable: Readable) -> std::io::Result<()> {
-    use std::os::unix::fs::PermissionsExt as _;
-    file.set_permissions(std::fs::Permissions::from_mode(mode(readable)))
-}
-
-/// Nothing, where the platform keeps no mode.
-#[cfg(windows)]
-fn kept_to(_file: &std::fs::File, _readable: Readable) -> std::io::Result<()> {
-    Ok(())
-}
-
-/// Make `path` and every directory missing above it, one at a time from `within` down,
-/// each made and then opened through the handle of the one above it and never through
-/// a link, so a link put on the way between two steps is refused rather than followed.
-#[cfg(unix)]
-pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
-    made(path, within).map(drop)
-}
-
-/// The directory `path`, made with every directory missing above it as [`make`] makes
-/// them, held open by the handle the walk ended on.
-#[cfg(unix)]
-fn made(path: &Path, within: &Path) -> Result<rustix::fd::OwnedFd, Fault> {
-    use rustix::fs::{mkdirat, openat, Mode, OFlags, CWD};
-    let opening = OFlags::DIRECTORY | OFlags::RDONLY | OFlags::CLOEXEC;
-    let unmade = |error: rustix::io::Errno| {
-        Fault::new(format!(
-            "{} was not made beneath {}: {error}",
-            path.display(),
-            within.display()
-        ))
-    };
-    let mut here = openat(CWD, within, opening, Mode::empty()).map_err(unmade)?;
-    for name in steps(path, within)? {
-        match mkdirat(&here, name, Mode::RWXU | Mode::RWXG | Mode::RWXO) {
-            Ok(()) | Err(rustix::io::Errno::EXIST) => {}
-            Err(error) => return Err(unmade(error)),
-        }
-        here = openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()).map_err(unmade)?;
-    }
-    Ok(here)
-}
-
-/// Make `path` and every directory missing above it, one at a time from `within` down.
-/// Windows has no flag that refuses a link on the way, so each step that is already
-/// there is looked at first and refused where it is not a directory of its own.
-#[cfg(windows)]
-pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
-    let mut here = within.to_path_buf();
-    for name in steps(path, within)? {
-        here.push(name);
-        match std::fs::symlink_metadata(&here) {
-            Ok(found) if found.is_dir() => {}
-            Ok(_) => {
-                return Err(Fault::new(format!(
-                    "{} is a link or a file, and lemonfiber makes its own directory there \
-                     rather than following one",
-                    here.display()
-                )))
-            }
-            Err(_) => std::fs::create_dir(&here).map_err(|error| Fault::new(error.to_string()))?,
-        }
-    }
-    Ok(())
-}
-
-/// Where `path` lies beneath `within`: each directory on the way opened through the handle
-/// of the one above it, never through a link and never waiting on what it opens, and the
-/// last step only looked at, so a pipe or a device put there is never opened.
-#[cfg(unix)]
-pub(super) fn lies(path: &Path, within: &Path) -> Lying {
-    use rustix::fs::{openat, statat, AtFlags, FileType, Mode, OFlags, CWD};
-    let Ok(mut names) = steps(path, within) else {
-        return Lying::Escaped;
-    };
-    let opening = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NONBLOCK | OFlags::DIRECTORY;
-    let Ok(mut here) = openat(CWD, within, opening, Mode::empty()) else {
-        return Lying::Absent;
-    };
-    let Some(last) = names.pop() else {
-        return Lying::Plain;
-    };
-    for name in names {
-        match openat(&here, name, opening | OFlags::NOFOLLOW, Mode::empty()) {
-            Ok(opened) => here = opened,
-            Err(rustix::io::Errno::NOENT) => return Lying::Absent,
-            Err(_) => return Lying::Escaped,
-        }
-    }
-    match statat(&here, last, AtFlags::SYMLINK_NOFOLLOW) {
-        Ok(found) if FileType::from_raw_mode(found.st_mode) == FileType::Symlink => Lying::Escaped,
-        Ok(_) => Lying::Plain,
-        Err(rustix::io::Errno::NOENT) => Lying::Absent,
-        Err(_) => Lying::Escaped,
-    }
-}
-
-/// Where `path` lies beneath `within`, each step looked at and refused where it is a link.
-#[cfg(windows)]
-pub(super) fn lies(path: &Path, within: &Path) -> Lying {
-    let Ok(names) = steps(path, within) else {
-        return Lying::Escaped;
-    };
-    let mut here = within.to_path_buf();
-    for name in names {
-        here.push(name);
-        match std::fs::symlink_metadata(&here) {
-            Ok(found) if found.file_type().is_symlink() => return Lying::Escaped,
-            Ok(_) => {}
-            Err(_) => return Lying::Absent,
-        }
-    }
-    Lying::Plain
-}
-
-/// The names `path` is made of below `within`, refused where it is not beneath it or
-/// steps back up out of it.
-fn steps<'a>(path: &'a Path, within: &Path) -> Result<Vec<&'a std::ffi::OsStr>, Fault> {
-    let rest = path
-        .strip_prefix(within)
-        .map_err(|_| outside(path, within))?;
-    rest.components()
-        .map(|part| match part {
-            Component::Normal(name) => Ok(name),
-            _ => Err(outside(path, within)),
-        })
-        .collect()
-}
-
-/// The refusal of a directory that does not lie beneath the one it is made in.
-fn outside(path: &Path, within: &Path) -> Fault {
-    Fault::new(format!(
-        "{} does not lie beneath {}, and lemonfiber makes its own directories only there",
-        path.display(),
-        within.display()
-    ))
 }
 
 /// What emptying and writing the checked file came to, a failure in the platform's own
@@ -349,7 +172,7 @@ fn standing(file: &std::fs::File, path: &Path, within: &Path) -> Standing {
         return Standing::Gone;
     };
     let named = std::fs::metadata(&resolved);
-    let plain = opened.is_file() && named.is_ok_and(|named| same_file(&opened, &named));
+    let plain = opened.is_file() && named.is_ok_and(|named| fs::same_file(&opened, &named));
     if plain && resolved.starts_with(&root) {
         Standing::Plain
     } else {
@@ -376,58 +199,52 @@ enum Use {
 }
 
 /// Opening for `purpose`, refusing to follow a link at the last name of the path and
-/// refusing to wait.
+/// refusing to wait, where the platform has flags for either; where it has none, a link at
+/// the last name is caught by the file it opened not being the one the name resolves to.
 ///
 /// Not waiting matters as much as not following: a pipe put where the file is expected
 /// would otherwise hold the open until something wrote to it, or read from it. A plain
 /// file opens the same either way, and creating one through a link at its name is refused
 /// with the rest.
-#[cfg(unix)]
-fn options(purpose: Use) -> std::fs::OpenOptions {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    let mut options = std::fs::OpenOptions::new();
-    match purpose {
-        Use::Read => options.read(true),
-        Use::Write => options.write(true).create(true),
-    };
-    options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    options
-}
-
-/// Opening for `purpose`. Windows has no flag for it, so a link at the last name is
-/// caught by the file it opened not being the one the name resolves to.
-#[cfg(windows)]
 fn options(purpose: Use) -> std::fs::OpenOptions {
     let mut options = std::fs::OpenOptions::new();
     match purpose {
         Use::Read => options.read(true),
         Use::Write => options.write(true).create(true),
     };
+    fs::unfollowed_unwaiting(&mut options);
     options
 }
 
-/// Whether two readings are of one file: the same device and the same number on it.
-#[cfg(unix)]
-fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt as _;
-
-    one.dev() == other.dev() && one.ino() == other.ino()
+/// Make `path` and every directory missing above it beneath `within`, never through a
+/// link.
+pub(super) fn make(path: &Path, within: &Path) -> Result<(), Fault> {
+    beneath::make(path, within).map_err(|refusal| fault(refusal, path, within))
 }
 
-/// Whether two readings are of one file: the same volume and the same index on it.
-#[cfg(windows)]
-fn same_file(one: &std::fs::Metadata, other: &std::fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt as _;
-
-    one.volume_serial_number() == other.volume_serial_number()
-        && one.file_index() == other.file_index()
-        && one.file_index().is_some()
+/// The names `path` steps through beneath `within`.
+pub(super) fn steps<'a>(path: &'a Path, within: &Path) -> Result<Vec<&'a std::ffi::OsStr>, Fault> {
+    beneath::steps(path, within).map_err(|refusal| fault(refusal, path, within))
 }
 
-mod moving;
-mod replacing;
+/// What a refusal beneath `within` means for `path`, in the port's words.
+fn fault(refusal: Refusal, path: &Path, within: &Path) -> Fault {
+    match refusal {
+        Refusal::Escaped => Fault::escaped(path, within),
+        Refusal::Said(message) => Fault::new(message),
+    }
+}
+
+/// What a file and the directories above it are made with, as `readable` says.
+const fn kept(readable: Readable) -> Kept {
+    match readable {
+        Readable::Owner => Kept::OWNER,
+        Readable::Private => Kept::PRIVATE,
+        Readable::Shared => Kept::SHARED,
+    }
+}
+
 mod unpacking;
-
 pub(crate) use unpacking::{unpacked, UNPACKED_AT_MOST};
 
 #[cfg(test)]

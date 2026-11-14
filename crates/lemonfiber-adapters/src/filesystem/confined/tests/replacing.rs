@@ -163,7 +163,11 @@ fn nothing_there_reads_as_nothing_and_what_is_not_a_plain_file_is_refused() {
 #[cfg(unix)]
 #[test]
 fn a_directory_of_somebody_elses_on_the_way_is_refused_for_a_file_of_the_owners() {
-    if rustix::process::geteuid().is_root() {
+    let (_dir, owned, _) = owned();
+    let made_by = std::fs::metadata(&owned)
+        .ok()
+        .and_then(|meta| lemonfiber_platform::fs::owned(&meta));
+    if made_by.is_some_and(|by| by.uid == 0) {
         return;
     }
     let refused = Disk.made(

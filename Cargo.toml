@@ -29,6 +29,7 @@ lemonfiber-error = { path = "crates/lemonfiber-error" }
 lemonfiber-fixtures = { path = "crates/lemonfiber-fixtures" }
 lemonfiber-manifest = { path = "crates/lemonfiber-manifest" }
 lemonfiber-outward = { path = "crates/lemonfiber-outward" }
+lemonfiber-platform = { path = "crates/lemonfiber-platform" }
 lemonfiber-plugin = { path = "crates/lemonfiber-plugin" }
 lemonfiber-ports = { path = "crates/lemonfiber-ports" }
 lemonfiber-pinned = { path = "crates/lemonfiber-pinned" }
@@ -63,11 +64,12 @@ etcetera = "0.11"
 # The operating system's CSPRNG, for every secret lemonfiber mints itself.
 getrandom = "0.4"
 include_dir = "0.7"
-# The platform's own spelling of the flag that refuses to open a file through a link;
-# its constants alone, and only in the filesystem adapter.
+# The platform's own spelling of the flags that refuse to open a file through a link or
+# to wait on a pipe; its constants alone, and only in `lemonfiber-platform`.
 libc = "0.2"
 # Making a directory beneath another through the directory's own handle, so a link put
-# on the way between one step and the next is refused rather than followed.
+# on the way between one step and the next is refused rather than followed; in
+# `lemonfiber-platform`, and in the adapter kit a plugin's own adapter writes through.
 rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
 # rustls, not the platform's TLS: it keeps the musl static release target free of
 # an OpenSSL build dependency. json for decoding service API responses.
