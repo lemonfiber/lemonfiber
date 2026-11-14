@@ -8,6 +8,7 @@
 use async_trait::async_trait;
 
 use super::Failure;
+use crate::instant::Instant;
 
 /// One live TV channel, as one member's account may watch it.
 #[derive(
@@ -35,8 +36,12 @@ pub struct Programme {
     pub title: String,
     /// Its certificate, as the server holds it, where it has one.
     pub certificate: Option<String>,
-    /// When it ends, in RFC 3339, where the server knows.
-    pub ends: Option<String>,
+    /// When it ends, where the server knows.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub ends: Option<Instant>,
 }
 
 /// A channel's live stream, opened on one member's account.

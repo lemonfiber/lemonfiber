@@ -311,7 +311,7 @@ impl Tuning for Upstream {
             now: Some(Programme {
                 title: "The evening news".to_owned(),
                 certificate: Some("PG".to_owned()),
-                ends: Some("2026-11-13T19:00:00Z".to_owned()),
+                ends: Some(lemonfiber_ports::Instant::from_seconds(1_794_596_400)),
             }),
         }])
     }
