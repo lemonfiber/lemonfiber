@@ -516,6 +516,15 @@ impl Household for AHousehold {
     async fn signs_devices_in(&self) -> Result<bool, Failure> {
         unreachable!("the door asks this household who somebody is and nothing else")
     }
+    async fn sign_in_by_code(
+        &self,
+        _: &str,
+    ) -> Result<lemonfiber_core::ports::service::SignInCode, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
+    async fn signed_by_code(&self, _: &str) -> Result<Option<Signed>, Failure> {
+        unreachable!("the door asks this household who somebody is and nothing else")
+    }
 }
 
 /// A surface with a household behind it, minting its sessions from `random`.

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "identity.source/v1/openapi.json",
-      "sha256": "a185d32df2718b7b81cd0d6aa3bd2a020c658aa67a4382004ec27c87e3b2aadb"
+      "sha256": "44b8dd9fe87ca7c678d065d37026f3aff688f5171d0fd093a785f0ccc258c6b7"
     },
     {
       "path": "identity.source/v1/operations/startup_completed.json",
@@ -82,12 +82,20 @@
       "sha256": "b76d62b81e0def4f67b62d12ef54b8e85a260b512b1d730b4c934235299845a3"
     },
     {
+      "path": "identity.source/v1/operations/sign_in_by_code.json",
+      "sha256": "edf2f0810255ba2fd77e8404acc851483c1a4cc257dd35ef7e8ebddfdab6bd27"
+    },
+    {
+      "path": "identity.source/v1/operations/signed_by_code.json",
+      "sha256": "0be5a9a55166cc07d94368fbe4934a9494c0178e20cd9f3272d65050370d9292"
+    },
+    {
       "path": "identity.source/v1/holds.json",
       "sha256": "021029113130e4e73895b36cbb0386919fff431d18664ad6cca60ba37de0c827"
     },
     {
       "path": "identity.source/v1/conformance.json",
-      "sha256": "ec48ada54be3a6324e8a6c650a46ac4d4499c2ca7e1b27197e001b9e9cf2773a"
+      "sha256": "81a518b209f2aaf626f009cc0ffa4f85d0782bbdf08887cf4b29c6995c7df736"
     }
   ],
   "major": 1
