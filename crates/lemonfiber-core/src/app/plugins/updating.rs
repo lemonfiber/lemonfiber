@@ -226,6 +226,9 @@ async fn recorded(
     super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
     crate::seed::run::reinstalled(ctx).await;
+    if let Ok(manifest) = super::writing::stack_manifest(ctx) {
+        account.install.awaits = super::proving::waiting(ctx, &manifest, would, coming.stack).await;
+    }
     Ok(after)
 }
 
@@ -257,6 +260,7 @@ fn started(
             overrides: crate::plugin::overrides(manifest),
             reversed: None,
             recipes_ran: Vec::new(),
+            awaits: Vec::new(),
             taking,
             granting: crate::plugin::granting(would),
             sharing: crate::plugin::sharing(would),
@@ -542,6 +546,7 @@ fn unheld(
     served: &[crate::ports::service::Route],
 ) -> Result<(), Box<Problem>> {
     super::colliding::apart(would, others)?;
+    super::forming::declared(would, &super::writing::stack_manifest(ctx)?)?;
     super::pinning::as_trusted(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, served)
 }

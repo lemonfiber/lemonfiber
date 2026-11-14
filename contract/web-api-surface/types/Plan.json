@@ -41,6 +41,12 @@
         "array[string]"
       ],
       "required": true
+    },
+    "vanished": {
+      "type": [
+        "array[ref:Vanished]"
+      ],
+      "required": false
     }
   },
   "variants": []

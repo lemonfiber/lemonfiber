@@ -92,6 +92,7 @@ pub(super) async fn install(
         .record(would.clone())
         .map_err(|there| Box::new(already(&there, &named)))?;
     super::colliding::apart(&would, held.installed())?;
+    super::forming::declared(&would, &stack_manifest)?;
     super::pinning::as_trusted(&would, trusted)?;
     super::granting::aimed(&would, trusted)?;
 
@@ -114,6 +115,7 @@ pub(super) async fn install(
     let mut put_back = None;
     let mut recorded = false;
     let mut recipes_ran = Vec::new();
+    let mut awaits = Vec::new();
 
     if acting {
         // Every value a recipe asks the operator for is given, and nothing else is,
@@ -183,6 +185,7 @@ pub(super) async fn install(
             super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);
             crate::seed::run::reinstalled(ctx).await;
+            awaits = proving::waiting(ctx, &stack_manifest, &would, stack).await;
         } else {
             put_back = Some(reversing(ctx, &would, stack, &stamp).await);
         }
@@ -212,6 +215,7 @@ pub(super) async fn install(
             overrides: crate::plugin::overrides(&read.manifest),
             reversed: put_back,
             recipes_ran,
+            awaits,
             taking,
         })),
         agreement: Some(offer),

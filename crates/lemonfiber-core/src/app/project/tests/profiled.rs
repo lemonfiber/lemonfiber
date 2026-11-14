@@ -6,6 +6,15 @@ use super::machine;
 const HOLDING: &str =
     "services:\n  sonarr:\n    profiles:\n    - dl\n  komga:\n    profiles:\n    - plugin-komga\n";
 
+/// `ctx` with komga recorded as installed, naming no form, so it joins every one.
+fn komga_installed(ctx: &crate::app::Ctx) {
+    let mut register = crate::plugin::Register::empty();
+    let _ = register.record(crate::test_support::an_installed("komga", Vec::new()));
+    if let Some(kept) = crate::app::plugins::kept_at(ctx) {
+        let _ = std::fs::write(kept, register.to_json().unwrap_or_default());
+    }
+}
+
 /// What the profiles file holds.
 fn beside(project: &std::path::Path) -> String {
     std::fs::read_to_string(project.join(".env")).unwrap_or_default()
@@ -14,6 +23,7 @@ fn beside(project: &std::path::Path) -> String {
 #[test]
 fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins() {
     let (ctx, project) = machine("profiled");
+    komga_installed(&ctx);
     assert!(super::super::kept(&ctx, HOLDING).is_ok());
     assert_eq!(
         beside(&project),
@@ -24,7 +34,11 @@ fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins(
         &ctx,
         &super::super::held(&ctx).unwrap_or_default(),
         super::super::Pass::Write,
-        Some(&["media".to_owned()].into_iter().collect()),
+        Some(
+            &["media".to_owned(), "plugin-komga".to_owned()]
+                .into_iter()
+                .collect(),
+        ),
     );
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(
@@ -49,6 +63,7 @@ const MOVED: &str = "services:\n  jellyfin-adapter:\n    profiles:\n    - media\
 #[test]
 fn a_service_in_a_stack_profile_is_started_with_that_profile_alone() {
     let (ctx, project) = machine("profiled-moved");
+    komga_installed(&ctx);
     assert!(super::super::kept(&ctx, MOVED).is_ok());
     assert_eq!(
         beside(&project),
@@ -59,12 +74,31 @@ fn a_service_in_a_stack_profile_is_started_with_that_profile_alone() {
         &ctx,
         &super::super::held(&ctx).unwrap_or_default(),
         super::super::Pass::Write,
-        Some(&["media".to_owned()].into_iter().collect()),
+        Some(
+            &["media".to_owned(), "plugin-komga".to_owned()]
+                .into_iter()
+                .collect(),
+        ),
     );
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(
         beside(&project),
         "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+    );
+}
+
+#[test]
+fn a_plugin_record_that_cannot_be_read_leaves_the_stacks_profiles_alone() {
+    let (ctx, project) = machine("profiled-unreadable");
+    if let Some(kept) = crate::app::plugins::kept_at(&ctx) {
+        let _ = std::fs::write(kept, "not a record");
+    }
+
+    assert!(super::super::kept(&ctx, HOLDING).is_ok());
+
+    assert_eq!(
+        beside(&project),
+        "COMPOSE_PROFILES=\nCOMPOSE_FILE=compose.generated.yml\n"
     );
 }
 
@@ -88,6 +122,7 @@ fn a_profiles_file_somebody_edited_is_kept() {
 #[test]
 fn the_operators_overlay_is_read_after_the_project() {
     let (mut ctx, project) = machine("profiled-overlay");
+    komga_installed(&ctx);
     let overlay = crate::overlay::at(&ctx.settings.env_file.clone().unwrap_or_default());
     assert!(std::fs::write(&overlay, "services: {}\n").is_ok());
     ctx.settings.overlays = vec![overlay.clone()];
@@ -132,6 +167,7 @@ fn an_overlay_mounting_the_data_location_again_is_read_with_the_project() {
 #[test]
 fn an_overlay_whose_path_cannot_be_listed_leaves_plain_compose_reading_the_project() {
     let (mut ctx, project) = machine("profiled-colon");
+    komga_installed(&ctx);
     let overlay = project.with_file_name("over:lay.yml");
     assert!(std::fs::write(&overlay, "services: {}\n").is_ok());
     ctx.settings.overlays = vec![overlay];

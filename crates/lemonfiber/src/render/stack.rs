@@ -166,6 +166,20 @@ fn left_out(plan: &Plan) -> Lines {
             wanting(out.needs)
         ));
     }
+    lines.extend(vanished(plan));
+    lines
+}
+
+/// Each installed plugin naming forms the stack no longer declares, with those forms.
+fn vanished(plan: &Plan) -> Lines {
+    let mut lines = Lines::default();
+    for one in &plan.vanished {
+        lines.put(format!(
+            "{} names forms this stack no longer declares: {}",
+            one.plugin,
+            one.forms.join(", ")
+        ));
+    }
     lines
 }
 

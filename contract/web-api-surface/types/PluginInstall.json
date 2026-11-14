@@ -12,6 +12,12 @@
       ],
       "required": true
     },
+    "awaits": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "changes": {
       "type": [
         "array[ref:PluginChange]"

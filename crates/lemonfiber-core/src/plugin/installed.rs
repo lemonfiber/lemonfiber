@@ -296,6 +296,12 @@ pub struct Installed {
     pub description: Option<String>,
     /// What was placed, one entry per service the plugin declares.
     pub services: Vec<Placed>,
+    /// The forms its manifest names its services join.
+    ///
+    /// Empty on a record written before they were kept, which joins every form, as such a
+    /// plugin always ran.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub forms: Vec<String>,
     /// Every core capability its services fill, as the install settled them, core names
     /// only, which is what a removal reads to say what would go unfilled. Defaulted for a
     /// register written before the field existed, which reads as filling nothing.
@@ -407,6 +413,7 @@ impl Installed {
                 .iter()
                 .map(|service| Placed::of(manifest, service))
                 .collect(),
+            forms: manifest.plugin.forms.clone(),
             provides: filled(manifest),
             contributions: manifest
                 .contributions

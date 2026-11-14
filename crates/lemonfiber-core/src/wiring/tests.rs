@@ -637,6 +637,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         manifest: String::new(),
         tree: String::new(),
         installed_at: String::new(),
+        forms: Vec::new(),
     }
 }
 

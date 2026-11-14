@@ -1,6 +1,6 @@
 use lemonfiber_manifest::Criticality;
 
-use super::{criticality, profile_of, profiled};
+use super::{criticality, joining, pinned_in, profile_of, profiled};
 use crate::test_support::{an_installed, media};
 
 /// The stack profile the bundle names for the media server's plugin.
@@ -85,4 +85,50 @@ fn a_plugins_criticality_is_the_stacks_weight_of_the_same_name() {
     ] {
         assert_eq!(criticality(declared), weighed);
     }
+}
+
+#[test]
+fn a_first_party_plugin_sits_in_its_bundle_profile_whatever_its_stage() {
+    let moved = media::moved();
+    let pin = lemonfiber_bundled::PINNED
+        .iter()
+        .find(|pin| pin.first_party.plugin == media::PLUGIN)
+        .copied();
+    for stage in [
+        Some(lemonfiber_bundled::Stage::Assembled),
+        Some(lemonfiber_bundled::Stage::Installed),
+        Some(lemonfiber_bundled::Stage::Offered),
+        None,
+    ] {
+        let pins: Vec<lemonfiber_bundled::Pinned> = pin
+            .map(|pin| lemonfiber_bundled::Pinned { stage, ..pin })
+            .into_iter()
+            .collect();
+        let placed = moved
+            .as_ref()
+            .and_then(|installed| pinned_in(&pins, installed).map(|(_, profile)| profile));
+        assert!(placed.is_some());
+        assert_eq!(placed, pinned_profile(), "{stage:?}");
+    }
+}
+
+#[test]
+fn only_a_plugin_the_bundle_does_not_place_joins_forms_of_its_own() {
+    let stranger = crate::plugin::Installed {
+        forms: vec!["books".to_owned()],
+        ..an_installed("komga", Vec::new())
+    };
+    let joins = joining(
+        &[stranger]
+            .into_iter()
+            .chain(media::moved())
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        joins
+            .iter()
+            .map(|one| (one.plugin.as_str(), one.profile.as_str(), one.forms.clone()))
+            .collect::<Vec<_>>(),
+        vec![("komga", "plugin-komga", vec!["books".to_owned()])]
+    );
 }

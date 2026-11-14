@@ -97,6 +97,7 @@ mod pinning;
 mod planned;
 pub(crate) use planned::beside;
 mod colliding;
+mod forming;
 mod twice;
 mod updating;
 pub(crate) mod writing;

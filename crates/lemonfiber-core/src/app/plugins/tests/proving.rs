@@ -47,6 +47,52 @@ async fn a_plugin_whose_proof_holds_is_started_asked_and_then_recorded() {
     );
 }
 
+/// A plugin waits for its forms: none of them running here, its service is started to prove
+/// it, then stopped once it is installed.
+#[tokio::test]
+async fn a_plugin_none_of_whose_forms_run_is_stopped_once_installed_and_awaits_them() {
+    let runner = Arc::new(Recording::answering(Ok(spoke(""))));
+    let ctx = proving("awaits", runner.clone(), answering(200));
+
+    let install =
+        report(installing(&ctx, &source("awaits", PROVING)).await).and_then(|one| one.install);
+
+    assert_eq!(
+        install
+            .as_ref()
+            .map(|one| (one.recorded, one.awaits.clone())),
+        Some((true, vec!["library".to_owned()]))
+    );
+    assert!(runner.ran("up"), "its own service was started to prove it");
+    assert!(
+        runner.ran("stop"),
+        "and stopped again once it was installed"
+    );
+    assert!(!runner.ran("rm"), "and left on the machine");
+}
+
+/// A plugin that would not stop once installed stays recorded and is said to await nothing,
+/// since nothing was stopped for its forms to start again.
+#[tokio::test]
+async fn a_plugin_that_will_not_stop_once_installed_awaits_nothing() {
+    let runner = Keyed::answering(
+        vec![("stop", Ok(engine_refused("no such container")))],
+        Ok(spoke("")),
+    );
+    let ctx = proving("awaits-unstopped", runner.clone(), answering(200));
+
+    let install = report(installing(&ctx, &source("awaits-unstopped", PROVING)).await)
+        .and_then(|one| one.install);
+
+    assert_eq!(
+        install
+            .as_ref()
+            .map(|one| (one.recorded, one.awaits.clone())),
+        Some((true, Vec::new()))
+    );
+    assert!(runner.ran("stop"));
+}
+
 impl LostToTheInstall {
     /// One of them, before anything has started.
     pub(super) fn losing(once_up: &'static str) -> Arc<Self> {

@@ -209,6 +209,11 @@
     "status": 400,
     "description": "Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it."
   },
+  "PLUGIN-51": {
+    "name": "UNDECLARED_FORM",
+    "status": 400,
+    "description": "Raised when a plugin's manifest names a form the stack does not declare."
+  },
   "PLUGIN-6": {
     "name": "NOWHERE",
     "status": 500,
