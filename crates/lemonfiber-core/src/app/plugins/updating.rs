@@ -18,14 +18,16 @@
 
 use std::path::Path;
 
-use crate::error::{Problem, Remedy, State};
+use crate::error::Problem;
 use crate::instant::Instant;
 use crate::plugin::{Install, Installed, Installs, Register, Restored, Update};
 
 use super::super::Ctx;
 use super::writing::{carry_out, nowhere_to_write};
 use super::{proving, verifying};
-use crate::error::codes::plugin::{ANOTHER_PLUGIN, NOTHING_TO_UPDATE, STUCK};
+use refused::{another_plugin, not_installed, stuck};
+
+mod refused;
 
 /// Replace the installed version of a plugin with the one at this path, or say what
 /// doing so would come to.
@@ -66,7 +68,7 @@ pub(crate) async fn update(
     without.forget(&was.plugin);
     let wiring = super::standing::standing(ctx, &stack_manifest, &without, &would);
     let served = crate::seed::run::served(ctx).await;
-    unheld(ctx, &would, without.installed(), &served)?;
+    unheld(ctx, &stack_manifest, &would, without.installed(), &served)?;
     let trusted = crate::plugin::first_party::EMBEDDED;
     super::granting::aimed(&would, trusted)?;
     let granting =
@@ -157,7 +159,7 @@ pub(crate) async fn update(
         stamp,
         standing: &standing,
         before: &before,
-        services: &stack_manifest.services,
+        stack_manifest: &stack_manifest,
         consent,
     };
     let came = match on(ctx, &coming, &mut account.install).await {
@@ -227,9 +229,8 @@ async fn recorded(
     super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
     crate::seed::run::reinstalled(ctx).await;
-    if let Ok(manifest) = super::writing::stack_manifest(ctx) {
-        account.install.awaits = super::proving::waiting(ctx, &manifest, would, coming.stack).await;
-    }
+    account.install.awaits =
+        super::proving::waiting(ctx, coming.stack_manifest, would, coming.stack).await;
     Ok(after)
 }
 
@@ -290,8 +291,8 @@ struct Coming<'a> {
     standing: &'a super::super::engine::Stack,
     /// What the stack's own checks said then.
     before: &'a [crate::doctor::Finding],
-    /// The stack's services, which the new version's recipes may call.
-    services: &'a [lemonfiber_manifest::Service],
+    /// The stack's manifest, whose services the new version's recipes may call.
+    stack_manifest: &'a lemonfiber_manifest::Manifest,
     /// What the operator agreed to and gave, which the recipes run under.
     consent: &'a super::Consent,
 }
@@ -364,7 +365,7 @@ async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
         ctx,
         coming.manifest,
         coming.would,
-        coming.services,
+        &coming.stack_manifest.services,
         coming.consent,
         coming.stamp,
     )
@@ -488,66 +489,19 @@ fn installed_as(held: &Register, plugin: &str) -> Result<Installed, Box<Problem>
         .ok_or_else(|| Box::new(not_installed(plugin)))
 }
 
-/// No version of this plugin is installed, so there is nothing to replace.
-fn not_installed(plugin: &str) -> Problem {
-    Problem::new(
-        NOTHING_TO_UPDATE,
-        format!("{plugin} is not installed, so there is nothing to update"),
-        "Nothing was changed. An update replaces a version this machine already has.",
-        Remedy::new("Install it instead: lemonfiber plugin install on the same source"),
-    )
-    .in_state(State::Guided)
-}
-
-/// The source holds a different plugin from the one the update named. The name asked
-/// for is the asker's own words, so it is said through the sanitiser.
-fn another_plugin(named: &str, holds: &str) -> Problem {
-    let named = crate::text::plain(named);
-    Problem::new(
-        ANOTHER_PLUGIN,
-        format!("That source holds {holds}, not {named}"),
-        format!(
-            "Nothing was changed. An update puts a new version of {named} in place of the one \
-             installed, and this source holds a different plugin."
-        ),
-        Remedy::new(format!(
-            "Name a source that holds {named}, or install {holds} on its own"
-        )),
-    )
-    .in_state(State::Guided)
-}
-
-/// The installed version's containers would not come off, and nothing else was touched.
-fn stuck(was: &Installed) -> Problem {
-    Problem::new(
-        STUCK,
-        format!(
-            "{} {} would not stop, so it was not updated",
-            was.plugin, was.version
-        ),
-        format!(
-            "Nothing else was changed: {} is still installed, its files are where they were, \
-             and the record still names {}. The container engine was asked to take its \
-             containers off and would not.",
-            was.plugin, was.version
-        ),
-        Remedy::new("Check the container engine is running, then try the update again"),
-    )
-    .in_state(State::Guided)
-}
-
 /// Refuse the new version anything another plugin or this machine already holds.
 ///
 /// `others` is every installed plugin but the version being replaced, so an update is
 /// never held to what it replaces.
 fn unheld(
     ctx: &Ctx,
+    stack_manifest: &lemonfiber_manifest::Manifest,
     would: &Installed,
     others: &[Installed],
     served: &[crate::ports::service::Route],
 ) -> Result<(), Box<Problem>> {
     super::colliding::apart(would, others)?;
-    super::forming::declared(would, &super::writing::stack_manifest(ctx)?)?;
+    super::forming::declared(would, stack_manifest)?;
     super::pinning::as_trusted(would, crate::plugin::first_party::EMBEDDED)?;
     super::occupied::unoccupied(ctx, would, others, served)
 }

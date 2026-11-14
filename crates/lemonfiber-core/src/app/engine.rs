@@ -520,12 +520,7 @@ pub(super) fn resolved(
         resolve(&manifest, forms, ctx.settings.protocols)
     }
     .map_err(|err| Box::new(err.problem()))?;
-    let register = super::plugins::read(ctx)?;
-    plan = crate::stack::closure::joined(
-        plan,
-        &manifest,
-        &crate::plugin::joining(register.installed()),
-    );
+    plan = crate::stack::closure::joined(plan, &manifest, &inflight::joining(ctx));
     let replaced = super::targets::replaced_parts(ctx, &manifest);
     plan.services.retain(|service| !replaced.contains(service));
     Ok((manifest, plan))

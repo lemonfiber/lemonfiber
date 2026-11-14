@@ -172,8 +172,8 @@ fn installed(ctx: &Ctx) -> Vec<crate::plugin::Installed> {
 }
 
 /// Every installed plugin whose services sit in a profile of its own, with the forms it
-/// joins.
-fn joining(ctx: &Ctx) -> Vec<crate::stack::closure::Joining> {
+/// joins: none where the register cannot be read.
+pub(super) fn joining(ctx: &Ctx) -> Vec<crate::stack::closure::Joining> {
     crate::plugin::joining(&installed(ctx))
 }
 
