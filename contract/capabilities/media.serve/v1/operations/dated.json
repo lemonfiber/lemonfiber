@@ -32,19 +32,25 @@
               "$defs": {
                 "Dated": {
                   "additionalProperties": false,
-                  "description": "When a key was made and last used, as the server writes each moment.",
+                  "description": "When a key was made and last used.",
                   "properties": {
                     "created": {
-                      "description": "When it was made.",
+                      "default": null,
+                      "description": "When it was made, where the server says.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     },
                     "last_used": {
+                      "default": null,
                       "description": "When it was last used, absent where the server says it never was.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     }

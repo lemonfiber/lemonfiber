@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::MemberStanding;
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Claimed, Dated, Declinable, Declined, Invitations, Member};
@@ -508,8 +509,8 @@ async fn the_doctor_dates_the_decline_key_from_the_media_server() {
     let http = Fake::by_path(vec![(
         media::serve("dated"),
         media::answered(&[Dated {
-            created: Some("2026-10-05T00:00:00Z".to_owned()),
-            last_used: Some("2026-10-05T00:00:30Z".to_owned()),
+            created: Some(Instant::from_seconds(1_791_158_400)),
+            last_used: Some(Instant::from_seconds(1_791_158_430)),
         }]),
     )]);
     let ctx = over(

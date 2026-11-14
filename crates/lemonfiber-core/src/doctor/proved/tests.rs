@@ -77,7 +77,10 @@ async fn a_run_proof_is_run_once_and_its_verdict_kept_with_when_it_was_reached()
     )
     .await;
     assert_eq!(first.asked().len(), 1);
-    assert!(note(said.first()).contains("reached at 100"), "{said:?}");
+    assert!(
+        note(said.first()).contains("reached at 1970-01-01T00:01:40Z"),
+        "{said:?}"
+    );
 
     let again = Proving::exiting(1, "broken");
     let said = verdicts(
@@ -92,7 +95,7 @@ async fn a_run_proof_is_run_once_and_its_verdict_kept_with_when_it_was_reached()
     .await;
     assert!(again.asked().is_empty(), "a kept verdict is not run again");
     assert!(
-        matches!(said.first(), Some(Verdict::Pass { note: Some(note) }) if note.contains("reached at 100")),
+        matches!(said.first(), Some(Verdict::Pass { note: Some(note) }) if note.contains("reached at 1970-01-01T00:01:40Z")),
         "{said:?}"
     );
 }
@@ -264,7 +267,7 @@ async fn a_failed_run_is_kept_and_reported_as_the_plugins_failure() {
     .await;
     assert!(again.asked().is_empty());
     assert!(
-        note(said.first()).contains("did not hold, reached at 100"),
+        note(said.first()).contains("did not hold, reached at 1970-01-01T00:01:40Z"),
         "{said:?}"
     );
 }
