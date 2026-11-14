@@ -137,7 +137,7 @@ and the rest is named in **Standing**.
 
 ## What the table adds up to
 
-Of the sixty-six requests, fifty-nine reach the web in full, five reach it in
+Of the sixty-seven requests, sixty reach the web in full, five reach it in
 part, zero do not reach it at all, and two — `ui` and `pass` — are honest exceptions.
 Five gaps and two exceptions is close to the split `G1-R1` asks for, and the split is
 deliberately lopsided: an exception has to survive being argued, and almost nothing
