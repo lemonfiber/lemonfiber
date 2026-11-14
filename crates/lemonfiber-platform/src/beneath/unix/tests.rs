@@ -78,3 +78,21 @@ fn a_link_swapped_in_above_the_state_after_it_was_checked_reaches_nothing_outsid
     assert!(std::fs::read_to_string(elsewhere.join("operator.env"))
         .is_ok_and(|text| text == "SECRET=kept"));
 }
+
+#[test]
+fn a_link_standing_where_the_state_is_is_refused_and_left_alone() {
+    let (_dir, root, elsewhere) = project();
+    let (from, to) = ends(&root);
+    let _ = std::fs::remove_dir_all(&from);
+    let _ = symlink(&elsewhere, &from);
+
+    let refused = moving(&from, &to, &root, &|| ());
+
+    assert!(
+        matches!(&refused, Err(Refusal::Said(why)) if why.contains("it is a link")),
+        "{refused:?}"
+    );
+    assert!(std::fs::symlink_metadata(&from).is_ok_and(|found| found.is_symlink()));
+    assert!(std::fs::symlink_metadata(&to).is_err());
+    assert!(untouched(&elsewhere));
+}
