@@ -1,6 +1,7 @@
 use super::{TellingCheck, BEHIND};
 use crate::baseline::Baseline;
 use crate::doctor::{Category, Check, Verdict};
+use crate::instant::Instant;
 use crate::ports::service::{Occasion, Telling};
 use crate::seed::{said, wanted_telling, TELLING};
 use crate::test_support::requests::{answered, intake, REQUESTS};
@@ -32,7 +33,12 @@ fn asking(answer: Answer) -> Arc<dyn crate::ports::service::Requests> {
 
 fn recorded(value: &str) -> Baseline {
     let mut baseline = Baseline::new();
-    baseline.record("seerr", TELLING, value, "2026-08-28T00:00:00Z");
+    baseline.record(
+        "seerr",
+        TELLING,
+        value,
+        Instant::from_seconds(1_787_875_200),
+    );
     baseline
 }
 

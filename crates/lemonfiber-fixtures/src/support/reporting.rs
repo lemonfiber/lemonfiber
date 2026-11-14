@@ -227,7 +227,7 @@ impl Reporting {
         self.said.push(LogLine {
             service: service.to_owned(),
             stream: Stream::Stderr,
-            at: None,
+            stamped: None,
             line: line.to_owned(),
         });
         self
@@ -243,7 +243,7 @@ impl Reporting {
         self.said.push(LogLine {
             service: service.to_owned(),
             stream: Stream::Stdout,
-            at: Some(at.to_owned()),
+            stamped: Some(at.to_owned()),
             line: line.to_owned(),
         });
         self

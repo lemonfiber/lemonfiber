@@ -189,7 +189,7 @@ pub(crate) fn observe_client(
             expected
                 .map(|record| crate::baseline::Record {
                     value: canonical_category(&record.value).to_owned(),
-                    at: record.at.clone(),
+                    at: record.at,
                     origin: record.origin,
                 })
                 .as_ref(),

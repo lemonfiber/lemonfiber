@@ -358,7 +358,7 @@ fn held_anew(
     }];
     crate::settings::kept(&secrets, &keeping, ctx.seams.random.as_ref(), &|replaced| {
         let seeded = files.iter().map(|(_, path, bytes)| Change {
-            at: stamp.clone(),
+            at: stamp,
             operation: operation.clone(),
             target: path.display().to_string(),
             kind: Kind::Seeded {
@@ -371,7 +371,7 @@ fn held_anew(
         let changes: Vec<Change> = replaced
             .iter()
             .map(|one| Change {
-                at: stamp.clone(),
+                at: stamp,
                 operation: operation.clone(),
                 target: one.name.clone(),
                 kind: Kind::Secret {

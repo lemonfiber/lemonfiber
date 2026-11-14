@@ -2,6 +2,7 @@ use super::{
     prose, residual, settings, shown, Contents, Filenames, Marks, Piece, Residual, Taken, Terms,
     SALT_BYTES,
 };
+use crate::instant::Instant;
 use crate::ports::random::Random;
 
 /// Salt built rather than written, for the reason every credential-shaped fixture in
@@ -214,7 +215,7 @@ fn the_first_page_states_what_was_done_to_the_bundle() {
         taken: Taken {
             lemonfiber: "0.7.0".to_owned(),
             stack: "1.2.0".to_owned(),
-            at: "2026-08-18T00:00:00Z".to_owned(),
+            at: Instant::from_seconds(1_787_011_200),
         },
         terms: terms(&[], Filenames::Replaced),
     };

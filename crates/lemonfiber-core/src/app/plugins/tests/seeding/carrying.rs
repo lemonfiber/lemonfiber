@@ -2,6 +2,7 @@
 //! that service wrote or the stack published, and the account set up on it.
 
 use super::*;
+use crate::instant::Instant;
 
 /// The stack's own service the moving manifest's upstream moves in place of.
 const RESERVED: &str = "jellyfin";
@@ -59,7 +60,8 @@ fn minted_moved(
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
 
-    super::super::super::minting::minted(ctx, &would, manifest, "1", trusted).ok()?;
+    super::super::super::minting::minted(ctx, &would, manifest, Instant::from_seconds(1), trusted)
+        .ok()?;
     minted(ctx)
 }
 
@@ -305,7 +307,7 @@ fn minted_moving_in(
         &ctx,
         &would,
         &manifest,
-        "1",
+        Instant::from_seconds(1),
         crate::plugin::first_party::EMBEDDED,
     )
     .ok()?;
@@ -455,7 +457,14 @@ fn minted_account(
     would.manifest = crate::test_support::CONTRACTED_MANIFEST.to_owned();
     would.tree = crate::test_support::A_TREE.to_owned();
 
-    super::super::super::minting::minted(&ctx, &would, &manifest, "1", trusted).ok()?;
+    super::super::super::minting::minted(
+        &ctx,
+        &would,
+        &manifest,
+        Instant::from_seconds(1),
+        trusted,
+    )
+    .ok()?;
     let held =
         crate::settings::secrets_at(&ctx).and_then(|at| crate::settings::Secrets::at(&at).ok())?;
     let part = |id: &str| held.value(&format!("komga:{id}")).map(str::to_owned);
@@ -545,7 +554,7 @@ fn carried(
             &ctx,
             &would,
             manifest,
-            "1",
+            Instant::from_seconds(1),
             crate::plugin::first_party::EMBEDDED,
         )
         .ok()

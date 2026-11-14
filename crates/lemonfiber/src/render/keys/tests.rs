@@ -1,3 +1,4 @@
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, Purpose, Secret, State};
 use lemonfiber_fixtures::ports::Chance;
 
@@ -32,9 +33,9 @@ fn a_key(name: &str, state: State, member_minted: bool) -> Listed {
         scope: "act".to_owned(),
         purpose: Purpose::Other,
         state,
-        minted: "2026-10-05T06:00:00".to_owned(),
+        minted: Instant::from_seconds(1_791_180_000),
         used: None,
-        revoked: (state == State::Revoked).then(|| "2026-10-05T07:00:00".to_owned()),
+        revoked: (state == State::Revoked).then_some(Instant::from_seconds(1_791_183_600)),
         member_minted,
         proved_by: None,
     }
@@ -134,7 +135,7 @@ fn a_machine_with_no_keys_says_so() {
 #[test]
 fn a_key_in_use_says_when_it_was_last_used() {
     let mut key = a_key("ha", State::Active, false);
-    key.used = Some("2026-10-05T08:00:00".to_owned());
+    key.used = Some(Instant::from_seconds(1_791_187_200));
     let said = listing(&Listing {
         keys: vec![key],
         revoked: None,
@@ -153,7 +154,7 @@ fn a_claim_is_shown_once_as_a_link_and_a_code_with_when_it_lapses() {
         scope: "read".to_owned(),
         purpose: Purpose::Other,
         link: link.clone(),
-        lapses: "2026-10-05T06:10:00".to_owned(),
+        lapses: Instant::from_seconds(1_791_180_600),
     })
     .text();
     assert!(
@@ -189,9 +190,9 @@ fn a_device(revoked: bool) -> lemonfiber_core::device_keys::Listed {
         fingerprint: "ab".repeat(32),
         backing: lemonfiber_core::device_keys::Backing::Strongbox,
         app: "ios:ABCDE12345.app.lemon".to_owned(),
-        registered: "2026-10-13T00:00:00Z".to_owned(),
-        used: (!revoked).then(|| "2026-10-13T01:00:00Z".to_owned()),
-        revoked: revoked.then(|| "2026-10-13T02:00:00Z".to_owned()),
+        registered: Instant::from_seconds(1_791_849_600),
+        used: (!revoked).then_some(Instant::from_seconds(1_791_853_200)),
+        revoked: revoked.then_some(Instant::from_seconds(1_791_856_800)),
     }
 }
 
@@ -202,7 +203,7 @@ fn a_device_key_registered_names_its_backing_app_and_fingerprint() {
         fingerprint: "ab".repeat(32),
         backing: lemonfiber_core::device_keys::Backing::Tee,
         app: "ios:ABCDE12345.app.lemon".to_owned(),
-        registered: "2026-10-13T00:00:00Z".to_owned(),
+        registered: Instant::from_seconds(1_791_849_600),
     })
     .text();
     assert!(
@@ -223,9 +224,9 @@ fn the_device_keys_are_listed_with_where_each_stands_and_what_a_revoke_did() {
         .text()
     };
     let said = listed(None, false);
-    assert!(said.contains("last used 2026-10-13T01:00:00Z"), "{said}");
+    assert!(said.contains("last used 2026-10-13T01:00:00 UTC"), "{said}");
     assert!(said.contains("never used"), "{said}");
-    assert!(said.contains("revoked 2026-10-13T02:00:00Z"), "{said}");
+    assert!(said.contains("revoked 2026-10-13T02:00:00 UTC"), "{said}");
     assert!(said.contains("active"), "{said}");
     assert!(listed(Some("pixel"), false).contains("Revoked the device key pixel."));
     assert!(listed(Some("pixel"), true).contains("Revoking would refuse the device key pixel"));
@@ -243,7 +244,7 @@ fn a_push_endpoint() -> lemonfiber_core::push::Listed {
     lemonfiber_core::push::Listed {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/abc".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: Instant::from_seconds(1_794_009_600),
     }
 }
 
@@ -252,7 +253,7 @@ fn a_push_endpoint_registered_says_it_is_woken_or_would_be() {
     let mut report = lemonfiber_core::push::Registered {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/abc".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: Instant::from_seconds(1_794_009_600),
         rehearsed: false,
     };
     let said = super::pushed(&report).text();

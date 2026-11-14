@@ -59,11 +59,10 @@ pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
     }
     lines.put(format!(
         "    installed  {}",
-        if one.installed_at.is_empty() {
-            "at a moment the record does not hold".to_owned()
-        } else {
-            format!("at {} (seconds since the epoch)", one.installed_at)
-        }
+        one.installed_at.map_or_else(
+            || "at a moment the record does not hold".to_owned(),
+            |at| format!("at {}", at.said())
+        )
     ));
     if !declared.upstream.is_empty() {
         lines.put(format!(
@@ -98,7 +97,11 @@ pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
         lines.put(format!(
             "    outside    {} {} at {}: {} — it fills none of {} until a proof it passes \
              clears this",
-            answered.capability, answered.operation, answered.at, answered.why, answered.capability
+            answered.capability,
+            answered.operation,
+            answered.at.said(),
+            answered.why,
+            answered.capability
         ));
     }
     for change in &declared.overrides {

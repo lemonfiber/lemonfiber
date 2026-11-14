@@ -139,7 +139,7 @@ fn moved_in_place(manifest: &Manifest, would: &Installed) -> Option<Change> {
             placed.service == would.plugin && placed.replaces.as_deref() == Some(&would.plugin)
         });
     moves.then(|| Change {
-        at: would.installed_at.clone(),
+        at: would.installed_at.unwrap_or_default(),
         operation: crate::plugin::owner(&would.plugin),
         target: would.plugin.clone(),
         kind: Kind::MovedInPlace {

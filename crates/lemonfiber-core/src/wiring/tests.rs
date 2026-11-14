@@ -2,6 +2,7 @@ use super::{
     recorded, settle, substitute, unfilled, Chosen, LeftBehind, Reaches, Refused, Settled,
     Substitution, Unfilled, Whose, FILLS_KEY,
 };
+use crate::instant::Instant;
 use lemonfiber_manifest::Manifest;
 
 /// Where each of these services came from, where every one is the stack's own.
@@ -453,7 +454,7 @@ fn choosing_what_already_fills_it_is_refused_rather_than_journalled_as_a_change(
 fn a_substitution_is_journalled_as_a_change_that_can_be_put_back() {
     let change = substituting(stack(), &Chosen::default(), "indexer.search", "nzbhydra2")
         .and_then(Result::ok)
-        .map(|made| recorded(&made, None, "2026-09-19T00:00:00Z"));
+        .map(|made| recorded(&made, None, Instant::from_seconds(1_789_776_000)));
     assert_eq!(
         change.as_ref().map(|change| change.operation.clone()),
         Some("substitute".to_owned())
@@ -636,7 +637,7 @@ fn plugin_filling(plugin: &str, service: &str, capability: &str) -> crate::plugi
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     }
 }
 

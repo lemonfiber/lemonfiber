@@ -25,11 +25,12 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Invited, Member};
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_fixtures::ports::{stamp, HOUR};
+use lemonfiber_fixtures::ports::{moment, HOUR};
 use lemonfiber_testing::media;
 
 /// The owner, who administers the server.
@@ -48,15 +49,15 @@ fn household() -> Vec<Member> {
 /// Ana, reset an hour ago: unclaimed, and seen before.
 fn ana_reset() -> Member {
     let mut ana = media::member("9", "Ana", false);
-    ana.last_seen = Some(format!("{}Z", stamp(-HOUR)));
+    ana.last_seen = Some(moment(-HOUR));
     ana
 }
 
 /// An invitation the media server records `member` as having been sent at `at`.
-fn invited(member: &str, at: &str) -> Invited {
+fn invited(member: &str, at: Instant) -> Invited {
     Invited {
         member: member.to_owned(),
-        at: at.to_owned(),
+        at: Some(at),
     }
 }
 
@@ -64,8 +65,8 @@ fn invited(member: &str, at: &str) -> Invited {
 /// when her password was taken off two hours ago.
 fn ana_invited() -> Vec<Invited> {
     vec![
-        invited("9", "2026-01-04T09:00:00Z"),
-        invited("9", &format!("{}Z", stamp(-2 * HOUR))),
+        invited("9", Instant::from_seconds(1_767_517_200)),
+        invited("9", moment(-2 * HOUR)),
     ]
 }
 
@@ -307,7 +308,7 @@ async fn a_reset_stands_for_its_own_window_and_not_the_account_s_age() {
     // Ana joined in January and was reset today, so she is unclaimed and her account is
     // years old. Bo is a real expired invitation: made long ago and never claimed.
     let mut since = ana_invited();
-    since.push(invited("7", "2026-01-04T09:00:00Z"));
+    since.push(invited("7", Instant::from_seconds(1_767_517_200)));
     let http = a_server_holding(
         media::answered(&[owner(), ana_reset(), media::member("7", "bo", false)]),
         &since,

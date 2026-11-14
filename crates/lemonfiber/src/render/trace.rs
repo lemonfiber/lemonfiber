@@ -3,6 +3,7 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{
     HouseholdMember, HouseholdReport, MemberRequest, MemberStanding, Restriction, StuckReport,
     TraceReport,
@@ -261,17 +262,13 @@ fn standing(member: &HouseholdMember) -> String {
         said.push(asking.standing.phrase().to_owned());
     }
     said.push(if member.claimed {
-        member
-            .last_seen
-            .as_deref()
-            .and_then(|at| at.split('T').next())
-            .map_or_else(
-                // Not "never signed in": the account has been claimed, which on this
-                // media server is done *by* signing in. A date missing here is the
-                // server not reporting one, not somebody who never arrived.
-                || "no sign-in recorded".to_owned(),
-                |day| format!("last seen {day}"),
-            )
+        member.last_seen.and_then(Instant::day).map_or_else(
+            // Not "never signed in": the account has been claimed, which on this
+            // media server is done *by* signing in. A date missing here is the
+            // server not reporting one, not somebody who never arrived.
+            || "no sign-in recorded".to_owned(),
+            |day| format!("last seen {day}"),
+        )
     } else if member.standing == MemberStanding::Declined {
         "invited, and they declined it — remove the account or reissue it".to_owned()
     } else if member.standing == MemberStanding::Expired {
@@ -359,7 +356,7 @@ pub(super) fn trace(report: &TraceReport) -> Lines {
     for stage in &report.stages {
         let label = stage.stage.label();
         match &stage.at {
-            Some(at) => lines.put(format!("  ✓ {label}   {}   {at}", stage.service)),
+            Some(at) => lines.put(format!("  ✓ {label}   {}   {}", stage.service, at.said())),
             None => lines.put(format!("  ✓ {label}   {}", stage.service)),
         }
     }
@@ -384,7 +381,10 @@ pub(super) fn trace(report: &TraceReport) -> Lines {
     if grabs > 1 || troubled {
         lines.put("  history:");
         for moment in &report.history {
-            lines.put(format!("      {}   {}", moment.outcome.phrase(), moment.at));
+            let at = moment
+                .at
+                .map_or_else(|| "at a moment not reported".to_owned(), Instant::said);
+            lines.put(format!("      {}   {at}", moment.outcome.phrase()));
         }
     }
     if let Some(coverage) = &report.coverage {

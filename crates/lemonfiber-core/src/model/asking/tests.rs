@@ -1,5 +1,6 @@
 use super::{Counted, MemberAsking};
 use crate::asking::{Policy, Standing};
+use crate::instant::Instant;
 
 /// One count, held to a limit or held to nothing.
 fn counted(limit: Option<u32>, used: u32) -> Counted {
@@ -12,13 +13,13 @@ fn counted(limit: Option<u32>, used: u32) -> Counted {
 }
 
 /// A member held to a limit, with a date the count makes room on.
-fn held(frees_up: Option<&str>) -> MemberAsking {
+fn held(frees_up: Option<Instant>) -> MemberAsking {
     MemberAsking {
         policy: Policy::WithinALimit,
         standing: Standing::QuotaExhausted,
         films: counted(Some(5), 5),
         television: counted(None, 0),
-        frees_up: frees_up.map(str::to_owned),
+        frees_up,
     }
 }
 
@@ -26,7 +27,7 @@ fn held(frees_up: Option<&str>) -> MemberAsking {
 /// there is room again.
 #[test]
 fn the_sentence_says_the_limit_what_is_gone_and_when_there_is_room() {
-    let said = held(Some("2026-09-16T21:04:09"))
+    let said = held(Some(Instant::from_seconds(1_789_592_649)))
         .sentence()
         .unwrap_or_default();
 
@@ -77,7 +78,8 @@ fn a_limit_with_no_period_counts_everything_they_have_asked_for() {
 /// renamed here would pass everything and break whoever reads `--json`.
 #[test]
 fn what_a_member_may_ask_for_goes_out_as_exactly_this_document() {
-    let written = serde_json::to_string(&held(Some("2026-09-16T21:04:09"))).unwrap_or_default();
+    let written = serde_json::to_string(&held(Some(Instant::from_seconds(1_789_592_649))))
+        .unwrap_or_default();
 
     assert_eq!(
         written,
@@ -85,7 +87,7 @@ fn what_a_member_may_ask_for_goes_out_as_exactly_this_document() {
             r#"{"policy":"within-a-limit","standing":"quota-exhausted","#,
             r#""films":{"limit":5,"used":5,"remaining":0,"period":"a week"},"#,
             r#""television":{"limit":null,"used":0,"remaining":null,"period":null},"#,
-            r#""frees_up":"2026-09-16T21:04:09"}"#
+            r#""frees_up":1789592649}"#
         )
     );
 }

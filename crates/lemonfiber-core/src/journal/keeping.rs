@@ -6,6 +6,7 @@
 //! operator to discover by looking for a change that is no longer there.
 
 use super::Change;
+use crate::instant::Instant;
 
 /// How many runs of the record are kept.
 ///
@@ -20,14 +21,14 @@ pub const RUNS_KEPT: usize = 100;
 ///
 /// The operation names the kind of run and every run of that kind reuses it; the surface
 /// stamps one time for a whole run. The pair is what tells two of them apart.
-fn run(change: &Change) -> (&str, &str) {
-    (&change.operation, &change.at)
+fn run(change: &Change) -> (&str, Instant) {
+    (&change.operation, change.at)
 }
 
 /// How many runs the record holds.
 #[must_use]
 pub fn runs(changes: &[Change]) -> usize {
-    let mut seen: Vec<(&str, &str)> = Vec::new();
+    let mut seen: Vec<(&str, Instant)> = Vec::new();
     for change in changes {
         let run = run(change);
         if !seen.contains(&run) {
@@ -43,7 +44,7 @@ pub fn runs(changes: &[Change]) -> usize {
 /// already within the bound is returned untouched.
 #[must_use]
 pub fn kept(changes: &[Change]) -> &[Change] {
-    let mut seen: Vec<(&str, &str)> = Vec::new();
+    let mut seen: Vec<(&str, Instant)> = Vec::new();
     let mut cut = 0;
     for (index, change) in changes.iter().enumerate().rev() {
         let run = run(change);

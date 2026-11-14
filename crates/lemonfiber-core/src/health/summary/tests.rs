@@ -1,14 +1,14 @@
 use super::{Reach, Standing, Summary, STEADY};
 use crate::condition::{Condition, Fault};
 use crate::error::Severity;
+use crate::instant::Instant;
 
-/// When the faults in these tests were raised, in the seconds-since-the-epoch
-/// the clock port hands out.
-const RAISED: &str = "1000";
+/// When the faults in these tests were raised.
+const RAISED: Instant = Instant::from_seconds(1000);
 
 /// Long enough after `RAISED` that everything has settled — so a test that is
 /// not about the debounce is not silently subject to it.
-const SETTLED: &str = "9000";
+const SETTLED: Instant = Instant::from_seconds(9000);
 
 /// One thing wrong, at a severity.
 fn wrong(check: &str, severity: Severity, summary: &str) -> Condition {
@@ -239,7 +239,7 @@ fn a_fault_that_keeps_bouncing_is_not_called_fixed_in_the_gaps() {
     // What flaps is a service restarting every few seconds; what makes the
     // summary flap is declaring it fixed between the bounces.
     let mut bouncing = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    bouncing.clear("1100");
+    bouncing.clear(Instant::from_seconds(1100));
     bouncing.raise(
         &Fault::new(
             "service.stopped",
@@ -248,19 +248,19 @@ fn a_fault_that_keeps_bouncing_is_not_called_fixed_in_the_gaps() {
             "nothing that needs it is working",
             "look at it",
         ),
-        "1200",
+        Instant::from_seconds(1200),
     );
-    bouncing.clear("1300");
+    bouncing.clear(Instant::from_seconds(1300));
 
-    let moments_later = (1300 + STEADY - 1).to_string();
+    let moments_later = Instant::from_seconds(1300 + STEADY - 1);
     assert_eq!(
-        Summary::of(Reach::Running, &[&bouncing], &moments_later).standing,
+        Summary::of(Reach::Running, &[&bouncing], moments_later).standing,
         Standing::Broken,
         "it has been coming back; do not call it fixed yet"
     );
-    let long_enough = (1300 + STEADY).to_string();
+    let long_enough = Instant::from_seconds(1300 + STEADY);
     assert_eq!(
-        Summary::of(Reach::Running, &[&bouncing], &long_enough).standing,
+        Summary::of(Reach::Running, &[&bouncing], long_enough).standing,
         Standing::Healthy,
         "and once it has stayed away, it is genuinely gone"
     );
@@ -271,30 +271,9 @@ fn something_that_cleared_and_never_came_back_is_gone_at_once() {
     // Only a fault with a history of returning is held on to; a one-off that
     // resolved is not kept around for half a minute.
     let mut resolved = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    resolved.clear("1100");
+    resolved.clear(Instant::from_seconds(1100));
     assert_eq!(
-        Summary::of(Reach::Running, &[&resolved], "1101").standing,
-        Standing::Healthy
-    );
-}
-
-#[test]
-fn a_clock_problem_cannot_pin_a_resolved_fault_to_the_summary_forever() {
-    let mut resolved = wrong("service.sonarr", Severity::Error, "sonarr stopped");
-    resolved.clear("1100");
-    resolved.raise(
-        &Fault::new(
-            "service.stopped",
-            Severity::Error,
-            "sonarr stopped",
-            "nothing that needs it is working",
-            "look at it",
-        ),
-        "1200",
-    );
-    resolved.cleared = Some("whenever".to_owned());
-    assert_eq!(
-        Summary::of(Reach::Running, &[&resolved], "9000").standing,
+        Summary::of(Reach::Running, &[&resolved], Instant::from_seconds(1101)).standing,
         Standing::Healthy
     );
 }
@@ -303,7 +282,7 @@ fn a_clock_problem_cannot_pin_a_resolved_fault_to_the_summary_forever() {
 fn a_symptom_is_not_folded_into_a_cause_the_summary_has_stopped_counting() {
     // Folding into a root that is no longer reported would hide both.
     let mut gone_disk = wrong("storage.space", Severity::Error, "the disk is full");
-    gone_disk.clear("1100");
+    gone_disk.clear(Instant::from_seconds(1100));
     let import = caused_by(
         "import.sonarr",
         Severity::Error,
@@ -390,7 +369,7 @@ fn an_affected_item_carries_when_its_check_went_wrong() {
     // The condition's own stamp, so the summary and the doctor name one moment for
     // one check, and a later run does not make an old fault look new.
     let mut stopped = wrong("service.sonarr", Severity::Error, "Sonarr is stopped");
-    stopped.clear("2000");
+    stopped.clear(Instant::from_seconds(2000));
     stopped.raise(
         &Fault::new(
             "service.sonarr",
@@ -399,20 +378,23 @@ fn an_affected_item_carries_when_its_check_went_wrong() {
             "nothing that needs it is working",
             "look at it",
         ),
-        "3000",
+        Instant::from_seconds(3000),
     );
     let standing = wrong("vpn.egress", Severity::Error, "the tunnel is down");
 
     let summary = Summary::of(Reach::Running, &[&stopped, &standing], SETTLED);
-    let onsets: Vec<(&str, &str)> = summary
+    let onsets: Vec<(&str, Instant)> = summary
         .affected
         .iter()
-        .map(|item| (item.check.as_str(), item.onset.as_str()))
+        .map(|item| (item.check.as_str(), item.onset))
         .collect();
 
     assert_eq!(
         onsets,
-        vec![("service.sonarr", "3000"), ("vpn.egress", RAISED)]
+        vec![
+            ("service.sonarr", Instant::from_seconds(3000)),
+            ("vpn.egress", RAISED)
+        ]
     );
 }
 

@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::app::Inviting;
+use crate::instant::Instant;
 
 /// The record is read from further back than the window it is judged against.
 ///
@@ -39,11 +40,11 @@ async fn the_record_is_read_from_further_back_than_the_window_it_judges() {
         .and_then(|request| {
             serde_json::from_str::<serde_json::Value>(request.body.as_deref()?).ok()
         })
-        .and_then(|asked| asked.get("since")?.as_str().map(str::to_owned))
-        .unwrap_or_default();
+        .and_then(|asked| asked.get("since")?.as_u64())
+        .map(Instant::from_seconds);
 
     assert!(
-        !read_from.is_empty() && read_from < judged,
+        read_from.is_some_and(|from| from < judged),
         "the record was read from {read_from:?}, which is not further back than the \
          {judged} an invitation is judged against — so nothing past its window can be found"
     );

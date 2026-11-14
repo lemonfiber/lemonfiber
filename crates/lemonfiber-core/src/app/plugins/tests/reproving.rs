@@ -3,6 +3,7 @@
 use super::speaking::{adapting, speaking};
 use super::*;
 use crate::app::plugins::conformance;
+use crate::instant::Instant;
 
 const PUBLISHED: [(&str, &str, u16); 1] = [("komga-adapter", "127.0.0.1", 8080)];
 
@@ -202,9 +203,5 @@ async fn the_installed_plugins_name_each_answer_kept_against_one_with_when_and_w
             "the answer did not read"
         )
     );
-    assert!(
-        one.at.len() >= 20 && one.at.get(10..11) == Some("T"),
-        "{}",
-        one.at
-    );
+    assert!(one.at > Instant::EPOCH, "{}", one.at);
 }

@@ -8,7 +8,7 @@
     },
     "onset": {
       "type": [
-        "string"
+        "integer/uint64"
       ],
       "required": true
     }

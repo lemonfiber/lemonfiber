@@ -6,6 +6,7 @@ use lemonfiber_fixtures::support::{Reporting, Tunnel};
 use super::{after_start, listening_port, pass, Asking, CameTo, Last, CHECK, RECORD};
 use crate::app::Ctx;
 use crate::config::Settings;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::test_support::{a_context, env_without_password, guard, torrent};
 
@@ -265,7 +266,7 @@ async fn a_rehearsal_passes_nothing() {
 #[test]
 fn putting_a_passed_port_back_is_left_to_the_service_and_never_written_here() {
     let change = Change {
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         operation: super::OPERATION.to_owned(),
         target: "qbittorrent".to_owned(),
         kind: Kind::Configured {

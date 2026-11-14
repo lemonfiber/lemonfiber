@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::error::Problem;
+use crate::instant::Instant;
 use crate::ports::filesystem::Readable;
 
 use super::super::super::Ctx;
@@ -14,7 +15,7 @@ use super::{recorded_making, unwritable};
 /// holds it for the plugin, readable by its owner alone where it names one.
 pub(super) fn starting(
     ctx: &Ctx,
-    recording: (&str, &str, &Path),
+    recording: (&str, Instant, &Path),
     stack: &Path,
     path: &Path,
     bytes: &[u8],
@@ -38,7 +39,7 @@ pub(super) fn starting(
 /// secret store holds it for the plugin, an `awaited` secret it holds none of left out.
 pub(super) fn upstream(
     ctx: &Ctx,
-    recording: (&str, &str, &Path),
+    recording: (&str, Instant, &Path),
     stack: &Path,
     path: &Path,
     (fields, awaited): (&BTreeMap<String, String>, &BTreeSet<String>),
@@ -71,7 +72,7 @@ fn holding(ctx: &Ctx, plugin: &str) -> impl Fn(&str) -> Option<String> {
 /// writes.
 fn made_confined(
     ctx: &Ctx,
-    recording: (&str, &str, &Path),
+    recording: (&str, Instant, &Path),
     stack: &Path,
     path: &Path,
     content: &[u8],

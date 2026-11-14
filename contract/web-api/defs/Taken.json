@@ -4,8 +4,10 @@
   "type": "object",
   "properties": {
     "at": {
-      "description": "When, as a service writes a moment.",
-      "type": "string"
+      "description": "When it was written.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "lemonfiber": {
       "description": "The lemonfiber that wrote it.",

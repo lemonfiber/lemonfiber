@@ -1,10 +1,11 @@
 use super::{horizon, kept, runs, RUNS_KEPT};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 
 /// One change of one run, stamped so that a stamp is a run.
-fn change(at: usize, key: &str) -> Change {
+fn change(at: u64, key: &str) -> Change {
     Change {
-        at: at.to_string(),
+        at: Instant::from_seconds(at),
         operation: "apply".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -17,7 +18,8 @@ fn change(at: usize, key: &str) -> Change {
 
 /// A record of `many` runs, two changes each, oldest first.
 fn record(many: usize) -> Vec<Change> {
-    (0..many)
+    (0_u64..)
+        .take(many)
         .flat_map(|at| [change(at, "PUID"), change(at, "PGID")])
         .collect()
 }
@@ -46,8 +48,8 @@ fn a_record_past_the_bound_keeps_the_newest_runs_and_drops_the_oldest() {
         "and every run left is whole, both of its changes"
     );
     assert_eq!(
-        left.first().map(|change| change.at.as_str()),
-        Some("5"),
+        left.first().map(|change| change.at),
+        Some(Instant::from_seconds(5)),
         "the five oldest runs went, newest kept"
     );
     assert!(

@@ -21,6 +21,7 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Allowance, Command, Ctx, Inviting, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{Invitation, InvitationStanding};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Invited, Member};
@@ -48,7 +49,7 @@ fn recorded() -> Vec<Invited> {
         .into_iter()
         .map(|member| Invited {
             member: member.to_owned(),
-            at: "2026-01-04T09:00:00Z".to_owned(),
+            at: Some(Instant::from_seconds(1_767_517_200)),
         })
         .collect()
 }

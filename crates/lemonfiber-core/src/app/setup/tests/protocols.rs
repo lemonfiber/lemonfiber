@@ -1,6 +1,7 @@
 //! The VPN question, the prerequisites, and confirming a run.
 
 use super::*;
+use lemonfiber_fixtures::ports::STAMPED;
 
 /// A torrent run that says it has a VPN is not warned about anything.
 #[tokio::test]
@@ -15,7 +16,7 @@ async fn a_tunnelled_torrent_run_is_not_warned() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -46,7 +47,7 @@ async fn torrents_without_a_vpn_are_warned_and_confirmed_and_never_refused() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -84,7 +85,7 @@ async fn declining_the_exposure_asks_again_rather_than_stopping() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -116,7 +117,7 @@ async fn a_usenet_only_run_is_never_asked_about_a_vpn() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -138,7 +139,7 @@ async fn the_prerequisites_are_shown_derived_from_the_chosen_protocols() {
             (&prompt, None),
             &ProbeFs::links(),
             &proving(),
-            &applying(&paths, "t")
+            &applying(&paths, STAMPED)
         )
         .await,
         Ok(Outcome::Applied)
@@ -162,7 +163,7 @@ async fn a_confirmed_run_gathers_the_answers_and_applies_them() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -203,7 +204,7 @@ async fn a_run_the_operator_does_not_confirm_applies_nothing() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -225,7 +226,7 @@ async fn where_the_container_user_does_not_apply_it_is_not_asked() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 
@@ -251,7 +252,7 @@ async fn gathering_saves_progress_so_a_quit_run_can_resume() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
     assert!(matches!(outcome, Ok(Outcome::Abandoned)));
@@ -324,7 +325,7 @@ fn resume_carries_an_interrupted_apply_forward_from_its_answers() {
     assert!(wizard.transition(Phase::Reviewing));
     assert!(wizard.transition(Phase::Applying));
 
-    assert!(super::super::resume(&mut wizard, &applying(&paths, "t")).is_ok());
+    assert!(super::super::resume(&mut wizard, &applying(&paths, STAMPED)).is_ok());
 
     assert_eq!(wizard.phase(), Phase::Applied);
     let file = store::read(&paths.env_file()).unwrap_or_default();
@@ -364,7 +365,7 @@ async fn a_wizard_past_gathering_is_refused_rather_than_re_applied() {
         (&prompt, None),
         &ProbeFs::links(),
         &proving(),
-        &applying(&paths, "t"),
+        &applying(&paths, STAMPED),
     )
     .await;
 

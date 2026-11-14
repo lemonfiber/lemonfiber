@@ -21,6 +21,7 @@
 //! for room. So each is its own line and none of them borrows another's words.
 
 use crate::household::State;
+use crate::instant::Instant;
 use crate::model::{HouseholdMember, MemberRequest};
 
 /// What to tell one member, in the order they would want it.
@@ -135,10 +136,10 @@ fn turned_down(requests: &[MemberRequest]) -> Vec<String> {
                     } else {
                         "Turned down"
                     },
-                    refused.at.as_deref().map_or_else(String::new, |at| format!(
-                        " on {}",
-                        at.split('T').next().unwrap_or(at)
-                    )),
+                    refused
+                        .at
+                        .and_then(Instant::day)
+                        .map_or_else(String::new, |day| format!(" on {day}")),
                     named(request),
                     refused.reason
                 )

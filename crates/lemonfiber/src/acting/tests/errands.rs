@@ -2,6 +2,7 @@
 
 use super::*;
 use lemonfiber_core::app::Restoring;
+use lemonfiber_core::instant::Instant;
 
 /// What a reset would revert, or did.
 fn a_reset(confirmed: bool) -> ResetReport {
@@ -334,7 +335,7 @@ fn a_restoration(relocation: Option<Relocation>) -> Restoration {
             manifest: Manifest {
                 schema: SCHEMA,
                 product_version: "0.9.0".to_owned(),
-                created_at: "2026-08-26".to_owned(),
+                created_at: Instant::from_seconds(1_787_702_400),
                 data_root: "/srv/media".to_owned(),
                 scope: Scope::WholeStack,
                 sensitive: true,

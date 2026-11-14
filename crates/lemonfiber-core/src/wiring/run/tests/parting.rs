@@ -53,13 +53,8 @@ async fn a_choice_stops_the_part_it_passes_over_journalled_before_the_choice() {
         Some(Kind::Ran { service, running: false }) if service == "prowlarr"
     ));
 
-    let stamp = changes
-        .first()
-        .map(|change| change.at.clone())
-        .unwrap_or_default();
-    let back = crate::app::putting_back::undo(&ctx, Some(&stamp))
-        .await
-        .ok();
+    let stamp = changes.first().map(|change| change.at).unwrap_or_default();
+    let back = crate::app::putting_back::undo(&ctx, Some(stamp)).await.ok();
 
     assert!(
         back.is_some_and(|back| back.reversed.iter().any(|undo| matches!(
@@ -115,12 +110,10 @@ async fn a_part_the_reversal_may_not_start_is_left_named() {
             .unwrap_or_default(),
     )
     .ok()
-    .and_then(|journal| journal.changes().first().map(|change| change.at.clone()))
+    .and_then(|journal| journal.changes().first().map(|change| change.at))
     .unwrap_or_default();
 
-    let back = crate::app::putting_back::undo(&ctx, Some(&stamp))
-        .await
-        .ok();
+    let back = crate::app::putting_back::undo(&ctx, Some(stamp)).await.ok();
 
     assert!(back.is_some_and(|back| back.left.iter().any(|left| left.target == "prowlarr")));
     assert!(!handed(&runner, "up", "prowlarr"));

@@ -46,9 +46,13 @@
       }
     },
     "installed_at": {
-      "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Empty where the record predates\nit; a rehearsal's account carries the moment it was asked, which is the stamp\nthe install would have run under.",
-      "type": "string",
-      "default": ""
+      "description": "When it was installed, as the record stamps every change: whole seconds since\nthe epoch.\n\nThe install's own stamp, the one its changes are journalled under, so the\nlisting and the history name the same moment. Absent where the record predates\nit, and on an offer's account of what installing would record, which is not yet\nstamped.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "manifest": {
       "description": "The SHA-256 of the manifest it was installed from, in lower-case hexadecimal.",

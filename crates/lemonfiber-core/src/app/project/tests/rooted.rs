@@ -4,6 +4,7 @@
 use super::{machine, manifest, plan};
 use crate::app::Ctx;
 use crate::error::codes::storage::ROOT_REFUSED;
+use lemonfiber_fixtures::ports::STAMPED;
 
 /// An NFS export whose server is no host name.
 const REFUSED: &str = "nfs://nas local/volume1";
@@ -58,7 +59,7 @@ fn a_rewrite_over_a_refused_data_root_is_refused_naming_it() {
     rooted_at(&ctx, REFUSED);
 
     let rewritten = manifest().map(|manifest| {
-        super::super::rewritten(&ctx, &manifest, &[], "plugin tools", "stamp")
+        super::super::rewritten(&ctx, &manifest, &[], "plugin tools", STAMPED)
             .map_err(|problem| (problem.code.to_string(), problem.summary.clone()))
     });
 

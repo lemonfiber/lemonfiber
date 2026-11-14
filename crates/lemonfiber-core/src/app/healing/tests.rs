@@ -6,6 +6,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{heal, kept, paced, queue};
 use crate::app::Ctx;
+use crate::instant::Instant;
 use crate::journal::{Action, Change, Kind, Undo};
 use crate::model::{Act, ActOutcome, ActTaken, Healed, HealingSwitch, QueueHealth, Wedge};
 use crate::ports::media::TitleKind as Media;
@@ -485,7 +486,7 @@ async fn putting_the_drop_back_grabs_the_release_again_or_says_it_is_gone() {
         ]);
         let ctx = ctx(name, &ACTING, &http);
         let change = Change {
-            at: "1".to_owned(),
+            at: Instant::from_seconds(1),
             operation: super::acting::OPERATION.to_owned(),
             target: target.to_owned(),
             kind: Kind::Unqueued {

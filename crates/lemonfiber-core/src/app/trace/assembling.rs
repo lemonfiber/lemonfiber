@@ -83,7 +83,7 @@ pub(crate) fn assemble(
             stages.push(TraceStage {
                 stage,
                 service: service.to_owned(),
-                at: Some(event.at.clone()),
+                at: event.at,
             });
         }
         history.push(TraceMoment {

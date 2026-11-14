@@ -109,9 +109,12 @@
                   "type": "string"
                 },
                 "last_seen": {
-                  "description": "When the server last saw them, as it timestamps it.\n\n`None` before anybody has signed in, so an absence here is a fact about the\naccount rather than a gap in what was read.\n\nAbsent on every unclaimed invitation and on nothing else, so it is what a\nhousehold read shows as never having arrived.",
+                  "default": null,
+                  "description": "When the server last saw them.\n\n`None` before anybody has signed in, so an absence here is a fact about the\naccount rather than a gap in what was read.\n\nAbsent on every unclaimed invitation and on nothing else, so it is what a\nhousehold read shows as never having arrived.",
+                  "format": "uint64",
+                  "minimum": 0,
                   "type": [
-                    "string",
+                    "integer",
                     "null"
                   ]
                 },

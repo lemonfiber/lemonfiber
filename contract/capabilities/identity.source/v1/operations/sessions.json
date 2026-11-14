@@ -47,9 +47,12 @@
                       "type": "string"
                     },
                     "last_seen": {
-                      "description": "When the server last heard from it, as the server writes an instant, where it\nsays.",
+                      "default": null,
+                      "description": "When the server last heard from it, where it says.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     }

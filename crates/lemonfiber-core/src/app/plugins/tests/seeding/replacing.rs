@@ -455,7 +455,7 @@ async fn a_replacement_put_back_writes_the_old_key_back_where_the_service_keeps_
     assert_ne!(after, before);
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
 
     assert!(reversal.is_ok(), "{reversal:?}");
     assert_eq!(minted(&ctx), Some(before.clone()));
@@ -473,7 +473,7 @@ async fn a_settings_file_written_since_the_replacement_is_not_written_over_putti
     let _ = std::fs::write(starting_of(&ctx), &since);
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
 
     assert!(
         reversal.as_ref().err().is_some_and(|problem| problem
@@ -496,7 +496,7 @@ async fn a_settings_file_that_became_a_link_is_not_written_through_putting_it_ba
     let _ = std::os::unix::fs::symlink(&target, starting_of(&ctx));
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
 
     assert!(
         reversal
@@ -515,7 +515,7 @@ async fn a_settings_file_gone_since_the_replacement_is_left_gone_putting_it_back
     let _ = std::fs::remove_file(starting_of(&ctx));
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
 
     assert!(reversal.is_ok(), "{reversal:?}");
     assert_eq!(minted(&ctx), Some(before));
@@ -530,7 +530,7 @@ async fn a_settings_file_that_cannot_be_written_back_is_named_putting_it_back() 
     let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o400));
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
     let _ = std::fs::set_permissions(starting_of(&ctx), std::fs::Permissions::from_mode(0o600));
 
     assert!(
@@ -556,7 +556,7 @@ async fn a_settings_file_whose_kept_starting_files_cannot_be_read_is_named_putti
     );
 
     let run = seeded_in(&ctx).map(|change| change.at);
-    let reversal = crate::app::putting_back::undo(&ctx, run.as_deref()).await;
+    let reversal = crate::app::putting_back::undo(&ctx, run).await;
 
     assert!(
         reversal

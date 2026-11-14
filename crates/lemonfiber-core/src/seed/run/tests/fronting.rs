@@ -2,6 +2,7 @@
 
 use super::super::fronting::{refront, seed_routes, served};
 use super::*;
+use crate::instant::Instant;
 use crate::ports::service::{Route, Routing, Tls};
 
 /// Where a proxy is asked what it serves.
@@ -289,7 +290,7 @@ fn claimed(claimed: Option<&str>) -> crate::baseline::Baseline {
             "komga",
             super::super::owning::FIELD,
             claimed,
-            "2026-10-31T00:00:00Z",
+            Instant::from_seconds(1_793_404_800),
         );
     }
     baseline

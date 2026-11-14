@@ -1,6 +1,7 @@
 //! A request service speaking `request.intake`: set up, told and read over the contract.
 
 use super::*;
+use crate::instant::Instant;
 use crate::test_support::{CONTRACTED_REQUESTS, CONTRACTED_REQUESTS_AT};
 
 /// A plugin `intake` whose service, under [`CONTRACTED_REQUESTS`], fills
@@ -247,7 +248,7 @@ async fn the_household_telling_is_read_over_the_contract_against_its_own_record(
         CONTRACTED_REQUESTS,
         crate::seed::TELLING,
         &wanted,
-        "2026-08-28T00:00:00Z",
+        Instant::from_seconds(1_787_875_200),
     );
     super::super::save_baseline(&ctx, &baseline);
 
@@ -285,7 +286,7 @@ async fn without_a_request_service_there_is_no_telling_to_ask_about() {
         "seerr",
         crate::seed::TELLING,
         &crate::seed::said(&crate::seed::wanted_telling()),
-        "2026-08-28T00:00:00Z",
+        Instant::from_seconds(1_787_875_200),
     );
     super::super::save_baseline(&ctx, &baseline);
 

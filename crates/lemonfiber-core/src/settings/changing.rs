@@ -8,6 +8,7 @@ use crate::config::paths::SETTINGS;
 use crate::device_keys::run::apps_changed;
 use crate::error::codes::setting::{ALREADY_HOLDS, OWNER_SET_UP, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::model::{SettingChange, SettingMove, SettingsReport, Waiting};
 
@@ -147,12 +148,12 @@ async fn written(
     let mut journal: Vec<Change> = change
         .settings
         .iter()
-        .map(|one| journalled(one, &stamp))
+        .map(|one| journalled(one, stamp))
         .collect();
     journal.extend(
         overwrites
             .iter()
-            .map(|overwrite| overwrite.journalled(super::OPERATION, &stamp)),
+            .map(|overwrite| overwrite.journalled(super::OPERATION, stamp)),
     );
     crate::app::recover::journalled(&paths.journal(), &journal)
         .map_err(|failure| Box::new(failure.problem()))?;
@@ -197,9 +198,9 @@ fn named(ctx: &Ctx, setting: &str, readers: &Readers) -> Result<(), Box<Problem>
     fences::settings_takes(setting, readers.settings.contains_key(setting))
 }
 
-fn journalled(one: &SettingMove, stamp: &str) -> Change {
+fn journalled(one: &SettingMove, stamp: Instant) -> Change {
     Change {
-        at: stamp.to_owned(),
+        at: stamp,
         operation: super::OPERATION.to_owned(),
         target: one.setting.clone(),
         kind: Kind::Setting {

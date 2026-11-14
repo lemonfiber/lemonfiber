@@ -3,6 +3,7 @@
 use super::*;
 use crate::app::LettingGo;
 use crate::app::{Gathering, Restoring, Tracing};
+use crate::instant::Instant;
 
 /// A run that keeps archives, whose engine answers and reports nothing running.
 fn keeping_archives(vault: &Arc<crate::app::fixtures::FakeArchive>) -> Ctx {
@@ -178,7 +179,7 @@ async fn a_dispatched_listing_serialises_under_its_own_kind() {
     // an arm the mapping this file's own tests build never runs.
     let vault = Arc::new(crate::app::fixtures::FakeArchive::keeping_backups(&[(
         "lemonfiber-full-1.tar.gz",
-        "00000000000000000001",
+        Instant::from_seconds(1),
     )]));
     let json = dispatch(Command::Archives, &keeping_archives(&vault))
         .await

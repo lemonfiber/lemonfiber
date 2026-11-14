@@ -7,6 +7,7 @@ use crate::config::{
     PROVIDER_PORT_KEY, PROVIDER_TLS_KEY, VPN_PORT_FORWARDING_KEY,
 };
 use crate::error::Diagnose;
+use crate::instant::Instant;
 use crate::model::ConfigReport;
 use crate::reconfigure::{Review, Stance};
 use crate::test_support::a_context;
@@ -561,7 +562,7 @@ fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, curr
     let operation = crate::plugin::owner(plugin);
     let changes = [
         crate::journal::Change {
-            at: "1".to_owned(),
+            at: Instant::from_seconds(1),
             operation: operation.clone(),
             target: "document".to_owned(),
             kind: crate::journal::Kind::Made {
@@ -569,7 +570,7 @@ fn a_plugin_set(ctx: &Ctx, plugin: &str, key: &str, previous: Option<&str>, curr
             },
         },
         crate::journal::Change {
-            at: "1".to_owned(),
+            at: Instant::from_seconds(1),
             operation,
             target: ".env".to_owned(),
             kind: crate::journal::Kind::Set {

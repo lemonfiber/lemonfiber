@@ -11,6 +11,7 @@ use common::service::*;
 
 use crate::common;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::seed::wholesale_drift;
 
 #[test]
@@ -20,7 +21,12 @@ fn every_client_drifted_at_once_reads_as_wholesale() {
     // operator editing each by hand.
     let existing = vec![holding("1", "qbittorrent", 8080, "shows")];
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:qbittorrent:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let wanted = [client("qBittorrent", "qbittorrent", 8080)];
     assert!(wholesale_drift(&existing, &wanted, &expected, "sonarr"));
 }
@@ -35,8 +41,18 @@ fn one_client_still_at_lemonfibers_value_is_not_wholesale() {
         holding("2", "sabnzbd", 8080, "tv"),
     ];
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:qbittorrent:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let wanted = [
         client("qBittorrent", "qbittorrent", 8080),
         client("SABnzbd", "sabnzbd", 8080),

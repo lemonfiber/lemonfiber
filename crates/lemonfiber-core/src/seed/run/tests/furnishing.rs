@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use super::*;
 use crate::baseline::Baseline;
+use crate::instant::Instant;
 use crate::test_support::{contracted, first_party};
 
 /// The plugin whose adapter speaks `media.serve`.
@@ -170,7 +171,7 @@ async fn a_media_server_claimed_over_owner_claim_is_asked_only_once_it_is_ours()
         SERVICE,
         super::super::owning::FIELD,
         "ours",
-        "2026-10-31T00:00:00Z",
+        Instant::from_seconds(1_793_404_800),
     );
 
     let unheld = furnished(&ctx, &fillers, &Baseline::new(), &BTreeSet::new()).await;

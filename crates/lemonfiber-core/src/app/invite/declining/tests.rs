@@ -19,8 +19,8 @@ fn member(id: &str, name: &str, claimed: bool) -> Member {
 
 fn offer(decline: Option<&str>) -> Offer {
     Offer {
-        offered: "2026-10-03T10:00:00Z".to_owned(),
-        lapses: "2026-10-05T10:00:00Z".to_owned(),
+        offered: crate::instant::Instant::from_seconds(1_791_021_600),
+        lapses: crate::instant::Instant::from_seconds(1_791_194_400),
         decline: decline.map(TokenHash::of),
         claim: None,
     }
@@ -57,17 +57,6 @@ fn the_invitations_hold_each_unclaimed_offer_that_carries_a_token() {
         ana.map(|one| (one.issued, one.lapses)),
         Some((1_791_021_600, 1_791_194_400))
     );
-}
-
-#[test]
-fn an_offer_whose_dates_cannot_be_read_is_left_out() {
-    let mut unreadable = offer(Some("ana-token"));
-    unreadable.offered = "yesterday".to_owned();
-    let offers: Offers = [("9".to_owned(), unreadable)].into_iter().collect();
-
-    assert!(invitations(&offers, &[member("9", "ana", false)])
-        .invitations
-        .is_empty());
 }
 
 #[test]

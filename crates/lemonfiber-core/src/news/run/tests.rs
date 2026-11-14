@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::app::{conditions, dispatch, Command};
 use crate::condition::{Conditions, Fault};
 use crate::error::Severity;
+use crate::instant::Instant;
 use crate::test_support::{a_context, nowhere, spoke, Reporting, Scripted};
 
 use super::news;
@@ -43,11 +44,11 @@ async fn a_problem_is_the_one_the_store_of_conditions_holds_with_its_onset() {
             "nothing new arrives for series",
             "start it",
         )),
-        "1000",
+        Instant::from_seconds(1000),
     );
     conditions::save(&ctx, &known);
 
-    let problems: Vec<(String, String)> = news(&ctx)
+    let problems: Vec<(String, Instant)> = news(&ctx)
         .await
         .problems
         .into_iter()
@@ -56,6 +57,6 @@ async fn a_problem_is_the_one_the_store_of_conditions_holds_with_its_onset() {
 
     assert_eq!(
         problems,
-        vec![("service.sonarr".to_owned(), "1000".to_owned())]
+        vec![("service.sonarr".to_owned(), Instant::from_seconds(1000))]
     );
 }

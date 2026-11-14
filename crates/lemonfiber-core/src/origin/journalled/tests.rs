@@ -1,4 +1,5 @@
 use super::of_journalled;
+use crate::instant::Instant;
 use crate::journal::{Change, Kind};
 use crate::origin::{Origin, Replaced};
 
@@ -11,7 +12,7 @@ fn installed(plugin: &str) -> Change {
 /// The document of `plugin`'s, recorded as made under `operation`.
 fn made_under(operation: &str, plugin: &str) -> Change {
     Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: operation.to_owned(),
         target: "document".to_owned(),
         kind: Kind::Made {
@@ -22,7 +23,7 @@ fn made_under(operation: &str, plugin: &str) -> Change {
 
 fn set(operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: "2".to_owned(),
+        at: Instant::from_seconds(2),
         operation: operation.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -208,7 +209,7 @@ fn a_replaced_credential_is_withheld_and_never_shown() {
 #[test]
 fn a_credential_journalled_by_fingerprint_is_traced_to_its_plugin() {
     let secret = |operation: &str, previous: Option<&str>, current: &str| Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: operation.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Secret {
@@ -344,7 +345,7 @@ fn nothing_is_said_where_a_plugin_is_not_what_put_the_value_in_force() {
 fn only_an_operation_that_made_its_own_document_is_a_plugin() {
     let journal = [
         Change {
-            at: "1".to_owned(),
+            at: Instant::from_seconds(1),
             operation: "apply".to_owned(),
             target: "data".to_owned(),
             kind: Kind::Made {

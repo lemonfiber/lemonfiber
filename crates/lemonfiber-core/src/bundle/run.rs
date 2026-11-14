@@ -17,7 +17,6 @@ use crate::bundle::{self, Contents, Filenames, Marks, Piece, Residual, Taken, Te
 use crate::bytes::humanize;
 use crate::doctor::Verdict;
 use crate::error::{Problem, Remedy, State};
-use crate::instant;
 use crate::ports::docker::LogQuery;
 
 use crate::app::Ctx;
@@ -196,7 +195,7 @@ pub async fn collect(ctx: &Ctx, lemonfiber: &str, wanted: &Wanted) -> Option<Con
         taken: Taken {
             lemonfiber: lemonfiber.to_owned(),
             stack,
-            at: instant::written(ctx.seams.clock.now()).unwrap_or_default(),
+            at: ctx.stamp(),
         },
         terms,
     })

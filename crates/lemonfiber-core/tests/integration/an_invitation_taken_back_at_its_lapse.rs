@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::common::household::recorded_admin;
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{HouseholdReport, MemberStanding};
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::{Lapsed, LeftBecause, Member, TakenBack};
@@ -39,7 +40,7 @@ fn holding(others: &[Member]) -> Arc<Fake> {
 /// Ana's account: unclaimed, last seen in March, and switched off where `disabled`.
 fn ana_seen(disabled: bool) -> Member {
     let mut ana = media::member("9", "ana", false);
-    ana.last_seen = Some("2026-03-01T10:00:00Z".to_owned());
+    ana.last_seen = Some(Instant::from_seconds(1_772_359_200));
     ana.access.disabled = disabled;
     ana
 }

@@ -504,7 +504,7 @@ async fn the_reading_says_where_a_plugin_came_from_when_and_what_it_stands_in_fo
         Some(at.display().to_string().as_str())
     );
     assert_eq!(
-        one.map(|one| one.installed_at.clone()),
+        one.and_then(|one| one.installed_at),
         Some(ctx.stamp()),
         "stamped as its changes are journalled"
     );

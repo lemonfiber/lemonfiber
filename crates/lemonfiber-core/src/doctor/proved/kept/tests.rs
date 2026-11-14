@@ -2,6 +2,7 @@ use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_manifest::container::Posture;
 
 use super::{keep, read, Kept, Key};
+use crate::instant::Instant;
 use crate::plugin::Verdict;
 
 fn key(image: &str) -> Key {
@@ -15,13 +16,13 @@ fn key(image: &str) -> Key {
     }
 }
 
-fn kept(proof: &str, image: &str, reached: &str) -> Kept {
+fn kept(proof: &str, image: &str, reached: Instant) -> Kept {
     Kept {
         plugin: "quality".to_owned(),
         proof: proof.to_owned(),
         key: key(image),
         verdict: Verdict::Passed,
-        reached: reached.to_owned(),
+        reached,
     }
 }
 
@@ -29,11 +30,29 @@ fn kept(proof: &str, image: &str, reached: &str) -> Kept {
 fn a_verdict_is_kept_in_place_of_the_last_for_the_same_proof_and_beside_the_others() {
     let at = Scratch::new("kept-verdicts");
     let file = at.join("run-proofs.json");
-    keep(Some(&file), read(Some(&file)), kept("a", "old", "1"));
-    keep(Some(&file), read(Some(&file)), kept("b", "old", "2"));
-    keep(Some(&file), read(Some(&file)), kept("a", "new", "3"));
+    keep(
+        Some(&file),
+        read(Some(&file)),
+        kept("a", "old", Instant::from_seconds(1)),
+    );
+    keep(
+        Some(&file),
+        read(Some(&file)),
+        kept("b", "old", Instant::from_seconds(2)),
+    );
+    keep(
+        Some(&file),
+        read(Some(&file)),
+        kept("a", "new", Instant::from_seconds(3)),
+    );
     let held = read(Some(&file));
-    assert_eq!(held, vec![kept("b", "old", "2"), kept("a", "new", "3")]);
+    assert_eq!(
+        held,
+        vec![
+            kept("b", "old", Instant::from_seconds(2)),
+            kept("a", "new", Instant::from_seconds(3))
+        ]
+    );
 }
 
 #[test]
@@ -43,5 +62,5 @@ fn nothing_kept_or_nothing_readable_reads_as_nothing_kept() {
     assert_eq!(read(Some(&at.join("absent.json"))), Vec::new());
     let _ = std::fs::write(at.join("garbled.json"), "{not json");
     assert_eq!(read(Some(&at.join("garbled.json"))), Vec::new());
-    keep(None, Vec::new(), kept("a", "x", "1"));
+    keep(None, Vec::new(), kept("a", "x", Instant::from_seconds(1)));
 }

@@ -8,6 +8,7 @@
 
 use lemonfiber_contract::capabilities::request::intake as contract;
 use lemonfiber_contract::wire::Kind as Refusal;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::{
@@ -103,7 +104,7 @@ async fn passed(
         request_service,
         wanted,
         &mut journal,
-        "2026-08-28T00:00:00Z",
+        Instant::from_seconds(1_787_875_200),
         rehearsing,
     )
     .await

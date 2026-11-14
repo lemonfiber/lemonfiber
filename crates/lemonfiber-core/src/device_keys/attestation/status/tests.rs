@@ -7,9 +7,7 @@ const TAKEN: &str =
 #[test]
 fn the_snapshot_this_build_carries_reads_and_says_when_it_was_taken() {
     assert!(carried().is_some_and(|snapshot| !snapshot.entries.is_empty()));
-    assert!(taken()
-        .and_then(|taken| crate::instant::read(&taken))
-        .is_some());
+    assert!(taken().is_some_and(|at| at > crate::instant::Instant::EPOCH));
 }
 
 #[test]

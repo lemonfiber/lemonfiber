@@ -163,7 +163,7 @@ pub(crate) fn record(ctx: &Ctx, key: &str, value: &str) {
         super::seed::Loaded::Fresh => crate::baseline::Baseline::new(),
         super::seed::Loaded::Lost => return,
     };
-    baseline.record(SETTINGS, key, value, &ctx.stamp());
+    baseline.record(SETTINGS, key, value, ctx.stamp());
     super::seed::save_baseline(ctx, &baseline);
 }
 

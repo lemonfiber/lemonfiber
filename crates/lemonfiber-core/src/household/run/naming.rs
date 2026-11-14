@@ -7,7 +7,6 @@
 //! rule to be forgotten in.
 
 use std::collections::BTreeMap;
-use std::time::SystemTime;
 
 use futures_util::future::join_all;
 
@@ -78,7 +77,7 @@ pub(super) struct Naming<'a> {
     /// The quality in force, which is what an estimate of a request's cost turns on.
     pub(super) quality: &'a Selection,
     /// Now, against which a request that is waiting is measured.
-    pub(super) now: SystemTime,
+    pub(super) now: crate::instant::Instant,
     /// Why each request that was turned down from here was turned down. The request
     /// service keeps none, so this is the only place the words survive.
     pub(super) reasons: &'a Reasons,

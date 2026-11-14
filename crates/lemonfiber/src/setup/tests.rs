@@ -15,8 +15,8 @@ use lemonfiber_core::stack::Source;
 use tokio::sync::mpsc::Receiver;
 
 use super::{
-    already_set_up, bare_run, confirm_setup, default_data_location, greeting, setting_up, stamp,
-    Bare, Ctx, Environment, PathBuf, Paths, SetupFlags, Surface,
+    already_set_up, bare_run, confirm_setup, default_data_location, greeting, setting_up, Bare,
+    Ctx, Environment, PathBuf, Paths, SetupFlags, Surface,
 };
 
 /// A surface that answers from a script and says whether anyone is there.
@@ -303,11 +303,6 @@ fn the_proposed_data_location_sits_under_this_machines_data_directory() {
         default_data_location(&paths),
         paths.data_dir().join("media")
     );
-}
-
-#[test]
-fn a_stamp_is_a_sortable_number_of_seconds() {
-    assert!(stamp().chars().all(|c| c.is_ascii_digit()));
 }
 
 #[tokio::test(start_paused = true)]

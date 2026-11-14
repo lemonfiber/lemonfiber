@@ -19,6 +19,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::instant::Instant;
+
 /// Where a recorded value came from: one lemonfiber wrote itself, or one it
 /// adopted from the operator as the accepted state.
 ///
@@ -52,8 +54,9 @@ impl Origin {
 pub struct Record {
     /// The value lemonfiber last recorded.
     pub value: String,
-    /// When it recorded it — the seed's own stamp, seconds since the epoch as text.
-    pub at: String,
+    /// When it recorded it — the seed's own stamp.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub at: Instant,
     /// Whether lemonfiber wrote this value or adopted it from the operator. Absent
     /// in a baseline written before adoption existed, where it reads as `Written` —
     /// the only kind those runs recorded.
@@ -84,7 +87,7 @@ impl Baseline {
     /// original `at`: it is when the value was written, not when it was last
     /// confirmed, so an idempotent re-seed that changes nothing leaves the baseline
     /// — and the file it is stored in — untouched rather than restamped every run.
-    pub fn record(&mut self, service: &str, field: &str, value: &str, at: &str) {
+    pub fn record(&mut self, service: &str, field: &str, value: &str, at: Instant) {
         self.write(service, field, value, at, Origin::Written);
     }
 
@@ -92,7 +95,7 @@ impl Baseline {
     /// as theirs to keep rather than as drift or as lemonfiber's own value to bring
     /// up to date. It is recorded exactly as [`Self::record`] does, but marked as
     /// adopted, which is the whole of the difference a comparison later reads.
-    pub fn adopt(&mut self, service: &str, field: &str, value: &str, at: &str) {
+    pub fn adopt(&mut self, service: &str, field: &str, value: &str, at: Instant) {
         self.write(service, field, value, at, Origin::Adopted);
     }
 
@@ -100,11 +103,11 @@ impl Baseline {
     /// value is unchanged — the one write path [`Self::record`], [`Self::adopt`] and
     /// [`Self::merge`] all funnel through, so the keep-the-timestamp rule holds
     /// however a value is set.
-    fn write(&mut self, service: &str, field: &str, value: &str, at: &str, origin: Origin) {
+    fn write(&mut self, service: &str, field: &str, value: &str, at: Instant, origin: Origin) {
         let fields = self.services.entry(service.to_owned()).or_default();
         let at = match fields.get(field) {
-            Some(existing) if existing.value == value => existing.at.clone(),
-            _ => at.to_owned(),
+            Some(existing) if existing.value == value => existing.at,
+            _ => at,
         };
         fields.insert(
             field.to_owned(),
@@ -170,7 +173,7 @@ impl Baseline {
     pub fn merge(&mut self, other: &Baseline) {
         for (service, fields) in &other.services {
             for (field, record) in fields {
-                self.write(service, field, &record.value, &record.at, record.origin);
+                self.write(service, field, &record.value, record.at, record.origin);
             }
         }
     }

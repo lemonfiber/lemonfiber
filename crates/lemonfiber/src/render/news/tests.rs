@@ -1,6 +1,7 @@
 use lemonfiber_core::news::{News, NewsKind, NewsProblem, NewsRequest, NewsUpdate};
 
 use lemonfiber_core::app::Outcome;
+use lemonfiber_core::instant::Instant;
 
 use super::news;
 
@@ -12,7 +13,7 @@ fn report() -> News {
         }],
         requests: vec![NewsRequest {
             request: "12".to_owned(),
-            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
+            asked: Some(Instant::from_seconds(1_794_139_200)),
             title: Some("Dune".to_owned()),
             kind: None,
             unit: None,
@@ -20,7 +21,7 @@ fn report() -> News {
         }],
         problems: vec![NewsProblem {
             check: "service.sonarr".to_owned(),
-            onset: "1759400000".to_owned(),
+            onset: Instant::from_seconds(1_759_400_000),
             summary: "Sonarr is stopped".to_owned(),
         }],
         unread: Vec::new(),
@@ -65,7 +66,7 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
         }],
         requests: vec![NewsRequest {
             request: "3".to_owned(),
-            asked: Some("2026-11-08T12:00:00.000Z".to_owned()),
+            asked: Some(Instant::from_seconds(1_794_139_200)),
             title: None,
             kind: None,
             unit: None,
@@ -73,7 +74,7 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
         }],
         problems: vec![NewsProblem {
             check: "storage.space".to_owned(),
-            onset: "written by hand".to_owned(),
+            onset: Instant::from_seconds(1_794_135_600),
             summary: "The volume is full".to_owned(),
         }],
         unread: Vec::new(),
@@ -86,7 +87,7 @@ fn an_item_without_its_words_is_named_by_what_names_it_alone() {
     );
     assert!(said.contains("  #3   asked for by Bram"), "{said}");
     assert!(
-        said.contains("  storage.space   since written by hand   The volume is full"),
+        said.contains("  storage.space   since 2026-11-08T11:00:00 UTC   The volume is full"),
         "{said}"
     );
 }

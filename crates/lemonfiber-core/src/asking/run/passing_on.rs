@@ -109,7 +109,7 @@ fn written(ctx: &Ctx, reasons: &Reasons) -> Option<String> {
 fn held(ctx: &Ctx, request: i64, said: Said<'_>, asked: &[HouseholdRequest]) -> Reasons {
     let still_held: BTreeSet<i64> = asked.iter().map(|filed| filed.id).collect();
     let mut reasons = crate::app::refusals::load(ctx);
-    let at = crate::instant::written(ctx.seams.clock.now());
+    let at = Some(ctx.stamp());
     match said {
         Said::Operators(reason) => reasons.keep(Reference::Filed(request), reason, at),
         Said::RanOut(reason) => reasons.closed(Reference::Filed(request), reason, at),
@@ -143,7 +143,7 @@ async fn passed_on(
     reasons.passed_on(
         Reference::Filed(request),
         told.reached.clone(),
-        crate::instant::written(ctx.seams.clock.now()),
+        Some(ctx.stamp()),
     );
     Some(became_of(&told))
 }

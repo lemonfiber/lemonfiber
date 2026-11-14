@@ -1,6 +1,7 @@
 //! Applying the answers, and the ways out of an apply that stopped.
 
 use super::*;
+use crate::instant::Instant;
 
 /// What an interrupted apply leaves behind: half-written settings, the marker
 /// saying the writing had begun, and the journal of what it managed to write.
@@ -16,7 +17,7 @@ fn interrupted(paths: &Paths) {
     )
     .is_ok());
     let written = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "setup".to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {

@@ -298,6 +298,7 @@ fn listing(manifest: Manifest, downgrade: bool, relocation: Option<Relocation>) 
 /// the substitution an operator has no way to notice afterwards, because what comes
 /// back with a finished restore is the second listing.
 fn agreement(manifest: &Manifest, downgrade: bool, relocation: Option<&Relocation>) -> String {
+    let created = manifest.created_at.to_string();
     let mut words: Vec<&str> = Vec::new();
     match &manifest.scope {
         Scope::WholeStack => words.push("the whole stack"),
@@ -314,7 +315,7 @@ fn agreement(manifest: &Manifest, downgrade: bool, relocation: Option<&Relocatio
         }
     }
     words.push(&manifest.product_version);
-    words.push(&manifest.created_at);
+    words.push(&created);
     words.push(if manifest.sensitive {
         "sensitive"
     } else {

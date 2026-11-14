@@ -145,9 +145,8 @@ pub async fn mint(
         purpose,
     } = prepared(ctx, name, scope, purpose, by).await?;
     let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
-    let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
     let record =
-        Record::minted(name, scope, purpose, &secret, now, by.clone()).proved_by(proved_by);
+        Record::minted(name, scope, purpose, &secret, ctx.stamp(), by.clone()).proved_by(proved_by);
     let mut opened = Opened::at(ctx, &path).await?;
     let made = added(ctx, &path, &mut opened.kept, &record, by);
     opened.let_go(ctx).await;
@@ -431,13 +430,13 @@ fn active(kept: &Kept, name: &str) -> Option<Record> {
 
 /// Mark the active key holding `name` revoked now, and keep the record.
 fn revoked(ctx: &Ctx, path: &Path, kept: &mut Kept, name: &str) -> Result<(), Box<Problem>> {
-    let now = crate::instant::written(ctx.seams.clock.now()).unwrap_or_default();
+    let now = ctx.stamp();
     for record in kept
         .keys
         .iter_mut()
         .filter(|record| record.name == name && !record.is_revoked())
     {
-        record.revoked = Some(now.clone());
+        record.revoked = Some(now);
     }
     kept.keep(path).map_err(|why| Box::new(unkept(why)))
 }
@@ -487,9 +486,9 @@ async fn listed(ctx: &Ctx, kept: &Kept, revoked: Option<String>) -> Listing {
                 scope: record.scope.written(),
                 purpose: record.purpose,
                 state: state(record, members.as_ref()),
-                minted: record.minted.clone(),
-                used: used.at.get(&record.name).cloned(),
-                revoked: record.revoked.clone(),
+                minted: record.minted,
+                used: used.at.get(&record.name).copied(),
+                revoked: record.revoked,
                 member_minted: matches!(record.by, Minter::Member { .. }),
                 proved_by: record.proved_by.clone(),
             })

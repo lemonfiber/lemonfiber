@@ -31,8 +31,9 @@ use crate::app::Ctx;
 /// One repair, as it will be read back long afterwards.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Entry {
-    /// When it was carried out, as a service writes a moment.
-    pub at: String,
+    /// When it was carried out.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub at: crate::instant::Instant,
     /// The check whose finding it answered.
     pub check: String,
     /// What it set out to do, in the words the operator was shown before agreeing.

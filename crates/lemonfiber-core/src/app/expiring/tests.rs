@@ -1,19 +1,20 @@
 use crate::collected::Reference;
 use crate::ports::service::{MediaStatus, RequestStatus};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{agreeing, closing, expiring, overdue, standing, why, Arranged, CameTo, Expiry};
 use crate::app::Ctx;
 use crate::config::Settings;
+use crate::instant::{Instant, DAY};
 use crate::ports::service::{Address, HouseholdRequest};
 use crate::test_support::requests::{self, answered, intake, refusing, taken, REQUESTS};
 use crate::test_support::{a_context, a_password, env_at};
 
-/// A moment the calendar holds, for these requests to have been asked at.
-const ASKED: &str = "2026-08-17T21:04:09";
+/// A moment the calendar holds, for these requests to have been asked at: 2026-08-17T21:04:09.
+const ASKED: Instant = Instant::from_seconds(1_787_000_649);
 
 /// A context whose settings point at a scratch install of its own.
 fn ctx(name: &str) -> crate::app::Ctx {
@@ -26,12 +27,12 @@ fn ctx(name: &str) -> crate::app::Ctx {
 }
 
 /// One request as the service records it, at the status that decides its state.
-fn asked(id: i64, made: Option<&str>, request_status: RequestStatus) -> HouseholdRequest {
+fn asked(id: i64, made: Option<Instant>, request_status: RequestStatus) -> HouseholdRequest {
     HouseholdRequest {
         arrived: None,
         shelf_id: None,
         id,
-        made: made.map(str::to_owned),
+        made,
         member: "Ana".to_owned(),
         member_id: None,
         kind: Some(crate::ports::media::Kind::Movies),
@@ -40,11 +41,6 @@ fn asked(id: i64, made: Option<&str>, request_status: RequestStatus) -> Househol
         request_status: Some(request_status),
         media_status: Some(MediaStatus::Pending),
     }
-}
-
-/// The moment these requests were asked at, as an instant.
-fn when() -> SystemTime {
-    crate::instant::read(ASKED).unwrap_or(UNIX_EPOCH)
 }
 
 /// Naming a period records it, and a second run finds it.
@@ -164,7 +160,7 @@ fn only_what_nobody_ruled_on_and_waited_long_enough_is_closed() {
         asked(2, Some(ASKED), RequestStatus::Pending),
         asked(3, Some(ASKED), RequestStatus::Approved),
     ];
-    let closing = overdue(&held, 30, when() + Duration::from_secs(86_400 * 45));
+    let closing = overdue(&held, 30, ASKED.later(DAY * 45));
 
     assert_eq!(
         closing.iter().map(|held| held.id).collect::<Vec<i64>>(),
@@ -172,23 +168,20 @@ fn only_what_nobody_ruled_on_and_waited_long_enough_is_closed() {
         "the wrong requests were reached"
     );
     assert!(
-        overdue(&held, 30, when() + Duration::from_secs(86_400 * 29)).is_empty(),
+        overdue(&held, 30, ASKED.later(DAY * 29)).is_empty(),
         "a request inside the period was closed"
     );
 }
 
-/// A request this cannot date is never closed.
+/// A request with no date is never closed.
 ///
 /// It has not been shown to have waited at all, and closing one on no evidence is
 /// the opposite of what a period is for.
 #[test]
-fn a_request_with_no_readable_date_is_never_closed() {
-    let held = [
-        asked(1, None, RequestStatus::Pending),
-        asked(2, Some("tuesday"), RequestStatus::Pending),
-    ];
+fn a_request_with_no_date_is_never_closed() {
+    let held = [asked(1, None, RequestStatus::Pending)];
 
-    assert!(overdue(&held, 30, when() + Duration::from_secs(86_400 * 400)).is_empty());
+    assert!(overdue(&held, 30, ASKED.later(DAY * 400)).is_empty());
 }
 
 /// The arrangement says what runs it, because nothing does.
@@ -325,7 +318,11 @@ fn waiting() -> HouseholdRequest {
     HouseholdRequest {
         member: "Alex".to_owned(),
         item: Some(3),
-        ..asked(7, Some("2020-01-01T00:00:00.000Z"), RequestStatus::Pending)
+        ..asked(
+            7,
+            Some(Instant::from_seconds(1_577_836_800)),
+            RequestStatus::Pending,
+        )
     }
 }
 

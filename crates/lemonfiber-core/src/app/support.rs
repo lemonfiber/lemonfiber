@@ -165,7 +165,12 @@ fn named_for_the_moment(contents: &Contents) -> String {
     format!(
         "{}-support-{}.tar.gz",
         crate::PRODUCT,
-        contents.taken.at.replace(':', "-")
+        contents
+            .taken
+            .at
+            .calendar()
+            .unwrap_or_default()
+            .replace(':', "-")
     )
 }
 

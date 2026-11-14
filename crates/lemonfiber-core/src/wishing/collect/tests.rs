@@ -1,6 +1,7 @@
 use super::{askable, leaves_of};
 use crate::collected::store::{Ask, Standing};
 use crate::collected::Unit;
+use crate::instant::Instant;
 use crate::model::{Stands, TitleKind, TitleUnit};
 use crate::ports::service::{BookUnit, Candidate, CandidateState, Left, MusicUnit};
 
@@ -28,7 +29,7 @@ fn waiting(unit: Unit, reference: &str, standing: Standing) -> Ask {
         year: None,
         cover: None,
         member: "ada".to_owned(),
-        asked_at: String::new(),
+        asked_at: Instant::EPOCH,
         standing,
         settled_at: None,
         arrived_at: None,

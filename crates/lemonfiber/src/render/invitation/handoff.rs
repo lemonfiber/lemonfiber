@@ -130,8 +130,7 @@ fn signed_in(lines: &mut Lines, report: &Handoff) {
     for session in &report.sessions {
         let seen = session
             .last_seen
-            .as_deref()
-            .map(|at| format!(", last heard from {at}"))
+            .map(|at| format!(", last heard from {}", at.said()))
             .unwrap_or_default();
         lines.put(format!("  {} — {}{seen}", session.device, session.client));
     }

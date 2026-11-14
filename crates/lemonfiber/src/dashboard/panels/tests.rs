@@ -368,7 +368,11 @@ fn an_unavailable_queue_or_storage_or_service_panel_says_why() {
 fn the_header_says_how_the_screen_is_doing_and_how_the_stack_is() {
     // Two different questions: a healthy stack can be shown through half-failing
     // telemetry, and a perfect screen can be reporting a stack that is on fire.
-    let summary = Summary::of(Reach::Running, &[], "1000");
+    let summary = Summary::of(
+        Reach::Running,
+        &[],
+        lemonfiber_core::instant::Instant::from_seconds(1000),
+    );
     let line = header(Telemetry::Degraded, &summary, WIDE);
     let text: String = line
         .spans
@@ -381,7 +385,11 @@ fn the_header_says_how_the_screen_is_doing_and_how_the_stack_is() {
 
 #[test]
 fn every_way_the_screen_can_be_doing_has_words_of_its_own() {
-    let summary = Summary::of(Reach::Running, &[], "1000");
+    let summary = Summary::of(
+        Reach::Running,
+        &[],
+        lemonfiber_core::instant::Instant::from_seconds(1000),
+    );
     let mut said: Vec<String> = [
         Telemetry::Live,
         Telemetry::Degraded,

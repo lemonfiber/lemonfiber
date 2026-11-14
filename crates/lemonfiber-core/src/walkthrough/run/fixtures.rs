@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use crate::app::Ctx;
 use crate::config::Settings;
+use crate::instant::Instant;
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::service::{
     AddPlan, Added, CatalogueEntry, Download, QueueItem, ReleaseProbe, TraceEvent,
@@ -64,7 +65,7 @@ pub(super) fn listing(entries: &[CatalogueEntry]) -> Answer {
 pub(super) fn event(outcome: Outcome) -> TraceEvent {
     TraceEvent {
         outcome,
-        at: "2026-08-08T00:00:00Z".to_owned(),
+        at: Some(Instant::from_seconds(1_786_147_200)),
         part: None,
     }
 }

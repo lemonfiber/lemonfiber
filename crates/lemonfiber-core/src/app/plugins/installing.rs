@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::doctor::BUNDLED_CHECKS;
 use crate::error::codes::plugin::UNCONFORMING;
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 use crate::plugin::{CaseVerdict, Install, Installed, Installs, Register};
 
 use super::super::Ctx;
@@ -83,10 +84,10 @@ pub(super) async fn install(
     // was fetched, rather than from the checkout it was read out of.
     let stamp = ctx.stamp();
     let stack_manifest = writing::stack_manifest(ctx)?;
-    let (mut would, named) = settled(&stack_manifest, held.installed(), &read, path, from, &stamp);
+    let (mut would, named) = settled(&stack_manifest, held.installed(), &read, path, from, stamp);
     let trusted = crate::plugin::first_party::EMBEDDED;
     let granting = super::granting::asked(ctx, &stack_manifest, held.installed(), &would, trusted);
-    would.granted = super::granting::approved(&granting, &stamp);
+    would.granted = super::granting::approved(&granting, Some(stamp));
     let mut after = held.clone();
     after
         .record(would.clone())
@@ -135,14 +136,14 @@ pub(super) async fn install(
         super::planned::fenced(ctx, &would, &asked)?;
         let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
         writing::unlinked(ctx, &would, stack)?;
-        super::minting::minted(ctx, &would, &read.manifest, &stamp, trusted)?;
-        carry_out(ctx, &would.plugin, &stamp, &planned)?;
-        super::granting::journalled(ctx, &would.plugin, &[], &would.granted, &stamp)?;
+        super::minting::minted(ctx, &would, &read.manifest, stamp, trusted)?;
+        carry_out(ctx, &would.plugin, stamp, &planned)?;
+        super::granting::journalled(ctx, &would.plugin, &[], &would.granted, stamp)?;
 
         // Started before it is registered, which is why the invocation carries this
         // plugin rather than reading it back: the register is what layers a plugin's
         // document into the stack, and it is deliberately not written yet.
-        proving::started(ctx, &would, stack, &stamp).await?;
+        proving::started(ctx, &would, stack, stamp).await?;
         let source = crate::plugin::root(path);
         secured = proving::asked(ctx, &read.manifest, &would, stack, &source, &mut stated).await;
         against = Some(proving::AGAINST);
@@ -163,7 +164,7 @@ pub(super) async fn install(
         {
             // The recipes run once the install holds and before it is recorded, so a
             // recipe that does not hold puts back an install nothing has recorded.
-            let coming = Following::of(&read.manifest, &would, &stack_manifest, stack, &stamp);
+            let coming = Following::of(&read.manifest, &would, &stack_manifest, stack, stamp);
             recipes_ran = followed(ctx, &coming, consent).await?;
             // Answered for here rather than passed on. The record writer is shared and
             // says *your settings could not be saved, your existing settings are
@@ -175,7 +176,7 @@ pub(super) async fn install(
             // file that could not be written — and a plugin whose container is up
             // with nothing recording it is the state this verb exists to not leave.
             if let Err(why) = super::super::record::keep(kept_at(ctx).as_deref(), &after) {
-                let back = reversing(ctx, &would, stack, &stamp).await;
+                let back = reversing(ctx, &would, stack, stamp).await;
                 return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
             }
             recorded = true;
@@ -184,7 +185,7 @@ pub(super) async fn install(
             let _ = super::conformance::cleared(ctx, &would.plugin);
             crate::seed::run::reinstalled(ctx).await;
         } else {
-            put_back = Some(reversing(ctx, &would, stack, &stamp).await);
+            put_back = Some(reversing(ctx, &would, stack, stamp).await);
         }
     }
 
@@ -230,7 +231,7 @@ struct Following<'a> {
     /// Where the stack is.
     stack: &'a Path,
     /// The stamp the install is journalled under.
-    stamp: &'a str,
+    stamp: Instant,
 }
 
 impl<'a> Following<'a> {
@@ -240,7 +241,7 @@ impl<'a> Following<'a> {
         would: &'a Installed,
         stack_manifest: &'a lemonfiber_manifest::Manifest,
         stack: &'a Path,
-        stamp: &'a str,
+        stamp: Instant,
     ) -> Self {
         Self {
             manifest,
@@ -296,7 +297,7 @@ pub(super) fn settled(
     read: &Accepted,
     path: &Path,
     from: Option<&Fetched<'_>>,
-    stamp: &str,
+    stamp: Instant,
 ) -> (Installed, PathBuf) {
     let source = crate::plugin::root(path);
     let mut installed = Installed::of(&read.manifest)

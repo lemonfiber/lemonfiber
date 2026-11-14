@@ -360,8 +360,9 @@ pub struct Nonconforming {
     pub operation: String,
     /// What was outside the contract.
     pub why: String,
-    /// When it answered so, as RFC 3339.
-    pub at: String,
+    /// When it answered so.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    pub at: crate::instant::Instant,
 }
 
 /// Whether one installed plugin's source can still be fetched.

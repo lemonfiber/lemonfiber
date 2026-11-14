@@ -35,8 +35,8 @@ pub(super) fn pairing(report: &Pairing) -> Lines {
         lines.put(format!("  {caution}"));
     }
     lines.put(format!(
-        "It stops being good at {} UTC, {} minutes from now.",
-        report.until,
+        "It stops being good at {}, {} minutes from now.",
+        report.until.said(),
         LASTS.as_secs() / 60
     ));
     lines.spaced(format!(

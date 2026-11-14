@@ -80,7 +80,7 @@ impl Witness for Keeping {
             capability: self.capability.clone(),
             operation: operation.to_owned(),
             why: why.to_owned(),
-            at: self.ctx.hours_ago(0),
+            at: self.ctx.stamp(),
         };
         let _ = kept(&self.ctx, answered);
     }

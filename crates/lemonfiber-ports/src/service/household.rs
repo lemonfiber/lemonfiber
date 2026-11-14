@@ -12,6 +12,8 @@ use async_trait::async_trait;
 
 use super::{Failure, Medium};
 
+use crate::instant::Instant;
+
 /// Who a sign-in proved somebody to be, and the access the server granted for it.
 ///
 /// Both, because the second is what a session is held against: the id says whose
@@ -159,7 +161,7 @@ pub trait Household: Send + Sync {
     /// # Errors
     ///
     /// Returns [`Failure`] when the server is unreachable or refuses.
-    async fn when_invited(&self, since: &str) -> Result<Vec<Invited>, Failure>;
+    async fn when_invited(&self, since: Instant) -> Result<Vec<Invited>, Failure>;
 
     /// The libraries the server holds, named.
     ///
@@ -270,9 +272,12 @@ pub struct Session {
     pub device: String,
     /// The app it signed in with.
     pub client: String,
-    /// When the server last heard from it, as the server writes an instant, where it
-    /// says.
-    pub last_seen: Option<String>,
+    /// When the server last heard from it, where it says.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub last_seen: Option<Instant>,
 }
 
 /// Somebody watching something now, as the media server lists the session.
@@ -465,14 +470,18 @@ pub struct Member {
     pub claimed: bool,
     /// What they may watch.
     pub access: Access,
-    /// When the server last saw them, as it timestamps it.
+    /// When the server last saw them.
     ///
     /// `None` before anybody has signed in, so an absence here is a fact about the
     /// account rather than a gap in what was read.
     ///
     /// Absent on every unclaimed invitation and on nothing else, so it is what a
     /// household read shows as never having arrived.
-    pub last_seen: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub last_seen: Option<Instant>,
 }
 
 /// When one account was made, as the media server recorded it happening.
@@ -483,6 +492,10 @@ pub struct Member {
 pub struct Invited {
     /// The account it is about, matching a [`Member::id`].
     pub member: String,
-    /// When it was made, as the server timestamps it.
-    pub at: String,
+    /// When it was made, where the server's record says.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub at: Option<Instant>,
 }

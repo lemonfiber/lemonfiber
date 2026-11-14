@@ -296,7 +296,7 @@ fn carries_archive(command: &Command) -> bool {
 
 /// Whether the command names the run it was given.
 fn carries_at(command: &Command) -> bool {
-    matches!(command, Command::Undo { run: Some(at) } if at == STAMP)
+    matches!(command, Command::Undo { run: Some(at) } if *at == STAMP)
 }
 
 /// Whether the command has the accepted re-point in it.
@@ -366,7 +366,7 @@ fn give_archive(given: &mut Arguments) {
 }
 
 fn give_at(given: &mut Arguments) {
-    given.at = Some(STAMP.to_owned());
+    given.at = Some(STAMP);
 }
 
 fn give_repoint(given: &mut Arguments) {

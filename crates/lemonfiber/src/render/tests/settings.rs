@@ -30,7 +30,7 @@ fn versions_name_the_binary_the_stack_and_compose() {
     let text = versions(&a_version()).text();
     assert!(text.contains("stack 1.2.3"));
     assert!(text.contains("compose 2.29"));
-    assert!(text.contains("attestation status list taken 2026-10-13T00:45:44Z"));
+    assert!(text.contains("attestation status list taken 2026-10-13T00:45:44 UTC"));
     // A compose that could not be reached says so rather than being left blank.
     let unreachable = VersionReport {
         compose: None,

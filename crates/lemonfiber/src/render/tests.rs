@@ -13,6 +13,7 @@ use lemonfiber_core::bundle::Contents;
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::glossary::Vocabulary;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::migration::carrying::not_carried;
 use lemonfiber_core::migration::mode::offered;
 use lemonfiber_core::model::{
@@ -32,7 +33,7 @@ fn an_archive() -> Manifest {
     Manifest {
         schema: SCHEMA,
         product_version: "0.8.0".to_owned(),
-        created_at: "2026-07-30".to_owned(),
+        created_at: Instant::from_seconds(1_785_369_600),
         data_root: "/srv/media".to_owned(),
         scope: Scope::WholeStack,
         sensitive: true,
@@ -74,7 +75,7 @@ fn every_outcome() -> Vec<Outcome> {
     every.push(Outcome::PushEndpoint(lemonfiber_core::push::Registered {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/abc".to_owned(),
-        registered: "2026-11-07T00:00:00Z".to_owned(),
+        registered: Instant::from_seconds(1_794_009_600),
         rehearsed: false,
     }));
     every.push(Outcome::PushEndpoints(lemonfiber_core::push::Listing {
@@ -121,8 +122,8 @@ fn the_keys() -> Vec<Outcome> {
         scope: "read".to_owned(),
         purpose: Purpose::Mcp,
         state,
-        minted: "2026-10-05T06:00:00".to_owned(),
-        used: Some("2026-10-05T07:00:00".to_owned()),
+        minted: Instant::from_seconds(1_791_180_000),
+        used: Some(Instant::from_seconds(1_791_183_600)),
         revoked: None,
         member_minted: false,
         proved_by: None,
@@ -142,7 +143,7 @@ fn the_keys() -> Vec<Outcome> {
             scope: "read".to_owned(),
             purpose: Purpose::Other,
             link: format!("lemonfiber://key?claim=lfc_{}", "7".repeat(64)),
-            lapses: "2026-10-05T06:10:00".to_owned(),
+            lapses: Instant::from_seconds(1_791_180_600),
         }),
         Outcome::Keys(Listing {
             keys: vec![

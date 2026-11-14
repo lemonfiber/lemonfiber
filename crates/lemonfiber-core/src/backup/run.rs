@@ -20,6 +20,7 @@ use crate::archive::{Archive, Fault, Space};
 use crate::backup::{self, Manifest, Pace, Plan, Retention, Scope};
 use crate::config::paths::Paths;
 use crate::error::{Problem, Remedy, State};
+use crate::instant::Instant;
 
 use crate::app::{quiesced, Ctx};
 use crate::error::codes::backup::{
@@ -123,7 +124,7 @@ pub async fn capture(
     paths: &Paths,
     plan: Plan,
     product_version: &str,
-    stamp: &str,
+    stamp: Instant,
     data_root: &str,
     taking: Taking,
     archive: &dyn Archive,
@@ -217,7 +218,7 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
         &archives.paths,
         plan,
         env!("CARGO_PKG_VERSION"),
-        &ctx.stamp(),
+        ctx.stamp(),
         &data_root,
         Taking::of(Retention::keeping(KEEP), ctx.dry_run),
         archives.vault.as_ref(),
@@ -303,7 +304,7 @@ pub async fn existing(
         &archives.paths,
         backup::plan(&archives.paths, &Scope::existing(project, host_paths), &[]),
         env!("CARGO_PKG_VERSION"),
-        &ctx.stamp(),
+        ctx.stamp(),
         &data_root(ctx),
         Taking::of(Retention::keeping(KEEP), ctx.dry_run),
         archives.vault.as_ref(),
@@ -343,17 +344,12 @@ fn scope_slug(scope: &Scope) -> String {
 /// The filename a capture of `scope` taken at `stamp` is written under.
 ///
 /// Carries the scope so retention keeps each kind of backup on its own count, and
-/// the stamp with its colons replaced so the name is legal on every platform and
-/// still sorts by age. Two captures of the same scope within one second would name
-/// the same file; the archive adapter refuses to overwrite one already there, so
-/// the collision surfaces rather than silently replacing a backup.
-fn archive_name(scope: &Scope, stamp: &str) -> String {
-    format!(
-        "{}-{}-{}.tar.gz",
-        crate::PRODUCT,
-        scope_slug(scope),
-        stamp.replace(':', "-")
-    )
+/// the instant in whole seconds, which is legal in a name on every platform. Two
+/// captures of the same scope within one second would name the same file; the
+/// archive adapter refuses to overwrite one already there, so the collision
+/// surfaces rather than silently replacing a backup.
+fn archive_name(scope: &Scope, stamp: Instant) -> String {
+    format!("{}-{}-{}.tar.gz", crate::PRODUCT, scope_slug(scope), stamp)
 }
 
 /// Prune the archives of this scope older than the retention count allows, oldest

@@ -20,7 +20,7 @@ use super::standing::Held;
 #[must_use]
 pub(super) fn recorded_now(ctx: &Ctx, held: &Held, member: &Member) -> bool {
     let offer = Offer {
-        offered: ctx.hours_ago(0),
+        offered: ctx.stamp(),
         lapses: ctx.hours_ago(-HOURS_TO_CLAIM),
         decline: None,
         claim: None,

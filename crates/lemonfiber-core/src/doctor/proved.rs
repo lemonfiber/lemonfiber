@@ -39,7 +39,7 @@ pub(crate) struct Running {
     /// Where the verdicts are kept across restarts, where anywhere is configured.
     pub(crate) kept: Option<PathBuf>,
     /// The moment this run is stamped with.
-    pub(crate) now: String,
+    pub(crate) now: crate::instant::Instant,
     /// Where the values minted for a run's throwaway starting files come from.
     pub(crate) random: Arc<dyn crate::ports::random::Random>,
     /// Writes the certificate a service serves with into a run's throwaway copy.
@@ -164,7 +164,7 @@ impl Proved {
         if let Some(earlier) = held.iter().find(|one| {
             one.plugin == self.plugin && one.proof == self.proof.proof && one.key == key
         }) {
-            return self.reported(&earlier.verdict, &earlier.reached);
+            return self.reported(&earlier.verdict, earlier.reached);
         }
         let came = performed(
             self.running.program.as_ref(),
@@ -188,15 +188,16 @@ impl Proved {
                     proof: self.proof.proof.clone(),
                     key,
                     verdict: reached.clone(),
-                    reached: self.running.now.clone(),
+                    reached: self.running.now,
                 },
             );
         }
-        self.reported(&reached, &self.running.now)
+        self.reported(&reached, self.running.now)
     }
 
     /// A proof's verdict as the doctor reports it, with when it was reached.
-    fn reported(&self, reached: &crate::plugin::Verdict, at: &str) -> Verdict {
+    fn reported(&self, reached: &crate::plugin::Verdict, at: crate::instant::Instant) -> Verdict {
+        let at = crate::app::ctx::instant(i64::try_from(at.seconds()).unwrap_or(i64::MAX));
         match reached {
             crate::plugin::Verdict::Passed | crate::plugin::Verdict::FailingAsDeclared { .. } => {
                 Verdict::Pass {

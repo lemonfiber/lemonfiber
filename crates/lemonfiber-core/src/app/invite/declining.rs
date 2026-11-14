@@ -62,8 +62,8 @@ pub(super) fn invitations(offers: &Offers, household: &[Member]) -> Invitations 
                     token: offer.decline.as_ref()?.as_str().to_owned(),
                     account: id.clone(),
                     name: member.name.clone(),
-                    issued: seconds(&offer.offered)?,
-                    lapses: seconds(&offer.lapses)?,
+                    issued: offer.offered.seconds(),
+                    lapses: offer.lapses.seconds(),
                 })
             })
             .collect(),
@@ -217,12 +217,6 @@ pub(super) async fn issued(
         .await
         .ok()?;
     address(ctx, service, declining.as_ref(), &token).await
-}
-
-/// The seconds since the Unix epoch a recorded moment names.
-pub(super) fn seconds(moment: &str) -> Option<u64> {
-    let at: jiff::Timestamp = moment.parse().ok()?;
-    u64::try_from(at.as_second()).ok()
 }
 
 #[cfg(test)]

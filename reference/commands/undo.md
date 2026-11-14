@@ -14,7 +14,7 @@ Usage: lemonfiber undo [OPTIONS] <AT>
 
 Arguments:
   <AT>
-          The stamp of the run to put back, copied from `lemonfiber history`
+          When the run to put back was made, copied from `lemonfiber history`
 
 Options:
       --json

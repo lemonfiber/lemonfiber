@@ -53,7 +53,7 @@ pub(crate) fn remembered(ctx: &Ctx, found: &[Finding]) -> Conditions {
     let mut conditions = load(ctx);
     let now = ctx.stamp();
     for finding in found {
-        conditions.observe(&finding.check, wrong(finding).as_ref(), &now);
+        conditions.observe(&finding.check, wrong(finding).as_ref(), now);
     }
     // Written down only by a run that is really happening. What this file holds is how
     // often a fault has been seen and how often a fix for it was tried and left it
@@ -104,7 +104,7 @@ pub(crate) fn dated(ctx: &Ctx, found: Vec<Finding>) -> Vec<Finding> {
         .map(|finding| {
             let onset = wrong(&finding)
                 .and(conditions.get(&finding.check))
-                .map(|condition| condition.since.clone());
+                .map(|condition| condition.since);
             Finding { onset, ..finding }
         })
         .collect()

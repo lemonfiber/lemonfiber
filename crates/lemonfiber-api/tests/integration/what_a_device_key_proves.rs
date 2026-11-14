@@ -3,6 +3,7 @@
 
 use base64::Engine as _;
 use lemonfiber_core::device_keys::proof::Mint;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_fixtures::attestations::ANDROID_RSA_ROOT;
 use ring::rand::SystemRandom;
 use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
@@ -195,7 +196,7 @@ async fn a_signature_over_an_issued_challenge_mints_in_place_of_the_password_onc
     assert_eq!(read(&minted.body, "/kind"), "minted-key");
     let kept = fs::read_to_string(env.with_file_name(lemonfiber_core::device_keys::FILE))
         .unwrap_or_default();
-    assert!(kept.contains("\"used\": \"2025-01-08"), "{kept}");
+    assert!(kept.contains("\"used\": 1736294400"), "{kept}");
     let again = minting(&router, &token, &body.replace("\"ha\"", "\"ha2\"")).await;
     assert_eq!(code(&again), "DEVICE-10");
     let listed = presented(router, "GET", "/api/keys", &token, Some((HERE, false))).await;
@@ -445,7 +446,7 @@ async fn a_key_is_refused_at_every_device_key_route_whatever_its_scope() {
             Scope::Act,
             Purpose::Other,
             &secret,
-            "2026-10-05T06:00:00".to_owned(),
+            Instant::from_seconds(1_791_180_000),
             Minter::Operator,
         )],
     };

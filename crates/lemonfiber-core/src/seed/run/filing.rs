@@ -193,7 +193,7 @@ fn record(
     for category in categories {
         let wanted = completed(category);
         if held.get(category) == Some(&wanted) {
-            baseline.record(id, &field(category), &wanted, &at);
+            baseline.record(id, &field(category), &wanted, at);
         }
     }
 }

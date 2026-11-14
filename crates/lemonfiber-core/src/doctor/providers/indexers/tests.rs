@@ -1,5 +1,4 @@
-use std::time::UNIX_EPOCH;
-
+use crate::instant::Instant;
 use crate::ports::service::Limits;
 
 use super::{
@@ -31,15 +30,18 @@ fn allowed(name: &str, queries: Option<u64>, grabs: Option<u64>) -> IndexerUse {
             grabs,
             window: Duration::from_secs(24 * 60 * 60),
         }),
-        searched_from: Some(UNIX_EPOCH + Duration::from_secs(1_786_900_000)),
-        grabbed_from: Some(UNIX_EPOCH + Duration::from_secs(1_786_910_000)),
+        searched_from: Some(Instant::from_seconds(1_786_900_000)),
+        grabbed_from: Some(Instant::from_seconds(1_786_910_000)),
         ..answering(name)
     }
 }
 
+/// 2026-08-16T20:00:00Z, when a rested indexer is tried again.
+const RESTED_UNTIL: Instant = Instant::from_seconds(1_786_910_400);
+
 fn rested(name: &str) -> IndexerUse {
     IndexerUse {
-        rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
+        rested_until: Some(RESTED_UNTIL),
         ..answering(name)
     }
 }
@@ -87,6 +89,9 @@ fn a_household_with_one_indexer_is_told_about_the_indexer() {
     assert!(matches!(
         found.first().map(|finding| &finding.verdict),
         Some(Verdict::Warn(problem)) if problem.code == INDEXER_RESTED
+            && problem.detail.as_deref() == Some(
+                "its aggregator has stopped querying it until 2026-08-16T20:00:00 UTC after repeated failures"
+            )
     ));
 }
 
@@ -228,7 +233,7 @@ fn a_passing_indexer_with_a_cap_says_what_it_is_measured_against() {
 fn a_failing_indexer_is_reported_as_failing_rather_than_as_capped() {
     let both = IndexerUse {
         queries: 100,
-        rested_until: Some("2026-08-16T20:00:00Z".to_owned()),
+        rested_until: Some(RESTED_UNTIL),
         ..allowed("Fast", Some(100), None)
     };
     let found = findings(&[both, answering("Other")]);

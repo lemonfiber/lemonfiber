@@ -3,6 +3,7 @@
 use super::common::service::*;
 use super::{a_pre_existing_client, seed_clients_with};
 use lemonfiber_core::baseline::{Baseline, Origin, Record};
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::ports::service::{Category, RegisteredClient};
 use lemonfiber_core::seed::State;
 
@@ -27,7 +28,7 @@ async fn an_adopt_pass_takes_on_a_pre_existing_unmanaged_value() {
         recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
         Some(&Record {
             value: "their-tv".to_owned(),
-            at: "2".to_owned(),
+            at: Instant::from_seconds(2),
             origin: Origin::Adopted,
         }),
         "the operator's own value is adopted as the baseline",
@@ -51,7 +52,12 @@ async fn an_adopted_value_lemonfiber_also_wants_stays_adopted_not_re_recorded() 
         }),
     }];
     let mut expected = Baseline::new();
-    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.adopt(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let (states, recorded, _changes) = seed_clients_with(
         FakeService::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
@@ -83,7 +89,12 @@ async fn an_adopted_value_the_service_still_holds_is_kept_not_made_stale() {
         }),
     }];
     let mut expected = Baseline::new();
-    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "their-tv", "1");
+    expected.adopt(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "their-tv",
+        Instant::from_seconds(1),
+    );
     let (states, _recorded, changes) = seed_clients_with(
         FakeService::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
@@ -111,7 +122,12 @@ async fn an_adopt_pass_promotes_a_drifted_value_and_records_it_as_adopted() {
         }),
     }];
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let (states, recorded, changes) = seed_clients_with(
         FakeService::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
@@ -128,7 +144,7 @@ async fn an_adopt_pass_promotes_a_drifted_value_and_records_it_as_adopted() {
         recorded.entry("sonarr", "downloadclient:sabnzbd:8080"),
         Some(&Record {
             value: "my-own-tv".to_owned(),
-            at: "2".to_owned(),
+            at: Instant::from_seconds(2),
             origin: Origin::Adopted,
         }),
         "the operator's edit is recorded as the adopted baseline",
@@ -150,7 +166,12 @@ async fn a_seed_after_an_adopt_pass_keeps_the_adopted_edit() {
         }),
     }];
     let mut expected = Baseline::new();
-    expected.adopt("sonarr", "downloadclient:sabnzbd:8080", "my-own-tv", "2");
+    expected.adopt(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "my-own-tv",
+        Instant::from_seconds(2),
+    );
     let (states, _recorded, changes) = seed_clients_with(
         FakeService::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],

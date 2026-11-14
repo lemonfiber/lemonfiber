@@ -66,8 +66,9 @@ struct Taken {
         reason = "read so a snapshot naming no source does not read"
     )]
     source: String,
-    /// When it was read, as every instant this product writes is.
-    fetched: String,
+    /// When it was read.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    fetched: crate::instant::Instant,
 }
 
 /// One shard of a snapshot's entries.
@@ -81,8 +82,8 @@ struct Shard {
 /// A snapshot of the list.
 #[derive(Debug, Clone)]
 pub(crate) struct Snapshot {
-    /// When it was taken, as every instant this product writes is.
-    fetched: String,
+    /// When it was taken.
+    fetched: crate::instant::Instant,
     /// Each certificate named, by its serial number in its normal form.
     entries: BTreeMap<String, Entry>,
 }
@@ -95,7 +96,6 @@ impl Snapshot {
     /// where any of them does not read, or the time it was taken is not an instant.
     pub(crate) fn read(taken: &str, shards: &[&str]) -> Option<Self> {
         let taken: Taken = serde_json::from_str(taken).ok()?;
-        crate::instant::read(&taken.fetched)?;
         let mut entries = BTreeMap::new();
         for shard in shards {
             let shard: Shard = serde_json::from_str(shard).ok()?;
@@ -140,8 +140,8 @@ pub(crate) fn carried() -> Option<&'static Snapshot> {
 
 /// When the snapshot this build carries was taken, or nothing where it does not read.
 #[must_use]
-pub fn taken() -> Option<String> {
-    carried().map(|snapshot| snapshot.fetched.clone())
+pub fn taken() -> Option<crate::instant::Instant> {
+    carried().map(|snapshot| snapshot.fetched)
 }
 
 #[cfg(test)]

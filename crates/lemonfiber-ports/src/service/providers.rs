@@ -17,6 +17,8 @@ use std::time::{Duration, SystemTime};
 use async_trait::async_trait;
 use lemonfiber_manifest::Date;
 
+use crate::instant::Instant;
+
 use super::Failure;
 
 /// An allowance recorded against an account, and the point it counts from.
@@ -156,9 +158,13 @@ pub struct IndexerUse {
     pub grabs: u64,
     /// How many of those it did not hand over.
     pub failed_grabs: u64,
-    /// When the aggregator will try it again, in its own words, where it has taken it
-    /// out of rotation after repeated failures.
-    pub rested_until: Option<String>,
+    /// When the aggregator will try it again, where it has taken it out of rotation
+    /// after repeated failures.
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub rested_until: Option<Instant>,
     /// What it allows and over how long, where the operator recorded either.
     pub limits: Option<Limits>,
     /// When the oldest search still inside the window was made.
@@ -166,10 +172,18 @@ pub struct IndexerUse {
     /// A reset falls out of this and nothing else: a rolling window frees up the moment
     /// its oldest call ages out of it. A total has no times in it, so a count alone can
     /// say an allowance is spent and never say when it comes back.
-    pub searched_from: Option<SystemTime>,
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub searched_from: Option<Instant>,
     /// When the oldest grab still inside the window was made — the same, for the other
     /// allowance, which runs out on its own schedule.
-    pub grabbed_from: Option<SystemTime>,
+    #[serde(
+        default,
+        deserialize_with = "crate::instant::until_adapters_answer_integers"
+    )]
+    pub grabbed_from: Option<Instant>,
 }
 
 /// The indexers an aggregator queries, and how they have been behaving.

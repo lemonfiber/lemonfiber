@@ -11,7 +11,9 @@
             "properties": {
               "since": {
                 "description": "The port's `since`.",
-                "type": "string"
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
               }
             },
             "required": [
@@ -35,8 +37,14 @@
                   "description": "When one account was made, as the media server recorded it happening.",
                   "properties": {
                     "at": {
-                      "description": "When it was made, as the server timestamps it.",
-                      "type": "string"
+                      "default": null,
+                      "description": "When it was made, where the server's record says.",
+                      "format": "uint64",
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     },
                     "member": {
                       "description": "The account it is about, matching a [`Member::id`].",
@@ -44,8 +52,7 @@
                     }
                   },
                   "required": [
-                    "member",
-                    "at"
+                    "member"
                   ],
                   "type": "object"
                 }

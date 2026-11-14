@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 
+use lemonfiber_fixtures::ports::STAMPED;
+
 use super::{carry_out, missing_from};
 use crate::app::Ctx;
 use crate::plugin::{Lands, Write};
@@ -52,7 +54,7 @@ fn a_project_whose_journal_cannot_be_written_is_not_written() {
     let written = carry_out(
         &ctx,
         "tools",
-        "stamp",
+        STAMPED,
         &[Write {
             path: project.clone(),
             lands: Lands::Document {
@@ -76,7 +78,7 @@ fn a_secrets_file_that_cannot_be_written_is_refused_naming_it() {
     let refused = carry_out(
         &ctx,
         "tools",
-        "stamp",
+        STAMPED,
         &[Write {
             path: path.clone(),
             lands: Lands::Secrets(Vec::new()),
@@ -106,7 +108,7 @@ fn a_key_whose_directory_is_a_planted_link_is_refused_and_nothing_lands_outside(
     let refused = carry_out(
         &ctx,
         "tools",
-        "stamp",
+        STAMPED,
         &[Write {
             path: key,
             lands: Lands::Key,

@@ -21,21 +21,27 @@
     },
     "registered": {
       "description": "When it was registered.",
-      "type": "string"
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "revoked": {
       "description": "When it was revoked, where it has been.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     },
     "used": {
       "description": "When it last proved a mint, where it has.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "minimum": 0
     }
   },
   "required": [

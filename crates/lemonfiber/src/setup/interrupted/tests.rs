@@ -3,6 +3,7 @@ use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Vpn, Wizard};
@@ -82,7 +83,7 @@ fn interrupted(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
     // One written change, in the line-per-change shape the log is read back from,
     // so there is something a roll-back can actually undo.
     let written = Change {
-        at: "1".to_owned(),
+        at: Instant::from_seconds(1),
         operation: "setup".to_owned(),
         target: "the environment file".to_owned(),
         kind: Kind::Set {

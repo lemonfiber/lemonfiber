@@ -1,12 +1,13 @@
 use super::{became_of, held, still_owed, written, Said};
 use crate::asking::Reasons;
+use crate::instant::Instant;
 use crate::ports::service::HouseholdRequest;
 use crate::ports::service::{MediaStatus, RequestStatus};
 use crate::telling::Told;
 use crate::test_support::a_context;
 
 /// A moment the calendar holds, for these records to be stamped with.
-const AT: &str = "2026-08-17T21:04:09";
+const AT: Instant = Instant::from_seconds(1_787_000_649);
 
 /// One request as the service records it, at the two statuses that decide its state.
 fn asked(id: i64) -> HouseholdRequest {
@@ -14,7 +15,7 @@ fn asked(id: i64) -> HouseholdRequest {
         arrived: None,
         shelf_id: None,
         id,
-        made: Some(AT.to_owned()),
+        made: Some(AT),
         member: "Ana".to_owned(),
         member_id: None,
         kind: Some(crate::ports::media::Kind::Movies),

@@ -17,6 +17,7 @@
 use serde::Serialize;
 
 use super::level::Level;
+use crate::instant::Instant;
 use crate::ports::filesystem::StorageFacts;
 
 /// Which of the two volumes a reading is about.
@@ -59,15 +60,15 @@ pub enum Freshness {
     /// Read off a local disk, so it is true as of now.
     Live,
     /// Read across a network share, which answers with what it was last told —
-    /// carrying the moment it was taken, in seconds since the epoch, so a figure
-    /// nobody can refresh is at least dated.
-    AsOf(u64),
+    /// carrying the moment it was taken, so a figure nobody can refresh is at least
+    /// dated.
+    AsOf(Instant),
 }
 
 impl Freshness {
     /// How a reading of this kind is taken from a volume of this type.
     #[must_use]
-    pub const fn of(network: bool, taken: u64) -> Self {
+    pub const fn of(network: bool, taken: Instant) -> Self {
         if network {
             Self::AsOf(taken)
         } else {
@@ -120,7 +121,7 @@ impl Volume {
         at: &std::path::Path,
         facts: &StorageFacts,
         committed: u64,
-        taken: u64,
+        taken: Instant,
     ) -> Self {
         let measured = facts.total > 0;
         let free = measured.then_some(facts.available);

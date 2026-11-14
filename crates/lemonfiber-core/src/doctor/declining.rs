@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::decline::UNEXPLAINED;
 use crate::error::{Problem, Remedy};
+use crate::instant::Instant;
 use crate::ports::service::{AppKeys, Dated, Declining};
 
 /// The name this check and anything answering it share.
@@ -151,16 +152,10 @@ async fn ran(decline: Option<&Decline>) -> Verdict {
         })
 }
 
-/// Whether `next` is graver than `gravest`: a use nothing explains before a use that
-/// cannot be read, and either before an explained one.
-fn graver(gravest: &Verdict, next: &Verdict) -> bool {
-    matches!(
-        (gravest, next),
-        (
-            Verdict::Pass { .. },
-            Verdict::Warn(_) | Verdict::Unverified { .. }
-        ) | (Verdict::Unverified { .. }, Verdict::Warn(_))
-    )
+/// Whether `next` is graver than `gravest`: a use nothing explains before an explained
+/// one.
+const fn graver(gravest: &Verdict, next: &Verdict) -> bool {
+    matches!((gravest, next), (Verdict::Pass { .. }, Verdict::Warn(_)))
 }
 
 /// The newest moment the service answers acting, in seconds since the Unix epoch, or
@@ -178,25 +173,14 @@ async fn latest_recorded(service: &dyn Declining) -> Result<Option<u64>, ()> {
 /// Whether the key's last use is explained by its making or by something the service
 /// recorded, `recorded` being the newest of the latter.
 fn judged(dated: &Dated, recorded: Option<u64>) -> Verdict {
-    let Some(written) = dated.last_used.as_deref() else {
+    let Some(used) = dated.last_used.map(Instant::seconds) else {
         return Verdict::Pass {
             note: Some("the decline service's key has not been used".to_owned()),
         };
     };
-    let Some(used) = seconds(written) else {
-        return Verdict::Unverified {
-            reason: format!(
-                "the media server dates the decline service's key's last use as {written:?}, \
-                 which is no moment this build reads, so the use cannot be accounted for"
-            ),
-            remedy: Remedy::new("Check which media server version the stack runs")
-                .with_detail("lemonfiber status"),
-        };
-    };
     let explained = dated
         .created
-        .as_deref()
-        .and_then(seconds)
+        .map(Instant::seconds)
         .into_iter()
         .chain(recorded)
         .max();
@@ -241,12 +225,6 @@ fn unexplained(used: u64, explained: Option<u64>) -> Problem {
 /// `at`, in seconds since the Unix epoch, as a report writes a moment.
 fn instant(at: u64) -> String {
     crate::app::ctx::instant(i64::try_from(at).unwrap_or(i64::MAX))
-}
-
-/// The seconds since the Unix epoch a moment the server wrote names, to the second.
-fn seconds(moment: &str) -> Option<u64> {
-    let at: jiff::Timestamp = moment.parse().ok()?;
-    u64::try_from(at.as_second()).ok()
 }
 
 /// One finding of this check.

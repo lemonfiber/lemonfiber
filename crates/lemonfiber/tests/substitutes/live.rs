@@ -401,9 +401,12 @@ pub fn run(
 
     let history = core.run(&["history"], "");
     step(&history, "history");
-    let stamp = strings_under(&history.said, "at").into_iter().next();
+    let stamp = history
+        .said
+        .pointer("/data/changes/0/at")
+        .and_then(serde_json::Value::as_u64);
     assert!(stamp.is_some(), "nothing to undo:\n{}", history.printed);
     if let Some(stamp) = stamp {
-        step(&core.agreed(&["undo", &stamp]), "undo");
+        step(&core.agreed(&["undo", &stamp.to_string()]), "undo");
     }
 }

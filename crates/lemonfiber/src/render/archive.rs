@@ -126,7 +126,7 @@ fn would(preview: &Preview) -> Lines {
         "This backup holds {}, taken by lemonfiber {} on {}.",
         scope_name(&preview.manifest.scope),
         preview.manifest.product_version,
-        preview.manifest.created_at,
+        preview.manifest.created_at.said(),
     ));
     for member in &preview.manifest.members {
         lines.put(format!("  - {}", member.label));

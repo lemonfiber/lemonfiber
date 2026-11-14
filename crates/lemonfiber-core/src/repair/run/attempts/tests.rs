@@ -1,9 +1,10 @@
 use super::{Entry, Repairs, KEPT};
+use crate::instant::Instant;
 use crate::repair::Outcome;
 
 fn entry(check: &str, outcome: Outcome) -> Entry {
     Entry {
-        at: "1000".to_owned(),
+        at: Instant::from_seconds(1000),
         check: check.to_owned(),
         did: "put it right".to_owned(),
         outcome,

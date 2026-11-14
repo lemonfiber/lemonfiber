@@ -33,17 +33,15 @@ pub struct Expiry {
     after: Option<u32>,
     /// When it was agreed to, so somebody reading it later knows it is a decision
     /// somebody in this house made rather than something that arrived with an upgrade.
-    ///
-    /// Absent where the machine's clock could not be written as a date, which is worth
-    /// keeping the period over and not worth losing it over.
-    #[serde(default)]
-    agreed: Option<String>,
+    /// Absent on a record kept without one.
+    #[serde(default, deserialize_with = "crate::instant::kept_option")]
+    agreed: Option<crate::instant::Instant>,
 }
 
 impl Expiry {
     /// The arrangement an operator has just agreed to.
     #[must_use]
-    pub fn agreed_to(after: u32, at: Option<String>) -> Self {
+    pub fn agreed_to(after: u32, at: Option<crate::instant::Instant>) -> Self {
         Self {
             after: Some(after),
             agreed: at,
@@ -56,10 +54,10 @@ impl Expiry {
         self.after
     }
 
-    /// The day it was agreed to, where the clock could be written down.
+    /// When it was agreed to, where the record says.
     #[must_use]
-    pub fn agreed(&self) -> Option<&str> {
-        self.agreed.as_deref()
+    pub const fn agreed(&self) -> Option<crate::instant::Instant> {
+        self.agreed
     }
 
     /// Whether a period is short enough to close a request the operator was never

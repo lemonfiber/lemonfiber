@@ -1,6 +1,7 @@
 //! A change exits on whether it happened, and on what it left behind.
 
 use super::*;
+use lemonfiber_core::instant::Instant;
 
 /// A walk that ended in one state, with nothing else to say about it.
 fn walked(state: WalkState) -> Outcome {
@@ -30,7 +31,7 @@ fn a_restore_that_overwrote_nothing_is_not_reported_as_a_restore() {
         manifest: Manifest {
             schema: SCHEMA,
             product_version: "0.7.0".to_owned(),
-            created_at: "2026-07-30".to_owned(),
+            created_at: Instant::from_seconds(1_785_369_600),
             data_root: "/srv/media".to_owned(),
             scope: Scope::WholeStack,
             sensitive: true,
@@ -349,7 +350,7 @@ fn komga() -> lemonfiber_core::plugin::Installed {
         signed: String::new(),
         manifest: String::new(),
         tree: String::new(),
-        installed_at: String::new(),
+        installed_at: None,
     }
 }
 

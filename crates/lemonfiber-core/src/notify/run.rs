@@ -112,7 +112,7 @@ pub async fn notify(
         let said = channel.deliver(&digest).await;
         let check = format!("{CHANNEL_CHECK}.{}", channel.name());
         match said {
-            Ok(()) => conditions.observe(&check, None, &now),
+            Ok(()) => conditions.observe(&check, None, now),
             Err(problem) => {
                 let fault = Fault::new(
                     CHANNEL_REFUSED,
@@ -122,7 +122,7 @@ pub async fn notify(
                      waiting on the screen rather than arriving anywhere",
                     "check the channel's configuration; the alert is kept in-app either way",
                 );
-                conditions.observe(&check, Some(&fault), &now);
+                conditions.observe(&check, Some(&fault), now);
                 refused.push(problem.channel);
             }
         }

@@ -17,6 +17,7 @@ use crate::common;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::{Change, Kind};
 use lemonfiber_core::repair::run::{Left, Reversal};
 use lemonfiber_fixtures::files::Files;
@@ -70,9 +71,9 @@ fn ctx(root: &Path) -> Ctx {
 }
 
 /// A setting one run of an operation wrote into lemonfiber's own environment file.
-fn set(at: &str, operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
+fn set(at: Instant, operation: &str, key: &str, previous: Option<&str>, current: &str) -> Change {
     Change {
-        at: at.to_owned(),
+        at,
         operation: operation.to_owned(),
         target: ".env".to_owned(),
         kind: Kind::Set {
@@ -108,34 +109,24 @@ fn reading(root: &Path) -> String {
 }
 
 /// Ask for a run back, answering with what the reversal came to.
-async fn put_back(root: &Path, at: &str) -> Reversal {
-    dispatch(
-        Command::Undo {
-            run: Some(at.to_owned()),
-        },
-        &ctx(root),
-    )
-    .await
-    .ok()
-    .and_then(|outcome| match outcome {
-        Outcome::Undo(reversal) => Some(reversal),
-        _ => None,
-    })
-    .unwrap_or_default()
+async fn put_back(root: &Path, at: Instant) -> Reversal {
+    dispatch(Command::Undo { run: Some(at) }, &ctx(root))
+        .await
+        .ok()
+        .and_then(|outcome| match outcome {
+            Outcome::Undo(reversal) => Some(reversal),
+            _ => None,
+        })
+        .unwrap_or_default()
 }
 
 /// Ask for a run back that cannot be, answering with the refusal as it reads.
-async fn refusal(root: &Path, at: &str) -> String {
-    dispatch(
-        Command::Undo {
-            run: Some(at.to_owned()),
-        },
-        &ctx(root),
-    )
-    .await
-    .err()
-    .map(|problem| format!("{problem:?}"))
-    .unwrap_or_default()
+async fn refusal(root: &Path, at: Instant) -> String {
+    dispatch(Command::Undo { run: Some(at) }, &ctx(root))
+        .await
+        .err()
+        .map(|problem| format!("{problem:?}"))
+        .unwrap_or_default()
 }
 
 /// The whole of one run goes back, and a run stamped differently is left alone.
@@ -146,13 +137,19 @@ async fn one_run_goes_back_as_a_unit_and_the_others_stand() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
-            set("1000", SEED, "TWO", None, "new"),
-            set("2000", "reconfigure", "LATER", Some("was"), "kept"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "TWO", None, "new"),
+            set(
+                Instant::from_seconds(2000),
+                "reconfigure",
+                "LATER",
+                Some("was"),
+                "kept",
+            ),
         ],
     );
 
-    let reversal = put_back(&root, "1000").await;
+    let reversal = put_back(&root, Instant::from_seconds(1000)).await;
     assert_eq!(reversal.reversed.len(), 2, "{reversal:?}");
     assert!(reversal.left.is_empty(), "{reversal:?}");
 
@@ -178,7 +175,7 @@ async fn a_reversal_names_a_credential_to_replace_without_reporting_its_value() 
     journalled(
         &root,
         &[set(
-            "1000",
+            Instant::from_seconds(1000),
             SEED,
             "DOWNLOAD_TORRENT_PASSWORD",
             Some("before"),
@@ -186,7 +183,7 @@ async fn a_reversal_names_a_credential_to_replace_without_reporting_its_value() 
         )],
     );
 
-    let reversal = put_back(&root, "1000").await;
+    let reversal = put_back(&root, Instant::from_seconds(1000)).await;
     let said = format!("{reversal:?}");
     let env = reading(&root);
 
@@ -210,12 +207,21 @@ async fn a_reversal_names_a_credential_to_replace_without_reporting_its_value() 
 async fn a_rehearsed_reversal_names_what_would_go_back_and_touches_nothing() {
     let root = scratch("rehearsed-run");
     env_holds(&root, "ONE=new\n");
-    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    journalled(
+        &root,
+        &[set(
+            Instant::from_seconds(1000),
+            SEED,
+            "ONE",
+            Some("old"),
+            "new",
+        )],
+    );
     let recorded = std::fs::read_to_string(paths(&root).journal()).unwrap_or_default();
 
     let reversal = dispatch(
         Command::Undo {
-            run: Some("1000".to_owned()),
+            run: Some(Instant::from_seconds(1000)),
         },
         &ctx(&root).rehearsing(),
     )
@@ -250,9 +256,18 @@ async fn a_rehearsed_reversal_names_what_would_go_back_and_touches_nothing() {
 async fn a_stamp_naming_no_run_is_refused_explicitly() {
     let root = scratch("no-run");
     env_holds(&root, "ONE=new\n");
-    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    journalled(
+        &root,
+        &[set(
+            Instant::from_seconds(1000),
+            SEED,
+            "ONE",
+            Some("old"),
+            "new",
+        )],
+    );
 
-    let said = refusal(&root, "9999").await;
+    let said = refusal(&root, Instant::from_seconds(9999)).await;
     assert!(
         said.contains("9999"),
         "the refusal names the target: {said}"
@@ -264,9 +279,18 @@ async fn a_stamp_naming_no_run_is_refused_explicitly() {
 async fn a_reversal_is_journalled_and_can_itself_be_put_back() {
     let root = scratch("rollable");
     env_holds(&root, "ONE=new\n");
-    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    journalled(
+        &root,
+        &[set(
+            Instant::from_seconds(1000),
+            SEED,
+            "ONE",
+            Some("old"),
+            "new",
+        )],
+    );
 
-    let reversal = put_back(&root, "1000").await;
+    let reversal = put_back(&root, Instant::from_seconds(1000)).await;
     assert_eq!(reversal.reversed.len(), 1, "{reversal:?}");
     assert!(reading(&root).contains("ONE=old"));
 
@@ -289,12 +313,12 @@ async fn a_run_holding_an_edited_setting_is_not_offered() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
-            set("1000", SEED, "TWO", Some("was"), "new"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "TWO", Some("was"), "new"),
         ],
     );
 
-    let said = refusal(&root, "1000").await;
+    let said = refusal(&root, Instant::from_seconds(1000)).await;
     assert!(said.contains("TWO"), "the refusal names the change: {said}");
     assert!(
         said.contains("discard"),
@@ -314,12 +338,18 @@ async fn a_stamp_naming_two_runs_is_refused() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
-            set("1000", "reconfigure", "TWO", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
+            set(
+                Instant::from_seconds(1000),
+                "reconfigure",
+                "TWO",
+                Some("old"),
+                "new",
+            ),
         ],
     );
 
-    let said = refusal(&root, "1000").await;
+    let said = refusal(&root, Instant::from_seconds(1000)).await;
     assert!(said.contains("reconfigure"), "{said}");
     assert!(said.contains("seed"), "{said}");
     assert!(reading(&root).contains("ONE=new"), "nothing was put back");
@@ -334,9 +364,9 @@ async fn what_a_reversal_could_not_reach_is_reported_beside_what_it_did() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
             Change {
-                at: "1000".to_owned(),
+                at: Instant::from_seconds(1000),
                 operation: SEED.to_owned(),
                 target: "sonarr".to_owned(),
                 kind: Kind::Configured {
@@ -350,7 +380,7 @@ async fn what_a_reversal_could_not_reach_is_reported_beside_what_it_did() {
         ],
     );
 
-    let reversal = put_back(&root, "1000").await;
+    let reversal = put_back(&root, Instant::from_seconds(1000)).await;
     assert_eq!(
         reversal.reversed.len(),
         1,
@@ -387,7 +417,7 @@ async fn a_machine_that_cannot_say_where_its_record_is_refuses() {
 
     let said = dispatch(
         Command::Undo {
-            run: Some("1000".to_owned()),
+            run: Some(Instant::from_seconds(1000)),
         },
         &nowhere,
     )
@@ -412,9 +442,9 @@ async fn a_field_inside_a_service_goes_back_and_the_record_says_so() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
             Change {
-                at: "1000".to_owned(),
+                at: Instant::from_seconds(1000),
                 operation: SEED.to_owned(),
                 target: "sonarr".to_owned(),
                 kind: Kind::Configured {
@@ -430,7 +460,7 @@ async fn a_field_inside_a_service_goes_back_and_the_record_says_so() {
 
     let reversal = dispatch(
         Command::Undo {
-            run: Some("1000".to_owned()),
+            run: Some(Instant::from_seconds(1000)),
         },
         &reaching(&root),
     )
@@ -469,9 +499,9 @@ async fn a_path_the_run_made_comes_off_and_is_not_recorded_as_made_again() {
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
             Change {
-                at: "1000".to_owned(),
+                at: Instant::from_seconds(1000),
                 operation: SEED.to_owned(),
                 target: made.to_string_lossy().into_owned(),
                 kind: Kind::Made {
@@ -481,7 +511,7 @@ async fn a_path_the_run_made_comes_off_and_is_not_recorded_as_made_again() {
         ],
     );
 
-    let reversal = put_back(&root, "1000").await;
+    let reversal = put_back(&root, Instant::from_seconds(1000)).await;
 
     assert_eq!(reversal.reversed.len(), 2, "both went back: {reversal:?}");
     assert!(!made.exists(), "the directory came off");
@@ -514,7 +544,16 @@ async fn a_path_the_run_made_comes_off_and_is_not_recorded_as_made_again() {
 async fn a_stack_that_cannot_be_read_stops_the_reversal() {
     let root = scratch("no-stack");
     env_holds(&root, "ONE=new\n");
-    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    journalled(
+        &root,
+        &[set(
+            Instant::from_seconds(1000),
+            SEED,
+            "ONE",
+            Some("old"),
+            "new",
+        )],
+    );
 
     let nowhere = lemonfiber_testing::a_live_context()
         .filesystem(Files::empty())
@@ -529,7 +568,7 @@ async fn a_stack_that_cannot_be_read_stops_the_reversal() {
 
     let refused = dispatch(
         Command::Undo {
-            run: Some("1000".to_owned()),
+            run: Some(Instant::from_seconds(1000)),
         },
         &nowhere,
     )
@@ -548,9 +587,9 @@ async fn a_stack_that_cannot_be_read_stops_the_reversal() {
 ///
 /// The other kind of change entirely: a setting lives in a file anything can write, and
 /// this lives inside the service, where nothing on the host can reach it.
-fn configured(at: &str, operation: &str, target: &str) -> Change {
+fn configured(at: Instant, operation: &str, target: &str) -> Change {
     Change {
-        at: at.to_owned(),
+        at,
         operation: operation.to_owned(),
         target: target.to_owned(),
         kind: Kind::Configured {
@@ -581,15 +620,15 @@ async fn a_rehearsed_reversal_separates_what_needs_the_service_from_what_does_no
     journalled(
         &root,
         &[
-            set("1000", SEED, "ONE", Some("old"), "new"),
-            configured("1000", SEED, "sonarr"),
+            set(Instant::from_seconds(1000), SEED, "ONE", Some("old"), "new"),
+            configured(Instant::from_seconds(1000), SEED, "sonarr"),
         ],
     );
     let recorded = std::fs::read_to_string(paths(&root).journal()).unwrap_or_default();
 
     let reversal = dispatch(
         Command::Undo {
-            run: Some("1000".to_owned()),
+            run: Some(Instant::from_seconds(1000)),
         },
         &ctx(&root).rehearsing(),
     )
@@ -648,12 +687,18 @@ fn unrewritable(root: &Path) {
 async fn a_journal_that_cannot_be_read_refuses_the_reversal() {
     let root = scratch("unreadable-journal");
     env_holds(&root, "ONE=new\n");
-    let good =
-        serde_json::to_string(&set("1000", SEED, "ONE", Some("old"), "new")).unwrap_or_default();
+    let good = serde_json::to_string(&set(
+        Instant::from_seconds(1000),
+        SEED,
+        "ONE",
+        Some("old"),
+        "new",
+    ))
+    .unwrap_or_default();
     let path = paths(&root).journal();
     let _ = std::fs::write(&path, format!("{{ not a change }}\n{good}\n"));
 
-    let said = refusal(&root, "1000").await;
+    let said = refusal(&root, Instant::from_seconds(1000)).await;
     assert!(said.contains("could not be read"), "{said}");
     assert!(reading(&root).contains("ONE=new"), "nothing was put back");
 }
@@ -664,10 +709,19 @@ async fn a_journal_that_cannot_be_read_refuses_the_reversal() {
 async fn a_reversal_that_cannot_be_recorded_says_it_stands_unrecorded() {
     let root = scratch("unrecorded-reversal");
     env_holds(&root, "ONE=new\n");
-    journalled(&root, &[set("1000", SEED, "ONE", Some("old"), "new")]);
+    journalled(
+        &root,
+        &[set(
+            Instant::from_seconds(1000),
+            SEED,
+            "ONE",
+            Some("old"),
+            "new",
+        )],
+    );
     unrewritable(&root);
 
-    let said = refusal(&root, "1000").await;
+    let said = refusal(&root, Instant::from_seconds(1000)).await;
     assert!(said.contains("UNDO-3"), "{said}");
     assert!(said.contains("could not be recorded"), "{said}");
     assert!(
@@ -703,7 +757,7 @@ async fn a_run_that_minted_a_key_goes_back_by_revoking_it() {
     let Some(at) = journal
         .as_ref()
         .and_then(|journal| journal.changes().last())
-        .map(|change| change.at.clone())
+        .map(|change| change.at)
     else {
         unreachable!("a mint is journaled")
     };

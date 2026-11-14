@@ -22,8 +22,10 @@
       "type": "string"
     },
     "until": {
-      "description": "When it stops being one, written as every other instant this product writes.",
-      "type": "string"
+      "description": "When it stops being one.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     }
   },
   "required": [

@@ -2,6 +2,7 @@
 
 use super::common::service::*;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, ClientProbe, DownloadClient, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, Severity, State, Wiring};
@@ -23,7 +24,12 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
     }];
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:qbittorrent:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let states: Vec<State> = wire_download_clients(
         &FakeService::with_clients(Mode::Normal, existing),
@@ -37,7 +43,7 @@ async fn a_client_the_operator_re_filed_is_preserved_as_drift() {
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
     .into_iter()
@@ -75,7 +81,12 @@ async fn seed_clients_probed(
 ) -> Vec<Wiring> {
     let mut journal = Journal::new();
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:qbittorrent:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:qbittorrent:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
     let mut records = Baseline::new();
     let base = FakeService::with_clients(Mode::Normal, existing);
     let service = match probes {
@@ -94,7 +105,7 @@ async fn seed_clients_probed(
             reset: false,
             rehearsing: false,
         },
-        "2",
+        Instant::from_seconds(2),
     )
     .await
 }

@@ -18,6 +18,7 @@
 //! anything.
 
 use crate::error::{Diagnose as _, Problem};
+use crate::instant::Instant;
 use crate::journal::{Change, Undo};
 use crate::rollback::{standing, together, Reversal as Judgement};
 
@@ -112,7 +113,7 @@ const NEEDS_THE_SERVICE: &str = "it goes back through the service that made it, 
 /// Returns a [`Problem`] where the run cannot be found, where the stamp names more than
 /// one, where the judgement says the run cannot be put back, or for any reason the
 /// executor underneath gives.
-pub async fn undo(ctx: &Ctx, run: Option<&str>) -> Result<Reversal, Box<Problem>> {
+pub async fn undo(ctx: &Ctx, run: Option<Instant>) -> Result<Reversal, Box<Problem>> {
     match run {
         None => super::repair::reversing(ctx).await,
         Some(at) => named(ctx, at).await,
@@ -127,7 +128,7 @@ fn laid_out(ctx: &Ctx) -> Result<(crate::config::paths::Paths, std::path::PathBu
 }
 
 /// Put back the run stamped `at`.
-async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
+async fn named(ctx: &Ctx, at: Instant) -> Result<Reversal, Box<Problem>> {
     let (paths, stack) = laid_out(ctx)?;
     let journal = super::recover::journal_at(&paths.journal())
         .map_err(|failure| Box::new(failure.problem()))?;
@@ -135,13 +136,13 @@ async fn named(ctx: &Ctx, at: &str) -> Result<Reversal, Box<Problem>> {
 
     let operation = moved_at(changes, at).map_or_else(|| operation_at(changes, at), Ok)?;
     let run: Vec<&Change> = together(changes, &operation, at);
-    carried_out(ctx, (&paths, &stack), changes, &run, at).await
+    carried_out(ctx, (&paths, &stack), changes, &run, &at.to_string()).await
 }
 
 /// The run stamped `at` that moved a guard onto its plugin, where one did: judged as that
 /// run whatever else shares its stamp, so it is refused for good rather than as one of
 /// several.
-fn moved_at(changes: &[Change], at: &str) -> Option<String> {
+fn moved_at(changes: &[Change], at: Instant) -> Option<String> {
     changes
         .iter()
         .find(|change| {
@@ -289,7 +290,7 @@ async fn carried_out(
     // Recorded before the report is built, so a reversal that is reported is a reversal
     // that is in the record. The changes it writes are the inverse of the ones it put
     // back, which is what makes this run answerable to the same command.
-    super::recover::journalled(&paths.journal(), &recording(run, &reversed, &ctx.stamp()))
+    super::recover::journalled(&paths.journal(), &recording(run, &reversed, ctx.stamp()))
         .map_err(|failure| Box::new(super::recover::unrecorded("The reversal", &failure)))?;
 
     let mut left = standing_after(&reached.unreached, &carried);
@@ -337,7 +338,7 @@ pub(crate) fn would_reverse(undos: Vec<Undo>) -> Reversal {
 }
 
 /// The one operation a stamp names, refusing where it names none or several.
-fn operation_at(changes: &[Change], at: &str) -> Result<String, Box<Problem>> {
+fn operation_at(changes: &[Change], at: Instant) -> Result<String, Box<Problem>> {
     let mut named: Vec<&str> = changes
         .iter()
         .filter(|change| change.at == at)
@@ -346,9 +347,9 @@ fn operation_at(changes: &[Change], at: &str) -> Result<String, Box<Problem>> {
     named.sort_unstable();
     named.dedup();
     match named.as_slice() {
-        [] => Err(Box::new(no_such_run(at))),
+        [] => Err(Box::new(no_such_run(&at.to_string()))),
         [one] => Ok((*one).to_owned()),
-        several => Err(Box::new(more_than_one(at, several))),
+        several => Err(Box::new(more_than_one(&at.to_string(), several))),
     }
 }
 

@@ -162,7 +162,7 @@ pub(crate) async fn remove(
         &stack,
         after.installed(),
         &crate::plugin::owner(&going.plugin),
-        &ctx.stamp(),
+        ctx.stamp(),
     )?;
 
     // The credentials lemonfiber minted for its services, which go with the plugin: a

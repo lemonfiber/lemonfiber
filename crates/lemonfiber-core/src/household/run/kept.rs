@@ -15,7 +15,7 @@ pub(super) async fn listed(
     reasons: &crate::asking::Reasons,
 ) {
     crate::collected::run::arrivals(ctx).await;
-    let now = ctx.seams.clock.now();
+    let now = ctx.stamp();
     for ask in crate::collected::run::every(ctx).iter().rev() {
         let Some(name) = names.get(&ask.member) else {
             continue;

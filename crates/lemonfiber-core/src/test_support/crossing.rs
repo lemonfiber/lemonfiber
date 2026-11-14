@@ -1,5 +1,7 @@
 //! A plugin reading another service's credential as a secret that crosses to it.
 
+use crate::instant::Instant;
+
 /// A plugin of two services, each reading the series curator's key as a secret that
 /// crosses to it.
 pub(crate) fn a_crossing_reader() -> crate::plugin::Installed {
@@ -39,7 +41,7 @@ pub(crate) fn a_grant() -> crate::plugin::Grant {
         credential: "LIBRARY_CURATE_TV_API_KEY".to_owned(),
         of: "sonarr".to_owned(),
         serves: "media.serve".to_owned(),
-        at: "1".to_owned(),
+        at: Some(Instant::from_seconds(1)),
     }
 }
 

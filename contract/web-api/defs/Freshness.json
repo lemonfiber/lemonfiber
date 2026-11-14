@@ -16,7 +16,7 @@
       ]
     },
     {
-      "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, in seconds since the epoch, so a figure\nnobody can refresh is at least dated.",
+      "description": "Read across a network share, which answers with what it was last told —\ncarrying the moment it was taken, so a figure nobody can refresh is at least\ndated.",
       "type": "object",
       "properties": {
         "as": {

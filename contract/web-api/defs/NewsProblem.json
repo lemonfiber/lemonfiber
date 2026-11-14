@@ -9,7 +9,9 @@
     },
     "onset": {
       "description": "When the stack first saw it wrong since it last saw it right, in whole seconds\nsince the epoch: the same moment the health summary names for it.",
-      "type": "string"
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
     },
     "summary": {
       "description": "What is wrong, in one line.",

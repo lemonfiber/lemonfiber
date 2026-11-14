@@ -14,6 +14,7 @@ mod a_frame_awaits_nothing;
 mod a_latch_is_settled_once;
 mod an_adapter_only_reads_its_upstreams_credential;
 mod every_declared_code_is_raised;
+mod every_instant_is_seconds;
 mod how_long_a_file_may_be;
 mod modest_terminal;
 mod no_part_is_named_in_the_core;

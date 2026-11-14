@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::Ctx;
 use crate::error::{Problem, Remedy};
+use crate::instant::Instant;
 use crate::model::{HandedClient, HandedSession, Handoff, HandoffRemedy, HandoffState};
 use crate::ports::service::Member;
 
@@ -38,8 +39,9 @@ type Issued = BTreeMap<String, Kept>;
 /// One account's first code: when it was given, and which devices were signed in then.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Given {
-    /// When the code was first given, as an instant.
-    at: String,
+    /// When the code was first given.
+    #[serde(deserialize_with = "crate::instant::kept")]
+    at: Instant,
     /// The devices signed in to the account at that moment, by the identifier the media
     /// server tells each apart by. None of them is the device being handed over.
     #[serde(default)]
@@ -57,7 +59,7 @@ enum Kept {
     /// The moment and the devices signed in then.
     Given(Given),
     /// The moment alone.
-    Dated(String),
+    Dated(#[serde(deserialize_with = "crate::instant::kept")] Instant),
 }
 
 impl Kept {
@@ -196,7 +198,7 @@ fn proved(
     ctx: &Ctx,
     account: &str,
     now_signed_in: &BTreeSet<String>,
-) -> (HandoffState, Option<String>) {
+) -> (HandoffState, Option<Instant>) {
     let mut issued: Issued = super::record::beside(ctx, NAME);
     let before = issued.get(account).cloned().map(Kept::given);
     let already = before
@@ -211,11 +213,11 @@ fn proved(
         Some(given) => Some(given.at),
         None if ctx.dry_run => None,
         None => {
-            let now = ctx.hours_ago(0);
+            let now = ctx.stamp();
             issued.insert(
                 account.to_owned(),
                 Kept::Given(Given {
-                    at: now.clone(),
+                    at: now,
                     signed_in: already,
                 }),
             );

@@ -3,9 +3,11 @@
 use super::common::service::*;
 use super::seed_clients;
 use lemonfiber_core::baseline::Baseline;
+use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Category, DownloadClient, RegisteredClient};
 use lemonfiber_core::seed::{wire_download_clients, Baselines, State};
+use lemonfiber_fixtures::ports::STAMPED;
 
 /// Run the client driver as a rehearsal: the same pass over the same service, with
 /// the registering left out. `expected` is what lemonfiber last recorded, and `adopt`
@@ -31,7 +33,7 @@ async fn would_seed_clients(
             reset: false,
             rehearsing: true,
         },
-        "t",
+        STAMPED,
     )
     .await;
     let states = wirings.into_iter().map(|wiring| wiring.state).collect();
@@ -86,7 +88,12 @@ async fn a_rehearsed_adopt_names_the_connection_and_never_the_value() {
         }],
     );
     let mut expected = Baseline::new();
-    expected.record("sonarr", "downloadclient:sabnzbd:8080", "tv", "1");
+    expected.record(
+        "sonarr",
+        "downloadclient:sabnzbd:8080",
+        "tv",
+        Instant::from_seconds(1),
+    );
 
     let (states, recorded) = would_seed_clients(
         &service,
