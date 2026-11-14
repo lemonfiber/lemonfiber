@@ -159,7 +159,7 @@
     },
     {
       "path": "library.curate/v1/operations/events.json",
-      "sha256": "b428edb8e4ec21efd9e5170ef745d3a21fd68adc42809d5cbb85f6d6f24172e9"
+      "sha256": "8dd27eb40fa75b77596290bfb1a80851283dc629772b250587d47d32f5084ae6"
     },
     {
       "path": "library.curate/v1/holds.json",
@@ -167,7 +167,7 @@
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "dc6b6d5d866902de59f0091eef53ab4b376642fac3616ba968637a269cfb6bc9"
+      "sha256": "2e36d05b6575dc9ccde0dc3c8394bf213d238d2da49c12f18b9ffa875bdc40f8"
     }
   ],
   "major": 1

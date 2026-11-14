@@ -46,7 +46,7 @@
       ],
       "openapi": "library.curate/v1/openapi.json",
       "operations": 39,
-      "sha256": "99f0f8cbcf95170b3eb69251399dfe38d160a4bdf7dbc05377786e7fa71f9c30"
+      "sha256": "15523ff013caf05aaf3aac294760f8a736bbccbdb05637293882b75486c533c1"
     },
     {
       "capability": "indexer.search",
@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 29,
-      "sha256": "243af596322d307ef9f417ccf8060322d064c050b543e44490d630497093b070"
+      "sha256": "ea809dc33b9e19ce9435bf2948792b6b6f7187dc98664a30df1957b3fcd8d148"
     },
     {
       "capability": "proxy.front",
