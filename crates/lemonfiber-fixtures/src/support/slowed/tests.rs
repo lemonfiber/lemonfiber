@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use lemonfiber_ports::docker::{Engine as _, LogQuery};
+use lemonfiber_ports::docker::{Engine as _, Health, Lifecycle, LogQuery};
 
 use super::{Reporting, Slowed};
 
@@ -14,7 +14,10 @@ fn slowed(engine: Reporting) -> Slowed {
 
 #[tokio::test]
 async fn stats_and_logs_answer_as_the_engine_beneath() {
-    let engine = slowed(Reporting::default().saying("radarr", "started"));
+    let engine = slowed(
+        Reporting::holding(&["radarr"], Lifecycle::Running, Health::Healthy)
+            .saying("radarr", "started"),
+    );
     let query = LogQuery {
         tail: LogQuery::BEGIN_WITH,
         follow: false,
