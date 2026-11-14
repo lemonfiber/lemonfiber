@@ -9,7 +9,7 @@
 //! held to the one home: files outside `src/`, module trees declared behind `#[cfg(test)]`,
 //! items gated on it, and the crates only a `[dev-dependencies]` table names.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -66,14 +66,14 @@ impl<'ast> Visit<'ast> for Declared {
     }
 }
 
-/// The crates only ever built for tests: named under some `[dev-dependencies]` and under no
-/// `[dependencies]`.
+/// The crates only ever built for tests: named under some `[dev-dependencies]` or under the
+/// `[dependencies]` of crates only ever built for tests, and under no other `[dependencies]`.
 fn test_crates() -> BTreeSet<String> {
     let crates = workspace_root().join("crates");
     let Ok(entries) = fs::read_dir(&crates) else {
         unreachable!("the workspace keeps its crates under crates/");
     };
-    let mut built = BTreeSet::new();
+    let mut users: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut tested = BTreeSet::new();
     for entry in entries.flatten() {
         let Ok(manifest) = fs::read_to_string(entry.path().join("Cargo.toml")) else {
@@ -82,6 +82,12 @@ fn test_crates() -> BTreeSet<String> {
         let Ok(read) = manifest.parse::<toml::Table>() else {
             unreachable!("every crate manifest in the workspace parses");
         };
+        let name = read
+            .get("package")
+            .and_then(|package| package.get("name"))
+            .and_then(toml::Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
         let targets: Vec<&toml::Table> = std::iter::once(&read)
             .chain(
                 read.get("target")
@@ -91,21 +97,33 @@ fn test_crates() -> BTreeSet<String> {
                     .filter_map(toml::Value::as_table),
             )
             .collect();
-        for (table, into) in [
-            ("dependencies", &mut built),
-            ("dev-dependencies", &mut tested),
-        ] {
-            into.extend(
-                targets
-                    .iter()
-                    .filter_map(|target| target.get(table))
-                    .filter_map(toml::Value::as_table)
-                    .flat_map(toml::Table::keys)
-                    .cloned(),
-            );
+        let named = |table: &str| -> Vec<String> {
+            targets
+                .iter()
+                .filter_map(|target| target.get(table))
+                .filter_map(toml::Value::as_table)
+                .flat_map(toml::Table::keys)
+                .cloned()
+                .collect()
+        };
+        for dependency in named("dependencies") {
+            users.entry(dependency).or_default().insert(name.clone());
         }
+        tested.extend(named("dev-dependencies"));
     }
-    let only: BTreeSet<String> = tested.difference(&built).cloned().collect();
+    let named: BTreeSet<String> = tested.iter().chain(users.keys()).cloned().collect();
+    let mut only = BTreeSet::new();
+    loop {
+        let grown: BTreeSet<String> = named
+            .iter()
+            .filter(|one| users.get(*one).is_none_or(|by| by.is_subset(&only)))
+            .cloned()
+            .collect();
+        if grown == only {
+            break;
+        }
+        only = grown;
+    }
     assert!(
         only.contains("lemonfiber-fixtures"),
         "the fixtures crate was not read as a crate only tests build, which means this is \

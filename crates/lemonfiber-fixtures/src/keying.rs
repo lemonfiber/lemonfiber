@@ -95,22 +95,27 @@ impl AppKeys for Keys {
     }
 
     async fn astray(&self, app: &str) -> Result<Vec<Astray>, Failure> {
-        self.called(format!("astray {app}"));
-        match self
-            .answers
-            .get(app)
-            .cloned()
-            .unwrap_or(Astrayed::Holds(Vec::new()))
-        {
-            Astrayed::Holds(held) => Ok(held),
-            Astrayed::Unsupported => Err(Failure::Unsupported {
-                service: "plex".to_owned(),
-                detail: "astray is not offered".to_owned(),
-            }),
-            Astrayed::Unavailable => Err(Failure::Unavailable {
-                service: "plex".to_owned(),
-            }),
-        }
+        astray(self, app)
+    }
+}
+
+/// How `Keys` answers `astray`.
+fn astray(fake: &Keys, app: &str) -> Result<Vec<Astray>, Failure> {
+    fake.called(format!("astray {app}"));
+    match fake
+        .answers
+        .get(app)
+        .cloned()
+        .unwrap_or(Astrayed::Holds(Vec::new()))
+    {
+        Astrayed::Holds(held) => Ok(held),
+        Astrayed::Unsupported => Err(Failure::Unsupported {
+            service: "plex".to_owned(),
+            detail: "astray is not offered".to_owned(),
+        }),
+        Astrayed::Unavailable => Err(Failure::Unavailable {
+            service: "plex".to_owned(),
+        }),
     }
 }
 

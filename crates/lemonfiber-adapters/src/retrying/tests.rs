@@ -149,25 +149,9 @@ async fn octets_are_handed_on_once() {
     assert_eq!(asked(&fake), 1);
 }
 
-/// A transport that never connects, keeping the deadline each attempt carried.
-#[derive(Default)]
-struct Refused {
-    deadlines: std::sync::Mutex<Vec<Option<std::time::Duration>>>,
-}
-
-#[async_trait]
-impl Http for Refused {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        if let Ok(mut deadlines) = self.deadlines.lock() {
-            deadlines.push(request.deadline);
-        }
-        Err(Unreachable::once(&request.url, "connection refused"))
-    }
-}
-
 /// Every deadline `deadline` was asked with across its attempts, and how many there were.
 async fn attempted(deadline: std::time::Duration) -> (Vec<Option<std::time::Duration>>, u32) {
-    let refused = Arc::new(Refused::default());
+    let refused = Fake::silent();
     let retrying = Retrying::around(Arc::clone(&refused) as Arc<dyn Http>);
     let failure = retrying
         .send(&Request {
@@ -177,10 +161,10 @@ async fn attempted(deadline: std::time::Duration) -> (Vec<Option<std::time::Dura
         .await
         .err();
     let deadlines = refused
-        .deadlines
-        .lock()
-        .map(|deadlines| deadlines.clone())
-        .unwrap_or_default();
+        .requests()
+        .iter()
+        .map(|asked| asked.deadline)
+        .collect();
     (deadlines, failure.map_or(0, |failure| failure.attempts))
 }
 

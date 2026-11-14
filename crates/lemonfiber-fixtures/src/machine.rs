@@ -74,20 +74,25 @@ impl Living {
 #[async_trait]
 impl Running for Living {
     async fn alive(&self, _pid: u32) -> Option<bool> {
-        let asked = self
-            .asked
-            .lock()
-            .map(|mut asked| {
-                *asked += 1;
-                *asked - 1
-            })
-            .unwrap_or_default();
-        if asked == 0 {
-            if let Some(meanwhile) = &self.meanwhile {
-                meanwhile();
-            }
-        }
-        let last = self.answers.len().saturating_sub(1);
-        self.answers.get(asked.min(last)).copied().flatten()
+        alive(self, _pid)
     }
+}
+
+/// How `Living` answers `alive`.
+fn alive(fake: &Living, _pid: u32) -> Option<bool> {
+    let asked = fake
+        .asked
+        .lock()
+        .map(|mut asked| {
+            *asked += 1;
+            *asked - 1
+        })
+        .unwrap_or_default();
+    if asked == 0 {
+        if let Some(meanwhile) = &fake.meanwhile {
+            meanwhile();
+        }
+    }
+    let last = fake.answers.len().saturating_sub(1);
+    fake.answers.get(asked.min(last)).copied().flatten()
 }

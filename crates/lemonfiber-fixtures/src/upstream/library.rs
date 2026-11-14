@@ -147,12 +147,17 @@ impl Queues for Upstream {
 #[async_trait]
 impl QualityReleases for Upstream {
     async fn probe_releases(&self, kind: TitleKind) -> Result<ReleaseProbe, Failure> {
-        Ok(match kind {
-            TitleKind::Tv => ReleaseProbe::Matching,
-            TitleKind::Movies => ReleaseProbe::NoneFound,
-            TitleKind::Music => ReleaseProbe::NoneMatch,
-            TitleKind::Books => ReleaseProbe::NothingWanted,
-        })
+        Ok(probe_releases(kind))
+    }
+}
+
+/// How `Upstream` answers `probe_releases`.
+const fn probe_releases(kind: TitleKind) -> ReleaseProbe {
+    match kind {
+        TitleKind::Tv => ReleaseProbe::Matching,
+        TitleKind::Movies => ReleaseProbe::NoneFound,
+        TitleKind::Music => ReleaseProbe::NoneMatch,
+        TitleKind::Books => ReleaseProbe::NothingWanted,
     }
 }
 
@@ -192,20 +197,25 @@ impl Pipeline for Upstream {
         Ok(Vec::new())
     }
     async fn stuck_items(&self, kind: TitleKind) -> Result<Vec<StuckItem>, Failure> {
-        self.tell(format!("stuck {kind:?}"));
-        if kind == TitleKind::Movies {
-            return Err(Failure::Unavailable {
-                service: SERVICE.to_owned(),
-            });
-        }
-        Ok(vec![StuckItem {
-            title: "The Office".to_owned(),
-            stage: Stage::Downloading,
-            queued: Some(41),
-            title_id: Some(9),
-            release: Some(FINGERPRINT.to_owned()),
-        }])
+        stuck_items(self, kind)
     }
+}
+
+/// How `Upstream` answers `stuck_items`.
+fn stuck_items(fake: &Upstream, kind: TitleKind) -> Result<Vec<StuckItem>, Failure> {
+    fake.tell(format!("stuck {kind:?}"));
+    if kind == TitleKind::Movies {
+        return Err(Failure::Unavailable {
+            service: SERVICE.to_owned(),
+        });
+    }
+    Ok(vec![StuckItem {
+        title: "The Office".to_owned(),
+        stage: Stage::Downloading,
+        queued: Some(41),
+        title_id: Some(9),
+        release: Some(FINGERPRINT.to_owned()),
+    }])
 }
 
 /// A series held as `id`, its first season monitored and filed whole.
@@ -260,22 +270,10 @@ impl Fulfilling for Upstream {
         })
     }
     async fn unqueue(&self, kind: TitleKind, id: i64, blocklist: bool) -> Result<String, Failure> {
-        self.tell(format!("unqueue {kind:?} {id} {blocklist}"));
-        if id == 0 {
-            return Err(Failure::Refused {
-                service: SERVICE.to_owned(),
-                detail: "it holds no queue entry 0".to_owned(),
-            });
-        }
-        Ok(FINGERPRINT.to_owned())
+        unqueue(self, kind, id, blocklist)
     }
     async fn grab(&self, kind: TitleKind, id: i64, release: &str) -> Result<Grabbed, Failure> {
-        self.tell(format!("grab {kind:?} {id} {release}"));
-        Ok(if release == FINGERPRINT {
-            Grabbed::Grabbed
-        } else {
-            Grabbed::Gone
-        })
+        Ok(grab(self, kind, id, release))
     }
     async fn downloading(&self, kind: TitleKind) -> Result<Vec<Downloading>, Failure> {
         self.tell(format!("downloading {kind:?}"));
@@ -294,5 +292,27 @@ impl Fulfilling for Upstream {
                 title: "Diversity Day".to_owned(),
             }),
         }])
+    }
+}
+
+/// How `Upstream` answers `unqueue`.
+fn unqueue(fake: &Upstream, kind: TitleKind, id: i64, blocklist: bool) -> Result<String, Failure> {
+    fake.tell(format!("unqueue {kind:?} {id} {blocklist}"));
+    if id == 0 {
+        return Err(Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: "it holds no queue entry 0".to_owned(),
+        });
+    }
+    Ok(FINGERPRINT.to_owned())
+}
+
+/// How `Upstream` answers `grab`.
+fn grab(fake: &Upstream, kind: TitleKind, id: i64, release: &str) -> Grabbed {
+    fake.tell(format!("grab {kind:?} {id} {release}"));
+    if release == FINGERPRINT {
+        Grabbed::Grabbed
+    } else {
+        Grabbed::Gone
     }
 }

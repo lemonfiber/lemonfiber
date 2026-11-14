@@ -455,7 +455,7 @@ async fn work_that_was_released_is_answered_as_ended_and_released() {
 #[tokio::test]
 async fn work_nobody_asked_about_is_answered_as_ended_and_let_go() {
     let jobs = Jobs::default();
-    let job = watching(&jobs, Arc::new(Counting(Arc::new(AtomicUsize::new(0))))).await;
+    let job = watching(&jobs, there()).await;
     jobs.sweep().await;
     assert_eq!(jobs.sweep().await, 1);
 

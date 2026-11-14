@@ -74,14 +74,7 @@ impl MusicCurating for Upstream {
         Ok((reference != UNHELD).then(|| found(&format!("{unit:?}"), None)))
     }
     async fn request(&self, ask: &MusicAsk) -> Result<Candidate, Failure> {
-        self.tell(format!("request {ask:?}"));
-        if ask.reference == UNHELD {
-            return Err(unheld(&ask.reference));
-        }
-        Ok(Candidate {
-            state: CandidateState::Asked,
-            ..found(&format!("{:?}", ask.unit), None)
-        })
+        music_request(self, ask)
     }
     async fn profiles(&self) -> Result<AskedWith, Failure> {
         self.tell("profiles".to_owned());
@@ -94,6 +87,18 @@ impl MusicCurating for Upstream {
         }
         Ok(())
     }
+}
+
+/// How `Upstream` answers a music `request`.
+fn music_request(fake: &Upstream, ask: &MusicAsk) -> Result<Candidate, Failure> {
+    fake.tell(format!("request {ask:?}"));
+    if ask.reference == UNHELD {
+        return Err(unheld(&ask.reference));
+    }
+    Ok(Candidate {
+        state: CandidateState::Asked,
+        ..found(&format!("{:?}", ask.unit), None)
+    })
 }
 
 #[async_trait]
@@ -119,14 +124,7 @@ impl BookCurating for Upstream {
         Ok((reference != UNHELD).then(|| found(&format!("{unit:?}"), Some("ebook"))))
     }
     async fn request(&self, ask: &BookAsk) -> Result<Candidate, Failure> {
-        self.tell(format!("request {ask:?}"));
-        if ask.reference == UNHELD {
-            return Err(unheld(&ask.reference));
-        }
-        Ok(Candidate {
-            state: CandidateState::Here,
-            ..found(&format!("{:?}", ask.unit), Some("ebook"))
-        })
+        book_request(self, ask)
     }
     async fn profiles(&self) -> Result<AskedWith, Failure> {
         self.tell("profiles".to_owned());
@@ -139,4 +137,16 @@ impl BookCurating for Upstream {
         }
         Ok(())
     }
+}
+
+/// How `Upstream` answers a book `request`.
+fn book_request(fake: &Upstream, ask: &BookAsk) -> Result<Candidate, Failure> {
+    fake.tell(format!("request {ask:?}"));
+    if ask.reference == UNHELD {
+        return Err(unheld(&ask.reference));
+    }
+    Ok(Candidate {
+        state: CandidateState::Here,
+        ..found(&format!("{:?}", ask.unit), Some("ebook"))
+    })
 }

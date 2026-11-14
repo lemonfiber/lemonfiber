@@ -73,35 +73,11 @@ impl Applications {
 #[async_trait]
 impl AppSync for Applications {
     async fn register_application(&self, application: &Application) -> Result<(), Failure> {
-        match self.mode {
-            Mode::Down => Err(down("prowlarr")),
-            Mode::RejectsRegister => Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: unknown implementation".to_owned(),
-            }),
-            Mode::Swallows => Ok(()),
-            _ => {
-                if let (Ok(mut applications), Ok(mut id)) = (self.held.lock(), self.next_id.lock())
-                {
-                    applications.push(RegisteredApplication {
-                        id: id.to_string(),
-                        base_url: application.base_url.trim_end_matches('/').to_owned(),
-                    });
-                    *id += 1;
-                }
-                Ok(())
-            }
-        }
+        register_application(self, application)
     }
 
     async fn test_application(&self, _held: &RegisteredApplication) -> Result<(), Failure> {
-        if self.stale.lock().map_or(true, |stale| *stale) {
-            return Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: cannot connect to Sonarr".to_owned(),
-            });
-        }
-        Ok(())
+        test_application(self, _held)
     }
 
     async fn rekey_application(
@@ -109,41 +85,88 @@ impl AppSync for Applications {
         _held: &RegisteredApplication,
         key: &str,
     ) -> Result<(), Failure> {
-        if self.refuses_rekey {
-            return Err(Failure::Refused {
-                service: "prowlarr".to_owned(),
-                detail: "HTTP 400: validation failed".to_owned(),
-            });
-        }
-        if let Ok(mut rekeyed) = self.rekeyed.lock() {
-            rekeyed.push(key.to_owned());
-        }
-        if let Ok(mut stale) = self.stale.lock() {
-            *stale = self.stays_stale;
-        }
-        Ok(())
+        rekey_application(self, _held, key)
     }
 
     async fn applications(&self) -> Result<Vec<RegisteredApplication>, Failure> {
-        let count = match self.reads.lock() {
-            Ok(mut reads) => {
-                *reads += 1;
-                *reads
+        applications(self)
+    }
+}
+
+/// How `Applications` answers `register_application`.
+fn register_application(fake: &Applications, application: &Application) -> Result<(), Failure> {
+    match fake.mode {
+        Mode::Down => Err(down("prowlarr")),
+        Mode::RejectsRegister => Err(Failure::Refused {
+            service: "prowlarr".to_owned(),
+            detail: "HTTP 400: unknown implementation".to_owned(),
+        }),
+        Mode::Swallows => Ok(()),
+        _ => {
+            if let (Ok(mut applications), Ok(mut id)) = (fake.held.lock(), fake.next_id.lock()) {
+                applications.push(RegisteredApplication {
+                    id: id.to_string(),
+                    base_url: application.base_url.trim_end_matches('/').to_owned(),
+                });
+                *id += 1;
             }
-            Err(_) => 0,
-        };
-        match self.mode {
-            Mode::Down => Err(down("prowlarr")),
-            Mode::RefusesList => Err(Failure::Unauthorised {
-                service: "prowlarr".to_owned(),
-            }),
-            Mode::DropsAfterRegister if count >= 2 => Err(down("prowlarr")),
-            _ => Ok(self
-                .held
-                .lock()
-                .map(|applications| applications.clone())
-                .unwrap_or_default()),
+            Ok(())
         }
+    }
+}
+
+/// How `Applications` answers `test_application`.
+fn test_application(fake: &Applications, _held: &RegisteredApplication) -> Result<(), Failure> {
+    if fake.stale.lock().map_or(true, |stale| *stale) {
+        return Err(Failure::Refused {
+            service: "prowlarr".to_owned(),
+            detail: "HTTP 400: cannot connect to Sonarr".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// How `Applications` answers `rekey_application`.
+fn rekey_application(
+    fake: &Applications,
+    _held: &RegisteredApplication,
+    key: &str,
+) -> Result<(), Failure> {
+    if fake.refuses_rekey {
+        return Err(Failure::Refused {
+            service: "prowlarr".to_owned(),
+            detail: "HTTP 400: validation failed".to_owned(),
+        });
+    }
+    if let Ok(mut rekeyed) = fake.rekeyed.lock() {
+        rekeyed.push(key.to_owned());
+    }
+    if let Ok(mut stale) = fake.stale.lock() {
+        *stale = fake.stays_stale;
+    }
+    Ok(())
+}
+
+/// How `Applications` answers `applications`.
+fn applications(fake: &Applications) -> Result<Vec<RegisteredApplication>, Failure> {
+    let count = match fake.reads.lock() {
+        Ok(mut reads) => {
+            *reads += 1;
+            *reads
+        }
+        Err(_) => 0,
+    };
+    match fake.mode {
+        Mode::Down => Err(down("prowlarr")),
+        Mode::RefusesList => Err(Failure::Unauthorised {
+            service: "prowlarr".to_owned(),
+        }),
+        Mode::DropsAfterRegister if count >= 2 => Err(down("prowlarr")),
+        _ => Ok(fake
+            .held
+            .lock()
+            .map(|applications| applications.clone())
+            .unwrap_or_default()),
     }
 }
 

@@ -36,14 +36,7 @@ impl Kept {
 #[async_trait]
 impl Guarding for Kept {
     async fn guard(&self, guarded: &Guarded) -> Result<(), Failure> {
-        crate::noted(&self.handed, guarded.clone());
-        if self.refusing {
-            return Err(Failure::Refused {
-                service: "guard".to_owned(),
-                detail: "no".to_owned(),
-            });
-        }
-        Ok(())
+        guard(self, guarded)
     }
 
     async fn guarding(&self) -> Result<Option<Guarded>, Failure> {
@@ -55,6 +48,18 @@ impl Guarding for Kept {
             fingerprint: String::new(),
         })
     }
+}
+
+/// How `Kept` answers `guard`.
+fn guard(fake: &Kept, guarded: &Guarded) -> Result<(), Failure> {
+    crate::noted(&fake.handed, guarded.clone());
+    if fake.refusing {
+        return Err(Failure::Refused {
+            service: "guard".to_owned(),
+            detail: "no".to_owned(),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]

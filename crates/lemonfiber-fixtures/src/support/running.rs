@@ -13,8 +13,13 @@ pub struct Scripted(pub Result<Output, Failure>);
 #[async_trait]
 impl Runner for Scripted {
     async fn run(&self, _argv: &[String]) -> Result<Output, Failure> {
-        echoed(&self.0)
+        run(self, _argv)
     }
+}
+
+/// How `Scripted` answers `run`.
+fn run(fake: &Scripted, _argv: &[String]) -> Result<Output, Failure> {
+    echoed(&fake.0)
 }
 
 /// Something a test has done when a call carrying a word arrives.
@@ -305,20 +310,25 @@ impl Keyed {
 #[async_trait]
 impl Runner for Keyed {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        crate::noted(&self.seen, argv.to_vec());
-        let then = if self.switched() {
-            self.then.as_slice()
-        } else {
-            &[]
-        };
-        let answer = then
-            .iter()
-            .chain(&self.answers)
-            .find(|(key, _)| self.names(key, argv))
-            .map(|(_, answer)| answer)
-            .or(self.otherwise.as_ref());
-        answer.map_or_else(|| not_found(argv), echoed)
+        keyed_run(self, argv)
     }
+}
+
+/// How `Keyed` answers `run`.
+fn keyed_run(fake: &Keyed, argv: &[String]) -> Result<Output, Failure> {
+    crate::noted(&fake.seen, argv.to_vec());
+    let then = if fake.switched() {
+        fake.then.as_slice()
+    } else {
+        &[]
+    };
+    let answer = then
+        .iter()
+        .chain(&fake.answers)
+        .find(|(key, _)| fake.names(key, argv))
+        .map(|(_, answer)| answer)
+        .or(fake.otherwise.as_ref());
+    answer.map_or_else(|| not_found(argv), echoed)
 }
 
 /// Each key and its answer, owned.

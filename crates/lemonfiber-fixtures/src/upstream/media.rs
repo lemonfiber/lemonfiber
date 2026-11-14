@@ -287,12 +287,17 @@ impl Recounting for Upstream {
 #[async_trait]
 impl Encrypting for Upstream {
     async fn serve_tls(&self, path: &str, pin: &str) -> Result<Applied, Failure> {
-        self.tell(format!("serve_tls {path} {pin}"));
-        Ok(if path == READ_AT_START {
-            Applied::OnRestart
-        } else {
-            Applied::Now
-        })
+        Ok(serve_tls(self, path, pin))
+    }
+}
+
+/// How `Upstream` answers `serve_tls`.
+fn serve_tls(fake: &Upstream, path: &str, pin: &str) -> Applied {
+    fake.tell(format!("serve_tls {path} {pin}"));
+    if path == READ_AT_START {
+        Applied::OnRestart
+    } else {
+        Applied::Now
     }
 }
 

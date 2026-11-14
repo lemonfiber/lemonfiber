@@ -21,12 +21,17 @@ impl Accounts {
 #[async_trait]
 impl UsenetAccounts for Accounts {
     async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure> {
-        match &self.0 {
-            Ok(accounts) => Ok(accounts.clone()),
-            Err(_) => Err(Failure::Unavailable {
-                service: "sabnzbd".to_owned(),
-            }),
-        }
+        accounts(self)
+    }
+}
+
+/// How `Accounts` answers `accounts`.
+fn accounts(fake: &Accounts) -> Result<Vec<UsenetAccount>, Failure> {
+    match &fake.0 {
+        Ok(accounts) => Ok(accounts.clone()),
+        Err(_) => Err(Failure::Unavailable {
+            service: "sabnzbd".to_owned(),
+        }),
     }
 }
 
@@ -45,11 +50,16 @@ impl Indexed {
 #[async_trait]
 impl Indexers for Indexed {
     async fn indexers(&self, _now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
-        match &self.0 {
-            Ok(indexers) => Ok(indexers.clone()),
-            Err(_) => Err(Failure::Unavailable {
-                service: "prowlarr".to_owned(),
-            }),
-        }
+        indexers(self, _now)
+    }
+}
+
+/// How `Indexed` answers `indexers`.
+fn indexers(fake: &Indexed, _now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
+    match &fake.0 {
+        Ok(indexers) => Ok(indexers.clone()),
+        Err(_) => Err(Failure::Unavailable {
+            service: "prowlarr".to_owned(),
+        }),
     }
 }

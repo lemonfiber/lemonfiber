@@ -175,15 +175,20 @@ impl Host for Hosting {
     }
 
     async fn withdraw(&self, name: &str) -> Result<Vec<PathBuf>, Failure> {
-        self.begun.notify_one();
-        if let Ok(permit) = self.permits.acquire().await {
-            permit.forget();
-        }
-        if self.falls_over.swap(false, Ordering::SeqCst) {
-            std::panic::resume_unwind(Box::new("the service manager fell over"));
-        }
-        withdrawn(self, name)
+        withdraw(self, name).await
     }
+}
+
+/// How `Hosting` answers `withdraw`.
+async fn withdraw(fake: &Hosting, name: &str) -> Result<Vec<PathBuf>, Failure> {
+    fake.begun.notify_one();
+    if let Ok(permit) = fake.permits.acquire().await {
+        permit.forget();
+    }
+    if fake.falls_over.swap(false, Ordering::SeqCst) {
+        std::panic::resume_unwind(Box::new("the service manager fell over"));
+    }
+    withdrawn(fake, name)
 }
 
 /// Remember the placement and answer as though it took, unless told to refuse.

@@ -91,13 +91,7 @@ impl Part {
 #[async_trait]
 impl Ownership for Part {
     async fn owner(&self) -> Result<Owner, Failure> {
-        let holder = match self.after_restart {
-            Some(after) if self.restarts() > 0 => Some(after),
-            _ => self.holder,
-        };
-        holder.ok_or_else(|| Failure::Unavailable {
-            service: SERVICE.to_owned(),
-        })
+        owner(self)
     }
 
     async fn claimed_by(&self) -> Result<Option<String>, Failure> {
@@ -105,19 +99,35 @@ impl Ownership for Part {
     }
 
     async fn claim(&self) -> Result<Claim, Failure> {
-        self.claims.fetch_add(1, Ordering::Relaxed);
-        if let Some(blocking) = &self.blocking {
-            let _ = std::fs::remove_file(blocking);
-            let _ = std::fs::create_dir_all(blocking);
-        }
-        match self.claiming {
-            Claiming::Refused => Err(Failure::Refused {
-                service: SERVICE.to_owned(),
-                detail: "a diagnosis claims nothing".to_owned(),
-            }),
-            Claiming::OnRestart => Ok(Claim::ON_RESTART),
-            Claiming::Held(claimed) => Ok(Claim::Held(claimed)),
-        }
+        claim(self)
+    }
+}
+
+/// How `Part` answers `owner`.
+fn owner(fake: &Part) -> Result<Owner, Failure> {
+    let holder = match fake.after_restart {
+        Some(after) if fake.restarts() > 0 => Some(after),
+        _ => fake.holder,
+    };
+    holder.ok_or_else(|| Failure::Unavailable {
+        service: SERVICE.to_owned(),
+    })
+}
+
+/// How `Part` answers `claim`.
+fn claim(fake: &Part) -> Result<Claim, Failure> {
+    fake.claims.fetch_add(1, Ordering::Relaxed);
+    if let Some(blocking) = &fake.blocking {
+        let _ = std::fs::remove_file(blocking);
+        let _ = std::fs::create_dir_all(blocking);
+    }
+    match fake.claiming {
+        Claiming::Refused => Err(Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: "a diagnosis claims nothing".to_owned(),
+        }),
+        Claiming::OnRestart => Ok(Claim::ON_RESTART),
+        Claiming::Held(claimed) => Ok(Claim::Held(claimed)),
     }
 }
 

@@ -84,50 +84,60 @@ impl Filer {
 #[async_trait]
 impl Filing for Filer {
     async fn filed(&self) -> Result<Vec<Filed>, Failure> {
-        let read = self
-            .reads
-            .lock()
-            .map(|mut reads| {
-                *reads += 1;
-                *reads
-            })
-            .unwrap_or_default();
-        if self.answering.is_some_and(|answered| read > answered) {
-            return Err(Failure::Unavailable {
-                service: SERVICE.to_owned(),
-            });
-        }
-        Ok(self
-            .held
-            .lock()
-            .map(|held| {
-                held.iter()
-                    .map(|(category, folder)| Filed {
-                        category: category.clone(),
-                        folder: folder.clone(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
+        filed(self)
     }
 
     async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
-        if let Ok(mut told) = self.told.lock() {
-            told.extend_from_slice(folders);
-        }
-        if self.refusing {
-            return Err(Failure::Refused {
-                service: SERVICE.to_owned(),
-                detail: "no".to_owned(),
-            });
-        }
-        if !self.ignoring {
-            if let Ok(mut held) = self.held.lock() {
-                for one in folders {
-                    held.insert(one.category.clone(), one.folder.clone());
-                }
+        file_under(self, folders)
+    }
+}
+
+/// How `Filer` answers `filed`.
+fn filed(fake: &Filer) -> Result<Vec<Filed>, Failure> {
+    let read = fake
+        .reads
+        .lock()
+        .map(|mut reads| {
+            *reads += 1;
+            *reads
+        })
+        .unwrap_or_default();
+    if fake.answering.is_some_and(|answered| read > answered) {
+        return Err(Failure::Unavailable {
+            service: SERVICE.to_owned(),
+        });
+    }
+    Ok(fake
+        .held
+        .lock()
+        .map(|held| {
+            held.iter()
+                .map(|(category, folder)| Filed {
+                    category: category.clone(),
+                    folder: folder.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// How `Filer` answers `file_under`.
+fn file_under(fake: &Filer, folders: &[Filed]) -> Result<(), Failure> {
+    if let Ok(mut told) = fake.told.lock() {
+        told.extend_from_slice(folders);
+    }
+    if fake.refusing {
+        return Err(Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: "no".to_owned(),
+        });
+    }
+    if !fake.ignoring {
+        if let Ok(mut held) = fake.held.lock() {
+            for one in folders {
+                held.insert(one.category.clone(), one.folder.clone());
             }
         }
-        Ok(())
     }
+    Ok(())
 }

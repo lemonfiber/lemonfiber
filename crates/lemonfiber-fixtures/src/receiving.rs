@@ -113,26 +113,7 @@ impl Client for Receiving {
     }
 
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
-        match self.mode {
-            Mode::Down => Err(down("sonarr")),
-            Mode::RejectsRegister => Err(Failure::Refused {
-                service: "sonarr".to_owned(),
-                detail: "HTTP 400: unknown implementation".to_owned(),
-            }),
-            Mode::Swallows => Ok(()),
-            _ => {
-                if let (Ok(mut clients), Ok(mut id)) = (self.clients.lock(), self.next_id.lock()) {
-                    clients.push(RegisteredClient {
-                        id: id.to_string(),
-                        host: client.host.clone(),
-                        port: client.port,
-                        category: Some(client.category.clone()),
-                    });
-                    *id += 1;
-                }
-                Ok(())
-            }
-        }
+        register_download_client(self, client)
     }
 
     async fn update_download_client(
@@ -140,21 +121,7 @@ impl Client for Receiving {
         id: &str,
         client: &DownloadClient,
     ) -> Result<(), Failure> {
-        if matches!(self.mode, Mode::Down) {
-            return Err(down("sonarr"));
-        }
-        if matches!(self.mode, Mode::RefusesUpdate) {
-            return Err(Failure::Refused {
-                service: "sonarr".to_owned(),
-                detail: "HTTP 400: cannot update".to_owned(),
-            });
-        }
-        if let Ok(mut clients) = self.clients.lock() {
-            if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
-                existing.category = Some(client.category.clone());
-            }
-        }
-        Ok(())
+        update_download_client(self, id, client)
     }
 
     async fn set_client_field(
@@ -163,18 +130,7 @@ impl Client for Receiving {
         field: &str,
         value: Option<&str>,
     ) -> Result<(), Failure> {
-        if matches!(self.mode, Mode::Down) {
-            return Err(down("sonarr"));
-        }
-        if let Ok(mut clients) = self.clients.lock() {
-            if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
-                existing.category = value.map(|value| Category {
-                    field: field.to_owned(),
-                    value: value.to_owned(),
-                });
-            }
-        }
-        Ok(())
+        set_client_field(self, id, field, value)
     }
 
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
@@ -193,76 +149,159 @@ impl Client for Receiving {
     }
 
     async fn download_clients(&self) -> Result<Vec<RegisteredClient>, Failure> {
-        let count = match self.reads.lock() {
-            Ok(mut reads) => {
-                *reads += 1;
-                *reads
-            }
-            Err(_) => 0,
-        };
-        match self.mode {
-            Mode::Down => Err(down("sonarr")),
-            Mode::RefusesList => Err(Failure::Unauthorised {
-                service: "sonarr".to_owned(),
-            }),
-            Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
-            _ => Ok(self
-                .clients
-                .lock()
-                .map(|clients| clients.clone())
-                .unwrap_or_default()),
-        }
+        download_clients(self)
     }
 
     async fn register_root_folder(&self, folder: &RootFolder) -> Result<(), Failure> {
-        match self.mode {
-            Mode::Down => Err(down("sonarr")),
-            Mode::RejectsRegister => Err(Failure::Refused {
-                service: "sonarr".to_owned(),
-                detail: "HTTP 400: path is already used".to_owned(),
-            }),
-            Mode::Swallows => Ok(()),
-            _ => {
-                if let (Ok(mut folders), Ok(mut id)) = (self.folders.lock(), self.next_id.lock()) {
-                    folders.push(RegisteredFolder {
-                        id: id.to_string(),
-                        path: folder.path.trim_end_matches('/').to_owned(),
-                    });
-                    *id += 1;
-                }
-                Ok(())
-            }
-        }
+        register_root_folder(self, folder)
     }
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
-        let count = match self.reads.lock() {
-            Ok(mut reads) => {
-                *reads += 1;
-                *reads
+        root_folders(self)
+    }
+}
+
+/// How `Receiving` answers `register_download_client`.
+fn register_download_client(fake: &Receiving, client: &DownloadClient) -> Result<(), Failure> {
+    match fake.mode {
+        Mode::Down => Err(down("sonarr")),
+        Mode::RejectsRegister => Err(Failure::Refused {
+            service: "sonarr".to_owned(),
+            detail: "HTTP 400: unknown implementation".to_owned(),
+        }),
+        Mode::Swallows => Ok(()),
+        _ => {
+            if let (Ok(mut clients), Ok(mut id)) = (fake.clients.lock(), fake.next_id.lock()) {
+                clients.push(RegisteredClient {
+                    id: id.to_string(),
+                    host: client.host.clone(),
+                    port: client.port,
+                    category: Some(client.category.clone()),
+                });
+                *id += 1;
             }
-            Err(_) => 0,
-        };
-        match self.mode {
-            Mode::Down => Err(down("sonarr")),
-            Mode::RefusesList => Err(Failure::Unauthorised {
-                service: "sonarr".to_owned(),
-            }),
-            Mode::Unsupported => Err(Failure::Unsupported {
-                service: "sonarr".to_owned(),
-                detail: "there is no /api/v3".to_owned(),
-            }),
-            Mode::Disallowed => Err(Failure::Disallowed {
-                service: "sonarr".to_owned(),
-                detail: "never a listing".to_owned(),
-            }),
-            Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
-            _ => Ok(self
-                .folders
-                .lock()
-                .map(|folders| folders.clone())
-                .unwrap_or_default()),
+            Ok(())
         }
+    }
+}
+
+/// How `Receiving` answers `update_download_client`.
+fn update_download_client(
+    fake: &Receiving,
+    id: &str,
+    client: &DownloadClient,
+) -> Result<(), Failure> {
+    if matches!(fake.mode, Mode::Down) {
+        return Err(down("sonarr"));
+    }
+    if matches!(fake.mode, Mode::RefusesUpdate) {
+        return Err(Failure::Refused {
+            service: "sonarr".to_owned(),
+            detail: "HTTP 400: cannot update".to_owned(),
+        });
+    }
+    if let Ok(mut clients) = fake.clients.lock() {
+        if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+            existing.category = Some(client.category.clone());
+        }
+    }
+    Ok(())
+}
+
+/// How `Receiving` answers `set_client_field`.
+fn set_client_field(
+    fake: &Receiving,
+    id: &str,
+    field: &str,
+    value: Option<&str>,
+) -> Result<(), Failure> {
+    if matches!(fake.mode, Mode::Down) {
+        return Err(down("sonarr"));
+    }
+    if let Ok(mut clients) = fake.clients.lock() {
+        if let Some(existing) = clients.iter_mut().find(|held| held.id == id) {
+            existing.category = value.map(|value| Category {
+                field: field.to_owned(),
+                value: value.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// How `Receiving` answers `download_clients`.
+fn download_clients(fake: &Receiving) -> Result<Vec<RegisteredClient>, Failure> {
+    let count = match fake.reads.lock() {
+        Ok(mut reads) => {
+            *reads += 1;
+            *reads
+        }
+        Err(_) => 0,
+    };
+    match fake.mode {
+        Mode::Down => Err(down("sonarr")),
+        Mode::RefusesList => Err(Failure::Unauthorised {
+            service: "sonarr".to_owned(),
+        }),
+        Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
+        _ => Ok(fake
+            .clients
+            .lock()
+            .map(|clients| clients.clone())
+            .unwrap_or_default()),
+    }
+}
+
+/// How `Receiving` answers `register_root_folder`.
+fn register_root_folder(fake: &Receiving, folder: &RootFolder) -> Result<(), Failure> {
+    match fake.mode {
+        Mode::Down => Err(down("sonarr")),
+        Mode::RejectsRegister => Err(Failure::Refused {
+            service: "sonarr".to_owned(),
+            detail: "HTTP 400: path is already used".to_owned(),
+        }),
+        Mode::Swallows => Ok(()),
+        _ => {
+            if let (Ok(mut folders), Ok(mut id)) = (fake.folders.lock(), fake.next_id.lock()) {
+                folders.push(RegisteredFolder {
+                    id: id.to_string(),
+                    path: folder.path.trim_end_matches('/').to_owned(),
+                });
+                *id += 1;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// How `Receiving` answers `root_folders`.
+fn root_folders(fake: &Receiving) -> Result<Vec<RegisteredFolder>, Failure> {
+    let count = match fake.reads.lock() {
+        Ok(mut reads) => {
+            *reads += 1;
+            *reads
+        }
+        Err(_) => 0,
+    };
+    match fake.mode {
+        Mode::Down => Err(down("sonarr")),
+        Mode::RefusesList => Err(Failure::Unauthorised {
+            service: "sonarr".to_owned(),
+        }),
+        Mode::Unsupported => Err(Failure::Unsupported {
+            service: "sonarr".to_owned(),
+            detail: "there is no /api/v3".to_owned(),
+        }),
+        Mode::Disallowed => Err(Failure::Disallowed {
+            service: "sonarr".to_owned(),
+            detail: "never a listing".to_owned(),
+        }),
+        Mode::DropsAfterRegister if count >= 2 => Err(down("sonarr")),
+        _ => Ok(fake
+            .folders
+            .lock()
+            .map(|folders| folders.clone())
+            .unwrap_or_default()),
     }
 }
 

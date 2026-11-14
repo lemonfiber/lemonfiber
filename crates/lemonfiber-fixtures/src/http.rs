@@ -449,24 +449,29 @@ impl Http for Fake {
     }
 
     async fn fetch(&self, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
-        crate::noted(&self.seen, request.clone());
-        let (status, headers, bytes) = match self.resolved(request, false) {
-            Resolved::Answer(Answer::Octets { status, bytes }) => (status, Vec::new(), bytes),
-            resolved => {
-                let response = responding(request, resolved).await?;
-                (
-                    response.status,
-                    response.headers,
-                    response.body.into_bytes(),
-                )
-            }
-        };
-        Ok(Fetched {
-            status,
-            headers,
-            bytes: Some(bytes).filter(|bytes| bytes.len() <= most),
-        })
+        fetch(self, request, most).await
     }
+}
+
+/// How `Fake` answers `fetch`.
+async fn fetch(fake: &Fake, request: &Request, most: usize) -> Result<Fetched, Unreachable> {
+    crate::noted(&fake.seen, request.clone());
+    let (status, headers, bytes) = match fake.resolved(request, false) {
+        Resolved::Answer(Answer::Octets { status, bytes }) => (status, Vec::new(), bytes),
+        resolved => {
+            let response = responding(request, resolved).await?;
+            (
+                response.status,
+                response.headers,
+                response.body.into_bytes(),
+            )
+        }
+    };
+    Ok(Fetched {
+        status,
+        headers,
+        bytes: Some(bytes).filter(|bytes| bytes.len() <= most),
+    })
 }
 
 /// The response to this request, from whatever answers it.

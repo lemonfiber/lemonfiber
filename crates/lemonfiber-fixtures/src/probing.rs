@@ -124,11 +124,7 @@ fn counted_down(remaining: &AtomicUsize) -> bool {
 #[async_trait]
 impl FileSystem for Probing {
     async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        let resolved = self.resolves.clone()?;
-        if counted_down(&self.missing_leaves) {
-            return Err(Fault::new(MISSING));
-        }
-        Ok(resolved.unwrap_or_else(|| path.to_owned()))
+        canonicalize(self, path)
     }
 
     async fn touch(&self, _path: &Path) -> Result<(), Fault> {
@@ -136,18 +132,11 @@ impl FileSystem for Probing {
     }
 
     async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        if counted_down(&self.failing_links) {
-            return Err(Fault::new(REFUSED));
-        }
-        self.links.clone()
+        link(self, _from, _to)
     }
 
     async fn identify(&self, path: &Path) -> Result<Identity, Fault> {
-        if path.to_string_lossy().ends_with(".link") {
-            self.confirmed.clone()
-        } else {
-            self.original.clone()
-        }
+        identify(self, path)
     }
 
     async fn remove(&self, _path: &Path) {}
@@ -162,6 +151,32 @@ impl FileSystem for Probing {
 
     async fn ownership(&self, _path: &Path) -> Option<Ownership> {
         self.owner
+    }
+}
+
+/// How `Probing` answers `canonicalize`.
+fn canonicalize(fake: &Probing, path: &Path) -> Result<PathBuf, Fault> {
+    let resolved = fake.resolves.clone()?;
+    if counted_down(&fake.missing_leaves) {
+        return Err(Fault::new(MISSING));
+    }
+    Ok(resolved.unwrap_or_else(|| path.to_owned()))
+}
+
+/// How `Probing` answers `link`.
+fn link(fake: &Probing, _from: &Path, _to: &Path) -> Result<(), Fault> {
+    if counted_down(&fake.failing_links) {
+        return Err(Fault::new(REFUSED));
+    }
+    fake.links.clone()
+}
+
+/// How `Probing` answers `identify`.
+fn identify(fake: &Probing, path: &Path) -> Result<Identity, Fault> {
+    if path.to_string_lossy().ends_with(".link") {
+        fake.confirmed.clone()
+    } else {
+        fake.original.clone()
     }
 }
 

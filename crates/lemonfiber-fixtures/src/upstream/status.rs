@@ -61,24 +61,34 @@ impl Monitoring for Upstream {
         })
     }
     async fn check_in(&self, tag: &str) -> Result<(), Failure> {
-        self.tell(format!("check_in {tag}"));
-        match Covers::read(tag) {
-            Some(Covers::Job(_)) => Ok(()),
-            Some(_) | None => Err(Failure::Refused {
-                service: "upstream".to_owned(),
-                detail: format!("no heartbeat holds {tag}"),
-            }),
-        }
+        check_in(self, tag)
     }
     async fn retire(&self, tag: &str) -> Result<(), Failure> {
-        self.tell(format!("retire {tag}"));
-        if Covers::read(tag).is_some() {
-            Ok(())
-        } else {
-            Err(Failure::Disallowed {
-                service: "upstream".to_owned(),
-                detail: format!("{tag} is not lemonfiber's"),
-            })
-        }
+        retire(self, tag)
+    }
+}
+
+/// How `Upstream` answers `check_in`.
+fn check_in(fake: &Upstream, tag: &str) -> Result<(), Failure> {
+    fake.tell(format!("check_in {tag}"));
+    match Covers::read(tag) {
+        Some(Covers::Job(_)) => Ok(()),
+        Some(_) | None => Err(Failure::Refused {
+            service: "upstream".to_owned(),
+            detail: format!("no heartbeat holds {tag}"),
+        }),
+    }
+}
+
+/// How `Upstream` answers `retire`.
+fn retire(fake: &Upstream, tag: &str) -> Result<(), Failure> {
+    fake.tell(format!("retire {tag}"));
+    if Covers::read(tag).is_some() {
+        Ok(())
+    } else {
+        Err(Failure::Disallowed {
+            service: "upstream".to_owned(),
+            detail: format!("{tag} is not lemonfiber's"),
+        })
     }
 }

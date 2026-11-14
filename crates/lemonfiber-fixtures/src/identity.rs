@@ -51,11 +51,7 @@ impl MediaSetup {
 #[async_trait]
 impl MediaServer for MediaSetup {
     async fn startup_completed(&self) -> Result<bool, Failure> {
-        match self.startup {
-            Startup::Completed => Ok(true),
-            Startup::Fresh => Ok(false),
-            Startup::Down => Err(down("jellyfin")),
-        }
+        startup_completed(self)
     }
 
     async fn replace_admin_password(&self, _replacement: &str) -> Result<(), Failure> {
@@ -63,13 +59,27 @@ impl MediaServer for MediaSetup {
     }
 
     async fn create_admin(&self, _name: &str, _password: &str) -> Result<(), Failure> {
-        match self.create {
-            Create::Ok => Ok(()),
-            Create::Rejects => Err(Failure::Refused {
-                service: "jellyfin".to_owned(),
-                detail: "HTTP 400: user already exists".to_owned(),
-            }),
-        }
+        create_admin(self, _name, _password)
+    }
+}
+
+/// How `MediaSetup` answers `startup_completed`.
+fn startup_completed(fake: &MediaSetup) -> Result<bool, Failure> {
+    match fake.startup {
+        Startup::Completed => Ok(true),
+        Startup::Fresh => Ok(false),
+        Startup::Down => Err(down("jellyfin")),
+    }
+}
+
+/// How `MediaSetup` answers `create_admin`.
+fn create_admin(fake: &MediaSetup, _name: &str, _password: &str) -> Result<(), Failure> {
+    match fake.create {
+        Create::Ok => Ok(()),
+        Create::Rejects => Err(Failure::Refused {
+            service: "jellyfin".to_owned(),
+            detail: "HTTP 400: user already exists".to_owned(),
+        }),
     }
 }
 
@@ -142,28 +152,11 @@ impl RequestSetup {
 #[async_trait]
 impl Requests for RequestSetup {
     async fn establish(&self, _source: &IdentitySource) -> Result<(), Failure> {
-        match self.establish {
-            Configure::Ok => Ok(()),
-            Configure::Rejects => Err(Failure::Refused {
-                service: "seerr".to_owned(),
-                detail: NO_OWNER.to_owned(),
-            }),
-        }
+        establish(self, _source)
     }
 
     async fn initialized(&self) -> Result<bool, Failure> {
-        let count = match self.calls.lock() {
-            Ok(mut calls) => {
-                *calls += 1;
-                *calls
-            }
-            Err(_) => 0,
-        };
-        if count <= 1 {
-            Self::reading(&self.gate)
-        } else {
-            Self::reading(&self.readback)
-        }
+        initialized(self)
     }
 
     async fn answers(&self) -> Result<(), Failure> {
@@ -235,36 +228,78 @@ impl Requests for RequestSetup {
     }
 
     async fn telling(&self) -> Result<Telling, Failure> {
-        match self.gate {
-            Init::Down => Err(down("seerr")),
-            Init::Fresh | Init::Done => Ok(self
-                .told
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone()),
-        }
+        telling(self)
     }
 
     async fn tell(&self, telling: &Telling) -> Result<(), Failure> {
-        match self.gate {
-            Init::Down => Err(down("seerr")),
-            Init::Fresh | Init::Done => {
-                if let Ok(mut told) = self.told.lock() {
-                    *told = telling.clone();
-                }
-                Ok(())
-            }
-        }
+        tell(self, telling)
     }
 
     async fn configure_identity(&self, _source: &IdentitySource) -> Result<(), Failure> {
-        match self.configure {
-            Configure::Ok => Ok(()),
-            Configure::Rejects => Err(Failure::Refused {
-                service: "seerr".to_owned(),
-                detail: "HTTP 500: credentials rejected".to_owned(),
-            }),
+        configure_identity(self, _source)
+    }
+}
+
+/// How `RequestSetup` answers `establish`.
+fn establish(fake: &RequestSetup, _source: &IdentitySource) -> Result<(), Failure> {
+    match fake.establish {
+        Configure::Ok => Ok(()),
+        Configure::Rejects => Err(Failure::Refused {
+            service: "seerr".to_owned(),
+            detail: NO_OWNER.to_owned(),
+        }),
+    }
+}
+
+/// How `RequestSetup` answers `initialized`.
+fn initialized(fake: &RequestSetup) -> Result<bool, Failure> {
+    let count = match fake.calls.lock() {
+        Ok(mut calls) => {
+            *calls += 1;
+            *calls
         }
+        Err(_) => 0,
+    };
+    if count <= 1 {
+        RequestSetup::reading(&fake.gate)
+    } else {
+        RequestSetup::reading(&fake.readback)
+    }
+}
+
+/// How `RequestSetup` answers `telling`.
+fn telling(fake: &RequestSetup) -> Result<Telling, Failure> {
+    match fake.gate {
+        Init::Down => Err(down("seerr")),
+        Init::Fresh | Init::Done => Ok(fake
+            .told
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()),
+    }
+}
+
+/// How `RequestSetup` answers `tell`.
+fn tell(fake: &RequestSetup, telling: &Telling) -> Result<(), Failure> {
+    match fake.gate {
+        Init::Down => Err(down("seerr")),
+        Init::Fresh | Init::Done => {
+            if let Ok(mut told) = fake.told.lock() {
+                *told = telling.clone();
+            }
+            Ok(())
+        }
+    }
+}
+
+/// How `RequestSetup` answers `configure_identity`.
+fn configure_identity(fake: &RequestSetup, _source: &IdentitySource) -> Result<(), Failure> {
+    match fake.configure {
+        Configure::Ok => Ok(()),
+        Configure::Rejects => Err(Failure::Refused {
+            service: "seerr".to_owned(),
+            detail: "HTTP 500: credentials rejected".to_owned(),
+        }),
     }
 }
 

@@ -204,87 +204,11 @@ impl Fake {
 #[async_trait]
 impl Engine for Fake {
     async fn list(&self, _project: &str) -> Result<Vec<Container>, Failure> {
-        if !self.reachable {
-            return Err(Failure::Unreachable {
-                reason: "no daemon".to_owned(),
-            });
-        }
-        Ok(self
-            .behaviors
-            .iter()
-            .map(|behavior| Container {
-                id: format!("id-{}", behavior.service),
-                project: "lemonfiber".to_owned(),
-                service: behavior.service.to_owned(),
-                lifecycle: if behavior.running {
-                    Lifecycle::Running
-                } else {
-                    Lifecycle::Exited
-                },
-                health: Health::None,
-                published: Vec::new(),
-                mounts: Vec::new(),
-                exit: None,
-            })
-            .collect())
+        list(self, _project)
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
-        let behavior = self
-            .behaviors
-            .iter()
-            .find(|behavior| format!("id-{}", behavior.service) == container)
-            .ok_or_else(|| Failure::NoSuchContainer {
-                name: container.to_owned(),
-            })?;
-        if behavior.exec_fails {
-            return Err(Failure::NoSuchContainer {
-                name: container.to_owned(),
-            });
-        }
-        if argv.first().is_some_and(|arg| arg == "ip") {
-            self.dawdle(argv).await;
-            return Ok(self.answer_ip(argv));
-        }
-        let wants_country = argv.last().is_some_and(|arg| arg.ends_with("/country-iso"));
-        if wants_country {
-            return Ok(ExecOutput {
-                status: Some(0),
-                stdout: behavior.country.unwrap_or_default().to_owned(),
-            });
-        }
-        // A second address service, where the test gave one a different answer —
-        // which is what a cached or misconfigured echo looks like from here.
-        let asked_second = argv
-            .last()
-            .is_some_and(|arg| arg.contains("second.example"));
-        // A client cut off with the tunnel can leave the exec waiting rather than
-        // answering, where the test asks for that.
-        if self.is_dropped()
-            && behavior.service != "gluetun"
-            && self.link.is_some_and(|link| link.probe_hangs)
-        {
-            std::future::pending::<()>().await;
-        }
-        // While the tunnel is down the client answers with whatever the test says
-        // still gets out — nothing at all, where the killswitch holds.
-        let address = if self.is_dropped() && behavior.service != "gluetun" {
-            self.link.and_then(|link| link.leaks_as)
-        } else if asked_second {
-            behavior.second_opinion.or(behavior.address)
-        } else {
-            behavior.address
-        };
-        match address {
-            Some(address) => Ok(ExecOutput {
-                status: Some(0),
-                stdout: format!("{address}\n"),
-            }),
-            None => Ok(ExecOutput {
-                status: Some(1),
-                stdout: String::new(),
-            }),
-        }
+        exec(self, container, argv).await
     }
 
     async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
@@ -300,5 +224,91 @@ impl Engine for Fake {
     ) -> Result<Receiver<LogLine>, Failure> {
         let (_sender, receiver) = tokio::sync::mpsc::channel(1);
         Ok(receiver)
+    }
+}
+
+/// How `Fake` answers `list`.
+fn list(fake: &Fake, _project: &str) -> Result<Vec<Container>, Failure> {
+    if !fake.reachable {
+        return Err(Failure::Unreachable {
+            reason: "no daemon".to_owned(),
+        });
+    }
+    Ok(fake
+        .behaviors
+        .iter()
+        .map(|behavior| Container {
+            id: format!("id-{}", behavior.service),
+            project: "lemonfiber".to_owned(),
+            service: behavior.service.to_owned(),
+            lifecycle: if behavior.running {
+                Lifecycle::Running
+            } else {
+                Lifecycle::Exited
+            },
+            health: Health::None,
+            published: Vec::new(),
+            mounts: Vec::new(),
+            exit: None,
+        })
+        .collect())
+}
+
+/// How `Fake` answers `exec`.
+async fn exec(fake: &Fake, container: &str, argv: &[String]) -> Result<ExecOutput, Failure> {
+    let behavior = fake
+        .behaviors
+        .iter()
+        .find(|behavior| format!("id-{}", behavior.service) == container)
+        .ok_or_else(|| Failure::NoSuchContainer {
+            name: container.to_owned(),
+        })?;
+    if behavior.exec_fails {
+        return Err(Failure::NoSuchContainer {
+            name: container.to_owned(),
+        });
+    }
+    if argv.first().is_some_and(|arg| arg == "ip") {
+        fake.dawdle(argv).await;
+        return Ok(fake.answer_ip(argv));
+    }
+    let wants_country = argv.last().is_some_and(|arg| arg.ends_with("/country-iso"));
+    if wants_country {
+        return Ok(ExecOutput {
+            status: Some(0),
+            stdout: behavior.country.unwrap_or_default().to_owned(),
+        });
+    }
+    // A second address service, where the test gave one a different answer —
+    // which is what a cached or misconfigured echo looks like from here.
+    let asked_second = argv
+        .last()
+        .is_some_and(|arg| arg.contains("second.example"));
+    // A client cut off with the tunnel can leave the exec waiting rather than
+    // answering, where the test asks for that.
+    if fake.is_dropped()
+        && behavior.service != "gluetun"
+        && fake.link.is_some_and(|link| link.probe_hangs)
+    {
+        std::future::pending::<()>().await;
+    }
+    // While the tunnel is down the client answers with whatever the test says
+    // still gets out — nothing at all, where the killswitch holds.
+    let address = if fake.is_dropped() && behavior.service != "gluetun" {
+        fake.link.and_then(|link| link.leaks_as)
+    } else if asked_second {
+        behavior.second_opinion.or(behavior.address)
+    } else {
+        behavior.address
+    };
+    match address {
+        Some(address) => Ok(ExecOutput {
+            status: Some(0),
+            stdout: format!("{address}\n"),
+        }),
+        None => Ok(ExecOutput {
+            status: Some(1),
+            stdout: String::new(),
+        }),
     }
 }

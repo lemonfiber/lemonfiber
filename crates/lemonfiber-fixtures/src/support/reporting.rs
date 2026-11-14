@@ -319,35 +319,15 @@ impl Reporting {
 #[async_trait]
 impl Engine for Reporting {
     async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
-        self.hang().await;
-        let Some(engine) = &self.over else {
-            return listed(self, project);
-        };
-        let mut running = engine.list(project).await.unwrap_or_default();
-        running.extend(listed(self, project)?);
-        Ok(running)
+        list(self, project).await
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        self.hang().await;
-        if let Some(engine) = &self.over {
-            return engine.exec(container, argv).await;
-        }
-        self.answers(Question::Exec)?;
-        match &self.exec {
-            Some(output) => Ok(output.clone()),
-            None => executed(self, container, argv),
-        }
+        exec(self, container, argv).await
     }
 
     async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
-        self.hang().await;
-        if let Some(engine) = &self.over {
-            return engine.stats(project).await;
-        }
-        self.answers(Question::Stats)?;
-        let (_sender, receiver) = tokio::sync::mpsc::channel(1);
-        Ok(receiver)
+        stats(self, project).await
     }
 
     async fn logs(
@@ -356,13 +336,65 @@ impl Engine for Reporting {
         services: &[String],
         query: LogQuery,
     ) -> Result<Receiver<LogLine>, EngineFailure> {
-        self.hang().await;
-        if let Some(engine) = &self.over {
-            return engine.logs(project, services, query).await;
-        }
-        self.answers(Question::Logs)?;
-        logs(self, services).await
+        reporting_logs(self, project, services, query).await
     }
+}
+
+/// How `Reporting` answers `list`.
+async fn list(fake: &Reporting, project: &str) -> Result<Vec<Container>, EngineFailure> {
+    fake.hang().await;
+    let Some(engine) = &fake.over else {
+        return listed(fake, project);
+    };
+    let mut running = engine.list(project).await.unwrap_or_default();
+    running.extend(listed(fake, project)?);
+    Ok(running)
+}
+
+/// How `Reporting` answers `exec`.
+async fn exec(
+    fake: &Reporting,
+    container: &str,
+    argv: &[String],
+) -> Result<ExecOutput, EngineFailure> {
+    fake.hang().await;
+    if let Some(engine) = &fake.over {
+        return engine.exec(container, argv).await;
+    }
+    fake.answers(Question::Exec)?;
+    match &fake.exec {
+        Some(output) => Ok(output.clone()),
+        None => executed(fake, container, argv),
+    }
+}
+
+/// How `Reporting` answers `stats`.
+async fn stats(
+    fake: &Reporting,
+    project: &str,
+) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+    fake.hang().await;
+    if let Some(engine) = &fake.over {
+        return engine.stats(project).await;
+    }
+    fake.answers(Question::Stats)?;
+    let (_sender, receiver) = tokio::sync::mpsc::channel(1);
+    Ok(receiver)
+}
+
+/// How `Reporting` answers `logs`.
+async fn reporting_logs(
+    fake: &Reporting,
+    project: &str,
+    services: &[String],
+    query: LogQuery,
+) -> Result<Receiver<LogLine>, EngineFailure> {
+    fake.hang().await;
+    if let Some(engine) = &fake.over {
+        return engine.logs(project, services, query).await;
+    }
+    fake.answers(Question::Logs)?;
+    logs(fake, services).await
 }
 
 impl Reporting {

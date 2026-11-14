@@ -57,9 +57,7 @@ impl FileSystem for Remembering {
     }
 
     async fn remove(&self, path: &Path) {
-        if let Ok(mut held) = self.held.lock() {
-            held.remove(path);
-        }
+        remove(self, path);
     }
 
     async fn read(&self, path: &Path) -> Option<String> {
@@ -72,6 +70,13 @@ impl FileSystem for Remembering {
 
     async fn ownership(&self, _path: &Path) -> Option<Ownership> {
         None
+    }
+}
+
+/// How `Remembering` answers `remove`.
+fn remove(fake: &Remembering, path: &Path) {
+    if let Ok(mut held) = fake.held.lock() {
+        held.remove(path);
     }
 }
 

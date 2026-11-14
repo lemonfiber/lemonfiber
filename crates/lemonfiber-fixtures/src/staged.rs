@@ -216,71 +216,52 @@ impl Machine {
 #[async_trait]
 impl Runner for Machine {
     async fn run(&self, argv: &[String]) -> Result<Output, RunFailure> {
-        if let Ok(mut seen) = self.seen.lock() {
-            seen.push(argv.to_vec());
-        }
-        if argv.iter().any(|word| word == "pull") {
-            return self
-                .fetch
-                .lock()
-                .ok()
-                .and_then(|mut said| said.take())
-                .unwrap_or_else(|| Ok(spoke("")));
-        }
-        let Some(service) = fenced(argv) else {
-            let nth = self.stack_actions.lock().map_or(1, |mut asked| {
-                *asked += 1;
-                *asked
-            });
-            let refusal = if nth == 1 {
-                &self.stack
-            } else {
-                &self.bringing_back
-            };
-            return refusal
-                .lock()
-                .ok()
-                .and_then(|mut said| said.take())
-                .unwrap_or_else(|| Ok(spoke("")));
-        };
-        if let Some(said) = self.start.lock().ok().and_then(|mut start| start.take()) {
-            return said;
-        }
-        if let Ok(mut started) = self.started.lock() {
-            started.push(service);
-        }
-        Ok(spoke(""))
+        run(self, argv)
     }
+}
+
+/// How `Machine` answers `run`.
+fn run(fake: &Machine, argv: &[String]) -> Result<Output, RunFailure> {
+    if let Ok(mut seen) = fake.seen.lock() {
+        seen.push(argv.to_vec());
+    }
+    if argv.iter().any(|word| word == "pull") {
+        return fake
+            .fetch
+            .lock()
+            .ok()
+            .and_then(|mut said| said.take())
+            .unwrap_or_else(|| Ok(spoke("")));
+    }
+    let Some(service) = fenced(argv) else {
+        let nth = fake.stack_actions.lock().map_or(1, |mut asked| {
+            *asked += 1;
+            *asked
+        });
+        let refusal = if nth == 1 {
+            &fake.stack
+        } else {
+            &fake.bringing_back
+        };
+        return refusal
+            .lock()
+            .ok()
+            .and_then(|mut said| said.take())
+            .unwrap_or_else(|| Ok(spoke("")));
+    };
+    if let Some(said) = fake.start.lock().ok().and_then(|mut start| start.take()) {
+        return said;
+    }
+    if let Ok(mut started) = fake.started.lock() {
+        started.push(service);
+    }
+    Ok(spoke(""))
 }
 
 #[async_trait]
 impl Engine for Machine {
     async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
-        // Counted only once something has been started, because what the count stands
-        // for is how long a started service has been coming up. A listing taken while
-        // the stack is down — the stop reading back what it stopped — is not a look at
-        // anything starting.
-        let started = self.started();
-        if started.is_empty() {
-            return Ok(self.running_beside(project).await);
-        }
-        let listings = self.asked.lock().map_or(0, |mut asked| {
-            *asked += 1;
-            *asked
-        });
-        if self.coming == Coming::Silent {
-            return Err(EngineFailure::Unreachable {
-                reason: "the daemon went away".to_owned(),
-            });
-        }
-        if self.coming == Coming::Never {
-            return Ok(Vec::new());
-        }
-        let health = self.health(listings);
-        Ok(started
-            .iter()
-            .map(|service| Self::container(service, health))
-            .collect())
+        list(self, project).await
     }
 
     async fn exec(&self, container: &str, _argv: &[String]) -> Result<ExecOutput, EngineFailure> {
@@ -303,4 +284,33 @@ impl Engine for Machine {
         let (_sender, receiver) = channel(1);
         Ok(receiver)
     }
+}
+
+/// How `Machine` answers `list`.
+async fn list(fake: &Machine, project: &str) -> Result<Vec<Container>, EngineFailure> {
+    // Counted only once something has been started, because what the count stands
+    // for is how long a started service has been coming up. A listing taken while
+    // the stack is down — the stop reading back what it stopped — is not a look at
+    // anything starting.
+    let started = fake.started();
+    if started.is_empty() {
+        return Ok(fake.running_beside(project).await);
+    }
+    let listings = fake.asked.lock().map_or(0, |mut asked| {
+        *asked += 1;
+        *asked
+    });
+    if fake.coming == Coming::Silent {
+        return Err(EngineFailure::Unreachable {
+            reason: "the daemon went away".to_owned(),
+        });
+    }
+    if fake.coming == Coming::Never {
+        return Ok(Vec::new());
+    }
+    let health = fake.health(listings);
+    Ok(started
+        .iter()
+        .map(|service| Machine::container(service, health))
+        .collect())
 }

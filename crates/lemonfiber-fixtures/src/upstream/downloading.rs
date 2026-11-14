@@ -89,14 +89,19 @@ impl Seeding for Downloader {
     }
 
     async fn stop_seeding(&self, name: &str) -> Result<(), Failure> {
-        if name == "a film" {
-            Ok(())
-        } else {
-            Err(Failure::Refused {
-                service: "upstream".to_owned(),
-                detail: format!("nothing called {name} is held"),
-            })
-        }
+        stop_seeding(name)
+    }
+}
+
+/// How `Downloader` answers `stop_seeding`.
+fn stop_seeding(name: &str) -> Result<(), Failure> {
+    if name == "a film" {
+        Ok(())
+    } else {
+        Err(Failure::Refused {
+            service: "upstream".to_owned(),
+            detail: format!("nothing called {name} is held"),
+        })
     }
 }
 
@@ -106,13 +111,18 @@ impl Peering for Downloader {
         Ok(Some(51413))
     }
     async fn set_peer_port(&self, port: Option<u16>) -> Result<(), Failure> {
-        match port {
-            Some(0) => Err(Failure::Refused {
-                service: "upstream".to_owned(),
-                detail: "no client takes peers on port 0".to_owned(),
-            }),
-            Some(_) | None => Ok(()),
-        }
+        set_peer_port(port)
+    }
+}
+
+/// How `Downloader` answers `set_peer_port`.
+fn set_peer_port(port: Option<u16>) -> Result<(), Failure> {
+    match port {
+        Some(0) => Err(Failure::Refused {
+            service: "upstream".to_owned(),
+            detail: "no client takes peers on port 0".to_owned(),
+        }),
+        Some(_) | None => Ok(()),
     }
 }
 
@@ -125,13 +135,18 @@ impl Filing for Downloader {
         }])
     }
     async fn file_under(&self, folders: &[Filed]) -> Result<(), Failure> {
-        match folders.iter().find(|one| one.folder.is_empty()) {
-            Some(unfiled) => Err(Failure::Refused {
-                service: "upstream".to_owned(),
-                detail: format!("{} names no folder", unfiled.category),
-            }),
-            None => Ok(()),
-        }
+        file_under(folders)
+    }
+}
+
+/// How `Downloader` answers `file_under`.
+fn file_under(folders: &[Filed]) -> Result<(), Failure> {
+    match folders.iter().find(|one| one.folder.is_empty()) {
+        Some(unfiled) => Err(Failure::Refused {
+            service: "upstream".to_owned(),
+            detail: format!("{} names no folder", unfiled.category),
+        }),
+        None => Ok(()),
     }
 }
 

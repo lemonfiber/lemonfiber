@@ -68,15 +68,20 @@ impl Heard {
 #[async_trait]
 impl Narrator for Heard {
     async fn say(&self, said: &str) {
-        if let Some(watched) = &self.watching {
-            crate::noted(&self.seen, watched());
-        }
-        crate::noted(&self.said, said.to_owned());
+        say(self, said);
     }
 
     async fn pulled(&self, line: &str) {
         crate::noted(&self.pulled, line.to_owned());
     }
+}
+
+/// How `Heard` answers `say`.
+fn say(fake: &Heard, said: &str) {
+    if let Some(watched) = &fake.watching {
+        crate::noted(&fake.seen, watched());
+    }
+    crate::noted(&fake.said, said.to_owned());
 }
 
 #[cfg(test)]

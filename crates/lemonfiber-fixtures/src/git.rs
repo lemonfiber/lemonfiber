@@ -184,24 +184,29 @@ impl Remote {
 #[async_trait]
 impl Runner for Remote {
     async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        let refuses = self.refuses(argv);
-        crate::noted(&self.ran, argv.to_vec());
-        self.dawdled().await;
-        if refuses {
-            return Ok(refused("the daemon said no"));
-        }
-        if argv.first().map(String::as_str) != Some("git") {
-            return Ok(spoke(""));
-        }
-        let rest = asked_of(argv);
-        crate::noted(&self.asked, rest.clone());
-        Ok(self.said(&rest))
+        run(self, argv).await
     }
 
     async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
         crate::noted(&self.environments, env.to_vec());
         self.run(argv).await
     }
+}
+
+/// How `Remote` answers `run`.
+async fn run(fake: &Remote, argv: &[String]) -> Result<Output, Failure> {
+    let refuses = fake.refuses(argv);
+    crate::noted(&fake.ran, argv.to_vec());
+    fake.dawdled().await;
+    if refuses {
+        return Ok(refused("the daemon said no"));
+    }
+    if argv.first().map(String::as_str) != Some("git") {
+        return Ok(spoke(""));
+    }
+    let rest = asked_of(argv);
+    crate::noted(&fake.asked, rest.clone());
+    Ok(fake.said(&rest))
 }
 
 /// What git was asked, without `git` and the `-c` pairs every command carries.

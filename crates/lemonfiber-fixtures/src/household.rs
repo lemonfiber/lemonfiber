@@ -98,29 +98,11 @@ impl Household for Recognising {
     }
 
     async fn standing(&self, signed: &Signed) -> Result<bool, Failure> {
-        self.answering()?;
-        if self.withdrawn.load(Ordering::SeqCst) || self.moved_on.load(Ordering::SeqCst) {
-            return Ok(false);
-        }
-        Ok(self.known.as_deref() == Some(signed.id.as_str()))
+        standing(self, signed)
     }
 
     async fn household(&self) -> Result<Vec<Member>, Failure> {
-        self.answering()?;
-        if self.withdrawn.load(Ordering::SeqCst) {
-            return Ok(Vec::new());
-        }
-        Ok(self
-            .known
-            .iter()
-            .map(|id| Member {
-                id: id.clone(),
-                name: "ana".to_owned(),
-                claimed: true,
-                access: Access::default(),
-                last_seen: None,
-            })
-            .collect())
+        household(self)
     }
 
     async fn invite(&self, _: &str) -> Result<Member, Failure> {
@@ -180,6 +162,34 @@ impl Household for Recognising {
     async fn signed_by_code(&self, _: &str) -> Result<Option<Signed>, Failure> {
         unasked()
     }
+}
+
+/// How `Recognising` answers `standing`.
+fn standing(fake: &Recognising, signed: &Signed) -> Result<bool, Failure> {
+    fake.answering()?;
+    if fake.withdrawn.load(Ordering::SeqCst) || fake.moved_on.load(Ordering::SeqCst) {
+        return Ok(false);
+    }
+    Ok(fake.known.as_deref() == Some(signed.id.as_str()))
+}
+
+/// How `Recognising` answers `household`.
+fn household(fake: &Recognising) -> Result<Vec<Member>, Failure> {
+    fake.answering()?;
+    if fake.withdrawn.load(Ordering::SeqCst) {
+        return Ok(Vec::new());
+    }
+    Ok(fake
+        .known
+        .iter()
+        .map(|id| Member {
+            id: id.clone(),
+            name: "ana".to_owned(),
+            claimed: true,
+            access: Access::default(),
+            last_seen: None,
+        })
+        .collect())
 }
 
 #[cfg(test)]
