@@ -224,9 +224,9 @@ fn the_device_keys_are_listed_with_where_each_stands_and_what_a_revoke_did() {
         .text()
     };
     let said = listed(None, false);
-    assert!(said.contains("last used 2026-10-13T01:00:00Z"), "{said}");
+    assert!(said.contains("last used 2026-10-13T01:00:00 UTC"), "{said}");
     assert!(said.contains("never used"), "{said}");
-    assert!(said.contains("revoked 2026-10-13T02:00:00Z"), "{said}");
+    assert!(said.contains("revoked 2026-10-13T02:00:00 UTC"), "{said}");
     assert!(said.contains("active"), "{said}");
     assert!(listed(Some("pixel"), false).contains("Revoked the device key pixel."));
     assert!(listed(Some("pixel"), true).contains("Revoking would refuse the device key pixel"));

@@ -441,12 +441,12 @@ fn the_listing_says_what_each_plugin_is_doing() {
     .text();
     for expected in [
         "from       /srv/plugins/komga — unreviewed: nobody vouched for it",
-        "installed  at 1709287200 (seconds since the epoch)",
+        "installed  at 2024-03-01T10:00:00 UTC",
         "upstream   https://github.com/gotson/komga (MIT)",
         "claims     media.serve, komga:kobo-sync",
         "fills      media.serve",
         "stands in  komga fills media.serve, because you chose it",
-        "outside    media.serve playing at 2026-10-09T20:00:00Z: the answer did not read — it \
+        "outside    media.serve playing at 2026-10-09T20:00:00 UTC: the answer did not read — it \
          fills none of media.serve until a proof it passes clears this",
         "may change homepage.services — Add its own entry",
         "reaches    metadata.example.org",
@@ -720,7 +720,7 @@ fn an_answer_kept_against_a_plugin_is_named_with_when_why_and_what_it_stops() {
     .text();
     assert!(
         said.contains(
-            "outside    media.serve holdings at 2026-10-23T08:00:00Z: the answer did not read"
+            "outside    media.serve holdings at 2026-10-23T08:00:00 UTC: the answer did not read"
         ),
         "{said}"
     );

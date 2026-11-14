@@ -34,7 +34,7 @@ async fn the_baseline_persists_across_runs() {
 
     let read_back = std::fs::read_to_string(&baseline).unwrap_or_default();
     assert!(
-        read_back.contains(r#""value":"tv""#) && read_back.contains(r#""at":"1""#),
+        read_back.contains(r#""value":"tv""#) && read_back.contains(r#""at":1,"#),
         "the recorded value and its timestamp survive both passes unchanged: {read_back}"
     );
     let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

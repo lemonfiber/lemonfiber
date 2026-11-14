@@ -268,7 +268,7 @@ fn a_line_handed_on_carries_the_level_it_declares_in_one_lowercase_word() {
         Some(serde_json::json!({
             "service": "sonarr",
             "stream": "stdout",
-            "at": "2026-08-21T19:04:11Z",
+            "stamped": "2026-08-21T19:04:11Z",
             "line": "[Warn] disk is filling up",
             "level": "warn",
         }))
@@ -285,7 +285,7 @@ fn a_line_that_declares_nothing_is_handed_on_without_a_level() {
         Some(serde_json::json!({
             "service": "sabnzbd",
             "stream": "stdout",
-            "at": null,
+            "stamped": null,
             "line": "Starting download",
         }))
     );

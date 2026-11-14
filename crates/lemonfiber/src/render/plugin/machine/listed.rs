@@ -97,7 +97,11 @@ pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
         lines.put(format!(
             "    outside    {} {} at {}: {} — it fills none of {} until a proof it passes \
              clears this",
-            answered.capability, answered.operation, answered.at, answered.why, answered.capability
+            answered.capability,
+            answered.operation,
+            answered.at.said(),
+            answered.why,
+            answered.capability
         ));
     }
     for change in &declared.overrides {

@@ -152,7 +152,7 @@ async fn watched(ctx: &Ctx, projecting: bool) -> Result<Watched, Box<Problem>> {
     } else {
         0
     };
-    let taken = now(ctx);
+    let taken = ctx.stamp();
     let mut volumes = vec![Volume::measured(
         Role::Data,
         &root,
@@ -255,15 +255,6 @@ pub(crate) async fn walked(
     while let Some(occupant) = walking.recv().await {
         each(occupant);
     }
-}
-
-/// The moment this reading was taken, in seconds since the epoch.
-fn now(ctx: &Ctx) -> u64 {
-    ctx.seams
-        .clock
-        .now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs())
 }
 
 /// The completed downloads the torrent client is still holding.

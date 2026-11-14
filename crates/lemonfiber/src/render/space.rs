@@ -63,7 +63,8 @@ fn standing(volume: &Volume) -> Lines {
     // make it fresher — so it is dated rather than presented as now.
     if let Freshness::AsOf(taken) = volume.reading {
         lines.put(format!(
-            "  read  across a network share, as it stood at {taken} seconds past the epoch"
+            "  read  across a network share, as it stood at {}",
+            taken.said()
         ));
     }
     lines

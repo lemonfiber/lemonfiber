@@ -344,9 +344,10 @@ fn scope_slug(scope: &Scope) -> String {
 /// The filename a capture of `scope` taken at `stamp` is written under.
 ///
 /// Carries the scope so retention keeps each kind of backup on its own count, and
-/// the instant in whole seconds, which is legal in a name on every platform. Two captures of the same scope within one second would name
-/// the same file; the archive adapter refuses to overwrite one already there, so
-/// the collision surfaces rather than silently replacing a backup.
+/// the instant in whole seconds, which is legal in a name on every platform. Two
+/// captures of the same scope within one second would name the same file; the
+/// archive adapter refuses to overwrite one already there, so the collision
+/// surfaces rather than silently replacing a backup.
 fn archive_name(scope: &Scope, stamp: Instant) -> String {
     format!("{}-{}-{}.tar.gz", crate::PRODUCT, scope_slug(scope), stamp)
 }

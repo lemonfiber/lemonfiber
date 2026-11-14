@@ -5,6 +5,7 @@ use super::{
     reckon, Category, Counting, Measured, Occupant, Seeded, Stalled, Standing, Survey, Tally,
     Volume,
 };
+use crate::instant::Instant;
 use crate::ports::filesystem::{FsKind, Identity, StorageFacts};
 use crate::space::Role;
 
@@ -31,7 +32,7 @@ fn roomy(role: Role, at: &str) -> Volume {
             total: 1_000_000_000_000,
         },
         0,
-        0,
+        Instant::EPOCH,
     )
 }
 
@@ -218,7 +219,7 @@ fn the_stack_stands_where_its_worst_volume_stands_and_says_when_it_halts() {
             total: 1_000_000_000,
         },
         0,
-        0,
+        Instant::EPOCH,
     ));
     let reckoned = reckon(&measured);
     assert_eq!(reckoned.level, crate::space::Level::Exhausted);
@@ -242,7 +243,7 @@ fn space_freed_outside_this_product_clears_the_condition_on_the_next_reading() {
             total: 1_000_000_000,
         },
         0,
-        0,
+        Instant::EPOCH,
     )];
     assert!(reckon(&full).halted);
     assert!(!reckon(&a_stack()).halted, "the same code, a fuller disk");

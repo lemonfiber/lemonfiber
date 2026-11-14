@@ -584,7 +584,7 @@ fn proving_again_says_what_it_would_ask_and_what_it_came_to() {
         for expected in [
             opening,
             closing,
-            "kept       media.serve holdings at 2026-10-09T20:00:00Z: the answer did not read",
+            "kept       media.serve holdings at 2026-10-09T20:00:00 UTC: the answer did not read",
             "answers — the library API answers",
         ] {
             assert!(

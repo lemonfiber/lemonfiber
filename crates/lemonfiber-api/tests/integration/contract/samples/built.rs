@@ -472,7 +472,7 @@ pub(super) fn a_reckoning() -> lemonfiber_core::space::Reckoning {
                 total: 400_000_000_000,
             },
             35_000_000_000,
-            1_700_000_000,
+            lemonfiber_core::instant::Instant::from_seconds(1_700_000_000),
         )],
         root: std::path::PathBuf::from("/srv/media"),
         data: {

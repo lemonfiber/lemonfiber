@@ -87,7 +87,7 @@ fn what_a_member_may_ask_for_goes_out_as_exactly_this_document() {
             r#"{"policy":"within-a-limit","standing":"quota-exhausted","#,
             r#""films":{"limit":5,"used":5,"remaining":0,"period":"a week"},"#,
             r#""television":{"limit":null,"used":0,"remaining":null,"period":null},"#,
-            r#""frees_up":"2026-09-16T21:04:09"}"#
+            r#""frees_up":1789592649}"#
         )
     );
 }

@@ -70,6 +70,13 @@ fn an_instant_crosses_as_a_json_integer() {
 }
 
 #[test]
+fn an_instant_typed_in_reads_back_from_the_digits_it_is_written_as() {
+    let moment = Instant::from_seconds(1_786_924_800);
+    assert_eq!(moment.to_string().parse::<Instant>(), Ok(moment));
+    assert!("2026-08-17T00:00:00".parse::<Instant>().is_err());
+}
+
+#[test]
 fn an_instant_on_the_wire_reads_only_from_an_integer() {
     let read = |text: &str| serde_json::from_str::<Instant>(text).ok();
     assert_eq!(
