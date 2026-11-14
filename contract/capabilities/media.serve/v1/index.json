@@ -127,7 +127,7 @@
     },
     {
       "path": "media.serve/v1/operations/channels.json",
-      "sha256": "23b74500b2058defcf6927ba2b3845021feab9c5d16a276beef2d7dac91b8008"
+      "sha256": "1700e69dd8ee0c83355e999603b8d34ab1954787b0f5e136b80672a3ecca7e98"
     },
     {
       "path": "media.serve/v1/operations/tune.json",

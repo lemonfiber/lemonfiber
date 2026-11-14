@@ -79,9 +79,12 @@
                       ]
                     },
                     "ends": {
-                      "description": "When it ends, in RFC 3339, where the server knows.",
+                      "default": null,
+                      "description": "When it ends, where the server knows.",
+                      "format": "uint64",
+                      "minimum": 0,
                       "type": [
-                        "string",
+                        "integer",
                         "null"
                       ]
                     },

@@ -11,11 +11,14 @@
       ]
     },
     "ends": {
-      "description": "When it ends, in RFC 3339, where the server knows.",
+      "description": "When it ends, where the server knows.",
       "type": [
-        "string",
+        "integer",
         "null"
-      ]
+      ],
+      "format": "uint64",
+      "default": null,
+      "minimum": 0
     },
     "title": {
       "description": "What it is called.",
