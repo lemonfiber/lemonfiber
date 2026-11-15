@@ -318,3 +318,22 @@ fn an_event_its_kind_describes_otherwise_cannot_be_written() {
         "the stream says alert, and no kind describes the envelope it is said in"
     );
 }
+
+#[test]
+fn an_argument_reaches_a_definition_by_its_file_name_and_the_definition_is_written() {
+    let contract = Contract {
+        actions: lemonfiber_api::actions::published::every(|_| false),
+        ..holding(&[])
+    };
+    let files = contract.files().unwrap_or_default();
+    let undo = file(&files, "actions/undo.json");
+    assert_eq!(
+        undo.pointer("/arguments/0/type/anyOf/0/$ref"),
+        Some(&json!("../defs/Instant.json")),
+        "{undo}"
+    );
+    assert_eq!(
+        file(&files, "defs/Instant.json").get("type"),
+        Some(&json!("integer"))
+    );
+}

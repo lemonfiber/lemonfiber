@@ -6,7 +6,7 @@
       "type": {
         "anyOf": [
           {
-            "$ref": "#/$defs/Instant"
+            "$ref": "../defs/Instant.json"
           },
           {
             "type": "null"
