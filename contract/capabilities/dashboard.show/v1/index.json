@@ -7,11 +7,11 @@
     },
     {
       "path": "dashboard.show/v1/operations/apply.json",
-      "sha256": "57e3dcae7b599daaa439f56d0df81a0ff4470375d5085d2756ee2655536ae3a6"
+      "sha256": "37376c209f56a712262db5b46a3fd5b1e1779ea086caa3510733b7318713f8e3"
     },
     {
       "path": "dashboard.show/v1/operations/panels.json",
-      "sha256": "f33d0949eee0b73208be121c9f293ed42a937e3ccba3a5b30771e9374f48183a"
+      "sha256": "47473f0a87e8904b522877f5218d3b05a03489aa2cd07b1011a1bfbf90150e50"
     },
     {
       "path": "dashboard.show/v1/holds.json",
@@ -19,7 +19,7 @@
     },
     {
       "path": "dashboard.show/v1/conformance.json",
-      "sha256": "409a1028577a43f05231815d64449a4b3b1f54c7c4ea5c7568f3970f58b80ed2"
+      "sha256": "a6f4e1a0b24f09f02f820722b92a36f8346131a0e7994bc1e51823ea6387643d"
     }
   ],
   "major": 1

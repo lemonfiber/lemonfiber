@@ -56,6 +56,7 @@ fn made(id: &str, covers: &Covers) -> (String, Made) {
                 every_s: 60,
                 grace_s: None,
                 retries: 3,
+                accepted: None,
             },
             path: None,
             unconfigured: None,

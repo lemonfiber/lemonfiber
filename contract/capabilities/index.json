@@ -166,7 +166,7 @@
       ],
       "openapi": "dashboard.show/v1/openapi.json",
       "operations": 2,
-      "sha256": "56f01a13e20c91f17551097f13774d7aff9396731cb5ba9b455e16c004ae8403"
+      "sha256": "3af2280034a587fddcd471e48f9279e1a4e5c4aee230f2895b36dbaacc458985"
     },
     {
       "capability": "archive.extract",
@@ -226,7 +226,7 @@
       ],
       "openapi": "status.watch/v1/openapi.json",
       "operations": 5,
-      "sha256": "8854578499a473304bfaa1eb073ac66f55e34ec64a4fd3325599fa9dc22f2763"
+      "sha256": "072d73f642da9e2c7a64739e06a81317c1c91cd794bc7c020d88546945058055"
     },
     {
       "capability": "music.curate",

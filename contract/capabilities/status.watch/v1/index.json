@@ -15,7 +15,7 @@
     },
     {
       "path": "status.watch/v1/operations/provision.json",
-      "sha256": "0f3f79c84fbe61926d20b7866d512e1e56f490e84f2683344ec91875a92e8b21"
+      "sha256": "89bc6f8798b9c7d9b3348abb155c627cd75486c52b159cb8c205768262b97bf5"
     },
     {
       "path": "status.watch/v1/operations/check_in.json",

@@ -26,6 +26,7 @@ fn guarded(ctx: &Ctx) {
                 every_s: GUARD.every_s,
                 grace_s: Some(GUARD.grace_s),
                 retries: 0,
+                accepted: None,
             },
             path: None,
             unconfigured: None,

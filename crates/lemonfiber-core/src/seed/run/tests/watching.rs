@@ -110,6 +110,7 @@ fn kept_as(tag: &str) -> Made {
             every_s: 60,
             grace_s: None,
             retries: 3,
+            accepted: None,
         },
         path: None,
         unconfigured: None,

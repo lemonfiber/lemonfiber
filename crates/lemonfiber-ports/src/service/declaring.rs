@@ -162,6 +162,12 @@ impl Statuses {
             to: status,
         }
     }
+
+    /// Whether `status` is among them.
+    #[must_use]
+    pub const fn holds(self, status: u16) -> bool {
+        self.from <= status && status <= self.to
+    }
 }
 
 /// What each answer to the question means. An answer in none of them is a refusal.

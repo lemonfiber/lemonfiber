@@ -31,10 +31,6 @@ pub(super) const POLL: Duration = crate::patience::STARTING.between;
 /// How many of the last lines a failed service's container wrote are shown.
 pub(super) const LOG_LINES: usize = 50;
 
-/// The statuses an application answers a caller it will not serve, which tell it is
-/// up as surely as an answer does.
-const REFUSALS: [u16; 2] = [401, 403];
-
 /// What the step that gives a service each secret its environment names is called where
 /// it fails.
 const ENVIRONMENT: &str = "environment";
@@ -486,7 +482,7 @@ async fn unpassed(
         deadline: None,
     };
     match (kind, http.send(&request).await) {
-        (HealthKind::Http, Ok(response)) if passes(response.status) => None,
+        (HealthKind::Http, Ok(response)) if crate::plugin::health_passes(response.status) => None,
         (HealthKind::Http, Ok(response)) => {
             Some(format!("answered {path} with {}", response.status))
         }
@@ -496,12 +492,6 @@ async fn unpassed(
             unreached.reason
         )),
     }
-}
-
-/// Whether a health path answering `status` says its service is up: it answered, or it
-/// refused a caller presenting nothing.
-pub(crate) fn passes(status: u16) -> bool {
-    (200..400).contains(&status) || REFUSALS.contains(&status)
 }
 
 #[cfg(test)]

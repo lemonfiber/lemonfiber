@@ -6,7 +6,7 @@ use super::{beating, critical, entered, wanted, watched, Job, EXPIRING, GUARD, J
 use crate::door::{Candidate, Facing, Place, Reached};
 use crate::model::WatchPath;
 use crate::ports::hosting::{Manager, Standing};
-use crate::ports::service::{Covers, MonitorKind};
+use crate::ports::service::{Covers, MonitorKind, Statuses};
 use crate::wiring::Fillers;
 use lemonfiber_fixtures::hosting::Hosting;
 
@@ -82,6 +82,15 @@ fn watched_every_way(sonarr: &mut Service) {
     assert_eq!(http.provision.target, format!("{}/ping", address.0));
     assert_eq!(http.provision.tag, "lemonfiber:service:sonarr");
     assert_eq!((http.provision.every_s, http.provision.retries), (60, 3));
+    assert_eq!(
+        http.provision.accepted,
+        Some(vec![
+            Statuses { from: 200, to: 399 },
+            Statuses::only(401),
+            Statuses::only(403)
+        ]),
+        "a refusal of a caller presenting nothing is up, as at install"
+    );
 
     sonarr.health = Some(Health {
         kind: HealthKind::Http,
@@ -104,8 +113,8 @@ fn watched_every_way(sonarr: &mut Service) {
         sonarr.health = health;
         let port = watched("stack", sonarr, &fillers).provision;
         assert_eq!(
-            (port.kind, port.target),
-            (MonitorKind::Port, address.1.clone())
+            (port.kind, port.target, port.accepted),
+            (MonitorKind::Port, address.1.clone(), None)
         );
     }
 
@@ -149,6 +158,7 @@ fn an_entry_point_is_watched_over_the_households_address_and_said_where_it_canno
         household
             .as_ref()
             .is_some_and(|one| one.provision.target == "http://192.168.1.20:5055"
+                && one.provision.accepted == Some(vec![Statuses { from: 200, to: 399 }])
                 && one.path == Some(WatchPath::Household)
                 && one.short.is_none()
                 && one.covers == Covers::EntryPoint("seerr".to_owned())),
@@ -169,6 +179,7 @@ fn an_entry_point_is_watched_over_the_households_address_and_said_where_it_canno
         internal
             .as_ref()
             .is_some_and(|one| one.provision.target == address
+                && one.provision.accepted == Some(vec![Statuses { from: 200, to: 399 }])
                 && one.path == Some(WatchPath::Internal)
                 && one
                     .short
@@ -190,6 +201,7 @@ fn a_job_is_watched_by_a_heartbeat_that_alarms_once_its_grace_is_spent() {
     let beat = beating(GUARD).provision;
     assert_eq!(beat.tag, "lemonfiber:job:guard");
     assert_eq!(beat.kind, MonitorKind::Heartbeat);
+    assert_eq!(beat.accepted, None);
     assert_eq!(
         (beat.every_s, beat.grace_s, beat.retries),
         (60, Some(60), 0)

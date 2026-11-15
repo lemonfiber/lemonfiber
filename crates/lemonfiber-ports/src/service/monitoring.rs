@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use super::Failure;
+use super::{Failure, Statuses};
 
 /// What every tag lemonfiber gives a monitor begins with.
 pub const TAG_PREFIX: &str = "lemonfiber:";
@@ -121,6 +121,9 @@ pub struct Provision {
     pub grace_s: Option<u64>,
     /// How many checks in a row fail before it alarms.
     pub retries: u32,
+    /// The statuses an `http` or `keyword` monitor reads up, where it is told them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted: Option<Vec<Statuses>>,
 }
 
 /// What the watcher watches in place of what it was asked to, and why.

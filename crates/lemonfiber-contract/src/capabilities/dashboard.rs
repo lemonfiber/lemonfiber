@@ -4,7 +4,7 @@
 
 use lemonfiber_ports::service::{Entry, Group, PageWidget, Panels, Showing};
 
-use super::{curator_address, NAMED};
+use super::{curator_address, CURATOR, NAMED};
 
 /// Where the conformance cases' search box sends a search.
 const SEARCH: &str = "http://conformance-search/?q=";
@@ -31,6 +31,7 @@ crate::contract! {
                         PageWidget::Resources,
                         PageWidget::Search { url: SEARCH.to_owned() },
                     ],
+                    hosts: vec![CURATOR.to_owned()],
                 },
             };
             /// The panel list it shows.

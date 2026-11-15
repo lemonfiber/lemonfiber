@@ -25,6 +25,7 @@ async fn script<M: Monitoring>(watcher: &M) -> Vec<String> {
         every_s: 60,
         grace_s: Some(30),
         retries: 3,
+        accepted: None,
     };
     vec![
         said(watcher.reachable().await),

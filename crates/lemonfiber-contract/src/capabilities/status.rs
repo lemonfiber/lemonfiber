@@ -42,6 +42,7 @@ crate::contract! {
                     every_s: EVERY,
                     grace_s: Some(EVERY),
                     retries: RETRIES,
+                    accepted: None,
                 },
             };
             /// Record a check-in of the heartbeat holding a tag.
