@@ -259,15 +259,10 @@ async fn exec(fake: &Fake, container: &str, argv: &[String]) -> Result<ExecOutpu
     let behavior = fake
         .behaviors
         .iter()
-        .find(|behavior| format!("id-{}", behavior.service) == container)
+        .find(|behavior| format!("id-{}", behavior.service) == container && !behavior.exec_fails)
         .ok_or_else(|| Failure::NoSuchContainer {
             name: container.to_owned(),
         })?;
-    if behavior.exec_fails {
-        return Err(Failure::NoSuchContainer {
-            name: container.to_owned(),
-        });
-    }
     if argv.first().is_some_and(|arg| arg == "ip") {
         fake.dawdle(argv).await;
         return Ok(fake.answer_ip(argv));
