@@ -84,6 +84,12 @@ const NAMED: &[Named] = &[
         until: Until::NativeApi,
     },
     Named {
+        file: "crates/lemonfiber-contract/src/capabilities/indexer.rs",
+        part: "flaresolverr",
+        count: 1,
+        until: Until::NativeApi,
+    },
+    Named {
         file: "crates/lemonfiber-contract/src/capabilities/library.rs",
         part: "sabnzbd",
         count: 1,

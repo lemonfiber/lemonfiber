@@ -173,3 +173,34 @@ async fn an_indexer_refusing_the_solver_is_reported_unreached() {
         "{wirings:?}"
     );
 }
+
+/// An indexer that would not say which solvers it fetches through is reported unreached,
+/// and nothing is added to it.
+#[tokio::test]
+async fn an_indexer_that_will_not_say_its_solvers_is_reported_unreached() {
+    let http = Fake::by_path(vec![
+        (searching("proxies"), refused(Kind::Refused)),
+        (searching("add_proxy"), taken()),
+    ]);
+
+    let wirings = told("solvers-unread", http.clone(), false).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if !matches!(one.state,
+            State::Wired | State::AlreadyWired | State::Unmatched { .. })),
+        "{wirings:?}"
+    );
+    assert!(added(&http.requests()).is_empty());
+}
+
+/// An indexer this machine cannot ask over its contract is told nothing and says nothing.
+#[tokio::test]
+async fn an_indexer_nothing_can_ask_is_passed_over() {
+    let http = fetching_through(&[], taken());
+    let ctx = seed_ctx(true, None, None).with_http(http.clone());
+
+    let wirings = super::super::solvers::seed_solvers(&ctx, &indexed(Vec::new(), &solving())).await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
