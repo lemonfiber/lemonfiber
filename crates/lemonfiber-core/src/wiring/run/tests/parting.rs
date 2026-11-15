@@ -3,10 +3,11 @@
 
 use std::sync::Arc;
 
-use lemonfiber_fixtures::support::Recording;
+use lemonfiber_fixtures::support::{Recording, Reporting};
 
 use super::{agreed, ctx, fill};
 use crate::journal::{Action, Kind};
+use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::process::Output;
 
 /// A context whose engine answers every command with `status`, and what it was handed.
@@ -63,6 +64,54 @@ async fn a_choice_stops_the_part_it_passes_over_journalled_before_the_choice() {
         )))
     );
     assert!(handed(&runner, "up", "prowlarr"));
+}
+
+/// Every command the engine was handed that brings services up.
+fn brought_up(runner: &Recording) -> Vec<Vec<String>> {
+    runner
+        .seen()
+        .into_iter()
+        .filter(|argv| argv.iter().any(|word| word == "up"))
+        .collect()
+}
+
+#[tokio::test]
+async fn a_choice_stops_the_fence_of_the_part_it_passes_over_and_brings_up_what_still_runs() {
+    let (mut ctx, runner) = engine("rejoined", 0);
+    ctx.seams.engine = Arc::new(Reporting::holding(
+        &["prowlarr", "prowlarr-fence", "sonarr"],
+        Lifecycle::Running,
+        Health::Healthy,
+    ));
+
+    let report = agreed(&ctx, fill("indexer.search", "nzbhydra2")).await.ok();
+
+    assert!(report.is_some_and(|report| report.applied && report.unran.is_empty()));
+    assert!(handed(&runner, "stop", "prowlarr"));
+    assert!(handed(&runner, "stop", "prowlarr-fence"));
+    let up = brought_up(&runner);
+    assert!(up
+        .iter()
+        .any(|argv| argv.iter().any(|word| word == "sonarr")));
+    assert!(!up.iter().any(|argv| argv
+        .iter()
+        .any(|word| word == "prowlarr" || word == "prowlarr-fence")));
+}
+
+#[tokio::test]
+async fn what_still_runs_and_the_engine_would_not_bring_up_is_named() {
+    let (mut ctx, _) = engine("unrejoined", 1);
+    ctx.seams.engine = Arc::new(Reporting::holding(
+        &["sonarr"],
+        Lifecycle::Running,
+        Health::Healthy,
+    ));
+
+    let report = agreed(&ctx, fill("indexer.search", "nzbhydra2")).await.ok();
+
+    assert!(report.is_some_and(
+        |report| report.applied && report.unran.iter().any(|one| one.service == "sonarr")
+    ));
 }
 
 #[tokio::test]

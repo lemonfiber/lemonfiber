@@ -20,6 +20,19 @@ pub(crate) async fn running(ctx: &Ctx, services: &[String]) -> Vec<String> {
         .collect()
 }
 
+pub(crate) async fn listed(ctx: &Ctx) -> Vec<String> {
+    let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
+        return Vec::new();
+    };
+    containers
+        .into_iter()
+        .filter(|container| container.lifecycle == Lifecycle::Running)
+        .map(|container| container.service)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 pub(crate) async fn restarted(ctx: &Ctx, services: &[String]) -> Option<String> {
     if services.is_empty() {
         return None;

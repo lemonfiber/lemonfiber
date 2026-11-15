@@ -60,6 +60,8 @@ serde_json = { workspace = true }
 ratatui = { workspace = true }
 
 [dev-dependencies]
+# Asking a substitute's adapter over its contract as the core asks it.
+lemonfiber-contract = { workspace = true }
 lemonfiber-error = { workspace = true, features = ["testing"] }
 # The fakes the ports are driven through, shared with every other crate's tests
 # rather than written again here.

@@ -2,9 +2,22 @@
 
 use super::*;
 use crate::ports::service::{KnownSolver, Protocol, SolverAt};
-use crate::test_support::adapted::{asked_at, refused};
-use crate::test_support::indexer::{answering, searching, taken};
+use crate::test_support::adapted::{answered, asked_at, refused, unavailable, Adapted};
+use crate::test_support::indexer::{searching, taken, INDEXER};
+use lemonfiber_contract::capabilities::indexer::proxy;
 use lemonfiber_contract::wire::Kind;
+
+/// The bundle's challenge solver and the adapter in front of it.
+const SOLVER: Adapted = Adapted {
+    plugin: "flaresolverr",
+    adapter: "flaresolverr-adapter",
+    port: 8191,
+};
+
+/// Where the solver is asked whether it answers.
+fn answers() -> &'static str {
+    SOLVER.at(proxy::CAPABILITY, proxy::MAJOR, "answers")
+}
 
 /// Where the indexer reaches the challenge solver.
 const AT: &str = "http://flaresolverr:8191";
@@ -17,19 +30,32 @@ fn solving() -> Vec<crate::plugin::Installed> {
         .collect()
 }
 
-/// The moved indexer fetching through `held`, and answering an added solver with `added`.
+/// The moved indexer fetching through `held`, and answering an added solver with `added`,
+/// beside a solver that answers.
 fn fetching_through(held: &[KnownSolver], added: Answer) -> Arc<Fake> {
-    Fake::by_path(vec![
-        answering("proxies", &held.to_vec()),
-        (searching("add_proxy"), added),
+    answered_in_turn(held, added, vec![answered(&true)])
+}
+
+/// The same, the solver answering each of `answering` in turn, the last repeating.
+fn answered_in_turn(held: &[KnownSolver], added: Answer, answering: Vec<Answer>) -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
+        (searching("proxies"), vec![answered(&held.to_vec())]),
+        (searching("add_proxy"), vec![added]),
+        (answers(), answering),
     ])
 }
 
 /// What the pass tells the moved indexer, asked over `http`, rehearsing where `rehearsing`.
 async fn told(name: &str, http: Arc<Fake>, rehearsing: bool) -> Vec<Wiring> {
-    let mut ctx = indexing(name, http, false);
+    let mut ctx =
+        crate::test_support::adapted::asking(indexing(name, http, false), &[INDEXER, SOLVER]);
     ctx.dry_run = rehearsing;
     super::super::solvers::seed_solvers(&ctx, &indexed(Vec::new(), &solving())).await
+}
+
+/// How often the solver was asked whether it answers in `sent`.
+fn asked_whether(sent: &[crate::ports::http::Request]) -> usize {
+    asked_at(sent, answers()).len()
 }
 
 /// The solver as the indexer is told about it.
@@ -168,6 +194,7 @@ async fn an_indexer_that_will_not_say_its_solvers_is_reported_unreached() {
     let http = Fake::by_path(vec![
         (searching("proxies"), refused(Kind::Refused)),
         (searching("add_proxy"), taken()),
+        (answers(), answered(&true)),
     ]);
 
     let wirings = told("solvers-unread", http.clone(), false).await;
@@ -190,4 +217,71 @@ async fn an_indexer_nothing_can_ask_is_passed_over() {
 
     assert!(wirings.is_empty(), "{wirings:?}");
     assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// The indexer tries a solver as soon as it is told about it, so a solver still coming up
+/// is asked again until it answers, and only then is the indexer told.
+#[tokio::test(start_paused = true)]
+async fn a_solver_still_coming_up_is_told_to_the_indexer_once_it_answers() {
+    let http = answered_in_turn(
+        &[],
+        taken(),
+        vec![unavailable(), answered(&false), answered(&true)],
+    );
+
+    let wirings = told("solvers-coming-up", http.clone(), false).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == State::Wired),
+        "{wirings:?}"
+    );
+    assert_eq!(asked_whether(&http.requests()), 3);
+    assert_eq!(added(&http.requests()), vec![the_solver()]);
+}
+
+/// A solver that never answers is reported, naming it and how long it was given, and the
+/// indexer is told nothing.
+#[tokio::test(start_paused = true)]
+async fn a_solver_that_never_answers_is_reported_and_the_indexer_told_nothing() {
+    let http = answered_in_turn(&[], taken(), vec![unavailable()]);
+
+    let wirings = told("solvers-silent", http.clone(), false).await;
+
+    let waited = crate::patience::STARTING.longest().as_secs();
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == State::Failed {
+            detail: format!(
+                "FlareSolverr did not answer within {waited} seconds of being asked, so \
+                 Prowlarr was not told about it"
+            ),
+        }),
+        "{wirings:?}"
+    );
+    assert!(added(&http.requests()).is_empty());
+}
+
+/// A rehearsal does not wait on the solver.
+#[tokio::test]
+async fn a_rehearsal_does_not_ask_whether_the_solver_answers() {
+    let http = answered_in_turn(&[], taken(), vec![unavailable()]);
+
+    let _ = told("solvers-rehearsed-silent", http.clone(), true).await;
+
+    assert_eq!(asked_whether(&http.requests()), 0);
+}
+
+/// A solver this machine cannot ask over its contract is not waited on: the indexer's own
+/// test of it is what is left to say whether it answers.
+#[tokio::test]
+async fn a_solver_asked_over_no_contract_is_told_without_waiting() {
+    let http = answered_in_turn(&[], taken(), vec![unavailable()]);
+    let ctx = indexing("solvers-uncontracted", http.clone(), false);
+
+    let wirings = super::super::solvers::seed_solvers(&ctx, &indexed(Vec::new(), &solving())).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == State::Wired),
+        "{wirings:?}"
+    );
+    assert_eq!(asked_whether(&http.requests()), 0);
 }

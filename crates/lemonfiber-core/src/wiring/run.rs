@@ -206,23 +206,50 @@ async fn substituting(
         .as_ref()
         .map_err(crate::app::plugins::diagnosed)?;
 
-    let unran = parts_ran(ctx, &stack, &substitution).await;
+    let unran = carried_out(ctx, &stack, &substitution).await;
     Ok(reading(true, unran, taken(ctx, &manifest).await))
 }
 
-/// Each part `substitution` stops or starts, run in the project in `stack`, answering
-/// each one that could not be.
-async fn parts_ran(
+/// What `substitution` moves, moved in the project in `stack`: each part it stops with its
+/// fence, each it starts, and every service still running brought up on the project it
+/// wrote; each that could not be is answered.
+async fn carried_out(
     ctx: &Ctx,
     stack: &std::path::Path,
     substitution: &crate::wiring::Substitution,
 ) -> Vec<crate::model::Unran> {
-    let mut unran = Vec::new();
-    let parts = substitution
+    let running = crate::settings::restarting::listed(ctx).await;
+    let stopped = stopping(substitution, &running);
+    let mut unran = parts_ran(ctx, stack, &stopped, &substitution.starts).await;
+    unran.extend(rejoined(ctx, &running, &stopped).await);
+    unran
+}
+
+/// Each part `substitution` stops, followed by its fence where one of `running` holds it.
+fn stopping(substitution: &crate::wiring::Substitution, running: &[String]) -> Vec<String> {
+    substitution
         .stops
         .iter()
+        .flat_map(|part| {
+            let fence = format!("{part}{}", crate::fence::SUFFIX);
+            std::iter::once(part.clone()).chain(running.contains(&fence).then_some(fence))
+        })
+        .collect()
+}
+
+/// Each of `stops` stopped and each of `starts` started, run in the project in `stack`,
+/// answering each one that could not be.
+async fn parts_ran(
+    ctx: &Ctx,
+    stack: &std::path::Path,
+    stops: &[String],
+    starts: &[String],
+) -> Vec<crate::model::Unran> {
+    let mut unran = Vec::new();
+    let parts = stops
+        .iter()
         .map(|part| (part, false))
-        .chain(substitution.starts.iter().map(|part| (part, true)));
+        .chain(starts.iter().map(|part| (part, true)));
     for (part, running) in parts {
         if let Err(because) = crate::app::engine::ran(ctx, stack, part, running).await {
             unran.push(crate::model::Unran {
@@ -232,6 +259,27 @@ async fn parts_ran(
         }
     }
     unran
+}
+
+/// Each of `running` but `stopped` brought up on the project the change wrote, so the
+/// engine recreates each whose entry or networks it moved: an asker joins the network
+/// it shares with the part that fills its ask now. Each is named with why, where the
+/// engine would not.
+async fn rejoined(ctx: &Ctx, running: &[String], stopped: &[String]) -> Vec<crate::model::Unran> {
+    let kept: Vec<String> = running
+        .iter()
+        .filter(|service| !stopped.contains(service))
+        .cloned()
+        .collect();
+    let Some(because) = crate::settings::restarting::restarted(ctx, &kept).await else {
+        return Vec::new();
+    };
+    kept.into_iter()
+        .map(|service| crate::model::Unran {
+            service,
+            because: because.clone(),
+        })
+        .collect()
 }
 
 /// One setting written, or the settings file's own refusal.

@@ -42,6 +42,7 @@ pub fn replaced(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -
         })
         .filter(|upstream| !filling.contains(*upstream))
         .collect();
+    let mut listed = BTreeSet::new();
     manifest
         .services
         .iter()
@@ -52,6 +53,7 @@ pub fn replaced(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -
                 .flat_map(|one| one.services.iter().map(|placed| &placed.service)),
         )
         .filter(|id| passed_over.contains(id) || fronted.contains(id))
+        .filter(|id| listed.insert(*id))
         .cloned()
         .collect()
 }

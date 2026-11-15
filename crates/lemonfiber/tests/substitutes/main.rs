@@ -25,6 +25,12 @@ const NAMED: [&str; 4] = [
     "identity.source",
 ];
 
+/// The further capabilities an arm proves, each as those [`NAMED`] are proved.
+const FURTHER: [&str; 1] = [SOLVES];
+
+/// The capability a challenge solver fills.
+const SOLVES: &str = lemonfiber_contract::capabilities::indexer::proxy::CAPABILITY;
+
 /// The capability whose substitute may run unclaimed.
 const CLAIMABLE: &str = "media.serve";
 
@@ -41,7 +47,7 @@ struct Substitute {
     origin: String,
     revision: String,
     stands_in_for: String,
-    media_type: String,
+    media_type: Option<String>,
     claimed: bool,
 }
 
@@ -156,7 +162,15 @@ fn every_arm_stands_a_substitute_in_for_what_the_bundle_fills_the_capability_wit
     let mut arms = BTreeSet::new();
     for one in &pinned.substitute {
         assert!(arms.insert(one.arm.as_str()), "{} is named twice", one.arm);
-        assert!(NAMED.contains(&one.capability.as_str()), "{one:?}");
+        assert!(
+            NAMED.contains(&one.capability.as_str()) || FURTHER.contains(&one.capability.as_str()),
+            "{one:?}"
+        );
+        assert_eq!(
+            one.media_type.is_none(),
+            one.capability == SOLVES,
+            "{one:?}: a challenge solver alone files no media"
+        );
         assert_ne!(one.plugin, one.stands_in_for, "{one:?}");
         assert!(
             fills(&bundle, &one.stands_in_for).contains(&one.capability.as_str()),
@@ -239,7 +253,7 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
             (
                 one.plugin.as_str(),
                 one.capability.as_str(),
-                one.media_type.as_str(),
+                one.media_type.as_deref(),
             )
         })
         .or_else(|| {
@@ -247,7 +261,7 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
                 .curator
                 .iter()
                 .find(|one| one.arm == arm)
-                .map(|one| (one.plugin.as_str(), CURATES, one.media_type.as_str()))
+                .map(|one| (one.plugin.as_str(), CURATES, Some(one.media_type.as_str())))
         });
     assert!(one.is_some(), "substitutes.toml has no arm {arm}");
     let Some((plugin, capability, media_type)) = one else {
@@ -273,10 +287,11 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
     );
     let files = providing.map(|service| strings(service, "media_types"));
     assert!(
-        files
-            .as_ref()
-            .is_some_and(|files| files.is_empty() || files.contains(&media_type)),
-        "{arm}: {plugin} files {files:?}, not {media_type}"
+        files.as_ref().is_some_and(|files| match media_type {
+            Some(media_type) => files.is_empty() || files.contains(&media_type),
+            None => files.is_empty(),
+        }),
+        "{arm}: {plugin} files {files:?}, not {media_type:?}"
     );
 }
 
@@ -330,9 +345,7 @@ fn a_curator_arm_carries_a_household_request_to_a_grab_and_undoes_it() {
     let Some(asked) = asked else {
         return;
     };
-    let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
-    let _ = std::fs::remove_dir_all(&root);
-    live::run(&root, asked, &live::USENET, None);
+    live::run(&scratch(&arm), asked, &live::USENET, None);
 }
 
 /// The job's secret holding the operator's `TheTVDB` key, which Medusa looks a series up
@@ -385,7 +398,7 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
     };
     let asked = live::ASKED
         .iter()
-        .find(|asked| asked.media == one.media_type);
+        .find(|asked| Some(asked.media) == one.media_type.as_deref());
     assert!(asked.is_some(), "{one:?}");
     let Some(asked) = asked else {
         return;
@@ -397,12 +410,42 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
             return;
         }
     };
-    let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
-    let _ = std::fs::remove_dir_all(&root);
     let substitution = live::Substitution {
         plugin: one.plugin.clone(),
         capability: one.capability.clone(),
         settings,
     };
-    live::run(&root, asked, &live::USENET, Some(&substitution));
+    live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
+}
+
+#[test]
+fn a_solver_standing_in_is_told_to_the_indexer_and_fetches_only_pages_outside() {
+    let Ok(arm) = std::env::var(ARM) else {
+        return;
+    };
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let Ok(pinned) = pinned else {
+        return;
+    };
+    let Some(one) = pinned
+        .substitute
+        .iter()
+        .find(|one| one.arm == arm && one.capability == SOLVES)
+    else {
+        return;
+    };
+    let substitution = live::Substitution {
+        plugin: one.plugin.clone(),
+        capability: one.capability.clone(),
+        settings: Vec::new(),
+    };
+    live::solving::run(&scratch(&arm), &substitution);
+}
+
+/// The directory `arm` runs its stack beneath, emptied of any earlier run's.
+fn scratch(arm: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!("lemonfiber-arm-{arm}"));
+    let _ = std::fs::remove_dir_all(&root);
+    root
 }

@@ -1,7 +1,8 @@
 name: substitutes
-# Each capability `F14-R14` names, proved by the substitute `substitutes.toml` pins for
-# it, standing in for the bundle's choice, and each curator it pins run live through its
-# household's request: one job per arm, in parallel.
+# Each capability `F14-R14` names, and each further one `F14-R31` asks for that an arm
+# proves, proved by the substitute `substitutes.toml` pins for it, standing in for the
+# bundle's choice, and each curator it pins run live through its household's request: one
+# job per arm, in parallel.
 #
 # Every push to main runs it, and every night, since a substitute's upstream moves under
 # a pin that does not. A pull request runs it where its change reaches what an arm reads:
@@ -9,7 +10,9 @@ name: substitutes
 # any other pull request every arm still starts and reports by its own name, its steps
 # skipped and the reason given, so each arm can be a required check. Medusa's arm runs
 # only where SUBSTITUTES_THETVDB_KEY is set, since it looks a series up under the
-# operator's TheTVDB key, and says so where it is not.
+# operator's TheTVDB key, and says so where it is not. The challenge solver's arm asks the
+# challenged site only where the variable SUBSTITUTES_CHALLENGE_SITE names it, and says
+# so where it does not.
 on:
   pull_request:
   merge_group:
@@ -100,6 +103,7 @@ jobs:
           - media-serve-plex-unclaimed
           - media-serve-emby
           - library-curate-medusa
+          - indexer-proxy
           - curator-radarr
           - curator-lidarr
           - curator-bindery
@@ -158,6 +162,7 @@ jobs:
           SUBSTITUTE_TREE: ${{ github.workspace }}/.substitute
           SUBSTITUTES_THETVDB_KEY: ${{ secrets.SUBSTITUTES_THETVDB_KEY }}
           SUBSTITUTES_THETVDB_PIN: ${{ secrets.SUBSTITUTES_THETVDB_PIN }}
+          SUBSTITUTES_CHALLENGE_SITE: ${{ vars.SUBSTITUTES_CHALLENGE_SITE }}
         run: cargo test -p lemonfiber --test substitutes -- --nocapture
       - name: What every container said, where the arm failed
         if: failure()
