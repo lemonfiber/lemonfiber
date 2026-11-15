@@ -68,20 +68,11 @@ fn the_indexer_is_told_a_solver_answering_in_the_flaresolverr_api() {
     );
 }
 
-/// A solver answering in an API no indexer asks a solver in comes to nothing, and is said.
+/// A solver answering in another API does not fill the indexer's ask, which names the
+/// `FlareSolverr` API, so the two are never paired.
 #[test]
-fn a_solver_answering_in_another_api_is_reported() {
-    assert_eq!(
-        solving_in("sabnzbd"),
-        (
-            vec![None],
-            vec![
-                "FlareSolverr fills indexer.proxy, which Prowlarr asks for, and nothing in \
-                 lemonfiber tells Prowlarr about a service answering in FlareSolverr's API"
-                    .to_owned()
-            ]
-        )
-    );
+fn a_solver_answering_in_another_api_is_not_paired_with_the_indexer() {
+    assert_eq!(solving_in("sabnzbd"), (Vec::new(), Vec::new()));
 }
 
 /// A solver answering in the `FlareSolverr` API outside the fence is not told to the

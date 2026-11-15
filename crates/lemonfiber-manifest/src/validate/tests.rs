@@ -617,11 +617,11 @@ fn a_stack_service_takes_a_shape_only_where_it_provides_what_the_shape_serves() 
 
 #[test]
 fn a_port_two_services_publish_is_refused_naming_both() {
-    let text = edited("port = 8191\n", "port = 9696\n");
+    let text = edited("port = 3000\n", "port = 9696\n");
     let said = messages(&text);
     assert!(
         said.iter().any(|one| one
-            == "service prowlarr.publish: publishes 9696, which service flaresolverr already \
+            == "service prowlarr.publish: publishes 9696, which service homepage already \
                 publishes"),
         "{said:#?}"
     );
