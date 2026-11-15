@@ -50,6 +50,16 @@
                 "additionalProperties": false,
                 "description": "The one monitor to hold a tag.",
                 "properties": {
+                  "accepted": {
+                    "description": "The statuses an `http` or `keyword` monitor reads up, where it is told them.",
+                    "items": {
+                      "$ref": "#/$defs/Statuses"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
                   "every_s": {
                     "description": "The seconds between its checks, or between a heartbeat's check-ins.",
                     "format": "uint64",
@@ -90,6 +100,31 @@
                   "target",
                   "every_s",
                   "retries"
+                ],
+                "type": "object"
+              },
+              "Statuses": {
+                "additionalProperties": false,
+                "description": "The statuses from `from` to `to`, both included.",
+                "properties": {
+                  "from": {
+                    "description": "The first.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "to": {
+                    "description": "The last.",
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
                 ],
                 "type": "object"
               }

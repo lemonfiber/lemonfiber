@@ -28,6 +28,7 @@ fn panels() -> Panels {
                 url: "https://search.example/?q=".to_owned(),
             },
         ],
+        hosts: vec!["media".to_owned(), "monitor".to_owned()],
     }
 }
 

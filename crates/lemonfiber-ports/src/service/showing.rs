@@ -78,6 +78,10 @@ pub struct Panels {
     pub groups: Vec<Group>,
     /// The widgets along the page, in the order shown.
     pub widgets: Vec<PageWidget>,
+    /// Every name the stack's network reaches a service by that an entry's check is given
+    /// at, the only hosts the dashboard asks for a status.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosts: Vec<String>,
 }
 
 /// A dashboard, told what it shows.

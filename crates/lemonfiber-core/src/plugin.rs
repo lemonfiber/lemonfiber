@@ -19,6 +19,7 @@
 
 // The bundled stack's own claims, judged by the reader and the judge a plugin's meet.
 pub(crate) mod adapting;
+pub(crate) mod answering;
 pub mod bundled;
 // The catalogue's signed index, and what a name resolves to through it.
 pub mod catalogue;
@@ -82,6 +83,7 @@ use thiserror::Error;
 
 use crate::doctor::BUNDLED_CHECKS;
 
+pub(crate) use answering::passes as health_passes;
 pub use claimed::{
     claimed, read, read_digested, root, Asserted, Assertion, Claimed, Claiming, Contributed,
     Digested, Evidence, FailingAsDeclared, Ran, Unreadable, Verdict,
@@ -106,7 +108,6 @@ pub use profiled::{joining, profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
-pub(crate) use recording::health_passes;
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
 pub use reports::{

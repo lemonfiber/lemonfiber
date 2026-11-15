@@ -16,6 +16,7 @@ impl Showing for Upstream {
         Ok(Panels {
             groups: Vec::new(),
             widgets: vec![PageWidget::Resources],
+            hosts: Vec::new(),
         })
     }
 }

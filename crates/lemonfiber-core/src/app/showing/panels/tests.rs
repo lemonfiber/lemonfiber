@@ -249,6 +249,28 @@ fn a_service_answering_its_health_over_http_is_checked_where_the_stack_reaches_i
 }
 
 #[test]
+fn the_dashboard_is_told_every_host_an_entry_is_checked_at_and_no_other() {
+    let services = changed(carried(), "sonarr", |one| one.health = None);
+    let shown = listed(&services, &[]);
+    let mut checked: Vec<String> = entries(&shown)
+        .iter()
+        .filter_map(|one| one.check.as_deref())
+        .filter_map(|check| check.strip_prefix("http://"))
+        .filter_map(|rest| rest.split(':').next())
+        .map(str::to_owned)
+        .collect();
+    checked.sort();
+    checked.dedup();
+
+    assert!(shown.hosts.len() > 1, "{:?}", shown.hosts);
+    assert_eq!(shown.hosts, checked);
+    assert!(
+        !shown.hosts.iter().any(|host| host == "sonarr"),
+        "a service checked nowhere is no host the dashboard asks"
+    );
+}
+
+#[test]
 fn an_installed_plugins_service_is_listed_in_place_of_the_stack_service_it_moved_into() {
     let mut placed = crate::test_support::a_placed("sonarr", &[], Some(8989));
     placed.name = "Sonarr, moved".to_owned();

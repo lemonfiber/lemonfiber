@@ -1,6 +1,8 @@
 //! The panel list the core applies to the dashboard: an entry for every service with a
 //! port, under its group, and the page's widgets.
 
+use std::collections::BTreeSet;
+
 use lemonfiber_contract::capabilities::media::serve;
 use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::{Bind, HealthKind, Service};
@@ -114,6 +116,7 @@ pub(crate) fn panels(
         .collect();
     let guarded = guarded(fillers, &listings);
     let mut groups: Vec<Group> = Vec::new();
+    let mut hosts: BTreeSet<String> = BTreeSet::new();
     for listing in &listings {
         if listing.hidden || guarded.is_some_and(|(_, guard)| guard.id == listing.id) {
             continue;
@@ -125,12 +128,16 @@ pub(crate) fn panels(
         let Some(port) = reached.port else {
             continue;
         };
+        let checked = checked(fillers.service(listing.id), listing.health);
+        if let Some((_, host)) = checked {
+            hosts.insert(host.to_owned());
+        }
         let entry = Entry {
             name: listing.name.to_owned(),
             icon: listing.icon.clone(),
             link: link(place, port, reached),
             description: listing.description.to_owned(),
-            check: check(fillers.service(listing.id), listing.health),
+            check: checked.map(|(check, _)| check),
             widget: None,
         };
         let group = listing.group.unwrap_or(if reached.household {
@@ -154,6 +161,7 @@ pub(crate) fn panels(
                 url: search.to_owned(),
             },
         ],
+        hosts: hosts.into_iter().collect(),
     }
 }
 
@@ -188,11 +196,11 @@ fn link(place: &Place<'_>, port: u16, listing: &Listing<'_>) -> String {
     )
 }
 
-/// Where the dashboard asks whether a service is up: its health path, at the address the
-/// stack's network reaches it on.
-fn check(filler: Option<&Filler>, health: Option<&str>) -> Option<String> {
+/// Where the dashboard asks whether a service is up, with the host it asks: its health
+/// path, at the address the stack's network reaches it on.
+fn checked<'f>(filler: Option<&'f Filler>, health: Option<&str>) -> Option<(String, &'f str)> {
     let address = filler?.address.as_ref()?;
-    health.map(|path| format!("{}{path}", address.url()))
+    health.map(|path| (format!("{}{path}", address.url()), address.host.as_str()))
 }
 
 #[cfg(test)]

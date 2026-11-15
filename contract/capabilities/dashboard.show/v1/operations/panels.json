@@ -168,6 +168,13 @@
                   },
                   "type": "array"
                 },
+                "hosts": {
+                  "description": "Every name the stack's network reaches a service by that an entry's check is given\nat, the only hosts the dashboard asks for a status.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "widgets": {
                   "description": "The widgets along the page, in the order shown.",
                   "items": {

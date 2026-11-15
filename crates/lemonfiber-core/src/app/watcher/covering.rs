@@ -8,9 +8,10 @@ use crate::app::command::Hostable;
 use crate::app::Ctx;
 use crate::door::{candidates, Candidate, Place};
 use crate::model::{Unconfigured, WatchPath};
+use crate::plugin::answering::{up, ANSWERED};
 use crate::plugin::Installed;
 use crate::ports::hosting::Standing;
-use crate::ports::service::{Covers, MonitorKind, Provision};
+use crate::ports::service::{Covers, MonitorKind, Provision, Statuses};
 use crate::wiring::Fillers;
 
 /// The seconds between the checks of a service or an entry point.
@@ -91,11 +92,18 @@ impl Wanted {
                 every_s: EVERY_S,
                 grace_s: None,
                 retries: RETRIES,
+                accepted: None,
             },
             covers,
             path: None,
             short: None,
         }
+    }
+
+    /// The same monitor, reading `accepted` up.
+    fn accepting(mut self, accepted: Vec<Statuses>) -> Self {
+        self.provision.accepted = Some(accepted);
+        self
     }
 }
 
@@ -165,6 +173,7 @@ fn watched(project: &str, service: &Service, fillers: &Fillers) -> Wanted {
                 MonitorKind::Http,
                 format!("{}{path}", address.url()),
             )
+            .accepting(up())
         }
         (Some(address), Some(HealthKind::Tcp) | None) => Wanted::checked(
             covers,
@@ -185,12 +194,14 @@ fn watched(project: &str, service: &Service, fillers: &Fillers) -> Wanted {
 fn entered(candidate: &Candidate<'_>, place: &Place<'_>, fillers: &Fillers) -> Option<Wanted> {
     let covers = Covers::EntryPoint(candidate.id.to_owned());
     if let Some(address) = crate::door::run::reached(candidate, place) {
-        let mut wanted = Wanted::checked(covers, MonitorKind::Http, address.url);
+        let mut wanted =
+            Wanted::checked(covers, MonitorKind::Http, address.url).accepting(vec![ANSWERED]);
         wanted.path = Some(WatchPath::Household);
         return Some(wanted);
     }
     let internal = fillers.service(candidate.id)?.address.as_ref()?.url();
-    let mut wanted = Wanted::checked(covers, MonitorKind::Http, internal.clone());
+    let mut wanted =
+        Wanted::checked(covers, MonitorKind::Http, internal.clone()).accepting(vec![ANSWERED]);
     wanted.path = Some(WatchPath::Internal);
     wanted.short = Some(Unconfigured {
         wanted: HOUSEHOLD_PATH.to_owned(),
@@ -220,6 +231,7 @@ fn beating(job: Job) -> Wanted {
             every_s: job.every_s,
             grace_s: Some(job.grace_s),
             retries: MISSED,
+            accepted: None,
         },
         covers,
         path: None,
