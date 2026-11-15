@@ -16,7 +16,8 @@ use lemonfiber_manifest::Service;
 
 use super::super::Ctx;
 use crate::config::{store, REACH_REGISTRY_KEY};
-use crate::fence::{GRANTED, HELD, HOLDS, NFTABLES_HELD};
+use crate::fence::{GRANTED, HELD, HOLDS, MEMORY_MIB, NFTABLES_HELD};
+use crate::plugin::program::MEBIBYTE;
 use crate::plugin::Installed;
 use crate::ports::program::{Bound, Ended, Joined, Ran, Run};
 use crate::project::entry::{DROPPED, PROCESSES, SECURITY};
@@ -27,6 +28,9 @@ pub(crate) const ASKED: &str = "addresses";
 /// The argument the fence image answers under whether the container it runs in can hold
 /// the rules a fence installs.
 pub(crate) const PROBED: &str = "nftables";
+
+/// The argument the fence image asks a service from inside its network namespace under.
+pub(crate) const ASKING: &str = "ask";
 
 /// What the engine is asked when it is asked whether its containers hold the rules.
 const PROBING: &str = "whether its containers can hold nftables rules";
@@ -42,7 +46,7 @@ const WITHIN: Duration = Duration::from_secs(60);
 const READ_AT_MOST: usize = 256 * 1024;
 
 /// The memory it is held to, in bytes.
-const MEMORY: i64 = 64 * 1024 * 1024;
+const MEMORY: i64 = 64 * MEBIBYTE;
 
 /// Ask the engine whether its containers hold the rules a fence installs and, where they
 /// do, for its host's addresses, where a service of `stack`'s or of `installed`'s is
@@ -109,9 +113,9 @@ async fn probed(ctx: &Ctx, image: &str) -> Result<(), String> {
     let ran = ran(
         ctx,
         image,
-        PROBED,
+        &[PROBED],
         (Joined::Nothing, None),
-        &GRANTED,
+        (&GRANTED, MEMORY),
         PROBING,
     )
     .await?;
@@ -145,28 +149,64 @@ pub(super) async fn answered(
     (network, bound): (Joined, Option<Bound>),
     what: &str,
 ) -> Result<String, String> {
-    let ran = ran(ctx, image, command, (network, bound), &[], what).await?;
+    let ran = ran(
+        ctx,
+        image,
+        &[command],
+        (network, bound),
+        (&[], MEMORY),
+        what,
+    )
+    .await?;
     match ran.ended {
         Ended::Exited(0) => text(ran.stdout),
         ended => Err(unanswered(ended, what)),
     }
 }
 
-/// How the fence `image` ended and what it wrote, run once as `fence <command>` on
+/// What the service whose network namespace the running container `namespace` holds
+/// answered `method` on `path` at `port`, as the fence `image` prints it, run once as
+/// `fence ask` joined to that namespace with every capability dropped, a read-only root
+/// filesystem and the fence's own memory limit, and removed once it ends; or why it
+/// printed nothing that can be read.
+pub(crate) async fn asked_inside(
+    ctx: &Ctx,
+    image: &str,
+    namespace: &str,
+    (method, port, path): (&str, u16, &str),
+) -> Result<Vec<u8>, String> {
+    let port = port.to_string();
+    let what = format!("to ask {path} inside the network of {namespace}");
+    let ran = ran(
+        ctx,
+        image,
+        &[ASKING, method, &port, path],
+        (Joined::Namespace(namespace.to_owned()), None),
+        (&[], i64::from(MEMORY_MIB) * MEBIBYTE),
+        &what,
+    )
+    .await?;
+    match ran.ended {
+        Ended::Exited(0) => Ok(ran.stdout),
+        ended => Err(unanswered(ended, &what)),
+    }
+}
+
+/// How the fence `image` ended and what it wrote, run once as `fence` with `args` on
 /// `network` with `bound` mounted where it is given, every capability dropped but
-/// `granted` and a read-only root filesystem, and removed once it ends; or why the engine,
-/// asked for `what`, was not asked or answered more than is read.
+/// `granted`, held to `memory` bytes with a read-only root filesystem, and removed once it
+/// ends; or why the engine, asked for `what`, was not asked or answered more than is read.
 async fn ran(
     ctx: &Ctx,
     image: &str,
-    command: &str,
+    args: &[&str],
     (network, bound): (Joined, Option<Bound>),
-    granted: &[&str],
+    (granted, memory): (&[&str], i64),
     what: &str,
 ) -> Result<Ran, String> {
     let run = Run {
         image: image.to_owned(),
-        args: vec![command.to_owned()],
+        args: args.iter().map(|one| (*one).to_owned()).collect(),
         env: Vec::new(),
         user: None,
         security_opt: SECURITY.map(str::to_owned).to_vec(),
@@ -174,7 +214,7 @@ async fn ran(
         cap_add: granted.iter().map(|one| (*one).to_owned()).collect(),
         pids_limit: i64::from(PROCESSES),
         read_only: true,
-        memory: Some(MEMORY),
+        memory: Some(memory),
         bound,
         within: WITHIN,
         read_at_most: READ_AT_MOST,

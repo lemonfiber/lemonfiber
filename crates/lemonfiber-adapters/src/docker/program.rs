@@ -28,6 +28,9 @@ const NO_NETWORK: &str = "none";
 /// The network of the engine's host, which the run reading its addresses joins.
 const HOST_NETWORK: &str = "host";
 
+/// What a network mode joining another container's namespace names before its id.
+const JOINING: &str = "container:";
+
 /// What the engine answers asked to create a container from an image it does not hold.
 const NOT_HELD: u16 = 404;
 
@@ -77,13 +80,11 @@ pub(super) fn body(run: &Run) -> ContainerCreateBody {
         network_disabled: Some(run.network == Joined::Nothing),
         labels: Some(HashMap::from([(PROOF_LABEL.to_owned(), "run".to_owned())])),
         host_config: Some(HostConfig {
-            network_mode: Some(
-                match run.network {
-                    Joined::Nothing => NO_NETWORK,
-                    Joined::Host => HOST_NETWORK,
-                }
-                .to_owned(),
-            ),
+            network_mode: Some(match &run.network {
+                Joined::Nothing => NO_NETWORK.to_owned(),
+                Joined::Host => HOST_NETWORK.to_owned(),
+                Joined::Namespace(id) => format!("{JOINING}{id}"),
+            }),
             security_opt: Some(run.security_opt.clone()),
             cap_drop: Some(run.cap_drop.clone()),
             cap_add: Some(run.cap_add.clone()),

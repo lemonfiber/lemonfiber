@@ -53,7 +53,7 @@ pub struct Run {
 }
 
 /// The network a run's container joins.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Joined {
     /// None at all, as every proof's run.
     #[default]
@@ -61,6 +61,9 @@ pub enum Joined {
     /// The engine host's own, for the run that reads the host's addresses and holds no
     /// capability.
     Host,
+    /// The network namespace of the running container with this id, for the run that asks
+    /// a service publishing no port from inside the namespace it listens in.
+    Namespace(String),
 }
 
 /// A directory on the engine's machine, mounted at a path inside the container.
