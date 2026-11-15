@@ -123,7 +123,8 @@ jobs:
           echo "gathered $contract from $TAG as web-api.contract.tar.gz"
 
       # What a plugin author's tooling reads, the schemas of a stack's own files, and
-      # the code registry, on the same terms and for the same reason. An editor
+      # the code registry, and what the release's contract changed against the last
+      # release's, on the same terms and for the same reason. An editor
       # validating `plugin.toml` or `stack.toml`, the documentation rendering a
       # manifest's fields or a family of codes, and a catalogue checking a claim
       # against the vocabulary it was written for, all want the copy generated
@@ -141,7 +142,8 @@ jobs:
             contract/extension-points.json \
             contract/stack-manifest.schema.json \
             contract/stack-service.schema.json \
-            contract/codes.json
+            contract/codes.json \
+            contract/contract-diff.json
           do
             # A release missing one leaves an author's editor with nothing to validate
             # against and a catalogue unable to check a claim, which is better
