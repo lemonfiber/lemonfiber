@@ -28,10 +28,11 @@ fn two_names_are_two_directories() {
 }
 
 #[test]
-fn an_unmade_scratch_names_a_path_nothing_is_at() {
+fn an_unmade_scratch_names_a_path_nothing_is_at_in_a_directory_that_is() {
     let scratch = Scratch::unmade("unmade");
 
     assert!(!scratch.exists());
+    assert!(scratch.parent().is_some_and(std::path::Path::is_dir));
     assert_eq!(scratch.as_ref(), scratch.path());
 }
 

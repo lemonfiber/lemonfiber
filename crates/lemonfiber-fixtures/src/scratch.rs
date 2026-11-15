@@ -72,7 +72,9 @@ impl Scratch {
                 }
             })
             .collect();
-        let path = process().join(format!("{asking}-{name}"));
+        let process = process();
+        let _ = std::fs::create_dir_all(&process);
+        let path = process.join(format!("{asking}-{name}"));
         Self {
             at: path.clone(),
             root: path,
