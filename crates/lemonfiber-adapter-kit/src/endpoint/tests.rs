@@ -79,6 +79,13 @@ fn a_service_saying_it_is_not_ready_yet_is_the_service_not_answering() {
 }
 
 #[test]
+fn a_service_limiting_how_often_it_is_asked_is_the_service_not_answering_for_now() {
+    let endpoint = unanswered();
+    let refusal = endpoint.refusal(&answered(429, "Too Many Requests"));
+    assert!(matches!(refusal, Failure::Unavailable { service } if service == "upstream"));
+}
+
+#[test]
 fn any_other_failed_status_is_refused_in_the_services_own_words() {
     let endpoint = unanswered();
     let refusal = endpoint.refusal(&answered(500, "database is locked"));
