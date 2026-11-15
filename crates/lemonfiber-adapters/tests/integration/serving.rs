@@ -25,7 +25,7 @@ fn serve() -> Serve {
         tmpfs: Vec::new(),
         listens: Some(8989),
         contract: None,
-        alias: None,
+        alias: "sonarr".to_owned(),
         devices: Vec::new(),
     }
 }

@@ -191,11 +191,11 @@ pub(super) fn body(serve: &Serve, network: &str) -> ContainerCreateBody {
             .collect::<HashMap<_, _>>()
     });
     ContainerCreateBody {
-        networking_config: serve.alias.as_ref().map(|alias| NetworkingConfig {
+        networking_config: Some(NetworkingConfig {
             endpoints_config: Some(HashMap::from([(
                 network.to_owned(),
                 EndpointSettings {
-                    aliases: Some(vec![alias.clone()]),
+                    aliases: Some(vec![serve.alias.clone()]),
                     ..EndpointSettings::default()
                 },
             )])),

@@ -48,8 +48,9 @@ pub struct Serve {
     /// [`Self::listens`], published on the loopback interface at a port the engine
     /// chooses.
     pub contract: Option<u16>,
-    /// The name every other container on its network reaches it by, where it has one.
-    pub alias: Option<String>,
+    /// The name it and every other container on its network reach it by: its service id,
+    /// as on the stack's network.
+    pub alias: String,
     /// Each name it resolves to the machine lemonfiber runs on, where a stand-in answers.
     pub reaching: Vec<String>,
 }

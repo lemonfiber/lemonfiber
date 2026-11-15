@@ -270,7 +270,7 @@ pub(in crate::plugin) fn settled_as(
         contract: placed
             .contract_port()
             .filter(|port| Some(*port) != inside(placed)),
-        alias: None,
+        alias: placed.service.clone(),
     }
 }
 
