@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "guide_until": {
+      "type": [
+        "anyOf(null,ref:Instant)"
+      ],
+      "required": false
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "number": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "programmes": {
+      "type": [
+        "array[ref:Airing]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

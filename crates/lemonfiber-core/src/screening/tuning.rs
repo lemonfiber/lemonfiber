@@ -1,5 +1,5 @@
-//! Live TV for one member: the channels their own account may watch, and a channel's
-//! live stream opened for them on passes, renewed and closed.
+//! Live TV for one member: the channels their own account may watch, their guide, and a
+//! channel's live stream opened for them on passes, renewed and closed.
 //!
 //! **Both questions are asked every time.** Which channels a member's own account may
 //! watch is the media server's answer, read as that member and never as the adapter's
@@ -12,6 +12,8 @@
 //! answers is held to the live-stream paths it declared, and a path none covers is given
 //! no location and no pass.
 
+mod guide;
+
 use crate::app::targets::Media;
 use crate::app::{Ctx, Live};
 use crate::error::codes::play::{
@@ -23,6 +25,8 @@ use crate::model::{ChannelsReport, TunedReport};
 use crate::pass::{Key, Watching, LIFETIME};
 use crate::ports::service::{joined, Channel, Failure, Member};
 use crate::rating::Limits;
+
+pub(super) use guide::guide;
 
 use super::door::{self, Door};
 use super::tuned::{self, Open};
@@ -85,7 +89,7 @@ pub(super) async fn tuned(ctx: &Ctx, named: &str, live: Live) -> Result<TunedRep
 /// limits; none where their account may not watch live TV or the server has none.
 async fn watchable(server: &Media, member: &Member) -> Result<Vec<Channel>, Box<Problem>> {
     let channels = reachable(server, member).await?;
-    admitted(server, member, channels).await
+    Ok(admitted(&limits(server, member).await?, channels))
 }
 
 /// The channels `member`'s own account may watch; none where it may not watch live TV
@@ -98,16 +102,16 @@ async fn reachable(server: &Media, member: &Member) -> Result<Vec<Channel>, Box<
     }
 }
 
-/// Those of `channels` whose programme now is within `member`'s limits.
-async fn admitted(
-    server: &Media,
-    member: &Member,
-    channels: Vec<Channel>,
-) -> Result<Vec<Channel>, Box<Problem>> {
-    let limits = Limits::certified(server.identity.as_ref(), &member.access)
+/// What `member` may be offered, by the server's own certificates.
+async fn limits(server: &Media, member: &Member) -> Result<Limits, Box<Problem>> {
+    Limits::certified(server.identity.as_ref(), &member.access)
         .await
-        .ok_or_else(unanswered)?;
-    Ok(channels
+        .ok_or_else(unanswered)
+}
+
+/// Those of `channels` whose programme now is within `limits`.
+fn admitted(limits: &Limits, channels: Vec<Channel>) -> Vec<Channel> {
+    channels
         .into_iter()
         .filter(|channel| {
             limits.admits(
@@ -117,7 +121,7 @@ async fn admitted(
                     .and_then(|now| now.certificate.as_deref()),
             )
         })
-        .collect())
+        .collect()
 }
 
 /// Refused unless `channel` is one `member` may watch now.
@@ -126,7 +130,7 @@ async fn allowed(server: &Media, member: &Member, channel: &str) -> Result<(), B
     if reachable.is_empty() {
         return Err(no_live_tv());
     }
-    let admitted = admitted(server, member, reachable).await?;
+    let admitted = admitted(&limits(server, member).await?, reachable);
     if admitted.iter().any(|one| one.id == channel) {
         Ok(())
     } else {

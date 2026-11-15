@@ -94,12 +94,15 @@ pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
     Ok(Command::Held(Shelf { member, most }))
 }
 
-/// What a word about watching asks: what is playing, a member's channels, a channel opened
-/// or kept, or a title in their browser.
+/// What a word about watching asks: what is playing, a member's channels or guide, a
+/// channel opened or kept, or a title in their browser.
 pub(crate) fn watching(asked: Watching) -> Result<Command, u8> {
     match asked {
         Watching::Playing { member } => Ok(Command::Playing { member }),
         Watching::Channels { member } => Ok(channels(member)),
+        Watching::Guide { member } => Ok(Command::Viewing(Viewing::Guide {
+            member: member.unwrap_or_default(),
+        })),
         Watching::Tune(asked) => tuning(asked),
         Watching::Play(asked) => playing(asked),
     }

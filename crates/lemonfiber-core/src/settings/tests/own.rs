@@ -1,6 +1,6 @@
 use crate::settings::own::{
     is_configs, is_core, refusal, DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH,
-    DEVICE_KEY_APPS, DOMAIN,
+    DEVICE_KEY_APPS, DOMAIN, GUIDE_HOURS,
 };
 
 fn fingerprint() -> String {
@@ -122,6 +122,44 @@ fn the_dashboards_search_address_is_the_one_recorded_or_the_default_and_a_bad_on
     assert!(record("ecosia.org/search?q="));
     assert!(crate::settings::dashboard_search(&ctx)
         .is_err_and(|said| said.starts_with(DASHBOARD_SEARCH)));
+}
+
+#[test]
+fn the_guide_window_is_a_core_setting_taking_a_whole_number_of_hours_up_to_a_week() {
+    assert!(is_core(GUIDE_HOURS));
+    assert!(!is_configs(GUIDE_HOURS));
+    for value in ["1", "12", "168"] {
+        assert_eq!(refusal(GUIDE_HOURS, value), None, "{value}");
+    }
+    for value in ["", "0", "169", "-1", "12.5", "twelve", " 12"] {
+        assert!(
+            refusal(GUIDE_HOURS, value).is_some_and(|said| said.starts_with(GUIDE_HOURS)),
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+fn the_guide_window_is_the_one_recorded_or_twelve_hours_where_none_or_no_number_is() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("guide-hours");
+    let env = scratch.path().join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let settings = env.with_file_name(crate::config::paths::SETTINGS);
+    let record = |value: &str| {
+        crate::settings::store::recorded(&settings, &[(GUIDE_HOURS, Some(value))].into()).is_ok()
+    };
+
+    assert_eq!(crate::settings::guide_hours(&ctx), 12);
+    assert!(record("48"));
+    assert_eq!(crate::settings::guide_hours(&ctx), 48);
+    assert!(record("a fortnight"));
+    assert_eq!(crate::settings::guide_hours(&ctx), 12);
 }
 
 #[test]

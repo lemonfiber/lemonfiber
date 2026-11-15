@@ -4,8 +4,8 @@
 //! what an operator checks: whether a title a member cannot play is unlocated, and why.
 
 use lemonfiber_core::model::{
-    ChannelsReport, GrantReport, Located, PartWayReport, PlayReport, TitleReport, TunedReport,
-    WatchedReport,
+    ChannelsReport, GrantReport, GuideReport, Located, PartWayReport, PlayReport, TitleReport,
+    TunedReport, WatchedReport,
 };
 
 use super::held::titled;
@@ -120,6 +120,40 @@ pub(super) fn channels(report: &ChannelsReport) -> Lines {
             format!(" — {}{certificate}", now.title)
         });
         lines.put(format!("  {number}{}{now}  [{}]", channel.name, channel.id));
+    }
+    if report.channels.is_empty() {
+        lines.put("  No channel this member may watch now — which is the answer, not a gap.");
+    }
+    lines
+}
+
+/// The guide a member may watch: a line for each channel, then one for each programme on
+/// it from now with when it starts and ends, and where the guide ends.
+pub(super) fn guide(report: &GuideReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("{} — live TV guide", report.member));
+    for channel in &report.channels {
+        let number = channel
+            .number
+            .as_ref()
+            .map_or_else(String::new, |number| format!("{number} "));
+        lines.put(format!("  {number}{}  [{}]", channel.name, channel.id));
+        for airing in &channel.programmes {
+            let certificate = airing
+                .certificate
+                .as_ref()
+                .map_or_else(String::new, |certificate| format!(" ({certificate})"));
+            lines.put(format!(
+                "    {} to {} — {}{certificate}",
+                airing.starts.said(),
+                airing.ends.said(),
+                airing.title
+            ));
+        }
+        lines.put(channel.guide_until.map_or_else(
+            || "    The media server's guide holds nothing on it from now.".to_owned(),
+            |until| format!("    The guide reaches {}.", until.said()),
+        ));
     }
     if report.channels.is_empty() {
         lines.put("  No channel this member may watch now — which is the answer, not a gap.");

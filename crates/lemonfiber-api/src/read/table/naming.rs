@@ -255,6 +255,16 @@ pub(super) fn channels(member: Option<String>) -> Result<Command, Refusal> {
     Ok(Command::Viewing(Viewing::Channels { member }))
 }
 
+/// The live TV guide a member may watch, or why it cannot be answered.
+///
+/// Somebody has to be named: which channels may be watched is one account's answer.
+pub(super) fn guide(member: Option<String>) -> Result<Command, Refusal> {
+    let Some(member) = member.filter(|member| !member.is_empty()) else {
+        return Err(Refusal::NoShelfWithoutAMember);
+    };
+    Ok(Command::Viewing(Viewing::Guide { member }))
+}
+
 /// Following one item, or why the request could not be followed.
 ///
 /// The term is one value rather than several. The command line takes it as words so

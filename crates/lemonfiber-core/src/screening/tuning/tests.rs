@@ -306,4 +306,5 @@ fn a_path_no_live_stream_path_covers_is_given_no_pass() {
     assert_eq!(located(&ready, &ada, &open, 1).transcoded, None);
 }
 
+mod guide;
 mod standing;

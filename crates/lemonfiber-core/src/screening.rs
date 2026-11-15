@@ -133,6 +133,7 @@ pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<P
             .await
             .map(Outcome::Watched),
         Viewing::Channels { member } => tuning::channels(ctx, &member).await.map(Outcome::Channels),
+        Viewing::Guide { member } => tuning::guide(ctx, &member).await.map(Outcome::Guide),
         Viewing::Tune { member, live } => {
             tuning::tuned(ctx, &member, live).await.map(Outcome::Tuned)
         }

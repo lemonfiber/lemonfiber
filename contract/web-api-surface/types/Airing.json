@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "certificate": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "ends": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "starts": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

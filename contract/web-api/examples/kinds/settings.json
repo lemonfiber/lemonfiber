@@ -28,6 +28,16 @@
       {
         "choices": null,
         "environment": null,
+        "name": "LEMONFIBER_GUIDE_HOURS",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
         "name": "PLEX_LINK_MODE",
         "readers": [],
         "value": null,

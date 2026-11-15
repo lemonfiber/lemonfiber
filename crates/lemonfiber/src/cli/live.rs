@@ -1,10 +1,10 @@
-//! What the media server plays now, the channels a member may watch, which channel to open
-//! for them, and which title to play in their browser.
+//! What the media server plays now, the channels a member may watch and their guide, which
+//! channel to open for them, and which title to play in their browser.
 
 use clap::{Args, Subcommand};
 
-/// What is watched: what the media server plays now, the channels a member is offered, a
-/// channel opened for them and a title in their browser.
+/// What is watched: what the media server plays now, the channels a member is offered and
+/// their guide, a channel opened for them and a title in their browser.
 #[derive(Debug, Subcommand)]
 pub enum Watching {
     /// Show what the media server is playing now: who is watching what, and where.
@@ -21,6 +21,16 @@ pub enum Watching {
     /// out, and a member whose account may not watch live TV is shown none.
     Channels {
         /// Whose channels, named the way they sign in.
+        #[arg(long)]
+        member: Option<String>,
+    },
+    /// Show the live TV guide one member may watch: each channel's programmes from now.
+    ///
+    /// Read as that member across the hours `LEMONFIBER_GUIDE_HOURS` holds: a channel whose
+    /// programme now is outside their limits is left out, a programme outside them is left
+    /// out as a gap, and each channel says where the media server's guide ends.
+    Guide {
+        /// Whose guide, named the way they sign in.
         #[arg(long)]
         member: Option<String>,
     },

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A programme in a channel's guide.",
+  "type": "object",
+  "properties": {
+    "certificate": {
+      "description": "Its certificate, as the server holds it, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ends": {
+      "description": "When it ends.",
+      "$ref": "Instant.json"
+    },
+    "starts": {
+      "description": "When it starts.",
+      "$ref": "Instant.json"
+    },
+    "title": {
+      "description": "What it is called.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "starts",
+    "ends"
+  ]
+}

@@ -5,12 +5,12 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::instant::Instant;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    Addressee, Allowing, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared,
-    Declaring, Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Heard,
-    Hearing, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath,
-    Locations, Medium, Naming, OutsideAccount, OutsideServer, Picture, Playback, Ports,
-    Presentation, Programme, Question, Recounting, Screening, SeasonDetail, SeriesHeld, Statuses,
-    Token, Tuned, Tuning, Upkeep,
+    Addressee, Airing, Allowing, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated,
+    Declared, Declaring, Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished,
+    Furnishing, Heard, Hearing, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress,
+    Library, Listing, LivePath, Locations, Medium, Naming, OutsideAccount, OutsideServer, Picture,
+    Playback, Ports, Presentation, Programme, Question, Recounting, Screening, SeasonDetail,
+    SeriesHeld, Statuses, Token, Tuned, Tuning, Upkeep,
 };
 
 use super::Upstream;
@@ -316,6 +316,26 @@ impl Tuning for Upstream {
                 certificate: Some("PG".to_owned()),
                 ends: Some(lemonfiber_ports::Instant::from_seconds(1_794_596_400)),
             }),
+        }])
+    }
+
+    async fn guide(&self, member: &str, hours: u32) -> Result<Vec<Listing>, Failure> {
+        let aired = |title: &str, certificate: &str, starts: u64, ends: u64| Airing {
+            title: title.to_owned(),
+            certificate: Some(certificate.to_owned()),
+            starts: Instant::from_seconds(starts),
+            ends: Instant::from_seconds(ends),
+        };
+        let until = 1_794_594_600 + u64::from(hours) * lemonfiber_ports::instant::HOUR;
+        Ok(vec![Listing {
+            channel: format!("{member}-news"),
+            programmes: [
+                aired("The evening news", "PG", 1_794_594_600, 1_794_596_400),
+                aired("A late film", "18", 1_794_596_400, 1_794_603_600),
+            ]
+            .into_iter()
+            .filter(|airing| airing.starts.seconds() < until)
+            .collect(),
         }])
     }
 

@@ -8,14 +8,15 @@
 //! item afresh; standing behind the front door, with the keys it holds for the stack's
 //! own services; what a guard in front of it enforces; the certificate its internal
 //! TLS port presents; a library for each media type the stack files; and live TV, the
-//! channels one member may watch and a channel's live stream opened on their account.
+//! channels one member may watch, each one's guide, and a channel's live stream opened on
+//! their account.
 
 use lemonfiber_ports::media::{TitleKind, MEDIA};
 use lemonfiber_ports::service::{
     Allowing, AppKeys, Applied, Astray, Channel, Dated, Declared, Declaring, Encrypting, FiledAt,
     Fronted, Furnished, Furnishing, Heard, HowFar, Image, Item, ItemDetail, ItemProgress, Library,
-    OutsideAccount, OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld, Tuned,
-    Tuning, Upkeep, PICTURE_MOST, SERIES_MOST,
+    Listing, OutsideAccount, OutsideServer, Picture, Playback, Recounting, Screening, SeriesHeld,
+    Tuned, Tuning, Upkeep, PICTURE_MOST, SERIES_MOST,
 };
 use serde_json::Value;
 
@@ -45,6 +46,9 @@ const POSITION: u64 = 60;
 
 /// A term no library holds anything for.
 const TERM: &str = "conformance";
+
+/// How many hours from now the conformance cases ask a guide across.
+const GUIDED: u32 = 12;
 
 /// A live stream nothing opened, which the conformance cases close.
 const UNTUNED: &str = "conformance-live-stream";
@@ -193,6 +197,8 @@ crate::contract! {
         impl Tuning {
             /// The live TV channels one member's own account may watch, each with what is on it now.
             fn channels(str member: &str) -> Vec<Channel> where since = 4, asks = Asked { member: member() };
+            /// The guide of each channel one member's own account may watch, across a number of hours from now.
+            fn guide(str member: &str, value hours: u32) -> Vec<Listing> where since = 5, asks = Asked { member: member(), hours: GUIDED };
             /// Open one channel's live stream on one member's own account, where it may watch it.
             fn tune(str member: &str, str channel: &str) -> Option<Tuned> where since = 4, asks = Asked {
                 member: member(),

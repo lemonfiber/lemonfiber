@@ -117,6 +117,7 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/askable/{id}/poster",
             "/api/channels",
             "/api/front-door",
+            "/api/guide",
             "/api/held",
             "/api/held/{id}",
             "/api/held/{id}/backdrop",

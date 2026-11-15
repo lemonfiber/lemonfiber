@@ -149,6 +149,19 @@
     "file": false
   },
   {
+    "path": "/api/guide",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "guide"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/askable",
     "parameters": [
       {

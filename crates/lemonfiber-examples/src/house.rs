@@ -3,10 +3,11 @@
 
 use std::sync::Arc;
 
+use lemonfiber_core::instant::{Instant, HOUR};
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::ports::service::{
-    Asked, Certificate, Channel, Detail, Found, Headroom, Holds, Item, ItemDetail, Left,
-    MediaStatus, Medium, Page, Programme, Pulling, Requesting, Seeded, Signed, Tuned,
+    Airing, Asked, Certificate, Channel, Detail, Found, Headroom, Holds, Item, ItemDetail, Left,
+    Listing, MediaStatus, Medium, Page, Programme, Pulling, Requesting, Seeded, Signed, Tuned,
 };
 use lemonfiber_fixtures::declaring::enforceable;
 use lemonfiber_fixtures::http::{Answer, Fake};
@@ -168,6 +169,18 @@ fn media_server() -> Vec<Route> {
                     certificate: None,
                     ends: None,
                 }),
+            }]),
+        ),
+        at(
+            media::serve("guide"),
+            answered(&vec![Listing {
+                channel: CHANNEL.to_owned(),
+                programmes: vec![Airing {
+                    title: "The Evening News".to_owned(),
+                    certificate: None,
+                    starts: Instant::from_seconds(crate::world::AT),
+                    ends: Instant::from_seconds(crate::world::AT + HOUR),
+                }],
             }]),
         ),
         at(

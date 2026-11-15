@@ -8,15 +8,22 @@ pub(crate) const DASHBOARD_SEARCH: &str = "LEMONFIBER_DASHBOARD_SEARCH";
 /// Where the dashboard's search box sends a search where nothing is recorded.
 pub(crate) const DEFAULT_SEARCH: &str = "https://duckduckgo.com/?q=";
 
+/// How many hours from now the live TV guide answers each channel's programmes across.
+pub(crate) const GUIDE_HOURS: &str = "LEMONFIBER_GUIDE_HOURS";
+
+/// How many hours the live TV guide answers across where nothing is recorded.
+pub(crate) const DEFAULT_GUIDE_HOURS: u32 = 12;
+
 /// The domain the household's names are under where nothing is recorded.
 pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
 
 /// The domain the household's names are under.
 pub(crate) const DOMAIN: &str = lemonfiber_manifest::container::DOMAIN;
 
-pub(crate) const CORE: [&str; 4] = [
+pub(crate) const CORE: [&str; 5] = [
     DEVICE_KEY_APPS,
     DASHBOARD_SEARCH,
+    GUIDE_HOURS,
     DOMAIN,
     crate::plex_link::SETTING,
 ];
@@ -51,6 +58,9 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
             )
         });
     }
+    if name == GUIDE_HOURS {
+        return guide_hours(value).err();
+    }
     if name != DEVICE_KEY_APPS {
         return None;
     }
@@ -71,6 +81,28 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
                 .join(", ")
         )
     })
+}
+
+/// The hours `value` holds, where it is a whole number of hours a guide may be asked
+/// across.
+///
+/// # Errors
+///
+/// Why `value` is not one, naming the setting.
+pub(crate) fn guide_hours(value: &str) -> Result<u32, String> {
+    let hours = crate::ports::service::GUIDE_HOURS;
+    value
+        .parse::<u32>()
+        .ok()
+        .filter(|held| hours.contains(held))
+        .ok_or_else(|| {
+            format!(
+                "{GUIDE_HOURS} is how many hours from now the live TV guide answers across, a \
+                 whole number from {} to {}, and {value} is not one",
+                hours.start(),
+                hours.end()
+            )
+        })
 }
 
 /// Whether `value` is a domain a name can be put in front of: labels of ASCII letters,

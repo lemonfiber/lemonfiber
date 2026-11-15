@@ -323,6 +323,7 @@ fn the_first_of_them() -> Vec<Outcome> {
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
         Outcome::Channels(lemonfiber_core::model::ChannelsReport::default()),
+        Outcome::Guide(lemonfiber_core::model::GuideReport::default()),
         Outcome::Tuned(lemonfiber_core::model::TunedReport::default()),
         Outcome::Play(lemonfiber_core::model::PlayReport::default()),
         Outcome::Stuck(StuckReport {

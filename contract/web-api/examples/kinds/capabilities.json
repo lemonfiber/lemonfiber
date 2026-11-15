@@ -80,6 +80,7 @@
       "/api/explain": "available",
       "/api/forms": "available",
       "/api/front-door": "available",
+      "/api/guide": "available",
       "/api/held": "available",
       "/api/held/{id}": "available",
       "/api/held/{id}/backdrop": "available",

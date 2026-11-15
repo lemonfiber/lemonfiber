@@ -89,6 +89,15 @@ pub(crate) fn dashboard_search(ctx: &Ctx) -> Result<String, String> {
     own::refusal(own::DASHBOARD_SEARCH, value).map_or_else(|| Ok(value.to_owned()), Err)
 }
 
+/// How many hours from now the live TV guide answers across: the number recorded, or the
+/// default where none is or what is recorded is not one.
+pub(crate) fn guide_hours(ctx: &Ctx) -> u32 {
+    recorded::Recorded::of(ctx)
+        .value(own::GUIDE_HOURS)
+        .and_then(|value| own::guide_hours(value).ok())
+        .unwrap_or(own::DEFAULT_GUIDE_HOURS)
+}
+
 /// What the setting `name` holds, where it holds anything.
 pub(crate) fn recorded_value(ctx: &Ctx, name: &str) -> Option<String> {
     recorded::Recorded::of(ctx).value(name).map(str::to_owned)

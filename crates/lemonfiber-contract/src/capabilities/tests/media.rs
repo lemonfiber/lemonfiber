@@ -74,6 +74,7 @@ async fn script<
         format!("{:?}", server.revoke("gate-key").await),
         format!("{:?}", server.declared().await),
         format!("{:?}", server.channels("a7f3").await),
+        format!("{:?}", server.guide("a7f3", 12).await),
         format!("{:?}", server.tune("a7f3", "news").await),
         format!("{:?}", server.tune("a7f3", "barred").await),
         format!("{:?}", server.untune("ls1").await),

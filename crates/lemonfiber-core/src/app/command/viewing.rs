@@ -6,7 +6,8 @@ use crate::ports::service::HowFar;
 
 /// What a member asks of the media server through the core: one title, what they were
 /// part-way through, a grant for a device to play on, how far they got, the live TV
-/// channels they may watch, a channel to watch and a title to play in a browser.
+/// channels they may watch and their guide, a channel to watch and a title to play in a
+/// browser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Viewing {
     /// What one title is, as the member may see it.
@@ -41,6 +42,12 @@ pub enum Viewing {
     },
     /// The live TV channels a member may watch, each with the programme on it now.
     Channels {
+        /// The member, by name or id.
+        member: String,
+    },
+    /// The live TV guide a member may watch: each channel's programmes from now across
+    /// the guide window.
+    Guide {
         /// The member, by name or id.
         member: String,
     },
