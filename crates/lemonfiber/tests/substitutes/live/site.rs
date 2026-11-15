@@ -7,12 +7,36 @@ use std::io::{BufRead as _, BufReader, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, PoisonError};
 
+/// A Newznab category the site lists: its number, its name, and the subcategories it lists
+/// beneath it, each by number and name.
+struct Category {
+    id: &'static str,
+    name: &'static str,
+    subcategories: &'static [(&'static str, &'static str)],
+}
+
 /// The categories the site files its releases under, as Newznab numbers them.
-const CATEGORIES: [(&str, &str); 4] = [
-    ("2000", "Movies"),
-    ("3000", "Audio"),
-    ("5000", "TV"),
-    ("7000", "Books"),
+const CATEGORIES: [Category; 4] = [
+    Category {
+        id: "2000",
+        name: "Movies",
+        subcategories: &[],
+    },
+    Category {
+        id: "3000",
+        name: "Audio",
+        subcategories: &[],
+    },
+    Category {
+        id: "5000",
+        name: "TV",
+        subcategories: &[],
+    },
+    Category {
+        id: "7000",
+        name: "Books",
+        subcategories: &[("7020", "EBook")],
+    },
 ];
 
 /// The key the site answers to, which the operator gives the indexer that searches it.
@@ -131,12 +155,18 @@ fn refused() -> String {
 
 /// What the site can be searched for.
 fn caps() -> String {
-    let categories = CATEGORIES
-        .iter()
-        .fold(String::new(), |mut held, (id, name)| {
-            let _ = write!(held, "<category id=\"{id}\" name=\"{name}\"/>");
-            held
-        });
+    let mut categories = String::new();
+    for category in CATEGORIES {
+        let _ = write!(
+            categories,
+            "<category id=\"{}\" name=\"{}\">",
+            category.id, category.name
+        );
+        for (id, name) in category.subcategories {
+            let _ = write!(categories, "<subcat id=\"{id}\" name=\"{name}\"/>");
+        }
+        categories.push_str("</category>");
+    }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><caps><server title=\"lemonfiber arm\"/>\
          <limits max=\"100\" default=\"100\"/><searching>\

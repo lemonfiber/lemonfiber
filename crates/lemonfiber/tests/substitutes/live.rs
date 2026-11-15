@@ -170,7 +170,7 @@ pub const ASKED: [Asked; 4] = [
         seasons: &[],
         traced: "Pride and Prejudice",
         release: "Jane Austen - Pride and Prejudice (1813) [EPUB]",
-        category: "7000",
+        category: "7020",
         size: BOOK,
     },
 ];
