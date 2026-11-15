@@ -53,6 +53,20 @@ fn limited_to(
     watchable: &[Channel],
     more: Vec<(&'static str, Answer)>,
 ) -> Arc<Transport> {
+    let in_turn = more
+        .into_iter()
+        .map(|(path, answer)| (path, vec![answer]))
+        .collect();
+    answering_in_turn(age_limit, unrated, watchable, in_turn)
+}
+
+/// The same server, answering each of `more` in turn, the last repeating.
+fn answering_in_turn(
+    age_limit: Option<u32>,
+    unrated: Unrated,
+    watchable: &[Channel],
+    more: Vec<(&'static str, Vec<Answer>)>,
+) -> Arc<Transport> {
     let mut ada = media::member("a7f3", "Ada", true);
     ada.access.age_limit = age_limit;
     ada.access.unrated = unrated;
@@ -64,12 +78,12 @@ fn limited_to(
         })
         .collect();
     let mut routes = vec![
-        (media::identity("household"), media::answered(&[ada])),
-        (media::identity("ratings"), media::answered(&table)),
-        (media::serve("channels"), media::answered(&watchable)),
+        (media::identity("household"), vec![media::answered(&[ada])]),
+        (media::identity("ratings"), vec![media::answered(&table)]),
+        (media::serve("channels"), vec![media::answered(&watchable)]),
     ];
     routes.extend(more);
-    Transport::by_path(routes)
+    Transport::by_path_in_turn(routes)
 }
 
 /// The channels a family evening offers: one for children, one after the watershed,

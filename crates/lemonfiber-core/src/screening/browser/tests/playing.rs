@@ -57,12 +57,19 @@ fn reached(tag: &str, keyed: bool, more: Vec<(&'static str, Answer)>) -> (Ctx, A
     crate::test_support::adapted::parts_recorded(&ctx);
     ctx.settings.household_domain = Some("home.lan".to_owned());
     if keyed {
-        let project = crate::app::project::directory(&ctx).unwrap_or_default();
-        let pass = project.join("config").join(SERVICE);
+        let pass = configuration(&ctx);
         assert!(std::fs::create_dir_all(&pass).is_ok());
         assert!(std::fs::write(pass.join(File::Key.name()), key().written()).is_ok());
     }
     (ctx, transport)
+}
+
+/// The pass service's configuration directory in `ctx`'s project.
+fn configuration(ctx: &Ctx) -> std::path::PathBuf {
+    crate::app::project::directory(ctx)
+        .unwrap_or_default()
+        .join("config")
+        .join(SERVICE)
 }
 
 async fn playing(ctx: &Ctx, from: PlayFrom) -> Option<PlayReport> {
@@ -159,7 +166,7 @@ async fn a_title_off_the_shelf_a_silent_server_and_one_signing_no_device_in_are_
 }
 
 #[tokio::test]
-async fn with_no_key_no_randomness_or_no_playlist_nothing_plays() {
+async fn with_no_key_randomness_playlist_declaration_or_domain_nothing_plays() {
     let (keyless, _) = reached("keyless", false, Vec::new());
     let (unrandom, _) = reached("unrandom", true, Vec::new());
     let unrandom = unrandom.with_random(Arc::new(Chance::exactly(None)));
@@ -170,7 +177,14 @@ async fn with_no_key_no_randomness_or_no_playlist_nothing_plays() {
         true,
         vec![(media::serve("declared"), media::answered(&undeclared))],
     );
-    for ctx in [keyless, unrandom, unlisted] {
+    let (unanswering, _) = reached(
+        "undeclaring",
+        true,
+        vec![(media::serve("declared"), media::unavailable())],
+    );
+    let (mut domainless, _) = reached("domainless", true, Vec::new());
+    domainless.settings.household_domain = None;
+    for ctx in [keyless, unrandom, unlisted, unanswering, domainless] {
         let Some(report) = playing(&ctx, PlayFrom::Device(DEVICE.to_owned())).await else {
             unreachable!("answered as unlocated");
         };
@@ -179,4 +193,41 @@ async fn with_no_key_no_randomness_or_no_playlist_nothing_plays() {
             "{report:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn an_id_no_server_could_hold_is_refused_before_anything_is_asked() {
+    let (ctx, transport) = reached("not-an-item", true, Vec::new());
+    let answered = played(
+        &ctx,
+        "Ada",
+        "../users",
+        PlayFrom::Device(DEVICE.to_owned()),
+        Asker::Member,
+    )
+    .await;
+    assert_eq!(
+        answered.err().map(|problem| problem.code.to_string()),
+        Some(crate::error::codes::play::NOT_AN_ITEM.to_string())
+    );
+    assert!(transport.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_pass_handed_back_the_pass_service_cannot_be_told_of_plays_nowhere() {
+    let (ctx, _) = reached("unrenewed", true, Vec::new());
+    let Some(first) = playing(&ctx, PlayFrom::Device(DEVICE.to_owned())).await else {
+        unreachable!("the title plays");
+    };
+    let renewals = configuration(&ctx).join(File::Renewals.name());
+    let _ = std::fs::remove_file(&renewals);
+    assert!(std::fs::create_dir_all(&renewals).is_ok());
+    let pass = pass_in(&first.stream_from.unwrap_or_default());
+    let Some(again) = playing(&ctx, PlayFrom::Pass(pass)).await else {
+        unreachable!("answered as unlocated");
+    };
+    assert!(
+        again.unlocated.is_some() && again.stream_from.is_none(),
+        "{again:?}"
+    );
 }

@@ -15,7 +15,9 @@ use std::path::Path;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
-use lemonfiber_api::frontend::{absent, content_type, missing, page, routes, served, unanswered};
+use lemonfiber_api::frontend::{
+    absent, content_type, missing, page, page_playing, playing_from, routes, served, unanswered,
+};
 use lemonfiber_core::frontend::{Asset, Source};
 
 /// The app a build would embed, read from disk instead.
@@ -203,6 +205,24 @@ fn the_page_says_what_it_may_load_and_refuses_to_be_framed() {
     assert!(policy.contains("default-src 'self'"), "{policy}");
     assert!(policy.contains("frame-ancestors 'none'"), "{policy}");
     assert!(policy.contains("base-uri 'none'"), "{policy}");
+}
+
+#[test]
+fn a_page_that_plays_from_the_front_door_may_load_from_it() {
+    let door = "https://watch.home.lan";
+    let policy = said(
+        &page_playing(Some(app()), "/", Some(door)),
+        header::CONTENT_SECURITY_POLICY,
+    );
+    assert_eq!(policy, playing_from(door));
+    let alone = said(
+        &page_playing(Some(app()), "/", None),
+        header::CONTENT_SECURITY_POLICY,
+    );
+    assert_eq!(
+        alone,
+        said(&page(Some(app()), "/"), header::CONTENT_SECURITY_POLICY)
+    );
 }
 
 #[tokio::test]

@@ -280,9 +280,10 @@ async fn live_paths_that_cannot_be_written_say_why_and_pin_nothing() {
 }
 
 /// A renewal is kept where the pass service reads it, under the member it was issued to,
-/// with the key the project keeps for it; a renewal that lapsed is forgotten at the next.
+/// with the key the project keeps for it; a renewal that lapsed is forgotten at the next, and a
+/// leaver's at once.
 #[tokio::test]
-async fn a_renewal_is_kept_for_the_pass_service_and_a_lapsed_one_forgotten() {
+async fn a_renewal_is_kept_for_the_pass_service_and_a_lapsed_or_leavers_one_forgotten() {
     let registry = Registered::publishing(DIGEST);
     let (ctx, project) = machine("pass-renewed", &registry, true);
     assert_eq!(readied(&ctx).await, None);
@@ -301,7 +302,11 @@ async fn a_renewal_is_kept_for_the_pass_service_and_a_lapsed_one_forgotten() {
     assert!(super::renewed(&ctx, &[lapsing], "a7f3", now));
     let lasting = key.issued("ls2", "a7f3", now);
     assert!(super::renewed(&ctx, &[lasting], "a7f3", now + 600));
+    let theirs = key.issued("ls3", "b8e4", now);
+    assert!(super::renewed(&ctx, &[theirs], "b8e4", now + 600));
+    assert_eq!(renewals().len(), 2);
 
+    super::unrenewed(&ctx, "b8e4");
     let kept = renewals();
     assert_eq!(kept.len(), 1, "{kept:?}");
     assert!(kept

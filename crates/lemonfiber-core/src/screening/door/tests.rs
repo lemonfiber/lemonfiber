@@ -416,3 +416,47 @@ fn a_browser_reaches_the_guard_under_the_households_domain_or_is_told_why_not() 
         Err(super::NO_DOMAIN.to_owned())
     );
 }
+
+#[test]
+fn with_no_proxy_in_front_or_a_register_that_will_not_read_a_browser_has_no_address() {
+    let mut unproxied = bundled("no-proxy", Some("home.lan"));
+    let carried = Box::leak(Box::new(crate::stack::Carried {
+        manifest: Box::leak(
+            lemonfiber_fixtures::stack::assembled_without(&["caddy"]).into_boxed_str(),
+        ),
+        files: crate::stack::BUNDLED.files,
+    }));
+    unproxied.stack = crate::stack::Source::Embedded(carried);
+    let mut register = crate::plugin::Register::empty();
+    for part in crate::test_support::adapted::installed_parts()
+        .into_iter()
+        .filter(|part| part.plugin != "caddy")
+    {
+        assert!(register.record(part).is_ok());
+    }
+    assert!(std::fs::write(
+        register_of(&unproxied),
+        register.to_json().unwrap_or_default()
+    )
+    .is_ok());
+    assert_eq!(
+        super::for_a_browser(&unproxied),
+        Err(super::NO_PROXY.to_owned())
+    );
+
+    let unread = bundled("unread-register", Some("home.lan"));
+    assert!(std::fs::write(register_of(&unread), "{").is_ok());
+    assert_eq!(
+        super::for_a_browser(&unread),
+        Err(super::NO_BROWSER_ROUTE.to_owned())
+    );
+}
+
+/// Where `ctx` records the plugins installed.
+fn register_of(ctx: &crate::app::Ctx) -> std::path::PathBuf {
+    ctx.settings
+        .env_file
+        .clone()
+        .unwrap_or_default()
+        .with_file_name(crate::config::paths::PLUGINS)
+}

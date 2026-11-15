@@ -7,11 +7,11 @@ use std::sync::Arc;
 use lemonfiber_fixtures::declaring::enforceable;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{code, ctx_over, evening, key, server, was_asked};
+use super::{answering_in_turn, code, ctx_over, evening, key, was_asked};
 use crate::app::{Asker, Ctx, Live};
 use crate::model::TunedReport;
 use crate::pass::{File, SERVICE};
-use crate::ports::service::Tuned;
+use crate::ports::service::{Tuned, Unrated};
 use crate::screening::tuned::{self, Open};
 use crate::screening::tuning::tuned as asked;
 use crate::test_support::media;
@@ -37,23 +37,49 @@ fn standing(
     opened: Answer,
     more: Vec<(&'static str, Answer)>,
 ) -> (Ctx, Arc<Transport>) {
+    declaring(
+        tag,
+        keyed,
+        vec![media::answered(&enforceable())],
+        opened,
+        more,
+    )
+}
+
+/// The same household, the media server answering each of `declared` in turn when asked
+/// what it declares, the last repeating.
+fn declaring(
+    tag: &str,
+    keyed: bool,
+    declared: Vec<Answer>,
+    opened: Answer,
+    more: Vec<(&'static str, Answer)>,
+) -> (Ctx, Arc<Transport>) {
     let mut routes = vec![
-        (media::serve("declared"), media::answered(&enforceable())),
-        (media::serve("tune"), opened),
-        (media::serve("untune"), media::taken()),
+        (media::serve("declared"), declared),
+        (media::serve("tune"), vec![opened]),
+        (media::serve("untune"), vec![media::taken()]),
     ];
-    routes.extend(more);
-    let transport = server(&evening(), routes);
+    routes.extend(more.into_iter().map(|(path, answer)| (path, vec![answer])));
+    let transport = answering_in_turn(Some(12), Unrated::LetThrough, &evening(), routes);
     let mut ctx = ctx_over(Arc::clone(&transport), tag);
     let project = crate::app::project::directory(&ctx).unwrap_or_default();
     assert!(crate::screening::door::ensured(ctx.seams.confined.as_ref(), &project).is_ok());
     if keyed {
-        let pass = project.join("config").join(SERVICE);
+        let pass = configuration(&ctx);
         assert!(std::fs::create_dir_all(&pass).is_ok());
         assert!(std::fs::write(pass.join(File::Key.name()), key().written()).is_ok());
     }
     ctx.settings.household_host = Some("192.168.1.20".to_owned());
     (ctx, transport)
+}
+
+/// The pass service's configuration directory in `ctx`'s project.
+fn configuration(ctx: &Ctx) -> std::path::PathBuf {
+    crate::app::project::directory(ctx)
+        .unwrap_or_default()
+        .join("config")
+        .join(SERVICE)
 }
 
 /// What is kept of the live streams opened in `ctx`.
@@ -182,6 +208,47 @@ async fn paths_no_live_stream_path_covers_close_the_stream_and_locate_nothing() 
 }
 
 #[tokio::test]
+async fn a_declaration_withdrawn_between_its_two_asks_opens_nothing() {
+    let (ctx, transport) = declaring(
+        "withdrawn",
+        true,
+        vec![media::answered(&enforceable()), media::unavailable()],
+        media::answered(&Some(opening())),
+        Vec::new(),
+    );
+    let Some(report) = tuning(&ctx, Live::Open("kids".to_owned())).await else {
+        unreachable!("answered as unlocated");
+    };
+    assert!(report.unlocated.is_some(), "{report:?}");
+    assert_eq!(media::served(&transport.requests(), "declared").len(), 2);
+    assert!(!was_asked(&transport, "tune"));
+}
+
+#[tokio::test]
+async fn a_renewal_with_the_key_gone_or_the_pass_service_unwritable_locates_nothing() {
+    for (tag, broken) in [
+        ("renew-keyless", File::Key),
+        ("renew-unwritable", File::Renewals),
+    ] {
+        let (ctx, _) = standing(tag, true, media::answered(&Some(opening())), Vec::new());
+        assert!(tuning(&ctx, Live::Open("kids".to_owned())).await.is_some());
+        let file = configuration(&ctx).join(broken.name());
+        let _ = std::fs::remove_file(&file);
+        if broken == File::Renewals {
+            assert!(std::fs::create_dir_all(&file).is_ok());
+        }
+        let stream = "0123456789abcdef0123456789abcdef".to_owned();
+        let Some(renewed) = tuning(&ctx, Live::Renew(stream)).await else {
+            unreachable!("answered as unlocated: {tag}");
+        };
+        assert!(
+            renewed.unlocated.is_some() && renewed.direct.is_none(),
+            "{tag}: {renewed:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn with_no_key_nothing_is_opened() {
     let (keyless, transport) = standing(
         "keyless",
@@ -207,7 +274,10 @@ async fn channels_the_server_cannot_list_are_unanswered() {
     ]);
     let ctx = ctx_over(transport, "channels-failing");
     let answered = crate::screening::tuning::channels(&ctx, "Ada").await;
-    assert!(answered.is_err());
+    assert_eq!(
+        code(answered),
+        Some(crate::error::codes::play::SERVER_SILENT.to_string())
+    );
 }
 
 #[tokio::test]

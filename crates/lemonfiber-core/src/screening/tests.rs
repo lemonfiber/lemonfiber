@@ -792,3 +792,26 @@ fn each_raster_opens_only_as_its_own_image_and_never_as_a_drawing() {
         ));
     }
 }
+
+#[tokio::test]
+async fn a_stranger_asking_for_live_tv_or_a_browser_play_is_refused_by_name() {
+    let ctx = ctx_over(server(Vec::new()), "stranger-live");
+    let member = || "Zed".to_owned();
+    for asked in [
+        Viewing::Channels { member: member() },
+        Viewing::Tune {
+            member: member(),
+            live: crate::app::Live::Open("kids".to_owned()),
+            asker: crate::app::Asker::Member,
+        },
+        Viewing::Play {
+            member: member(),
+            id: FILM.to_owned(),
+            from: crate::app::PlayFrom::Device(PHONE.to_owned()),
+            asker: crate::app::Asker::Member,
+        },
+    ] {
+        let refused = viewed(&ctx, asked).await;
+        assert_eq!(code(refused).as_deref(), Some("PLAY-7"));
+    }
+}

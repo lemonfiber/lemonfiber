@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{closed, kept, read, renewed, theirs, Open};
+use super::{closed, kept, lapsed, read, renewed, theirs, Open};
 use crate::app::Ctx;
 use crate::ports::service::{Channel, Failure, Tuned, Tuning};
 use crate::test_support::a_context;
@@ -104,15 +104,35 @@ async fn a_live_stream_the_server_would_not_close_is_kept_for_the_next_sweep() {
     kept(&ctx, open("a7f3", "stuck", 100));
     kept(&ctx, open("b8e4", "ls2", 100));
     let server = Closing::default();
-    closed(&ctx, &server, |one| one.member == "a7f3").await;
+    let adas = |one: &Open| one.member == "a7f3";
+    closed(&ctx, &server, adas).await;
+    let left = || -> Vec<String> { read(&ctx).into_iter().map(|one| one.closes_by).collect() };
+    assert_eq!(left(), vec!["stuck".to_owned(), "ls2".to_owned()]);
+    closed(&ctx, &server, adas).await;
     let asked = server
         .closed
         .lock()
         .map(|asked| asked.clone())
         .unwrap_or_default();
-    assert_eq!(asked, vec!["ls1".to_owned(), "stuck".to_owned()]);
-    let left: Vec<String> = read(&ctx).into_iter().map(|one| one.closes_by).collect();
-    assert_eq!(left, vec!["stuck".to_owned(), "ls2".to_owned()]);
+    assert_eq!(
+        asked,
+        vec!["ls1".to_owned(), "stuck".to_owned(), "stuck".to_owned()]
+    );
+    assert_eq!(left(), vec!["stuck".to_owned(), "ls2".to_owned()]);
+}
+
+#[tokio::test]
+async fn the_sweep_closes_nothing_with_no_stack_to_read_or_no_media_server_to_ask() {
+    let unread = ctx("lapsed-unread");
+    let mut unread = unread;
+    kept(&unread, open("a7f3", "ls1", 0));
+    unread.stack = crate::test_support::nowhere();
+    let serverless = ctx("lapsed-serverless");
+    kept(&serverless, open("a7f3", "ls1", 0));
+    for ctx in [unread, serverless] {
+        lapsed(&ctx).await;
+        assert_eq!(read(&ctx).len(), 1);
+    }
 }
 
 #[test]
