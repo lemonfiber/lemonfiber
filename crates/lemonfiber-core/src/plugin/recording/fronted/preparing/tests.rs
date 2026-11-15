@@ -6,7 +6,7 @@ use lemonfiber_fixtures::ports::Chance;
 use super::super::filling::handed_over;
 use std::collections::BTreeMap;
 
-use super::{environment, handed, written, Minting};
+use super::{environment, handed, written, Minting, StandIns};
 use crate::plugin::program::{Starting, Throwaway};
 
 /// An adapter handing `api_key` the plugin's `upstream-key`, and `other` its `other-key`.
@@ -47,7 +47,7 @@ fn the_adapter_is_handed_the_value_its_upstream_was_seeded_with_or_one_minted_an
     let (Some(copy), Some(held)) = (copy, held) else {
         return;
     };
-    let mut secrets = written(&copy, Some(&held));
+    let mut secrets = written(&copy, Some(&held), &StandIns::default());
     assert_eq!(
         secrets.clone().into_iter().collect::<Vec<_>>(),
         vec![(

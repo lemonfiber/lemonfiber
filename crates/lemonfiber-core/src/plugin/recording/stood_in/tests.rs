@@ -101,12 +101,6 @@ fn each_secret_declaring_a_stand_in_is_given_it_wherever_the_service_names_it() 
     let random = Chance::exactly(Some(vec![0x00; 32]));
     let stand_ins = StandIns::of(&secrets(), &random).unwrap_or_default();
     let made = "A".repeat(43) + "=";
-    assert_eq!(stand_ins.secret("wireguard-key"), Some(made.as_str()));
-    assert_eq!(stand_ins.secret("entered"), None);
-    assert_eq!(
-        stand_ins.secrets(&guard()),
-        vec![format!("PRIVATE_KEY={made}")]
-    );
     assert_eq!(
         stand_ins.held().collect::<Vec<_>>(),
         vec![("wireguard-key", made.as_str())]
@@ -132,7 +126,10 @@ fn a_stand_in_to_be_made_without_random_bytes_is_refused_and_a_constant_needs_no
         ))),
     )];
     let stand_ins = StandIns::of(&constant, &none).unwrap_or_default();
-    assert_eq!(stand_ins.secret("token"), Some("documented"));
+    assert_eq!(
+        stand_ins.held().collect::<Vec<_>>(),
+        vec![("token", "documented")]
+    );
     assert!(
         stand_ins.made.is_empty(),
         "a declared constant is not scrubbed"

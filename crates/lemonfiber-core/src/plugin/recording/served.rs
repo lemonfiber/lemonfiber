@@ -13,6 +13,7 @@ use tokio::time::Instant;
 
 use super::addressed::Addressed;
 use super::asked::{answered, Item};
+use super::minted::{environment, known, Minting};
 use super::scrubbed::Scrub;
 use super::stood_in::{StandIns, STAND_INS};
 use super::{Failed, Recorder};
@@ -33,6 +34,10 @@ pub(super) const LOG_LINES: usize = 50;
 /// The statuses an application answers a caller it will not serve, which tell it is
 /// up as surely as an answer does.
 const REFUSALS: [u16; 2] = [401, 403];
+
+/// What the step that gives a service each secret its environment names is called where
+/// it fails.
+const ENVIRONMENT: &str = "environment";
 
 /// Where the library a service takes lands inside its container.
 const LIBRARY: &str = "/data";
@@ -81,6 +86,14 @@ pub(super) async fn answers(
     let stood = stand_ins
         .settings(placed, recorder.random)
         .map_err(failing(STAND_INS))?;
+    let mut minted = Vec::new();
+    let secreted = environment(
+        &Minting::at(root, recorder.random),
+        &mut known(copy.written(), &stand_ins),
+        placed,
+        &mut minted,
+    )
+    .map_err(failing(ENVIRONMENT))?;
     let settled = settled(placed, &copy, data.as_deref());
     let serve = Serve {
         image: built.map_or_else(|| settled.image.clone(), str::to_owned),
@@ -88,7 +101,7 @@ pub(super) async fn answers(
             .env
             .iter()
             .chain(&stood)
-            .chain(&stand_ins.secrets(placed))
+            .chain(&secreted)
             .cloned()
             .collect(),
         ..settled
@@ -100,6 +113,7 @@ pub(super) async fn answers(
         .made()
         .map(str::to_owned)
         .chain(stand_ins.made.iter().cloned())
+        .chain(minted)
         .chain(fingerprint)
         .collect();
     let mut scrub = Scrub::of(&seeded, Some(&served));

@@ -5,13 +5,13 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use lemonfiber_manifest::container::{Secret, Value};
+use lemonfiber_manifest::container::Secret;
 
 use lemonfiber_contract::adapter::KEY_FILE;
 
+use super::super::minted::{environment, known, valued, Minting};
 use super::super::stood_in::{StandIns, STAND_INS};
 use super::{refused, Faulted, Fronting, Placed, Recorder, Starting, Throwaway};
-use crate::ports::random::Random;
 
 /// What both containers are given before either starts.
 pub(super) struct Prepared {
@@ -34,61 +34,19 @@ pub(super) struct Prepared {
     pub(super) certificate: Option<(String, String)>,
 }
 
-/// Each secret either copy's files name, with the value written for it.
-fn written(copy: &Throwaway, held: Option<&Throwaway>) -> BTreeMap<String, String> {
-    held.into_iter()
-        .flat_map(Throwaway::written)
-        .chain(copy.written())
-        .map(|(secret, value)| (secret.to_owned(), value.to_owned()))
-        .collect()
-}
-
-/// What a run mints with: the randomness, and the shape each secret is declared in.
-struct Minting<'a> {
-    /// Where minted values come from.
-    random: &'a dyn Random,
-    /// The plugin and the shape each secret it declares is minted in.
-    shapes: crate::plugin::seeding::Shapes,
-}
-
-/// The value of `secret` for this run: the one already written for it, or one minted now
-/// in its declared shape and kept, so the upstream's files, its environment and the adapter
-/// all hold the same.
-fn valued(
-    minting: &Minting<'_>,
-    secrets: &mut BTreeMap<String, String>,
-    secret: &str,
-    made: &mut Vec<String>,
-) -> Result<String, String> {
-    if let Some(held) = secrets.get(secret) {
-        return Ok(held.clone());
-    }
-    let fresh = minting
-        .shapes
-        .minted(minting.random, secret)
-        .ok_or_else(|| crate::plugin::seeding::UNMINTED.to_owned())?;
-    made.push(fresh.clone());
-    secrets.insert(secret.to_owned(), fresh.clone());
-    Ok(fresh)
-}
-
-/// Each variable of `upstream`'s environment that names a secret, as `NAME=value`.
-fn environment(
-    minting: &Minting<'_>,
-    secrets: &mut BTreeMap<String, String>,
-    upstream: &Placed,
-    made: &mut Vec<String>,
-) -> Result<Vec<String>, String> {
-    let mut env = Vec::new();
-    for (name, value) in &upstream.fields.env {
-        if let Value::Secret(of) = value {
-            env.push(format!(
-                "{name}={}",
-                valued(minting, secrets, &of.secret, made)?
-            ));
-        }
-    }
-    Ok(env)
+/// Each secret either copy's files name, with the value written for it, then each stand-in
+/// nothing wrote.
+fn written(
+    copy: &Throwaway,
+    held: Option<&Throwaway>,
+    stand_ins: &StandIns,
+) -> BTreeMap<String, String> {
+    known(
+        held.into_iter()
+            .flat_map(Throwaway::written)
+            .chain(copy.written()),
+        stand_ins,
+    )
 }
 
 /// Each field of the adapter's `upstream`, holding the value its upstream was given.
@@ -169,16 +127,8 @@ impl Prepared {
             .chain(fingerprint)
             .chain(internal.as_ref().map(|(_, pinned)| pinned.clone()))
             .collect();
-        let mut secrets = written(&copy, apart.as_ref());
-        for (secret, value) in stand_ins.held() {
-            secrets
-                .entry(secret.to_owned())
-                .or_insert_with(|| value.to_owned());
-        }
-        let minting = Minting {
-            random: recorder.random,
-            shapes: crate::plugin::seeding::shapes(root),
-        };
+        let mut secrets = written(&copy, apart.as_ref(), &stand_ins);
+        let minting = Minting::at(root, recorder.random);
         let mut env = environment(&minting, &mut secrets, upstream, &mut made)
             .map_err(refused("upstream's environment"))?;
         env.extend(stood);

@@ -12,6 +12,7 @@ use crate::ports::program::{Program, Unran};
 
 pub(super) mod asking;
 mod building;
+mod minting;
 mod standing_in;
 
 const PINNED: &str = "ghcr.io/recyclarr/recyclarr@sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9";
