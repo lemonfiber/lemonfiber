@@ -90,12 +90,22 @@ async fn a_part_nobody_holds_or_somebody_else_holds_is_a_warning_naming_what_to_
 }
 
 #[tokio::test]
-async fn a_part_that_will_not_say_is_a_warning_never_a_pass() {
-    let verdicts = verdicts(vec![Asked::Silent, Asked::Unaskable]).await;
+async fn a_part_that_cannot_be_asked_over_its_contract_is_a_warning_never_a_pass() {
+    let verdicts = verdicts(vec![Asked::Unaskable]).await;
     assert!(
         verdicts
             .iter()
             .all(|verdict| warned_with(verdict, "could not be asked")),
+        "{verdicts:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_part_not_answering_yet_could_not_be_asked_and_is_never_a_pass_or_anybodys() {
+    let verdicts = verdicts(vec![Asked::Silent]).await;
+    assert!(
+        matches!(verdicts.as_slice(), [Verdict::Unverified { reason, .. }]
+            if reason == "Part 0 could not be asked who holds it: part is not answering"),
         "{verdicts:?}"
     );
 }
