@@ -4,7 +4,7 @@ use lemonfiber_fixtures::owning;
 
 use super::{OwnedCheck, Part};
 use crate::doctor::{Check as _, Verdict};
-use crate::ports::service::{Owner, Ownership};
+use crate::ports::service::{Claim, Failure, Owner, Ownership};
 
 /// How a part the check asks answers.
 #[derive(Clone, Copy)]
@@ -115,6 +115,53 @@ async fn a_machine_with_no_part_claimed_first_skips_the_check() {
     let verdicts = verdicts(Vec::new()).await;
     assert!(
         matches!(verdicts.as_slice(), [Verdict::Skipped { .. }]),
+        "{verdicts:?}"
+    );
+}
+
+/// A part refusing every question with the credential lemonfiber holds for it.
+struct Refusing;
+
+#[async_trait::async_trait]
+impl Ownership for Refusing {
+    async fn owner(&self) -> Result<Owner, Failure> {
+        Err(refused())
+    }
+
+    async fn claim(&self) -> Result<Claim, Failure> {
+        Err(refused())
+    }
+
+    async fn claimed_by(&self) -> Result<Option<String>, Failure> {
+        Err(refused())
+    }
+}
+
+fn refused() -> Failure {
+    Failure::Unauthorised {
+        service: "part".to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn a_part_answering_but_refusing_to_say_is_a_warning_naming_why() {
+    let verdicts: Vec<Verdict> = OwnedCheck::new(vec![(
+        Part {
+            id: "part-0".to_owned(),
+            name: "Part 0".to_owned(),
+            secrets: Vec::new(),
+        },
+        Some(Arc::new(Refusing) as Arc<dyn Ownership>),
+    )])
+    .run()
+    .await
+    .into_iter()
+    .map(|finding| finding.verdict)
+    .collect();
+
+    assert!(
+        matches!(verdicts.as_slice(), [verdict]
+            if warned_with(verdict, "could not be asked who holds it: part rejected the credential")),
         "{verdicts:?}"
     );
 }
