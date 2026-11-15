@@ -192,8 +192,7 @@ async fn a_live_stream_not_opened_for_the_member_is_neither_renewed_nor_closed()
 }
 
 #[tokio::test]
-async fn with_nowhere_to_locate_it_nothing_is_opened_and_why_is_a_fault_the_household_is_not_told_the_detail_of(
-) {
+async fn with_nowhere_to_locate_it_nothing_is_opened_and_why_is_a_fault_of_the_house() {
     let transport = server(&evening(), Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "unlocated");
     let Ok(report) = tuned(&ctx, "Ada", Live::Open("kids".to_owned())).await else {

@@ -97,8 +97,7 @@ async fn a_browser_named_by_something_else_is_refused_before_anything_is_asked()
 }
 
 #[tokio::test]
-async fn with_nowhere_to_play_it_no_session_is_opened_and_why_is_a_fault_the_household_is_not_told_the_detail_of(
-) {
+async fn with_nowhere_to_play_it_no_session_is_opened_and_why_is_a_fault_of_the_house() {
     let transport = server(Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "unlocated");
     let answered = played(
