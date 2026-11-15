@@ -219,6 +219,10 @@ async fn every_request_is_asked_of_one_fresh_container_after_its_first_run_and_w
         return;
     };
     assert_eq!(served.image, PINNED);
+    assert_eq!(
+        served.alias, "sonarr",
+        "it answers to its own id on its network"
+    );
     assert_eq!(served.listens, Some(8989));
     assert!(served.env.contains(&"PUID=1000".to_owned()));
     assert_eq!(

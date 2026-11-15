@@ -75,7 +75,6 @@ pub(super) fn serves(
         )
     };
     let serve = Serve {
-        alias: Some(upstream.service.clone()),
         reaching,
         env: settled.env.iter().chain(&prepared.env).cloned().collect(),
         ..settled

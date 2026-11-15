@@ -289,8 +289,8 @@ async fn every_case_the_adapter_speaks_is_asked_of_it_beside_its_upstream_and_wr
         }}))
     );
     let served = serving.asked();
-    let aliases: Vec<Option<&str>> = served.iter().map(|one| one.alias.as_deref()).collect();
-    assert_eq!(aliases, vec![Some("jellyfin"), None]);
+    let aliases: Vec<&str> = served.iter().map(|one| one.alias.as_str()).collect();
+    assert_eq!(aliases, vec!["jellyfin", "jellyfin-adapter"]);
     assert_eq!(
         served.get(1).map(|one| one.image.as_str()),
         Some("ghcr.io/lemonfiber/jellyfin-adapter@sha256:0352d3232d0ffe22725ebd706ed8fa92d23b20de02a076ac195971d1fc4a0c07")
