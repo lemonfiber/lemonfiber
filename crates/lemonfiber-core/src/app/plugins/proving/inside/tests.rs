@@ -294,3 +294,20 @@ async fn a_service_not_answering_yet_is_asked_again_until_the_deadline() {
     assert!(matches!(verdict, Verdict::Unproven { .. }), "{verdict:?}");
     assert!(program.asked().len() >= 2, "{:?}", program.asked().len());
 }
+
+#[tokio::test]
+async fn an_engine_that_will_not_say_what_runs_asks_nothing_and_says_so() {
+    let program = Proving::exiting(0, ANSWERED);
+    let ctx = crate::test_support::a_context()
+        .engine(Arc::new(Reporting::absent()))
+        .build()
+        .with_program(Arc::clone(&program) as Arc<dyn Program>);
+
+    let verdict = asked(&ctx, &solver(false), &asking("GET", "/")).await;
+
+    assert!(
+        matches!(&verdict, Verdict::Unproven { why } if why.contains("would not say where")),
+        "{verdict:?}"
+    );
+    assert!(program.asked().is_empty());
+}
