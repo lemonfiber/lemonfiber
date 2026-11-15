@@ -4,7 +4,7 @@ use lemonfiber_fixtures::proving::Proving;
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_manifest::container::Network;
 
-use super::{answering, read};
+use super::{answering, read, Asked};
 use crate::app::Ctx;
 use crate::plugin::{Placed, Verdict};
 use crate::ports::docker::{Health, Lifecycle};
@@ -63,7 +63,13 @@ fn machine(running: &[&str], program: &Arc<Proving>) -> Ctx {
 }
 
 async fn asked(ctx: &Ctx, placed: &Placed, request: &lemonfiber_plugin::Request) -> Verdict {
-    answering(ctx, placed, request, &expecting(200), ctx.seams.clock.now()).await
+    let expect = expecting(200);
+    let asked = Asked {
+        request,
+        expect: &expect,
+        image: lemonfiber_bundled::FENCE,
+    };
+    answering(ctx, placed, &asked, ctx.seams.clock.now()).await
 }
 
 #[tokio::test]
@@ -239,4 +245,52 @@ fn every_bundled_proof_of_a_service_publishing_nothing_names_one_it_can_be_asked
             "{expected} is not among {asked_inside:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn a_build_whose_bundle_pins_no_fence_asks_nothing_and_says_so() {
+    let program = Proving::exiting(0, ANSWERED);
+    let ctx = machine(&[SOLVER], &program);
+    let (request, expect) = (asking("GET", "/"), expecting(200));
+    let asked = Asked {
+        request: &request,
+        expect: &expect,
+        image: None,
+    };
+
+    let verdict = answering(&ctx, &solver(false), &asked, ctx.seams.clock.now()).await;
+
+    assert!(
+        matches!(&verdict, Verdict::Unproven { why } if why.contains("pins no fence")),
+        "{verdict:?}"
+    );
+    assert!(program.asked().is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_service_not_answering_yet_is_asked_again_until_the_deadline() {
+    let program = Proving::exiting(1, "");
+    let ctx = crate::test_support::a_context()
+        .engine(Arc::new(Reporting::holding(
+            &[SOLVER],
+            Lifecycle::Running,
+            Health::Healthy,
+        )))
+        .clock(Arc::new(lemonfiber_fixtures::ports::Ticking::by(
+            std::time::Duration::from_secs(1),
+        )))
+        .build()
+        .with_program(Arc::clone(&program) as Arc<dyn Program>);
+    let (request, expect) = (asking("GET", "/"), expecting(200));
+    let asked = Asked {
+        request: &request,
+        expect: &expect,
+        image: lemonfiber_bundled::FENCE,
+    };
+    let deadline = ctx.seams.clock.now() + std::time::Duration::from_secs(2);
+
+    let verdict = answering(&ctx, &solver(false), &asked, deadline).await;
+
+    assert!(matches!(verdict, Verdict::Unproven { .. }), "{verdict:?}");
+    assert!(program.asked().len() >= 2, "{:?}", program.asked().len());
 }

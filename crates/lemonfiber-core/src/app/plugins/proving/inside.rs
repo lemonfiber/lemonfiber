@@ -15,20 +15,31 @@ use super::POLL;
 /// The header naming what an answer's body is, as `fence ask` prints it.
 const CONTENT_TYPE: &str = "content-type";
 
-/// What asking `placed` `request` from inside its own network namespace came to, asked
-/// again while nothing answers there until `deadline`.
+/// One proof's request and what it expects, and the fence image this build pins to ask
+/// it with, where it pins one.
+pub(super) struct Asked<'a> {
+    /// The request the proof declares.
+    pub(super) request: &'a lemonfiber_plugin::Request,
+    /// What the answer must be.
+    pub(super) expect: &'a lemonfiber_plugin::Expect,
+    /// The fence image that asks it, where this build pins one.
+    pub(super) image: Option<&'a str>,
+}
+
+/// What asking `placed` the proof `asked` from inside its own network namespace came to,
+/// asked again while nothing answers there until `deadline`.
 pub(super) async fn answering(
     ctx: &Ctx,
     placed: &Placed,
-    request: &lemonfiber_plugin::Request,
-    expect: &lemonfiber_plugin::Expect,
+    asked: &Asked<'_>,
     deadline: std::time::SystemTime,
 ) -> Verdict {
     let service = &placed.service;
+    let (request, expect) = (asked.request, asked.expect);
     if let Err(unaskable) = super::asking::askable(request, &format!("{service}'s own network")) {
         return unaskable;
     }
-    let Some(image) = lemonfiber_bundled::FENCE else {
+    let Some(image) = asked.image else {
         return Verdict::Unproven {
             why: format!(
                 "{service} publishes no port, and this build's bundle pins no fence to ask it \

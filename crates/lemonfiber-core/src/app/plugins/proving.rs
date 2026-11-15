@@ -241,14 +241,13 @@ pub(crate) async fn asked(
                 answering(ctx, request, &proof.expect, address, deadline).await
             }
             (Some(request), None, Some(placed), None) => {
-                inside::answering(ctx, placed, request, &proof.expect, deadline).await
+                let asked = inside::Asked {
+                    request,
+                    expect: &proof.expect,
+                    image: lemonfiber_bundled::FENCE,
+                };
+                inside::answering(ctx, placed, &asked, deadline).await
             }
-            (Some(_), None, None, None) => Verdict::Unproven {
-                why: format!(
-                    "{} publishes no port this machine can reach, so there is nowhere to ask it",
-                    stated.of.as_deref().unwrap_or("the service it names")
-                ),
-            },
             _ => Verdict::Unproven {
                 why: "it does not settle one service and one asking, a request or a run, so \
                       nothing was asked"
