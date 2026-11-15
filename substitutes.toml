@@ -104,3 +104,17 @@ plugin     = "radarr"
 origin     = "https://github.com/lemonfiber/plugin-radarr"
 revision   = "8254128a737e9bda11310fb0f7e5748f2f4c966b"
 media_type = "movies"
+
+[[curator]]
+arm        = "curator-lidarr"
+plugin     = "lidarr"
+origin     = "https://github.com/lemonfiber/plugin-lidarr"
+revision   = "fdd241d938957db10518a61291e8f9c6f8583e44"
+media_type = "music"
+
+[[curator]]
+arm        = "curator-bindery"
+plugin     = "bindery"
+origin     = "https://github.com/lemonfiber/plugin-bindery"
+revision   = "48a7daa80726fc54e3c321c25b62f524fb2ecec6"
+media_type = "books"

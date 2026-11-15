@@ -101,6 +101,8 @@ jobs:
           - media-serve-emby
           - library-curate-medusa
           - curator-radarr
+          - curator-lidarr
+          - curator-bindery
     steps:
       - name: Why the arm does not run
         if: env.PROVES != 'true'
