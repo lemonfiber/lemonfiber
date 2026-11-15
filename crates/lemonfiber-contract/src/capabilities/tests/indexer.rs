@@ -6,13 +6,13 @@ use std::time::{Duration, SystemTime};
 
 use lemonfiber_ports::service::{
     Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, Indexers,
-    Protocol, PullsIndexers, RegisteredApplication, Solving,
+    Protocol, PullsIndexers, RegisteredApplication, SolverAt, Solvers, Solving,
 };
 
 use super::{crosses_alike, pull, search, solver};
 
 /// Every operation of the capability, once, each answer written down.
-async fn script<I: AppSync + Indexers + Aggregators>(indexer: &I) -> Vec<String> {
+async fn script<I: AppSync + Indexers + Aggregators + Solvers>(indexer: &I) -> Vec<String> {
     let application = Application {
         name: "films".to_owned(),
         kind: ApplicationKind::Movies,
@@ -29,6 +29,12 @@ async fn script<I: AppSync + Indexers + Aggregators>(indexer: &I) -> Vec<String>
         url: "http://aggregator:5076".to_owned(),
         key: "aggregator-key".to_owned(),
     };
+    let solver = SolverAt {
+        name: "solver".to_owned(),
+        url: "http://solver:8191".to_owned(),
+        protocol: Protocol("flaresolverr".to_owned()),
+        tag: "lemonfiber-solver".to_owned(),
+    };
     let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_791_500_000);
     vec![
         format!("{:?}", indexer.register_application(&application).await),
@@ -38,6 +44,8 @@ async fn script<I: AppSync + Indexers + Aggregators>(indexer: &I) -> Vec<String>
         format!("{:?}", indexer.indexers(now).await),
         format!("{:?}", indexer.aggregators().await),
         format!("{:?}", indexer.add_aggregator(&aggregator).await),
+        format!("{:?}", indexer.proxies().await),
+        format!("{:?}", indexer.add_proxy(&solver).await),
     ]
 }
 
@@ -46,7 +54,7 @@ async fn an_indexer_answers_and_is_told_through_its_contract_as_it_is_in_process
     crosses_alike!(
         script,
         search::Adapter,
-        ["register", "test", "rekey", "aggregator"]
+        ["register", "test", "rekey", "aggregator", "solver"]
     );
 }
 

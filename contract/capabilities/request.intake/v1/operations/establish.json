@@ -87,7 +87,7 @@
                 "type": "object"
               },
               "Protocol": {
-                "description": "The protocol a download client is reached in: the name of the API a curator speaks\nto it, as the download client declares it.",
+                "description": "The protocol a service is reached in: the name of the API it is asked in, as it\ndeclares it — a download client by the curator, a challenge solver by the indexer.",
                 "type": "string"
               }
             },

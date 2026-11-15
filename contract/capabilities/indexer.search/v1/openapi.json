@@ -93,6 +93,9 @@
     "/lemonfiber/indexer.search/v1/add_aggregator": {
       "$ref": "operations/add_aggregator.json"
     },
+    "/lemonfiber/indexer.search/v1/add_proxy": {
+      "$ref": "operations/add_proxy.json"
+    },
     "/lemonfiber/indexer.search/v1/aggregators": {
       "$ref": "operations/aggregators.json"
     },
@@ -101,6 +104,9 @@
     },
     "/lemonfiber/indexer.search/v1/indexers": {
       "$ref": "operations/indexers.json"
+    },
+    "/lemonfiber/indexer.search/v1/proxies": {
+      "$ref": "operations/proxies.json"
     },
     "/lemonfiber/indexer.search/v1/register_application": {
       "$ref": "operations/register_application.json"

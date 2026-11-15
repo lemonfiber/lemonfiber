@@ -1,6 +1,7 @@
 use lemonfiber_ports::serving::StandIn;
 use serde_json::Value;
 
+use crate::capabilities::indexer::solver_answering;
 use crate::capabilities::{curator_answering, parties, request::identity_answering};
 
 fn said(stand_in: &StandIn, method: &str, path: &str) -> Option<Value> {
@@ -34,7 +35,8 @@ fn every_party_answers_on_a_port_of_its_own_at_a_host_the_cases_name() {
             "identity source",
             "curator",
             "aggregator",
-            "site"
+            "site",
+            "challenge solver"
         ]
     );
     assert_eq!(ports.len(), all.len());
@@ -195,4 +197,21 @@ fn every_indexer_schema_the_curator_answers_holds_each_field_a_curator_of_series
         Some(&Value::from(false))
     );
     assert_eq!(torznab.len(), 12);
+}
+
+#[test]
+fn the_challenge_solver_answers_the_request_an_indexer_tests_it_with_in_its_own_api() {
+    let solver = solver_answering();
+
+    let answered = said(&solver, "POST", "/v1");
+
+    assert_eq!(solver.answers.len(), 1);
+    assert_eq!(
+        answered.as_ref().and_then(|answer| answer.get("status")),
+        Some(&Value::from("ok"))
+    );
+    assert!(answered
+        .as_ref()
+        .and_then(|answer| answer.pointer("/solution/cookies"))
+        .is_some_and(Value::is_array));
 }

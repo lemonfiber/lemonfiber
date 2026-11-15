@@ -1,0 +1,104 @@
+//! Telling the indexer the challenge solver it fetches an indexer site behind bot
+//! protection through.
+//!
+//! The solver is told to the indexer in the API it answers in, under a tag: the indexer
+//! sends an indexer site through the solver only where the site carries that tag, and
+//! which sites stand behind bot protection is the operator's to say, so no site is given
+//! it here. The indexer is asked over `indexer.search`, and one that answers it cannot
+//! fetch through a solver of that API is left unpaired.
+
+use lemonfiber_contract::capabilities::indexer::{search, SOLVER_TAG};
+
+use super::connecting::{pairings, Connection};
+use super::Ctx;
+use crate::app::targets::{spoken, Spoken};
+use crate::ports::service::{Failure, Protocol, SolverAt, Solvers as _};
+use crate::wiring::{Filler, Fillers};
+
+/// What this connection is called where it is reported.
+fn connection(solver: &str, indexer: &str) -> String {
+    format!("{solver} into {indexer}")
+}
+
+/// Tell each indexer about the challenge solver its ask for one settles on, the stack's or
+/// a plugin's, reached where the solver says it listens on the stack's network.
+///
+/// A pair nothing here connects is reported by the table, never dropped.
+pub(super) async fn seed_solvers(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::seed::Wiring> {
+    let mut wirings = Vec::new();
+    for pairing in pairings(fillers) {
+        let Ok((Connection::Solver, at, asker)) = pairing.made else {
+            continue;
+        };
+        let (Some(indexer), Some(native)) = (
+            indexer(ctx, asker.answering()).await,
+            pairing.filler.talks_in(),
+        ) else {
+            continue;
+        };
+        let solver = SolverAt {
+            name: pairing.filler.name.clone(),
+            url: at.url(),
+            protocol: Protocol(native.name().to_owned()),
+            tag: SOLVER_TAG.to_owned(),
+        };
+        wirings.push(crate::seed::Wiring::settled(
+            connection(&solver.name, &asker.name),
+            told(&indexer, &asker.name, &solver, ctx.dry_run).await,
+        ));
+    }
+    wirings
+}
+
+/// The indexer as this pass tells it, over `indexer.search`: nothing where it does not
+/// speak the contract or cannot be asked over it.
+async fn indexer(ctx: &Ctx, asker: &Filler) -> Option<search::Adapter> {
+    match spoken(ctx, asker, search::CAPABILITY, search::MAJOR).await {
+        Spoken::Over(adapter) => Some(search::Adapter(adapter)),
+        Spoken::Unanswered | Spoken::Not => None,
+    }
+}
+
+/// Point the indexer at the solver under the tag, leaving it alone where it already
+/// fetches through a solver at that address under that tag.
+async fn told(
+    indexer: &search::Adapter,
+    asker: &str,
+    solver: &SolverAt,
+    rehearsing: bool,
+) -> crate::seed::State {
+    let held = match indexer.proxies().await {
+        Ok(held) => held,
+        Err(failure) => return unreached(asker, solver, &failure),
+    };
+    if held
+        .iter()
+        .any(|known| known.url == solver.url && known.tags.contains(&solver.tag))
+    {
+        return crate::seed::State::AlreadyWired;
+    }
+    if rehearsing {
+        return crate::seed::State::WouldWire {
+            yours: None,
+            ours: Some(solver.url.clone()),
+        };
+    }
+    match indexer.add_proxy(solver).await {
+        Ok(()) => crate::seed::State::Wired,
+        Err(failure) => unreached(asker, solver, &failure),
+    }
+}
+
+/// An indexer that would not take the solver, in its own words: unpaired where it cannot
+/// fetch through a solver of that API, and otherwise as any other failure.
+fn unreached(asker: &str, solver: &SolverAt, failure: &Failure) -> crate::seed::State {
+    match failure {
+        Failure::Unsupported { detail, .. } => crate::seed::State::Unmatched {
+            reason: format!(
+                "{asker} cannot fetch through {}, which it would ask in the {} API: {detail}",
+                solver.name, solver.protocol.0
+            ),
+        },
+        _ => crate::seed::unreached(failure),
+    }
+}

@@ -1,0 +1,108 @@
+{
+  "post": {
+    "operationId": "proxies",
+    "requestBody": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "description": "What the operation is asked with.",
+            "title": "Asked",
+            "type": "object"
+          }
+        }
+      },
+      "required": true
+    },
+    "responses": {
+      "200": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$defs": {
+                "KnownSolver": {
+                  "additionalProperties": false,
+                  "description": "A challenge solver the indexer already fetches through.",
+                  "properties": {
+                    "id": {
+                      "description": "The identifier the indexer gave it.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "What it is called where somebody reads the list.",
+                      "type": "string"
+                    },
+                    "protocol": {
+                      "$ref": "#/$defs/Protocol",
+                      "description": "The API the indexer asks it in."
+                    },
+                    "tags": {
+                      "description": "The tags that send an indexer site through it.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "url": {
+                      "description": "Where the indexer says it is.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "url",
+                    "protocol",
+                    "tags"
+                  ],
+                  "type": "object"
+                },
+                "Protocol": {
+                  "description": "The protocol a service is reached in: the name of the API it is asked in, as it\ndeclares it — a download client by the curator, a challenge solver by the indexer.",
+                  "type": "string"
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "items": {
+                "$ref": "#/$defs/KnownSolver"
+              },
+              "title": "Array_of_KnownSolver",
+              "type": "array"
+            }
+          }
+        },
+        "description": "What the operation answers."
+      },
+      "204": {
+        "description": "Answered, with nothing to say."
+      },
+      "400": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "401": {
+        "description": "The plugin's key was absent or wrong."
+      },
+      "404": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "500": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "502": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      },
+      "503": {
+        "$ref": "../openapi.json#/components/responses/Refused"
+      }
+    },
+    "security": [
+      {
+        "key": []
+      }
+    ],
+    "x-lemonfiber-deadline": 15,
+    "x-lemonfiber-largest": 1048576,
+    "x-lemonfiber-since": 1
+  }
+}

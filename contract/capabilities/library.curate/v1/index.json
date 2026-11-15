@@ -11,7 +11,7 @@
     },
     {
       "path": "library.curate/v1/operations/register_download_client.json",
-      "sha256": "063edbbb2845f8ac0906c8655fe6c66a29b91bb562aa5803c7940bbc07f2340b"
+      "sha256": "d42e982190aa02df7ddd793020ac4520890396edaa88b76e65d84020e90aa222"
     },
     {
       "path": "library.curate/v1/operations/download_clients.json",
@@ -19,7 +19,7 @@
     },
     {
       "path": "library.curate/v1/operations/update_download_client.json",
-      "sha256": "caaadf60de76c6d8d6e98d00a4ed2678c85aa9087356814b8c28cf8051ef0972"
+      "sha256": "b8a9ae82fe0f0a1c250c2f6f7f026933b1fee3eebe2fd45add92416ff6a0cc82"
     },
     {
       "path": "library.curate/v1/operations/set_client_field.json",

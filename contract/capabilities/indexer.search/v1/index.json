@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "indexer.search/v1/openapi.json",
-      "sha256": "2160a25cfe9d4fd70dfbd23f94b9844fd4714c0d5fb29e6f3eaf678f24fb0aaf"
+      "sha256": "85b8920e72db4932c7f572feb67e9426701c84125ddbd95632128a4ab79635c1"
     },
     {
       "path": "indexer.search/v1/operations/register_application.json",
@@ -34,12 +34,20 @@
       "sha256": "6cb9fcb9fe4354f5a7998d4ccec96ea1842258051fe67c8cd2e840de486a7323"
     },
     {
+      "path": "indexer.search/v1/operations/proxies.json",
+      "sha256": "a732e6a87104c20662725e6f3149b70e3a1e58d8929a981cd4c126df88e01a1c"
+    },
+    {
+      "path": "indexer.search/v1/operations/add_proxy.json",
+      "sha256": "3387735a61d59cc190bcd2ab781d7270862bf56f54f075a25f50e8c29f746653"
+    },
+    {
       "path": "indexer.search/v1/holds.json",
       "sha256": "5d7a7a7c771f0feeb9e7bb7ca411ef231b8024e012d4888d17d510419f620788"
     },
     {
       "path": "indexer.search/v1/conformance.json",
-      "sha256": "4bf1c1f7ed6d86268e2e371ed4b388332fb5f16ab68157ffd48ddb28c02a6ef7"
+      "sha256": "cb79aaf6e3068affe0f586b2dbb058b15e1588c59d9609b5ba847cf02492ea9f"
     }
   ],
   "major": 1

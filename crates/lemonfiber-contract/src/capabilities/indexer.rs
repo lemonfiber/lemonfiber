@@ -2,8 +2,8 @@
 //! on behalf of the curators it is told about.
 //!
 //! The applications it searches for, each named by the media it files; the sources it
-//! searches and how hard they are used; and the aggregators a curator that pulls rather
-//! than being pushed to reads from it.
+//! searches and how hard they are used; the aggregators a curator that pulls rather than
+//! being pushed to reads from it; and the challenge solvers it fetches through.
 //!
 //! `indexer.pull` beside it is a facet, asked of every curator that speaks it: where it
 //! pulls its indexers from, each aggregator named in its native API.
@@ -15,7 +15,8 @@ use std::time::{Duration, SystemTime};
 
 use lemonfiber_ports::service::{
     Aggregator, AggregatorAt, Aggregators, AppSync, Application, ApplicationKind, IndexerUse,
-    Indexers, KnownAggregator, Protocol, PullsIndexers, RegisteredApplication, Solved, Solving,
+    Indexers, KnownAggregator, KnownSolver, Protocol, PullsIndexers, RegisteredApplication, Solved,
+    SolverAt, Solvers, Solving,
 };
 
 use super::{AGGREGATOR, AGGREGATOR_PORT, AGGREGATOR_PROTOCOL, NAMED};
@@ -36,6 +37,20 @@ pub const SITE_HOST: &str = "conformance-site";
 /// The port the conformance cases name that site on, where the recorder's stand-in for it
 /// answers.
 const SITE_PORT: u16 = 58_180;
+
+/// The host the conformance cases name a challenge solver an indexer fetches through on.
+pub const SOLVER_HOST: &str = "conformance-solver";
+
+/// The port the conformance cases name that solver on, where the recorder's stand-in for it
+/// answers.
+const SOLVER_PORT: u16 = 58_191;
+
+/// The API the conformance cases name that solver by, which `FlareSolverr` and Byparr answer.
+const SOLVER_PROTOCOL: &str = "flaresolverr";
+
+/// The tag the core tells an indexer a challenge solver under, which sends an indexer site
+/// carrying it through the solver.
+pub const SOLVER_TAG: &str = "lemonfiber-solver";
 
 /// The most a solved page may carry, in bytes.
 const PAGE_ANSWER: usize = 8 * crate::client::LARGEST;
@@ -61,6 +76,34 @@ pub fn site_answering() -> lemonfiber_ports::serving::StandIn {
             "GET",
             "/",
             serde_json::json!({ "name": NAMED }).to_string(),
+        )],
+    }
+}
+
+/// What answers as the challenge solver the conformance cases tell an indexer about while
+/// it is recorded: the solver's answer to the request an indexer tests a solver with, and
+/// nothing more.
+#[must_use]
+pub fn solver_answering() -> lemonfiber_ports::serving::StandIn {
+    use lemonfiber_ports::serving::Said;
+    lemonfiber_ports::serving::StandIn {
+        port: SOLVER_PORT,
+        headers: Vec::new(),
+        answers: vec![Said::json(
+            "POST",
+            "/v1",
+            serde_json::json!({
+                "status": "ok",
+                "message": "",
+                "solution": {
+                    "url": format!("http://{SITE_HOST}:{SITE_PORT}/"),
+                    "status": 200,
+                    "cookies": [],
+                    "userAgent": NAMED,
+                    "response": "",
+                },
+            })
+            .to_string(),
         )],
     }
 }
@@ -118,6 +161,20 @@ crate::contract! {
                     name: NAMED.to_owned(),
                     url: AGGREGATOR_URL.to_owned(),
                     key: Placeholder::Minted.written(),
+                },
+            };
+        }
+        impl Solvers {
+            /// The challenge solvers it fetches through.
+            fn proxies() -> Vec<KnownSolver> where since = 1, asks = Asked {};
+            /// Fetch through one more challenge solver, under the tag that sends an indexer
+            /// site through it.
+            fn add_proxy(refer solver: &SolverAt as SolverAt) -> () where since = 1, asks = Asked {
+                solver: SolverAt {
+                    name: NAMED.to_owned(),
+                    url: format!("http://{SOLVER_HOST}:{SOLVER_PORT}"),
+                    protocol: Protocol(SOLVER_PROTOCOL.to_owned()),
+                    tag: SOLVER_TAG.to_owned(),
                 },
             };
         }

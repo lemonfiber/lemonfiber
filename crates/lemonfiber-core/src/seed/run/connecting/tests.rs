@@ -292,6 +292,7 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         said,
         vec![
             "Lidarr into Bazarr",
+            "FlareSolverr into Prowlarr",
             "Lidarr into Recyclarr",
             "Bindery into Seerr",
             "Lidarr into Seerr",
@@ -440,6 +441,7 @@ fn an_asker_withheld_or_an_ask_answered_elsewhere_is_not_paired() {
             capability.starts_with("download.")
                 || *capability == "library.curate"
                 || *capability == "indexer.search"
+                || *capability == "indexer.proxy"
         }),
         "{paired:?}"
     );
@@ -535,3 +537,4 @@ fn a_plugin_asker_is_connected_to_nothing() {
 }
 
 mod crossing;
+mod solving;

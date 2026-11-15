@@ -7,7 +7,7 @@
     },
     {
       "path": "request.intake/v1/operations/establish.json",
-      "sha256": "3bc679bad546add45d8a699fbb1fbbeb68de2d725ae9a43d0f1cc4aa0bdab3f8"
+      "sha256": "81da33c5e4ecdd0503607a7f355fe5e140127181881f5300c0f2c1ae131b5144"
     },
     {
       "path": "request.intake/v1/operations/initialized.json",
@@ -15,7 +15,7 @@
     },
     {
       "path": "request.intake/v1/operations/configure_identity.json",
-      "sha256": "0b2e8761f5df77996a0b63f6c60d7d8622e28132eee683412c191b1fd31a7f28"
+      "sha256": "d10a02c16e3ee6b06b5029675e5883f2060582a9c9964c49aefbabc36114b9a0"
     },
     {
       "path": "request.intake/v1/operations/answers.json",
