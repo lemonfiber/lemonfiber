@@ -1,7 +1,7 @@
 use lemonfiber_ports::Instant;
 use serde_json::{json, Value};
 
-use super::{definition, held};
+use super::{definition, held, typed};
 
 /// `schema` with the instant defined beside it, as schemars defines it.
 fn defining(schema: Value) -> Value {
@@ -156,6 +156,30 @@ fn every_type_a_branch_names_is_told_apart() {
     assert_eq!(held(&with("integer"), &json!(1)), [""]);
     assert_eq!(held(&with("number"), &json!(1)), [""]);
     assert!(held(&with("integer"), &json!(1.5)).is_empty());
+}
+
+#[test]
+fn each_kind_of_value_is_typed_by_its_own_name_and_no_other() {
+    let names = [
+        "null", "boolean", "integer", "number", "string", "array", "object",
+    ];
+    for (value, own) in [
+        (json!(null), &["null"][..]),
+        (json!(true), &["boolean"]),
+        (json!(1), &["integer", "number"]),
+        (json!(1.5), &["number"]),
+        (json!("s"), &["string"]),
+        (json!([]), &["array"]),
+        (json!({}), &["object"]),
+    ] {
+        for name in names {
+            assert_eq!(
+                typed(Some(&json!(name)), &value),
+                own.contains(&name),
+                "{name} {value}"
+            );
+        }
+    }
 }
 
 #[test]
