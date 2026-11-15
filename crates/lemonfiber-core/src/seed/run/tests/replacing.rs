@@ -11,6 +11,7 @@ use crate::app::targets::MediaServer;
 use crate::plugin::first_party::FirstParty;
 use crate::plugin::Installed;
 use crate::wiring::{Chosen, Filler, Fillers};
+use lemonfiber_manifest::container::Network;
 
 /// The service a plugin brings in place of one of the parts.
 const STAND_IN: &str = "stand-in";
@@ -78,11 +79,16 @@ fn expected(before: &Plan, replaced: &str, at: &str) -> Plan {
 }
 
 /// A first-party plugin bringing a service in place of `filler` for `capability`: the API
-/// it answers in, the media it files, and a port of its own.
+/// it answers in, the media it files, whether it runs inside the fence, and a port of its own.
 fn standing_in_for(filler: &Filler, capability: &str) -> Installed {
     let mut placed = crate::test_support::a_placed(STAND_IN, &[capability], Some(ITS_PORT));
     placed.native.clone_from(&filler.native);
     placed.media_types.clone_from(&filler.media_types);
+    placed.fields.network = filler.fenced.then_some(Network {
+        via: None,
+        fenced: true,
+        egress_for: None,
+    });
     if capability == lemonfiber_contract::capabilities::library::curate::CAPABILITY {
         placed.speaks = vec![capability.to_owned() + "@1"];
     }
