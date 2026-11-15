@@ -264,24 +264,34 @@ async fn with_no_key_nothing_is_opened() {
 }
 
 #[tokio::test]
-async fn channels_the_server_cannot_list_are_unanswered() {
-    let transport = Transport::by_path(vec![
+async fn channels_a_server_cannot_list_are_unanswered_and_one_with_no_live_tv_lists_none() {
+    for (tag, listed, said) in [
         (
-            media::identity("household"),
-            media::answered(&[media::member("a7f3", "Ada", true)]),
+            "channels-failing",
+            media::unavailable(),
+            Some(crate::error::codes::play::SERVER_SILENT.to_string()),
         ),
-        (media::serve("channels"), media::unavailable()),
-    ]);
-    let ctx = ctx_over(Arc::clone(&transport), "channels-failing");
-    let Ok(server) = crate::screening::server(&ctx).await else {
-        unreachable!("the household has a media server");
-    };
-    let ada = media::member("a7f3", "Ada", true);
-    assert_eq!(
-        code(crate::screening::tuning::reachable(&server, &ada).await),
-        Some(crate::error::codes::play::SERVER_SILENT.to_string())
-    );
-    assert!(was_asked(&transport, "channels"));
+        (
+            "channels-unsupported",
+            media::refused(lemonfiber_contract::wire::Kind::Unsupported),
+            None,
+        ),
+    ] {
+        let transport = Transport::by_path(vec![(media::serve("channels"), listed)]);
+        let ctx = ctx_over(Arc::clone(&transport), tag);
+        let Ok(server) = crate::screening::server(&ctx).await else {
+            unreachable!("the household has a media server");
+        };
+        let ada = media::member("a7f3", "Ada", true);
+        let answered = crate::screening::tuning::reachable(&server, &ada).await;
+        assert_eq!(
+            answered.as_ref().map(Vec::len).ok(),
+            said.is_none().then_some(0),
+            "{tag}"
+        );
+        assert_eq!(code(answered), said, "{tag}");
+        assert!(was_asked(&transport, "channels"), "{tag}");
+    }
 }
 
 #[tokio::test]

@@ -18,6 +18,9 @@ use super::Upstream;
 /// Where the upstream reads a certificate only once it restarts.
 pub const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
 
+/// The live stream the upstream will not close.
+pub const STUCK: &str = "stuck";
+
 /// One item the server holds, with a poster and something that plays.
 fn item(id: &str) -> Item {
     Item {
@@ -326,8 +329,7 @@ impl Tuning for Upstream {
     }
 
     async fn untune(&self, closes_by: &str) -> Result<(), Failure> {
-        self.tell(format!("untune {closes_by}"));
-        Ok(())
+        untuned(self, closes_by)
     }
 }
 
@@ -367,4 +369,16 @@ impl Furnishing for Upstream {
             })
             .collect())
     }
+}
+
+/// How the upstream answers being told to close the live stream `closes_by`: it closes every
+/// one but [`STUCK`].
+fn untuned(upstream: &Upstream, closes_by: &str) -> Result<(), Failure> {
+    upstream.tell(format!("untune {closes_by}"));
+    if closes_by == STUCK {
+        return Err(Failure::Unavailable {
+            service: "media".to_owned(),
+        });
+    }
+    Ok(())
 }

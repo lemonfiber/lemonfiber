@@ -1,42 +1,10 @@
-use std::sync::Mutex;
-
-use async_trait::async_trait;
 use lemonfiber_fixtures::scratch::Scratch;
+use lemonfiber_fixtures::upstream::media::STUCK;
+use lemonfiber_fixtures::upstream::Upstream;
 
 use super::{closed, kept, lapsed, read, renewed, theirs, Open};
 use crate::app::Ctx;
-use crate::ports::service::{Channel, Failure, Tuned, Tuning};
 use crate::test_support::a_context;
-
-/// A media server that closes every live stream but the one named `stuck`, and says
-/// which it was asked to close.
-#[derive(Default)]
-struct Closing {
-    closed: Mutex<Vec<String>>,
-}
-
-#[async_trait]
-impl Tuning for Closing {
-    async fn channels(&self, _member: &str) -> Result<Vec<Channel>, Failure> {
-        Ok(Vec::new())
-    }
-
-    async fn tune(&self, _member: &str, _channel: &str) -> Result<Option<Tuned>, Failure> {
-        Ok(None)
-    }
-
-    async fn untune(&self, closes_by: &str) -> Result<(), Failure> {
-        if let Ok(mut closed) = self.closed.lock() {
-            closed.push(closes_by.to_owned());
-        }
-        if closes_by == "stuck" {
-            return Err(Failure::Unavailable {
-                service: "media".to_owned(),
-            });
-        }
-        Ok(())
-    }
-}
 
 /// A context keeping what it opens in a directory of its own.
 fn ctx(tag: &str) -> Ctx {
@@ -101,24 +69,19 @@ fn a_renewal_moves_only_the_lapse_and_keeps_no_pass() {
 async fn a_live_stream_the_server_would_not_close_is_kept_for_the_next_sweep() {
     let ctx = ctx("closed");
     kept(&ctx, open("a7f3", "ls1", 100));
-    kept(&ctx, open("a7f3", "stuck", 100));
+    kept(&ctx, open("a7f3", STUCK, 100));
     kept(&ctx, open("b8e4", "ls2", 100));
-    let server = Closing::default();
+    let server = Upstream::default();
     let adas = |one: &Open| one.member == "a7f3";
     closed(&ctx, &server, adas).await;
     let left = || -> Vec<String> { read(&ctx).into_iter().map(|one| one.closes_by).collect() };
-    assert_eq!(left(), vec!["stuck".to_owned(), "ls2".to_owned()]);
+    assert_eq!(left(), vec![STUCK.to_owned(), "ls2".to_owned()]);
     closed(&ctx, &server, adas).await;
-    let asked = server
-        .closed
-        .lock()
-        .map(|asked| asked.clone())
-        .unwrap_or_default();
     assert_eq!(
-        asked,
-        vec!["ls1".to_owned(), "stuck".to_owned(), "stuck".to_owned()]
+        server.told(),
+        ["ls1", STUCK, STUCK].map(|closes_by| format!("untune {closes_by}"))
     );
-    assert_eq!(left(), vec!["stuck".to_owned(), "ls2".to_owned()]);
+    assert_eq!(left(), vec![STUCK.to_owned(), "ls2".to_owned()]);
 }
 
 #[tokio::test]
