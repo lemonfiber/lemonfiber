@@ -150,7 +150,8 @@ fn at_the_door(
         Err(why) => return Err(Obstacle::new(DOOR_UNREADY, format!("{UNREADABLE} {why}"))),
     };
     url.map(|url| (url.replacen("http://", "https://", 1), fingerprint))
-        .ok_or_else(|| Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
+        .ok_or((NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
+        .map_err(Obstacle::from)
 }
 
 /// Where `server` serves each item, from its declaration once that is checked.
@@ -216,10 +217,11 @@ pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, Obstacle> {
                 .find(|placed| placed.service == guarding.id)
         })
         .and_then(|placed| placed.reached.as_ref()?.hostname().map(str::to_owned))
-        .ok_or_else(|| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
+        .ok_or((NO_BROWSER_ROUTE, UNROUTED))?;
     crate::door::proxied(&label, ctx.settings.household_domain.as_deref())
         .map(|address| address.url)
-        .ok_or_else(|| Obstacle::new(NO_BROWSER_ROUTE, NO_DOMAIN))
+        .ok_or((NO_BROWSER_ROUTE, NO_DOMAIN))
+        .map_err(Obstacle::from)
 }
 
 /// Said where no proxy fronts the household's services, so no browser reaches the door.

@@ -78,7 +78,8 @@ pub(super) async fn played(
                 lapses,
             )
             .then_some(pass)
-            .ok_or_else(|| Obstacle::new(PASSLESS, UNRENEWED))
+            .ok_or((PASSLESS, UNRENEWED))
+            .map_err(Obstacle::from)
         }
         PlayFrom::Device(device) => {
             server
@@ -97,14 +98,16 @@ pub(super) async fn played(
             ready
                 .key
                 .seal(id, &session, ready.nonce, now)
-                .ok_or_else(|| Obstacle::new(PASSLESS, UNSEALED))
+                .ok_or((PASSLESS, UNSEALED))
+                .map_err(Obstacle::from)
         }
     };
     let placed = pass.and_then(|pass| {
         grants::renewed(ctx, &member.id);
         Locations::played(&ready.template, &ready.base, id, &play_of(&pass))
             .map(|playlist| door::passed(&playlist, &pass))
-            .ok_or_else(|| Obstacle::new(UNPLACED, ASTRAY))
+            .ok_or((UNPLACED, ASTRAY))
+            .map_err(Obstacle::from)
     });
     let stream_from = match placed {
         Ok(at) => at,
@@ -194,7 +197,7 @@ async fn ready(
         .await?
         .locations
         .playlist
-        .ok_or_else(|| Obstacle::new(UNDECLARED, NO_PLAYLIST))?;
+        .ok_or((UNDECLARED, NO_PLAYLIST))?;
     let base = door::for_a_browser(ctx)?;
     Locations::played(
         &template,
@@ -202,10 +205,9 @@ async fn ready(
         id,
         &crate::secret::render(&[0; PLAY_BYTES]),
     )
-    .ok_or_else(|| Obstacle::new(UNPLACED, ASTRAY))?;
-    let key =
-        crate::app::project::passing::key(ctx).ok_or_else(|| Obstacle::new(PASSLESS, KEYLESS))?;
-    let nonce = nonce(ctx).ok_or_else(|| Obstacle::new(PASSLESS, UNSEALED))?;
+    .ok_or((UNPLACED, ASTRAY))?;
+    let key = crate::app::project::passing::key(ctx).ok_or((PASSLESS, KEYLESS))?;
+    let nonce = nonce(ctx).ok_or((PASSLESS, UNSEALED))?;
     Ok(Ready {
         template,
         base,

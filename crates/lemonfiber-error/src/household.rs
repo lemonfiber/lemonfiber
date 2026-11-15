@@ -110,6 +110,12 @@ impl Obstacle {
     }
 }
 
+impl From<(Code, &'static str)> for Obstacle {
+    fn from((code, said): (Code, &'static str)) -> Self {
+        Self::new(code, said)
+    }
+}
+
 impl std::fmt::Display for Obstacle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ({})", self.said, self.code)

@@ -247,12 +247,11 @@ async fn ready(ctx: &Ctx, server: &Media) -> Result<Ready, Obstacle> {
         } => (base, fingerprint),
         Door::Unknown(why) => return Err(why),
     };
-    let key =
-        crate::app::project::passing::key(ctx).ok_or_else(|| Obstacle::new(PASSLESS, KEYLESS))?;
+    let key = crate::app::project::passing::key(ctx).ok_or((PASSLESS, KEYLESS))?;
     let declared = door::declared(server.serve.as_ref()).await?;
     let watching = Watching::of(&crate::pass::told(&declared))
         .ok()
-        .ok_or_else(|| Obstacle::new(UNDECLARED, UNCOMPILED))?;
+        .ok_or((UNDECLARED, UNCOMPILED))?;
     Ok(Ready {
         base,
         fingerprint,
