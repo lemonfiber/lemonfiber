@@ -70,15 +70,14 @@ pub(super) async fn played(
             if ctx.dry_run {
                 return Ok(rehearsal());
             }
-            if !crate::app::project::passing::renewed(
+            crate::app::project::passing::renewed(
                 ctx,
                 std::slice::from_ref(&pass),
                 &member.id,
                 lapses,
-            ) {
-                return Ok(unlocated(told(asker, UNRENEWED.to_owned())));
-            }
-            pass
+            )
+            .then_some(pass)
+            .ok_or(UNRENEWED)
         }
         PlayFrom::Device(device) => {
             server
@@ -94,21 +93,26 @@ pub(super) async fn played(
                 member: member.id.clone(),
                 token: opened(&server, &member, &device).await?,
             };
-            let Some(pass) = ready.key.seal(id, &session, ready.nonce, now) else {
-                return Ok(unlocated(told(asker, UNSEALED.to_owned())));
-            };
-            pass
+            ready
+                .key
+                .seal(id, &session, ready.nonce, now)
+                .ok_or(UNSEALED)
         }
     };
-    grants::renewed(ctx, &member.id);
-    let Some(playlist) = Locations::played(&ready.template, &ready.base, id, &play_of(&pass))
-    else {
-        return Ok(unlocated(told(asker, UNPLACED.to_owned())));
+    let placed = pass.and_then(|pass| {
+        grants::renewed(ctx, &member.id);
+        Locations::played(&ready.template, &ready.base, id, &play_of(&pass))
+            .map(|playlist| door::passed(&playlist, &pass))
+            .ok_or(UNPLACED)
+    });
+    let stream_from = match placed {
+        Ok(at) => at,
+        Err(why) => return Ok(unlocated(told(asker, why.to_owned()))),
     };
     Ok(PlayReport {
         id: id.to_owned(),
         member: member.name,
-        stream_from: Some(door::passed(&playlist, &pass)),
+        stream_from: Some(stream_from),
         lapses: Some(lapses),
         unlocated: None,
         rehearsed: false,

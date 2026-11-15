@@ -258,7 +258,8 @@ async fn ready(ctx: &Ctx, server: &Media, asker: Asker) -> Result<Ready, String>
         .await
         .map_err(|why| told(asker, why))?;
     let watching = Watching::of(&crate::pass::told(&declared))
-        .map_err(|_| told(asker, UNDECLARED.to_owned()))?;
+        .ok()
+        .ok_or(told(asker, UNDECLARED.to_owned()))?;
     Ok(Ready {
         base,
         fingerprint,
