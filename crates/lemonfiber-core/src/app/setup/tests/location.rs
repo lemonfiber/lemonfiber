@@ -1,6 +1,7 @@
 //! Whether the data location can hardlink, and what to do when it cannot.
 
 use super::*;
+use crate::ports::filesystem::{Fault, FileSystem, FsKind, Identity, StorageFacts};
 use lemonfiber_fixtures::ports::STAMPED;
 
 #[tokio::test]
@@ -18,7 +19,7 @@ async fn an_answer_that_does_not_apply_here_stops_the_run() {
     let stopped = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -30,11 +31,15 @@ async fn an_answer_that_does_not_apply_here_stops_the_run() {
 
 /// A filesystem that cannot link, of a named type, so the copy-only warning
 /// carries the reason.
-fn cannot_link(kind: FsKind) -> ProbeFs {
-    ProbeFs {
+fn cannot_link(kind: FsKind) -> Probing {
+    let linking = Probing::linking();
+    Probing {
         failing_links: AtomicUsize::new(usize::MAX),
-        kind,
-        ..ProbeFs::links()
+        facts: StorageFacts {
+            kind,
+            ..linking.facts
+        },
+        ..linking
     }
 }
 
@@ -112,9 +117,9 @@ async fn a_location_that_cannot_link_can_be_swapped_for_one_that_can() {
         ..Scripted::workable(second.clone())
     };
     // The first link attempt fails; every one after it takes.
-    let filesystem = ProbeFs {
+    let filesystem = Probing {
         failing_links: AtomicUsize::new(1),
-        ..ProbeFs::links()
+        ..Probing::linking()
     };
 
     let outcome = run(
@@ -148,9 +153,9 @@ async fn a_location_that_does_not_exist_yet_is_tested_through_its_parent() {
     let prompt = Scripted::workable(dir.join("data-root"));
     // The chosen leaf is not there yet, so the first resolve fails and its
     // parent stands in — the link is proven on the parent, not the path.
-    let filesystem = ProbeFs {
+    let filesystem = Probing {
         missing_leaves: AtomicUsize::new(1),
-        ..ProbeFs::links()
+        ..Probing::linking()
     };
 
     let outcome = run(
@@ -180,9 +185,9 @@ async fn a_location_that_cannot_be_written_is_reported_untestable() {
         accept: Accept::Location,
         ..Scripted::workable(dir.join("data-root"))
     };
-    let filesystem = ProbeFs {
-        writable: false,
-        ..ProbeFs::links()
+    let filesystem = Probing {
+        writes: Err(Fault::new("permission denied")),
+        ..Probing::linking()
     };
 
     let outcome = run(
@@ -214,9 +219,9 @@ async fn a_location_with_no_reachable_parent_cannot_be_tested() {
         ..Scripted::workable(dir.join("data-root"))
     };
     // Nothing on the path resolves — not the location, not any parent of it.
-    let filesystem = ProbeFs {
-        reachable: false,
-        ..ProbeFs::links()
+    let filesystem = Probing {
+        resolves: Err(Fault::new("no such file or directory")),
+        ..Probing::linking()
     };
 
     let outcome = run(
@@ -242,7 +247,7 @@ async fn the_probe_filesystem_stubs_the_calls_the_probe_never_makes() {
     // of the filesystem port it never touches. Pinning the double's answers to
     // those keeps a future probe that did start calling them from meeting a
     // surprise rather than a defined stub.
-    let filesystem = ProbeFs::links();
+    let filesystem = Probing::linking();
     assert_eq!(filesystem.read(Path::new("/anything")).await, None);
     filesystem.write(Path::new("/anything"), "ignored").await;
     assert_eq!(filesystem.ownership(Path::new("/anything")).await, None);
@@ -258,9 +263,12 @@ async fn a_link_that_cannot_be_confirmed_is_reported_untestable() {
         ..Scripted::workable(dir.join("data-root"))
     };
     // The link is made, but the two names read back as different files.
-    let filesystem = ProbeFs {
-        confirmed_file: 999,
-        ..ProbeFs::links()
+    let filesystem = Probing {
+        confirmed: Ok(Identity {
+            file: 999,
+            links: 2,
+        }),
+        ..Probing::linking()
     };
 
     let outcome = run(

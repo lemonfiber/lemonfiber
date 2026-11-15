@@ -1,12 +1,9 @@
 //! How often each panel is read, and what a panel that will not answer does to the rest.
 
-use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
-
 use super::*;
 use crate::dashboard::pace::{PANEL_WITHIN, VPN_EVERY};
 use crate::dashboard::run::paced;
-use crate::ports::docker::{Container, Engine, ExecOutput, Failure, LogLine, LogQuery, Stats};
+use crate::ports::docker::{Engine, LogQuery};
 use crate::test_support::guard;
 
 /// A context reading the VPN pair through `engine`, its clock stopped `seconds` into
@@ -78,33 +75,6 @@ async fn a_refresh_asked_for_reads_every_panel() {
     assert!(!tunnelled(&asked.snapshot), "the tunnel was asked again");
 }
 
-/// An engine that takes every request and never answers any of them.
-struct Hanging;
-
-#[async_trait]
-impl Engine for Hanging {
-    async fn list(&self, _project: &str) -> Result<Vec<Container>, Failure> {
-        std::future::pending().await
-    }
-
-    async fn exec(&self, _container: &str, _argv: &[String]) -> Result<ExecOutput, Failure> {
-        std::future::pending().await
-    }
-
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, Failure> {
-        std::future::pending().await
-    }
-
-    async fn logs(
-        &self,
-        _project: &str,
-        _services: &[String],
-        _query: LogQuery,
-    ) -> Result<Receiver<LogLine>, Failure> {
-        std::future::pending().await
-    }
-}
-
 /// A source that will not answer marks its own panel within its bound, and the panels
 /// are read together, so the refresh costs the one bound rather than one per panel.
 #[tokio::test(start_paused = true)]
@@ -116,7 +86,7 @@ async fn a_source_that_will_not_answer_costs_its_bound_once() {
         ..Settings::default()
     };
     let ctx = a_context()
-        .engine(Arc::new(Hanging))
+        .engine(Arc::new(Reporting::hanging()))
         .settings(settings)
         .build()
         .with_patience(Duration::ZERO);
@@ -138,14 +108,15 @@ async fn a_source_that_will_not_answer_costs_its_bound_once() {
         gathered.snapshot.vpn
     );
     let quiet = Duration::from_secs(1);
-    assert!(tokio::time::timeout(quiet, Hanging.stats("p"))
+    assert!(tokio::time::timeout(quiet, Reporting::hanging().stats("p"))
         .await
         .is_err());
-    assert!(
-        tokio::time::timeout(quiet, Hanging.logs("p", &[], LogQuery::recent(1)))
-            .await
-            .is_err()
-    );
+    assert!(tokio::time::timeout(
+        quiet,
+        Reporting::hanging().logs("p", &[], LogQuery::recent(1))
+    )
+    .await
+    .is_err());
 }
 
 /// Whether imports link is what the probe found now, unknown where it did not answer,

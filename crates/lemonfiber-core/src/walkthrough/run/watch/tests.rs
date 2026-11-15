@@ -1,15 +1,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::super::fixtures::{
-    carrying_it, ctx_downloading, ctx_with, downloading, event, Fake, Ticking,
-};
+use super::super::fixtures::{carrying_it, ctx_downloading, ctx_with, downloading, event, Fake};
 use super::{done, first_word, furthest, past_patience, settled, speed_of, what_was_said, Landed};
 use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::service::QueueItem;
 use crate::test_support::Reporting;
 use crate::trace::{Outcome, Stage};
 use crate::walkthrough::{Reason, Step};
+use lemonfiber_fixtures::ports::Ticking;
 
 /// A queue record at one stage.
 const fn queued(stage: Stage, stuck: bool) -> QueueItem {

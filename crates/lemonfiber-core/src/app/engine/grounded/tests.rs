@@ -1,35 +1,14 @@
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-
-use async_trait::async_trait;
 
 use super::{grounded, waited, NO_DATA_LOCATION};
 use crate::app::Ctx;
 use crate::config::Settings;
-use crate::ports::filesystem::{Presence, Volume};
+use crate::ports::filesystem::Presence;
 use crate::stack::compose::Action;
 use crate::test_support::a_context;
-
-/// A drive answering each reading with the next one a test scripted, then staying
-/// on the last one once the script runs out.
-struct Drive {
-    readings: Vec<Presence>,
-    cursor: AtomicUsize,
-}
-
-#[async_trait]
-impl Volume for Drive {
-    async fn presence(&self, _path: &Path) -> Presence {
-        let at = self.cursor.fetch_add(1, Ordering::SeqCst);
-        self.readings
-            .get(at)
-            .or_else(|| self.readings.last())
-            .copied()
-            .unwrap_or(Presence::Gone)
-    }
-}
+use lemonfiber_fixtures::mounted::Drive;
 
 /// A context whose data location answers with the given readings in turn.
 fn ctx_reading(readings: Vec<Presence>) -> Ctx {
@@ -39,10 +18,7 @@ fn ctx_reading(readings: Vec<Presence>) -> Ctx {
             ..Settings::default()
         })
         .build()
-        .with_volume(Arc::new(Drive {
-            readings,
-            cursor: AtomicUsize::new(0),
-        }))
+        .with_volume(Arc::new(Drive::settling(readings)))
 }
 
 /// The wait, driven with a handful of looks and no interval at all.
@@ -132,9 +108,6 @@ async fn a_machine_with_no_data_location_has_nothing_to_prove() {
     let ctx = a_context()
         .settings(Settings::default())
         .build()
-        .with_volume(Arc::new(Drive {
-            readings: vec![Presence::Gone],
-            cursor: AtomicUsize::new(0),
-        }));
+        .with_volume(Arc::new(Drive::settling(vec![Presence::Gone])));
     assert!(over(&ctx, &Action::Up).await.is_ok());
 }

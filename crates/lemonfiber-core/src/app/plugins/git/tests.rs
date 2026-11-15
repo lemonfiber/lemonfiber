@@ -1,45 +1,16 @@
 //! Git as it is run against a stranger's repository.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
+use lemonfiber_fixtures::support::{spoke, Recording};
 
 use super::{command, environment, run, run_pinned, ASKING};
-use crate::ports::process::{Failure, Output, Runner};
 use crate::test_support::a_context;
 
-/// One command and the environment it was run with.
-type Ran = (Vec<String>, Vec<(String, String)>);
-
-/// A git that answers every command after `delay`, and remembers what it was run with.
-#[derive(Default)]
-struct Answering {
-    /// How long each command takes.
-    delay: Option<Duration>,
-    /// Every command and the environment it was run with.
-    ran: Mutex<Vec<Ran>>,
-}
-
-#[async_trait]
-impl Runner for Answering {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        self.run_with(argv, &[]).await
-    }
-
-    async fn run_with(&self, argv: &[String], env: &[(String, String)]) -> Result<Output, Failure> {
-        if let Ok(mut ran) = self.ran.lock() {
-            ran.push((argv.to_vec(), env.to_vec()));
-        }
-        if let Some(delay) = self.delay {
-            tokio::time::sleep(delay).await;
-        }
-        Ok(Output {
-            status: Some(0),
-            stdout: "listed".to_owned(),
-            stderr: String::new(),
-        })
-    }
+/// A git that answers every command, remembering what it was run with.
+fn answering() -> Recording {
+    Recording::answering(Ok(spoke("listed")))
 }
 
 /// Every command carries every setting, ahead of what was asked, so nothing the
@@ -75,18 +46,17 @@ fn every_command_is_git_with_every_setting_before_what_was_asked() {
 /// The machine's own configuration is not read and nothing may ask for a password.
 #[tokio::test]
 async fn git_runs_with_the_machines_configuration_unread_and_no_prompt() {
-    let answering = Arc::new(Answering::default());
+    let answering = Arc::new(answering());
     let ctx = a_context().runner(answering.clone()).build();
 
     let said = run(&ctx, &["ls-remote", "--", "https://example.org/x"], ASKING).await;
 
     assert_eq!(said.as_deref(), Ok("listed"));
-    let ran = answering
-        .ran
-        .lock()
-        .map(|ran| ran.clone())
+    let env = answering
+        .environments()
+        .first()
+        .cloned()
         .unwrap_or_default();
-    let env = ran.first().map(|(_, env)| env.clone()).unwrap_or_default();
     assert_eq!(env, environment());
     for (name, value) in [
         ("GIT_CONFIG_NOSYSTEM", "1"),
@@ -104,10 +74,7 @@ async fn git_runs_with_the_machines_configuration_unread_and_no_prompt() {
 /// A git that does not finish in time is stopped, and says how long it was given.
 #[tokio::test(start_paused = true)]
 async fn a_git_past_its_deadline_is_stopped_and_says_so() {
-    let answering = Arc::new(Answering {
-        delay: Some(ASKING + Duration::from_secs(1)),
-        ..Answering::default()
-    });
+    let answering = Arc::new(answering().taking(ASKING + Duration::from_secs(1)));
     let ctx = a_context().runner(answering).build();
 
     let said = run(&ctx, &["ls-remote", "--", "https://example.org/x"], ASKING).await;
@@ -122,7 +89,7 @@ async fn a_git_past_its_deadline_is_stopped_and_says_so() {
 /// unpinned one carries nothing more.
 #[tokio::test]
 async fn a_pin_is_one_more_setting_before_what_was_asked() {
-    let answering = Arc::new(Answering::default());
+    let answering = Arc::new(answering());
     let ctx = a_context().runner(answering.clone()).build();
     let pin = "http.curloptResolve=example.org:443:192.88.99.10";
 
@@ -143,11 +110,7 @@ async fn a_pin_is_one_more_setting_before_what_was_asked() {
 
     assert_eq!(pinned.as_deref(), Ok("listed"));
     assert_eq!(unpinned.as_deref(), Ok("listed"));
-    let ran: Vec<Vec<String>> = answering
-        .ran
-        .lock()
-        .map(|ran| ran.iter().map(|(argv, _)| argv.clone()).collect())
-        .unwrap_or_default();
+    let ran: Vec<Vec<String>> = answering.seen();
     let first = ran.first().cloned().unwrap_or_default();
     let at = first.iter().position(|arg| arg == pin);
     let asked = first.iter().position(|arg| arg == "ls-remote");

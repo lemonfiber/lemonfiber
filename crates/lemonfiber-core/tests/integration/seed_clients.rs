@@ -19,7 +19,7 @@ use lemonfiber_fixtures::ports::STAMPED;
 /// Run the client driver for the wanted clients, returning their resulting states
 /// and the number of changes journalled. The baseline it records into is discarded
 /// — the tests that assert on it drive the driver directly.
-async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<State>, usize) {
+async fn seed_clients(service: Receiving, wanted: &[DownloadClient]) -> (Vec<State>, usize) {
     let mut journal = Journal::new();
     let expected = Baseline::new();
     let mut records = Baseline::new();
@@ -46,7 +46,7 @@ async fn seed_clients(service: FakeService, wanted: &[DownloadClient]) -> (Vec<S
 /// recorded into — for the tests that assert what lemonfiber remembered it wrote.
 /// The expected snapshot is empty, as on a first seed.
 async fn seed_clients_recording(
-    service: FakeService,
+    service: Receiving,
     wanted: &[DownloadClient],
 ) -> (Vec<State>, Baseline) {
     let mut journal = Journal::new();
@@ -75,7 +75,7 @@ async fn seed_clients_recording(
 /// resulting states, what this run recorded, and the number of changes journalled —
 /// for the adoption tests, which turn on the baseline's origin and the adopt flag.
 async fn seed_clients_with(
-    service: FakeService,
+    service: Receiving,
     wanted: &[DownloadClient],
     expected: &Baseline,
     adopt: bool,

@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-
 use super::{drawing, online, proc_moment, sysctl_moment, Asking, PMSET, PS, SYSCTL};
 use crate::ports::machine::{Power, Running, Started, Supply};
 use crate::ports::process::{Failure, Output};
 use crate::ports::Runner;
-use lemonfiber_fixtures::support::{Recording, Scripted};
+use lemonfiber_fixtures::support::{Keyed, Recording, Scripted};
 
 /// What macOS answers when asked when it started.
 const BOOTED: &str = "{ sec = 1694612345, usec = 123456 } Wed Sep 13 18:19:05 2023\n";
@@ -154,24 +152,6 @@ fn a_mains_adapter_answers_one_or_nothing_this_understands() {
     assert_eq!(online("Unknown"), None);
 }
 
-/// A runner on which `ps` answers as given, and every other program as given too.
-struct Listing {
-    /// What `ps` comes to.
-    ps: Scripted,
-    /// What anything else comes to.
-    otherwise: Scripted,
-}
-
-#[async_trait]
-impl Runner for Listing {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if argv.first().map(String::as_str) == Some(PS) {
-            return self.ps.run(argv).await;
-        }
-        self.otherwise.run(argv).await
-    }
-}
-
 /// A program's answer, as it exited and what it printed.
 fn exited(status: i32, stdout: &str) -> Output {
     Output {
@@ -193,12 +173,9 @@ async fn is_running(
     ps: Result<Output, Failure>,
     otherwise: Result<Output, Failure>,
 ) -> Option<bool> {
-    Asking::over(Arc::new(Listing {
-        ps: Scripted(ps),
-        otherwise: Scripted(otherwise),
-    }))
-    .alive(38_480)
-    .await
+    Asking::over(Keyed::by_command(vec![(PS, ps)], Some(otherwise)))
+        .alive(38_480)
+        .await
 }
 
 #[tokio::test]

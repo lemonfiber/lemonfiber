@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 
 use super::{arrived, bearer, said, seen, send, tag, Message, Sent, REASON_MOST};
@@ -12,17 +11,7 @@ use crate::config::{Reaching, Settings, REACH_NTFY_KEY};
 use crate::endpoint::AUTHORIZATION;
 use crate::model::{BackendKind, BackendProof, ChosenBy, DeliveryOutcome};
 use crate::notify::backends::{Backend, Held};
-use crate::ports::http::{Http, Request, Response, Unreachable};
-
-/// A transport that never answers.
-struct Hanging;
-
-#[async_trait]
-impl Http for Hanging {
-    async fn send(&self, _request: &Request) -> Result<Response, Unreachable> {
-        std::future::pending().await
-    }
-}
+use crate::ports::http::Http;
 
 fn reaching(http: Arc<dyn Http>) -> Ctx {
     crate::test_support::a_context().build().with_http(http)
@@ -192,7 +181,7 @@ async fn nothing_answering_is_a_failure_in_the_transports_words() {
 
 #[tokio::test(start_paused = true)]
 async fn a_back_end_that_never_answers_is_given_up_on() {
-    let ctx = reaching(Arc::new(Hanging));
+    let ctx = reaching(Fake::hanging());
     let sent = send(
         &ctx,
         &backend(BackendKind::Ntfy),

@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{verdict, Bench};
+use lemonfiber_fixtures::probing::Probing;
+
+use super::verdict;
 use crate::doctor::storage::{Check, Environment, StorageCheck, Verdict};
 use crate::error::codes::storage::ROOT_REFUSED;
 
@@ -9,7 +11,7 @@ use crate::error::codes::storage::ROOT_REFUSED;
 /// nothing on this machine is probed in its place.
 #[tokio::test]
 async fn a_refused_data_root_fails_naming_it_and_nothing_is_probed() {
-    let bench = Bench::healthy();
+    let bench = Probing::healthy();
     let recorded = Arc::clone(&bench.recorded);
     let refused = crate::config::storage::Storage::read("nfs://nas local/volume1")
         .err()

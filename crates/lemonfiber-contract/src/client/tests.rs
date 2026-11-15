@@ -1,8 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::http::{Fetched, Http, Method, Request, Response, Unreachable};
+use lemonfiber_ports::http::Method;
 use lemonfiber_ports::service::{Applied, Failure};
 
 use super::{Bounds, Contracted, Witness, DEADLINE, LARGEST};
@@ -199,29 +198,14 @@ async fn a_request_that_cannot_be_written_is_refused_and_never_sent() {
     assert!(fake.request().is_none());
 }
 
-/// An adapter answering bytes that are not text.
-struct Binary;
-
-#[async_trait]
-impl Http for Binary {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        Err(Unreachable::once(&request.url, "only fetched"))
-    }
-
-    async fn fetch(&self, _request: &Request, _most: usize) -> Result<Fetched, Unreachable> {
-        Ok(Fetched {
-            status: 200,
-            headers: Vec::new(),
-            bytes: Some(vec![0xff, 0xfe]),
-        })
-    }
-}
-
 #[tokio::test]
 async fn an_answer_that_is_not_text_is_refused_and_witnessed() {
     let told = Arc::new(Told::default());
     let client = Contracted::new(
-        Arc::new(Binary),
+        Fake::always(Answer::Octets {
+            status: 200,
+            bytes: vec![0xff, 0xfe],
+        }),
         "http://adapter:8080",
         "plex-adapter",
         "k3y",
@@ -344,30 +328,11 @@ async fn a_call_without_the_key_carries_none_and_answers_its_status() {
     }
 }
 
-/// An adapter that takes every call and lets its deadline run out, as a transport reports it.
-struct Late;
-
-#[async_trait]
-impl Http for Late {
-    async fn send(&self, request: &Request) -> Result<Response, Unreachable> {
-        tokio::time::sleep(request.deadline.unwrap_or_default()).await;
-        Err(Unreachable {
-            connected: true,
-            ..Unreachable::once(&request.url, "operation timed out")
-        })
-    }
-}
-
 #[tokio::test(start_paused = true)]
 async fn an_answer_past_the_deadline_from_an_adapter_that_took_the_call_is_refused_and_witnessed() {
     let told = Arc::new(Told::default());
-    let client = Contracted::new(
-        Arc::new(Late),
-        "http://adapter:8080/",
-        "plex-adapter",
-        "k3y",
-    )
-    .witnessed_by(told.clone());
+    let client = Contracted::new(Fake::late(), "http://adapter:8080/", "plex-adapter", "k3y")
+        .witnessed_by(told.clone());
     let started = tokio::time::Instant::now();
 
     let answered: Result<serde_json::Value, Failure> = asked(&client).await;
@@ -409,7 +374,7 @@ async fn a_call_carries_its_operations_deadline_to_the_transport() {
 async fn an_operation_declaring_a_longer_deadline_is_awaited_that_long() {
     let told = Arc::new(Told::default());
     let client = Contracted::new(
-        Arc::new(Late),
+        Fake::late(),
         "http://adapter:8080/",
         "solver-adapter",
         "k3y",

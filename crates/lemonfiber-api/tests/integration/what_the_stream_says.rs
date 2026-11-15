@@ -3,22 +3,13 @@
 //! Both are decisions rather than behaviours, so a gap here is something a test
 //! makes rather than something it waits for.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use lemonfiber_api::events::backlog::{Backlog, HELD};
 use lemonfiber_api::events::wire::{Event, EventKind, Nature, Rendered, BEAT, BEAT_SAID};
 use lemonfiber_core::ports::Clock;
 use lemonfiber_fixtures::ports::Stopped;
 use serde::{Serialize, Serializer};
-
-/// A clock reading before the epoch, which a run cannot be named for.
-struct Backwards;
-
-impl Clock for Backwards {
-    fn now(&self) -> SystemTime {
-        UNIX_EPOCH - Duration::from_secs(1)
-    }
-}
 
 /// A payload that will not serialise, for the one answer rendering can give
 /// besides an envelope.
@@ -146,7 +137,7 @@ fn a_run_is_named_for_the_moment_it_opened() {
 
 #[test]
 fn a_run_that_cannot_be_dated_is_still_a_run_of_its_own() {
-    let run = Run::by(&Backwards).said(Nature::Record, "first");
+    let run = Run::by(Stopped::before_the_epoch(1).as_ref()).said(Nature::Record, "first");
 
     assert_eq!(run.id(0), Some("0-1"));
 }

@@ -1,37 +1,8 @@
+use lemonfiber_fixtures::providing::{Accounts, Indexed};
 use lemonfiber_manifest::Date;
 
 use super::{Arc, Check, Indexers, ProvidersCheck, SystemTime, UsenetAccounts, Verdict};
 use crate::ports::service::{Failure, IndexerUse, Recorded, UsenetAccount};
-
-/// A client that answers with what it was given.
-struct Client(Result<Vec<UsenetAccount>, Failure>);
-
-#[async_trait::async_trait]
-impl UsenetAccounts for Client {
-    async fn accounts(&self) -> Result<Vec<UsenetAccount>, Failure> {
-        match &self.0 {
-            Ok(accounts) => Ok(accounts.clone()),
-            Err(_) => Err(Failure::Unavailable {
-                service: "sabnzbd".to_owned(),
-            }),
-        }
-    }
-}
-
-/// An aggregator that answers with what it was given.
-struct Aggregator(Result<Vec<IndexerUse>, Failure>);
-
-#[async_trait::async_trait]
-impl Indexers for Aggregator {
-    async fn indexers(&self, _now: SystemTime) -> Result<Vec<IndexerUse>, Failure> {
-        match &self.0 {
-            Ok(indexers) => Ok(indexers.clone()),
-            Err(_) => Err(Failure::Unavailable {
-                service: "prowlarr".to_owned(),
-            }),
-        }
-    }
-}
 
 const fn today() -> Date {
     Date {
@@ -76,8 +47,8 @@ fn checking(
     indexers: Option<Result<Vec<IndexerUse>, Failure>>,
 ) -> ProvidersCheck {
     ProvidersCheck::new(
-        accounts.map(|answer| Arc::new(Client(answer)) as Arc<dyn UsenetAccounts>),
-        indexers.map(|answer| Arc::new(Aggregator(answer)) as Arc<dyn Indexers>),
+        accounts.map(|answer| Arc::new(Accounts::answering(answer)) as Arc<dyn UsenetAccounts>),
+        indexers.map(|answer| Arc::new(Indexed::answering(answer)) as Arc<dyn Indexers>),
         today(),
         SystemTime::UNIX_EPOCH,
     )

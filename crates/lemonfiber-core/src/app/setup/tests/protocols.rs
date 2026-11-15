@@ -14,7 +14,7 @@ async fn a_tunnelled_torrent_run_is_not_warned() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -45,7 +45,7 @@ async fn torrents_without_a_vpn_are_warned_and_confirmed_and_never_refused() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -83,7 +83,7 @@ async fn declining_the_exposure_asks_again_rather_than_stopping() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -115,7 +115,7 @@ async fn a_usenet_only_run_is_never_asked_about_a_vpn() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -137,7 +137,7 @@ async fn the_prerequisites_are_shown_derived_from_the_chosen_protocols() {
         run(
             &mut wizard,
             (&prompt, None),
-            &ProbeFs::links(),
+            &Probing::linking(),
             &proving(),
             &applying(&paths, STAMPED)
         )
@@ -161,7 +161,7 @@ async fn a_confirmed_run_gathers_the_answers_and_applies_them() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -202,7 +202,7 @@ async fn a_run_the_operator_does_not_confirm_applies_nothing() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -224,7 +224,7 @@ async fn where_the_container_user_does_not_apply_it_is_not_asked() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -250,7 +250,7 @@ async fn gathering_saves_progress_so_a_quit_run_can_resume() {
     let outcome = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )
@@ -363,7 +363,7 @@ async fn a_wizard_past_gathering_is_refused_rather_than_re_applied() {
     let refused = run(
         &mut wizard,
         (&prompt, None),
-        &ProbeFs::links(),
+        &Probing::linking(),
         &proving(),
         &applying(&paths, STAMPED),
     )

@@ -1763,6 +1763,8 @@ dependencies = [
  "lemonfiber-manifest",
  "lemonfiber-platform",
  "lemonfiber-ports",
+ "serde",
+ "serde_json",
  "tokio",
  "toml",
 ]

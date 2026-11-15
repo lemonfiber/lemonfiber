@@ -4,7 +4,7 @@
 //! and an async path exercised only in-crate has its coverage counted from the copy
 //! that never ran.
 //!
-//! The fake filesystem below deliberately does **not** implement `claim`. The port's
+//! The fake filesystem, `Remembering`, deliberately does **not** implement `claim`. The port's
 //! default — a look followed by a write — is what a fake should use, and leaving it
 //! in place is what proves the default works; the atomic override that matters is the
 //! real adapter's, and that one is tested against a real filesystem beside it.
@@ -15,92 +15,18 @@
 //! and the whole bound is exercised in the time it takes to read a map six hundred
 //! times.
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use lemonfiber_core::app::{claimed, dispatch, released, Command, Ctx};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::ports::filesystem::{
-    Fault, FileSystem, FsKind, Identity, Ownership, Storage, StorageFacts,
-};
+use lemonfiber_core::ports::filesystem::FileSystem;
 use lemonfiber_core::ports::machine::Running;
 use lemonfiber_core::ports::Narrator;
 use lemonfiber_fixtures::heard::Heard;
-
-/// A filesystem that remembers what was written to it.
-///
-/// The shared fakes are all read-only — they answer with what a test seeded and
-/// forget writes — and a lock is nothing but a write somebody else can see, so this
-/// one keeps them.
-#[derive(Default)]
-struct Remembering {
-    held: Mutex<HashMap<PathBuf, String>>,
-}
-
-impl Remembering {
-    /// What is at this path, if anything.
-    fn at(&self, path: &Path) -> Option<String> {
-        self.held
-            .lock()
-            .ok()
-            .and_then(|held| held.get(path).cloned())
-    }
-}
-
-#[async_trait]
-impl FileSystem for Remembering {
-    async fn canonicalize(&self, path: &Path) -> Result<PathBuf, Fault> {
-        Ok(path.to_path_buf())
-    }
-
-    async fn touch(&self, _path: &Path) -> Result<(), Fault> {
-        Ok(())
-    }
-
-    async fn link(&self, _from: &Path, _to: &Path) -> Result<(), Fault> {
-        Ok(())
-    }
-
-    async fn identify(&self, _path: &Path) -> Result<Identity, Fault> {
-        Err(Fault::new("unused"))
-    }
-
-    async fn remove(&self, path: &Path) {
-        if let Ok(mut held) = self.held.lock() {
-            held.remove(path);
-        }
-    }
-
-    async fn read(&self, path: &Path) -> Option<String> {
-        self.at(path)
-    }
-
-    async fn write(&self, path: &Path, contents: &str) {
-        if let Ok(mut held) = self.held.lock() {
-            held.insert(path.to_path_buf(), contents.to_owned());
-        }
-    }
-
-    async fn ownership(&self, _path: &Path) -> Option<Ownership> {
-        None
-    }
-}
-
-#[async_trait]
-impl Storage for Remembering {
-    async fn describe(&self, _path: &Path) -> StorageFacts {
-        StorageFacts {
-            point: PathBuf::new(),
-            kind: FsKind::Linking("test".to_owned()),
-            removable: false,
-            available: 0,
-            total: 0,
-        }
-    }
-}
+use lemonfiber_fixtures::machine::Living;
+use lemonfiber_fixtures::remembering::Remembering;
 
 /// Where a claim would go, given the settings below.
 fn lockfile() -> PathBuf {
@@ -530,58 +456,8 @@ async fn a_machine_that_keeps_no_settings_is_not_blocked_by_the_lock() {
     assert!(files.at(&lockfile()).is_none(), "nothing was written");
 }
 
-/// A machine answering whether a process is running as scripted, one answer per
-/// question and the last one repeated, and able to have another run take the stack at
-/// the moment it is asked.
-struct Answering {
-    /// The answers, in the order they are given.
-    answers: Vec<Option<bool>>,
-    /// How many have been asked for.
-    asked: Mutex<usize>,
-    /// A claim written into the files the first time it is asked, as another run
-    /// taking the stack between the question and the answer would write one.
-    meanwhile: Option<(Arc<Remembering>, String)>,
-}
-
-impl Answering {
-    /// A machine answering these, in order.
-    fn saying(answers: &[Option<bool>]) -> Arc<Self> {
-        Arc::new(Self {
-            answers: answers.to_vec(),
-            asked: Mutex::new(0),
-            meanwhile: None,
-        })
-    }
-
-    /// How many times it was asked.
-    fn times(&self) -> usize {
-        self.asked.lock().map(|asked| *asked).unwrap_or_default()
-    }
-}
-
-#[async_trait]
-impl Running for Answering {
-    async fn alive(&self, _pid: u32) -> Option<bool> {
-        let asked = self
-            .asked
-            .lock()
-            .map(|mut asked| {
-                *asked += 1;
-                *asked - 1
-            })
-            .unwrap_or_default();
-        if asked == 0 {
-            if let Some((files, claim)) = &self.meanwhile {
-                files.write(&lockfile(), claim).await;
-            }
-        }
-        let last = self.answers.len().saturating_sub(1);
-        self.answers.get(asked.min(last)).copied().flatten()
-    }
-}
-
 /// A context whose machine answers as `running` does, narrating to `heard`.
-fn ctx_asking(files: &Arc<Remembering>, heard: &Arc<Heard>, running: &Arc<Answering>) -> Ctx {
+fn ctx_asking(files: &Arc<Remembering>, heard: &Arc<Heard>, running: &Arc<Living>) -> Ctx {
     ctx_narrating(files, heard).with_running(Arc::clone(running) as Arc<dyn Running>)
 }
 
@@ -595,7 +471,7 @@ async fn a_claim_whose_run_has_gone_is_taken_at_once() {
         .write(&lockfile(), &written(somebody_else(), 1_789_428_749, "up"))
         .await;
     let heard = Arc::new(Heard::default());
-    let running = Answering::saying(&[Some(false)]);
+    let running = Living::saying(&[Some(false)]);
 
     let started = tokio::time::Instant::now();
     let taken = claimed(&ctx_asking(&files, &heard, &running), "down").await;
@@ -627,7 +503,7 @@ async fn a_claim_whose_run_is_still_there_is_waited_on() {
         )
         .await;
     let heard = Arc::new(Heard::default());
-    let running = Answering::saying(&[Some(true)]);
+    let running = Living::saying(&[Some(true)]);
 
     let refused = claimed(&ctx_asking(&files, &heard, &running), "down").await;
 
@@ -655,7 +531,7 @@ async fn a_run_that_dies_while_it_is_waited_on_gives_the_stack_up() {
         )
         .await;
     let heard = Arc::new(Heard::default());
-    let running = Answering::saying(&[Some(true), Some(false)]);
+    let running = Living::saying(&[Some(true), Some(false)]);
 
     let started = tokio::time::Instant::now();
     let taken = claimed(&ctx_asking(&files, &heard, &running), "down").await;
@@ -689,7 +565,7 @@ async fn a_holder_nobody_can_vouch_for_is_waited_on() {
         )
         .await;
     let heard = Arc::new(Heard::default());
-    let unanswered = Answering::saying(&[None]);
+    let unanswered = Living::saying(&[None]);
     assert!(claimed(&ctx_asking(&files, &heard, &unanswered), "down")
         .await
         .is_err());
@@ -700,7 +576,7 @@ async fn a_holder_nobody_can_vouch_for_is_waited_on() {
             &written(std::process::id(), TWELVE_SECONDS_AGO, "up"),
         )
         .await;
-    let everything_gone = Answering::saying(&[Some(false)]);
+    let everything_gone = Living::saying(&[Some(false)]);
     assert!(
         claimed(&ctx_asking(&files, &heard, &everything_gone), "down")
             .await
@@ -727,11 +603,13 @@ async fn a_claim_that_changed_while_the_machine_was_asked_is_left_alone() {
         TWELVE_SECONDS_AGO,
         "restart",
     );
-    let running = Arc::new(Answering {
-        answers: vec![Some(false), Some(true)],
-        asked: Mutex::new(0),
-        meanwhile: Some((Arc::clone(&files), theirs.clone())),
-    });
+    let running = {
+        let files = Arc::clone(&files);
+        let theirs = theirs.clone();
+        Living::meanwhile(&[Some(false), Some(true)], move || {
+            files.put(&lockfile(), &theirs);
+        })
+    };
 
     let refused = claimed(&ctx_asking(&files, &heard, &running), "down").await;
 

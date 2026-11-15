@@ -13,7 +13,7 @@ async fn an_adopt_pass_takes_on_a_pre_existing_unmanaged_value() {
     // The same pre-existing value, run through an adopt pass, is taken on — recorded
     // as the operator's own, marked adopted, with nothing written to the service.
     let (states, recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, a_pre_existing_client()),
+        Receiving::with_clients(Mode::Normal, a_pre_existing_client()),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &Baseline::new(),
         true,
@@ -59,7 +59,7 @@ async fn an_adopted_value_lemonfiber_also_wants_stays_adopted_not_re_recorded() 
         Instant::from_seconds(1),
     );
     let (states, recorded, _changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &expected,
         false,
@@ -96,7 +96,7 @@ async fn an_adopted_value_the_service_still_holds_is_kept_not_made_stale() {
         Instant::from_seconds(1),
     );
     let (states, _recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &expected,
         false,
@@ -129,7 +129,7 @@ async fn an_adopt_pass_promotes_a_drifted_value_and_records_it_as_adopted() {
         Instant::from_seconds(1),
     );
     let (states, recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &expected,
         true,
@@ -173,7 +173,7 @@ async fn a_seed_after_an_adopt_pass_keeps_the_adopted_edit() {
         Instant::from_seconds(2),
     );
     let (states, _recorded, changes) = seed_clients_with(
-        FakeService::with_clients(Mode::Normal, existing),
+        Receiving::with_clients(Mode::Normal, existing),
         &[client("SABnzbd", "sabnzbd", 8080)],
         &expected,
         false,

@@ -3,42 +3,28 @@
 
 use std::sync::Mutex;
 
-use async_trait::async_trait;
-
 use super::*;
-use crate::ports::process::{Failure, Output};
 
-/// A runner that notes what the project held when Compose was asked to take anything
-/// off.
-#[derive(Default)]
-struct Watching {
-    project: Mutex<Option<PathBuf>>,
-    at_rm: Mutex<Option<String>>,
-}
-
-#[async_trait]
-impl crate::ports::Runner for Watching {
-    async fn run(&self, argv: &[String]) -> Result<Output, Failure> {
-        if argv.iter().any(|word| word == "rm") {
-            let held = self
-                .project
+#[tokio::test]
+async fn a_removal_takes_the_containers_off_before_the_project_forgets_them() {
+    let project: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
+    let at_rm: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let runner = {
+        let project = Arc::clone(&project);
+        let at_rm = Arc::clone(&at_rm);
+        Recording::answering(Ok(spoke(""))).on("rm", move || {
+            let held = project
                 .lock()
                 .ok()
                 .and_then(|project| project.clone())
                 .and_then(|project| std::fs::read_to_string(project).ok());
-            if let Ok(mut at_rm) = self.at_rm.lock() {
+            if let Ok(mut at_rm) = at_rm.lock() {
                 *at_rm = held;
             }
-        }
-        Ok(spoke(""))
-    }
-}
-
-#[tokio::test]
-async fn a_removal_takes_the_containers_off_before_the_project_forgets_them() {
-    let runner = Arc::new(Watching::default());
-    let ctx = proving("rm-first", runner.clone(), answering(200));
-    if let Ok(mut project) = runner.project.lock() {
+        })
+    };
+    let ctx = proving("rm-first", Arc::new(runner), answering(200));
+    if let Ok(mut project) = project.lock() {
         *project = Some(project_of(&ctx));
     }
     assert_eq!(
@@ -49,8 +35,7 @@ async fn a_removal_takes_the_containers_off_before_the_project_forgets_them() {
     let gone = removal(removing(&ctx, "komga").await);
 
     assert!(gone.is_some_and(|one| one.removed));
-    let at_rm = runner
-        .at_rm
+    let at_rm = at_rm
         .lock()
         .ok()
         .and_then(|at_rm| at_rm.clone())

@@ -13,10 +13,11 @@ use lemonfiber_contract::capabilities::owner::claim;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::plugin::{Installed, Register};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
-use lemonfiber_core::ports::filesystem::{Beneath, Confined, Fault, Lying, Readable};
+use lemonfiber_core::ports::filesystem::Confined;
 use lemonfiber_core::ports::http::Request;
 use lemonfiber_core::ports::service::Owner;
 use lemonfiber_core::stack::Source;
+use lemonfiber_fixtures::confined::Keyed;
 use lemonfiber_fixtures::http::Answer;
 use lemonfiber_fixtures::support::Reporting;
 
@@ -224,7 +225,7 @@ impl Adapted {
     #[must_use]
     pub fn asking(self, mut ctx: Ctx) -> Ctx {
         ctx.seams.engine = Arc::new(self.running());
-        ctx.seams.confined = Keyed::holding(Arc::clone(&ctx.seams.confined), &[self.adapter]);
+        ctx.seams.confined = holding_keys(Arc::clone(&ctx.seams.confined), &[self.adapter]);
         ctx
     }
 
@@ -233,7 +234,7 @@ impl Adapted {
     /// configuration directory is. The engine stays `ctx`'s own.
     #[must_use]
     pub fn keyed(self, mut ctx: Ctx) -> Ctx {
-        ctx.seams.confined = Keyed::holding(Arc::clone(&ctx.seams.confined), &[self.adapter]);
+        ctx.seams.confined = holding_keys(Arc::clone(&ctx.seams.confined), &[self.adapter]);
         self.recorded(&ctx);
         ctx
     }
@@ -243,7 +244,7 @@ impl Adapted {
     /// stays `ctx`'s own, which says the adapter runs where it holds [`Self::running`].
     #[must_use]
     pub fn keyed_in(self, mut ctx: Ctx) -> Ctx {
-        ctx.seams.confined = Keyed::holding(Arc::clone(&ctx.seams.confined), &[self.adapter]);
+        ctx.seams.confined = holding_keys(Arc::clone(&ctx.seams.confined), &[self.adapter]);
         self.moved_in(&ctx);
         ctx
     }
@@ -319,7 +320,7 @@ pub fn running(adapted: &[Adapted]) -> Reporting {
 pub fn asking(mut ctx: Ctx, adapted: &[Adapted]) -> Ctx {
     let adapters: Vec<&str> = adapted.iter().map(|one| one.adapter).collect();
     ctx.seams.engine = Arc::new(running(adapted));
-    ctx.seams.confined = Keyed::holding(Arc::clone(&ctx.seams.confined), &adapters);
+    ctx.seams.confined = holding_keys(Arc::clone(&ctx.seams.confined), &adapters);
     ctx
 }
 
@@ -401,102 +402,9 @@ pub fn taken() -> Answer {
 /// A disk holding [`KEY`] for each of its services wherever that service's configuration
 /// directory is, and reading every other file as `inner` does: for a stack whose directory
 /// a test cannot write.
-pub struct Keyed {
-    inner: Arc<dyn Confined>,
-    services: Vec<String>,
-}
-
-impl Keyed {
-    /// `inner`, with a key held for each of `services` wherever its configuration
-    /// directory is.
-    #[must_use]
-    pub fn holding(inner: Arc<dyn Confined>, services: &[&str]) -> Arc<Self> {
-        Arc::new(Self {
-            inner,
-            services: services.iter().map(|one| (*one).to_owned()).collect(),
-        })
-    }
-
-    /// Whether `path` is where one of its services' keys is written in some stack.
-    fn holds(&self, path: &std::path::Path) -> bool {
-        self.services.iter().any(|service| {
-            path.ends_with(
-                std::path::Path::new(service).join(lemonfiber_contract::adapter::KEY_FILE),
-            )
-        })
-    }
-}
-
-impl Confined for Keyed {
-    fn read(&self, path: &std::path::Path, within: &std::path::Path) -> Beneath {
-        if self.holds(path) {
-            return Beneath::Read(KEY.to_owned());
-        }
-        self.inner.read(path, within)
-    }
-
-    fn overwrite(
-        &self,
-        path: &std::path::Path,
-        within: &std::path::Path,
-        contents: &[u8],
-    ) -> Result<(), Fault> {
-        self.inner.overwrite(path, within, contents)
-    }
-
-    fn written(
-        &self,
-        path: &std::path::Path,
-        within: &std::path::Path,
-        contents: &[u8],
-        readable: Readable,
-    ) -> Result<(), Fault> {
-        self.inner.written(path, within, contents, readable)
-    }
-
-    fn lies(&self, path: &std::path::Path, within: &std::path::Path) -> Lying {
-        self.inner.lies(path, within)
-    }
-
-    fn moved(
-        &self,
-        from: &std::path::Path,
-        to: &std::path::Path,
-        within: &std::path::Path,
-    ) -> Result<(), Fault> {
-        self.inner.moved(from, to, within)
-    }
-
-    fn made(
-        &self,
-        path: &std::path::Path,
-        within: &std::path::Path,
-        readable: Readable,
-    ) -> Result<(), Fault> {
-        self.inner.made(path, within, readable)
-    }
-
-    fn replaced(
-        &self,
-        path: &std::path::Path,
-        within: &std::path::Path,
-        contents: &[u8],
-        readable: Readable,
-    ) -> Result<(), Fault> {
-        self.inner.replaced(path, within, contents, readable)
-    }
-
-    fn bytes(
-        &self,
-        path: &std::path::Path,
-        within: &std::path::Path,
-    ) -> Result<Option<Vec<u8>>, Fault> {
-        self.inner.bytes(path, within)
-    }
-
-    fn removed(&self, path: &std::path::Path, within: &std::path::Path) -> Result<(), Fault> {
-        self.inner.removed(path, within)
-    }
+#[must_use]
+pub fn holding_keys(inner: Arc<dyn Confined>, services: &[&str]) -> Arc<Keyed> {
+    Keyed::holding(inner, services, lemonfiber_contract::adapter::KEY_FILE, KEY)
 }
 
 /// Whether the engine's account `reporting` lists `adapter` healthy and published on

@@ -9,12 +9,18 @@
 //! inside a container, and the addresses each container publishes are five
 //! questions rather than one.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use lemonfiber_ports::docker::{
     Container, Engine, ExecOutput, Failure as EngineFailure, Health, Lifecycle, LogLine, LogQuery,
     Published, Stats, Stream,
 };
 use tokio::sync::mpsc::Receiver;
+
+use answering::{exec, list, reporting_logs, stats};
+
+mod answering;
 
 /// An engine that reports whatever the test put in it.
 ///
@@ -54,6 +60,25 @@ pub struct Reporting {
     /// means `exec` has nothing to say and fails, as an engine asked for a
     /// container it does not know would.
     tunnel: Option<Tunnel>,
+    /// What every command run inside a container answers, where a test scripts one.
+    exec: Option<ExecOutput>,
+    /// The questions it refuses as an engine that is not answering them.
+    refusing: Vec<Question>,
+    /// Whether it takes every question and never answers any.
+    hangs: bool,
+    /// The engine listed beside it and asked everything else, where it stands beside one.
+    over: Option<Arc<dyn Engine>>,
+}
+
+/// A question an engine can be asked besides what it holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Question {
+    /// A command run inside a container.
+    Exec,
+    /// A sample of what each container uses.
+    Stats,
+    /// What the containers wrote.
+    Logs,
 }
 
 /// What a [`Reporting`] engine answers a VPN exec with: a public address for the
@@ -93,15 +118,8 @@ impl Reporting {
                     exit: None,
                 })
                 .collect(),
-            said: Vec::new(),
             reachable: true,
-            settles_after: None,
-            asked: std::sync::atomic::AtomicUsize::new(0),
-            refusals: 0,
-            refused: std::sync::atomic::AtomicUsize::new(0),
-            answers: None,
-            answered: std::sync::atomic::AtomicUsize::new(0),
-            tunnel: None,
+            ..Self::default()
         }
     }
 
@@ -257,46 +275,72 @@ impl Reporting {
         self
     }
 
+    /// The same engine, with this line among what its containers wrote.
+    #[must_use]
+    pub fn with_line(mut self, line: LogLine) -> Self {
+        self.said.push(line);
+        self
+    }
+
+    /// The same engine, answering every command run inside a container with `output`.
+    #[must_use]
+    pub fn answering_exec(mut self, output: ExecOutput) -> Self {
+        self.exec = Some(output);
+        self
+    }
+
+    /// The same engine, refusing each of `questions` as an engine not answering them.
+    #[must_use]
+    pub fn refusing(mut self, questions: &[Question]) -> Self {
+        self.refusing.extend_from_slice(questions);
+        self
+    }
+
+    /// The same engine, listed beside what `engine` holds, `engine` answering every other
+    /// question; what `engine` cannot list is listed as nothing.
+    #[must_use]
+    pub fn over(mut self, engine: Arc<dyn Engine>) -> Self {
+        self.over = Some(engine);
+        self
+    }
+
+    /// An engine that takes every question and never answers any.
+    #[must_use]
+    pub fn hanging() -> Self {
+        Self {
+            hangs: true,
+            ..Self::default()
+        }
+    }
+
     /// An engine that is not there.
     #[must_use]
     pub fn absent() -> Self {
-        Self {
-            containers: Vec::new(),
-            said: Vec::new(),
-            reachable: false,
-            settles_after: None,
-            asked: std::sync::atomic::AtomicUsize::new(0),
-            refusals: 0,
-            refused: std::sync::atomic::AtomicUsize::new(0),
-            answers: None,
-            answered: std::sync::atomic::AtomicUsize::new(0),
-            tunnel: None,
-        }
+        Self::default()
     }
 }
 
 #[async_trait]
 impl Engine for Reporting {
     async fn list(&self, project: &str) -> Result<Vec<Container>, EngineFailure> {
-        listed(self, project)
+        list(self, project).await
     }
 
     async fn exec(&self, container: &str, argv: &[String]) -> Result<ExecOutput, EngineFailure> {
-        executed(self, container, argv)
+        exec(self, container, argv).await
     }
 
-    async fn stats(&self, _project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
-        let (_sender, receiver) = tokio::sync::mpsc::channel(1);
-        Ok(receiver)
+    async fn stats(&self, project: &str) -> Result<Receiver<(String, Stats)>, EngineFailure> {
+        stats(self, project).await
     }
 
     async fn logs(
         &self,
-        _project: &str,
+        project: &str,
         services: &[String],
-        _query: LogQuery,
+        query: LogQuery,
     ) -> Result<Receiver<LogLine>, EngineFailure> {
-        logs(self, _project, services, _query).await
+        reporting_logs(self, project, services, query).await
     }
 }
 
@@ -314,128 +358,6 @@ pub(super) fn scripted(value: Option<&str>) -> ExecOutput {
             stdout: String::new(),
         },
     }
-}
-
-/// The containers this fixture holds, with health settled once it has been asked enough.
-/// The containers of one Compose project, as the engine would answer.
-///
-/// Narrowed to `project` because the real adapter narrows: it asks the daemon for
-/// containers carrying that project's label, so a fake that answered with every
-/// container it held would let a caller pass a proof it never actually made. The
-/// containers a fake is built with belong to lemonfiber's own project unless a test
-/// said otherwise, so this filter is invisible to every test that never mentioned
-/// one.
-fn listed(reporting: &Reporting, project: &str) -> Result<Vec<Container>, EngineFailure> {
-    if !reporting.reachable {
-        return Err(EngineFailure::Unreachable {
-            reason: "no daemon here".to_owned(),
-        });
-    }
-
-    if reporting.answers.is_some_and(|answers| {
-        reporting
-            .answered
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            >= answers
-    }) {
-        return Err(EngineFailure::Unreachable {
-            reason: "the daemon has gone".to_owned(),
-        });
-    }
-
-    // Refused before anything is counted against the settling budget, so an engine
-    // that was still starting arrives with the same patience for its containers as
-    // one that was there from the outset.
-    if reporting
-        .refused
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        < reporting.refusals
-    {
-        return Err(EngineFailure::Unreachable {
-            reason: "the daemon is still starting".to_owned(),
-        });
-    }
-
-    let asked = reporting
-        .asked
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let settled = reporting.settles_after.is_some_and(|after| asked >= after);
-
-    Ok(reporting
-        .containers
-        .iter()
-        .filter(|container| container.project == project)
-        .map(|container| Container {
-            health: if settled {
-                Health::Healthy
-            } else {
-                container.health
-            },
-            ..container.clone()
-        })
-        .collect())
-}
-
-/// Which scripted answer a command inside a container gets.
-fn executed(
-    reporting: &Reporting,
-    container: &str,
-    argv: &[String],
-) -> Result<ExecOutput, EngineFailure> {
-    let Some(tunnel) = &reporting.tunnel else {
-        return Err(EngineFailure::NoSuchContainer {
-            name: container.to_owned(),
-        });
-    };
-    if argv.last().is_some_and(|arg| arg.ends_with("/country-iso")) {
-        return Ok(ExecOutput {
-            status: Some(0),
-            stdout: tunnel.country.unwrap_or_default().to_owned(),
-        });
-    }
-    let asked_second = argv
-        .last()
-        .is_some_and(|arg| arg.contains("second.example"));
-    let ip = if container.contains(tunnel.gateway) {
-        if asked_second {
-            tunnel.second_opinion.or(tunnel.gateway_ip)
-        } else {
-            tunnel.gateway_ip
-        }
-    } else {
-        tunnel.client_ip
-    };
-    Ok(scripted(ip))
-}
-
-async fn logs(
-    reporting: &Reporting,
-    _project: &str,
-    services: &[String],
-    _query: LogQuery,
-) -> Result<Receiver<LogLine>, EngineFailure> {
-    // Opening a stream means finding the containers first, so an engine
-    // that cannot be reached refuses this as surely as it refuses a
-    // listing. A fake that answered anyway would be a fake that made
-    // the health gate's own failure path untestable.
-    if !reporting.reachable {
-        return Err(EngineFailure::Unreachable {
-            reason: "no daemon here".to_owned(),
-        });
-    }
-
-    let wanted: Vec<LogLine> = reporting
-        .said
-        .iter()
-        .filter(|line| services.is_empty() || services.contains(&line.service))
-        .cloned()
-        .collect();
-
-    let (sender, receiver) = tokio::sync::mpsc::channel(wanted.len().max(1));
-    for line in wanted {
-        let _ = sender.send(line).await;
-    }
-    Ok(receiver)
 }
 
 #[cfg(test)]

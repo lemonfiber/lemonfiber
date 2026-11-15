@@ -3,290 +3,19 @@
 //! Two services and a secret, and the one case that must never be overwritten: a
 //! A request service the household already set up is left as they left it.
 
-use common::service::*;
 use std::sync::Mutex;
 
-use crate::common;
-use async_trait::async_trait;
-use lemonfiber_core::ports::service::{
-    Failure, HouseholdRequest, MediaServer, Protocol, Requests, Telling,
-};
+use lemonfiber_core::ports::service::Protocol;
 use lemonfiber_core::seed::{wire_media_server_admin, wire_request_identity, State};
-
-// ---- The media server as the request service's identity, with a minted credential. ----
-
-/// How the media server's setup answers.
-enum Startup {
-    /// The wizard has already run.
-    Completed,
-    /// The wizard has not run.
-    Fresh,
-    /// Not answering.
-    Down,
-}
-
-/// How the media server answers the account creation. A refusal stands for every
-/// non-success; the not-answering path is exercised through the startup read.
-enum Create {
-    Ok,
-    Rejects,
-}
-
-struct FakeMedia {
-    startup: Startup,
-    create: Create,
-}
-
-#[async_trait]
-impl MediaServer for FakeMedia {
-    async fn startup_completed(&self) -> Result<bool, Failure> {
-        match self.startup {
-            Startup::Completed => Ok(true),
-            Startup::Fresh => Ok(false),
-            Startup::Down => Err(down("jellyfin")),
-        }
-    }
-
-    async fn replace_admin_password(&self, _replacement: &str) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    async fn create_admin(&self, _name: &str, _password: &str) -> Result<(), Failure> {
-        match self.create {
-            Create::Ok => Ok(()),
-            Create::Rejects => Err(Failure::Refused {
-                service: "jellyfin".to_owned(),
-                detail: "HTTP 400: user already exists".to_owned(),
-            }),
-        }
-    }
-}
-
-/// How the request service answers a read of its initialised state.
-enum Init {
-    /// Not initialised.
-    Fresh,
-    /// Already initialised.
-    Done,
-    /// Not answering.
-    Down,
-}
-
-/// How the request service answers the sign-in. A refusal stands for every non-success; the
-/// not-answering path is exercised through the initialised read.
-enum Configure {
-    Ok,
-    Rejects,
-}
-
-struct FakeReq {
-    /// The state reported on the first read (the gate) and on the second (the
-    /// read-back), so a fresh-then-confirmed sequence can be scripted.
-    gate: Init,
-    readback: Init,
-    configure: Configure,
-    establish: Configure,
-    calls: Mutex<u32>,
-    /// What the service is holding for what the household gets told, which `tell`
-    /// overwrites so a test can read back what would have reached it.
-    told: Mutex<Telling>,
-}
-
-impl FakeReq {
-    fn new(gate: Init, readback: Init, configure: Configure) -> Self {
-        Self {
-            gate,
-            readback,
-            configure,
-            establish: Configure::Ok,
-            calls: Mutex::new(0),
-            told: Mutex::new(Telling::default()),
-        }
-    }
-
-    fn refusing_an_owner(self) -> Self {
-        Self {
-            establish: Configure::Rejects,
-            ..self
-        }
-    }
-
-    fn reading(state: &Init) -> Result<bool, Failure> {
-        match state {
-            Init::Fresh => Ok(false),
-            Init::Done => Ok(true),
-            Init::Down => Err(down("seerr")),
-        }
-    }
-}
-
-#[async_trait]
-impl Requests for FakeReq {
-    async fn establish(
-        &self,
-        _source: &lemonfiber_core::ports::service::IdentitySource,
-    ) -> Result<(), Failure> {
-        match self.establish {
-            Configure::Ok => Ok(()),
-            Configure::Rejects => Err(Failure::Refused {
-                service: "seerr".to_owned(),
-                detail: NO_OWNER.to_owned(),
-            }),
-        }
-    }
-
-    async fn initialized(&self) -> Result<bool, Failure> {
-        let count = match self.calls.lock() {
-            Ok(mut calls) => {
-                *calls += 1;
-                *calls
-            }
-            Err(_) => 0,
-        };
-        if count <= 1 {
-            Self::reading(&self.gate)
-        } else {
-            Self::reading(&self.readback)
-        }
-    }
-
-    /// Signing in is the first half of configuring identity, and fails the same way.
-    /// It names no media server: a service already pointed at one refuses an address.
-    async fn answers(&self) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    /// The seeding driver never reads the household's requests; the household view is
-    /// driven from its own tests.
-    async fn requests(&self) -> Result<Vec<HouseholdRequest>, Failure> {
-        Ok(Vec::new())
-    }
-
-    /// This fake drives the identity wiring, which asks about no fulfilment target.
-    async fn fulfilment_targets(
-        &self,
-    ) -> Result<Vec<lemonfiber_core::ports::service::RegisteredTarget>, Failure> {
-        Ok(Vec::new())
-    }
-
-    async fn add_fulfilment_target(
-        &self,
-        _target: &lemonfiber_core::ports::service::FulfilmentTarget,
-    ) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    async fn move_fulfilment_target(
-        &self,
-        _held: &lemonfiber_core::ports::service::RegisteredTarget,
-        _at: &lemonfiber_core::ports::service::Endpoint,
-        _key: &str,
-    ) -> Result<(), Failure> {
-        Ok(())
-    }
-    async fn minted_as(&self) -> Result<String, Failure> {
-        Ok("Seerr".to_owned())
-    }
-
-    async fn test_fulfilment_target(
-        &self,
-        _kind: lemonfiber_core::ports::media::Kind,
-        _at: &lemonfiber_core::ports::service::Endpoint,
-        _key: &str,
-    ) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    async fn media_server_link(
-        &self,
-    ) -> Result<lemonfiber_core::ports::service::MediaServerLink, Failure> {
-        Err(Failure::Unavailable {
-            service: "seerr".to_owned(),
-        })
-    }
-
-    async fn link_media_server(
-        &self,
-        _at: &lemonfiber_core::ports::service::Endpoint,
-        _key: &str,
-    ) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    /// Neither is anything about removing somebody: this file is about identity setup.
-    /// A fake that refused would make every test here about a second service.
-    async fn member_for(&self, _media_server_id: &str) -> Result<Option<String>, Failure> {
-        Ok(None)
-    }
-
-    /// What somebody may ask for is not what this file is about — identity setup is —
-    /// so it answers as a service that has never heard of them.
-    async fn requesting(
-        &self,
-        _media_server_id: &str,
-    ) -> Result<Option<lemonfiber_core::ports::service::Requesting>, Failure> {
-        Ok(None)
-    }
-
-    async fn approval_first(&self, _id: &str) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    async fn remove_member(&self, _id: &str) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    /// Linking is not what this file is about — identity setup is — so it answers
-    /// success and records nothing. A fake that refused would make every test here
-    /// about a second service's availability.
-    async fn link_members(&self, _members: &[String]) -> Result<(), Failure> {
-        Ok(())
-    }
-
-    /// What this fake was told to say the service is telling the household.
-    async fn telling(&self) -> Result<Telling, Failure> {
-        match self.gate {
-            Init::Down => Err(down("seerr")),
-            Init::Fresh | Init::Done => Ok(self
-                .told
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone()),
-        }
-    }
-
-    /// Records what was asked for, so a test reads what would reach the service.
-    async fn tell(&self, telling: &Telling) -> Result<(), Failure> {
-        match self.gate {
-            Init::Down => Err(down("seerr")),
-            Init::Fresh | Init::Done => {
-                if let Ok(mut told) = self.told.lock() {
-                    *told = telling.clone();
-                }
-                Ok(())
-            }
-        }
-    }
-
-    async fn configure_identity(
-        &self,
-        _source: &lemonfiber_core::ports::service::IdentitySource,
-    ) -> Result<(), Failure> {
-        match self.configure {
-            Configure::Ok => Ok(()),
-            Configure::Rejects => Err(Failure::Refused {
-                service: "seerr".to_owned(),
-                detail: "HTTP 500: credentials rejected".to_owned(),
-            }),
-        }
-    }
-}
+use lemonfiber_fixtures::identity::{
+    Configure, Create, Init, MediaSetup, RequestSetup, Startup, NO_OWNER,
+};
 
 /// Run the identity driver, returning the resulting state and the password it
 /// recorded (present only where one was newly minted).
 async fn identity(
-    media: FakeMedia,
-    request_service: FakeReq,
+    media: MediaSetup,
+    request_service: RequestSetup,
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
@@ -295,8 +24,8 @@ async fn identity(
 
 /// The same, against a record that takes what it is given or refuses everything.
 async fn identity_keeping(
-    media: FakeMedia,
-    request_service: FakeReq,
+    media: MediaSetup,
+    request_service: RequestSetup,
     random: Option<Vec<u8>>,
     recorded: Option<&str>,
     takes: bool,
@@ -331,8 +60,8 @@ async fn identity_keeping(
 
 /// The same two services, asked what the pass would do rather than asked to do it.
 async fn would_identity(
-    media: FakeMedia,
-    request_service: FakeReq,
+    media: MediaSetup,
+    request_service: RequestSetup,
     recorded: Option<&str>,
 ) -> (State, Option<String>) {
     // Randomness is available on purpose: what proves nothing was minted is that
@@ -362,12 +91,11 @@ async fn would_identity(
     (state, kept.lock().ok().and_then(|kept| kept.clone()))
 }
 
-fn media(startup: Startup, create: Create) -> FakeMedia {
-    FakeMedia { startup, create }
+fn media(startup: Startup, create: Create) -> MediaSetup {
+    MediaSetup::new(startup, create)
 }
 
 const RANDOM: [u8; 24] = [0x11; 24];
-const NO_OWNER: &str = "HTTP 409: no owner can be made";
 
 /// A rehearsal against a fresh media server mints no admin password and creates no
 /// account, and says what a real pass would do without a value in it.
@@ -376,7 +104,7 @@ async fn a_rehearsed_identity_mints_nothing_and_creates_no_account() {
     let (state, minted) = would_identity(
         // A creation that would be refused, so that reaching it at all would show.
         media(Startup::Fresh, Create::Rejects),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         None,
     )
     .await;
@@ -398,7 +126,7 @@ async fn a_rehearsed_identity_mints_nothing_and_creates_no_account() {
 async fn a_rehearsed_identity_leaves_an_initialised_request_service_as_it_is() {
     let (state, minted) = would_identity(
         media(Startup::Completed, Create::Ok),
-        FakeReq::new(Init::Done, Init::Done, Configure::Rejects),
+        RequestSetup::new(Init::Done, Init::Done, Configure::Rejects),
         Some("recorded-already"),
     )
     .await;
@@ -411,7 +139,7 @@ async fn a_rehearsed_identity_leaves_an_initialised_request_service_as_it_is() {
 async fn a_media_server_that_is_not_answering_skips_the_identity() {
     let (state, minted) = identity(
         media(Startup::Down, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -424,7 +152,7 @@ async fn a_media_server_that_is_not_answering_skips_the_identity() {
 async fn no_randomness_fails_rather_than_setting_a_guessable_password() {
     let (state, minted) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         None,
         None,
     )
@@ -437,7 +165,7 @@ async fn no_randomness_fails_rather_than_setting_a_guessable_password() {
 async fn a_fresh_stack_mints_the_admin_and_wires_the_identity() {
     let (state, minted) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -450,7 +178,7 @@ async fn a_fresh_stack_mints_the_admin_and_wires_the_identity() {
 async fn a_rejected_admin_creation_fails_with_the_services_own_words() {
     let (state, minted) = identity(
         media(Startup::Fresh, Create::Rejects),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -471,7 +199,7 @@ async fn a_password_that_cannot_be_recorded_is_never_given_to_the_wizard() {
     // the record instead is one that stopped before the wizard was asked anything.
     let (state, minted) = identity_keeping(
         media(Startup::Fresh, Create::Rejects),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
         false,
@@ -490,7 +218,7 @@ async fn a_media_server_set_up_outside_lemonfiber_is_skipped() {
     // it up: its credential is unknown, and the identity cannot be wired.
     let (state, minted) = identity(
         media(Startup::Completed, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -505,7 +233,7 @@ async fn a_recorded_password_wires_an_already_initialised_request_service() {
     // service is already initialised: nothing is minted and nothing re-pointed.
     let (state, minted) = identity(
         media(Startup::Completed, Create::Ok),
-        FakeReq::new(Init::Done, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Done, Init::Done, Configure::Ok),
         None,
         Some("minted-earlier"),
     )
@@ -520,7 +248,7 @@ async fn a_request_service_that_is_not_answering_still_records_the_minted_passwo
     // even though the request service could not then be reached to finish the wiring.
     let (state, minted) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Down, Init::Done, Configure::Ok),
+        RequestSetup::new(Init::Down, Init::Done, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -536,7 +264,7 @@ async fn a_request_service_that_is_not_answering_still_records_the_minted_passwo
 async fn a_rejected_sign_in_fails() {
     let (state, _) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Rejects),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Rejects),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -548,7 +276,7 @@ async fn a_rejected_sign_in_fails() {
 async fn a_refused_owner_fails_before_the_request_service_is_read() {
     let (state, _) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Done, Init::Done, Configure::Ok).refusing_an_owner(),
+        RequestSetup::new(Init::Done, Init::Done, Configure::Ok).refusing_an_owner(),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -567,7 +295,7 @@ async fn a_sign_in_that_does_not_take_is_a_failure() {
     // the read-back, so the write did not land.
     let (state, _) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Fresh, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Fresh, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -579,7 +307,7 @@ async fn a_sign_in_that_does_not_take_is_a_failure() {
 async fn a_read_back_that_cannot_be_reached_is_skipped() {
     let (state, _) = identity(
         media(Startup::Fresh, Create::Ok),
-        FakeReq::new(Init::Fresh, Init::Down, Configure::Ok),
+        RequestSetup::new(Init::Fresh, Init::Down, Configure::Ok),
         Some(RANDOM.to_vec()),
         None,
     )
@@ -602,7 +330,7 @@ async fn a_read_back_that_cannot_be_reached_is_skipped() {
 async fn a_rehearsed_identity_names_the_server_a_fresh_request_service_would_answer_to() {
     let (state, minted) = would_identity(
         media(Startup::Completed, Create::Rejects),
-        FakeReq::new(Init::Fresh, Init::Done, Configure::Rejects),
+        RequestSetup::new(Init::Fresh, Init::Done, Configure::Rejects),
         Some("recorded-already"),
     )
     .await;

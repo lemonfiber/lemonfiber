@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::{about_path, ready_path, Served};
 use crate::capabilities::media::serve;
-use crate::capabilities::tests::Upstream;
+use lemonfiber_fixtures::upstream::Upstream;
 
 #[test]
 fn every_adapter_answers_at_its_own_paths() {
