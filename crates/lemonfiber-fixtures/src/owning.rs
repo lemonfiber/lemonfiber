@@ -24,6 +24,7 @@ enum Claiming {
 /// A part answering who holds it and what a claim comes to, counting claims and restarts.
 pub struct Part {
     holder: Option<Owner>,
+    refusing: bool,
     claiming: Claiming,
     after_restart: Option<Owner>,
     restarts: AtomicUsize,
@@ -36,6 +37,15 @@ impl Part {
     #[must_use]
     pub const fn answering(holder: Option<Owner>) -> Self {
         Self::new(holder, Claiming::Refused, None)
+    }
+
+    /// A part answering, but refusing the credential lemonfiber holds for it when asked who
+    /// holds it.
+    #[must_use]
+    pub const fn refusing() -> Self {
+        let mut part = Self::new(None, Claiming::Refused, None);
+        part.refusing = true;
+        part
     }
 
     /// A part held by `holder` that a claim leaves held by `claimed`.
@@ -79,6 +89,7 @@ impl Part {
     const fn new(holder: Option<Owner>, claiming: Claiming, after_restart: Option<Owner>) -> Self {
         Self {
             holder,
+            refusing: false,
             claiming,
             after_restart,
             restarts: AtomicUsize::new(0),
@@ -105,6 +116,11 @@ impl Ownership for Part {
 
 /// How `Part` answers `owner`.
 fn owner(fake: &Part) -> Result<Owner, Failure> {
+    if fake.refusing {
+        return Err(Failure::Unauthorised {
+            service: SERVICE.to_owned(),
+        });
+    }
     let holder = match fake.after_restart {
         Some(after) if fake.restarts() > 0 => Some(after),
         _ => fake.holder,

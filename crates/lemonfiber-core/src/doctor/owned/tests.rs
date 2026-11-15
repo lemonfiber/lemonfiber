@@ -4,7 +4,7 @@ use lemonfiber_fixtures::owning;
 
 use super::{OwnedCheck, Part};
 use crate::doctor::{Check as _, Verdict};
-use crate::ports::service::{Claim, Failure, Owner, Ownership};
+use crate::ports::service::{Owner, Ownership};
 
 /// How a part the check asks answers.
 #[derive(Clone, Copy)]
@@ -15,6 +15,8 @@ enum Asked {
     Silent,
     /// It cannot be asked over its contract.
     Unaskable,
+    /// Refusing the credential lemonfiber holds for it.
+    Refusing,
 }
 
 /// The verdicts the check comes to over `parts`, each a part answering as given.
@@ -34,6 +36,7 @@ async fn verdicts(parts: Vec<Asked>) -> Vec<Verdict> {
                         Asked::Holding(owner) => Some(owning::Part::answering(Some(owner))),
                         Asked::Silent => Some(owning::Part::answering(None)),
                         Asked::Unaskable => None,
+                        Asked::Refusing => Some(owning::Part::refusing()),
                     }
                     .map(|part| Arc::new(part) as Arc<dyn Ownership>),
                 )
@@ -119,45 +122,9 @@ async fn a_machine_with_no_part_claimed_first_skips_the_check() {
     );
 }
 
-/// A part refusing every question with the credential lemonfiber holds for it.
-struct Refusing;
-
-#[async_trait::async_trait]
-impl Ownership for Refusing {
-    async fn owner(&self) -> Result<Owner, Failure> {
-        Err(refused())
-    }
-
-    async fn claim(&self) -> Result<Claim, Failure> {
-        Err(refused())
-    }
-
-    async fn claimed_by(&self) -> Result<Option<String>, Failure> {
-        Err(refused())
-    }
-}
-
-fn refused() -> Failure {
-    Failure::Unauthorised {
-        service: "part".to_owned(),
-    }
-}
-
 #[tokio::test]
 async fn a_part_answering_but_refusing_to_say_is_a_warning_naming_why() {
-    let verdicts: Vec<Verdict> = OwnedCheck::new(vec![(
-        Part {
-            id: "part-0".to_owned(),
-            name: "Part 0".to_owned(),
-            secrets: Vec::new(),
-        },
-        Some(Arc::new(Refusing) as Arc<dyn Ownership>),
-    )])
-    .run()
-    .await
-    .into_iter()
-    .map(|finding| finding.verdict)
-    .collect();
+    let verdicts = verdicts(vec![Asked::Refusing]).await;
 
     assert!(
         matches!(verdicts.as_slice(), [verdict]
