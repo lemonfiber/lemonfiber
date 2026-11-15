@@ -37,6 +37,7 @@ fn a_service(
         native: Some(kind.name().to_owned()),
         replaces: None,
         via: None,
+        fenced: false,
     }
 }
 

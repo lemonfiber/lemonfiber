@@ -39,6 +39,55 @@ fn fronted(upstream: &str, adapter: &str) -> String {
     )
 }
 
+/// What is said of the fixture with its adapter filling `indexer.proxy` in front of an
+/// upstream naming its native API, with `network` added to the upstream's table.
+fn solving(network: &str) -> Vec<String> {
+    said(
+        &fronted(
+            &format!("{UPSTREAM_SERVICE}native = \"flaresolverr\"\n{network}"),
+            "",
+        )
+        .replace(
+            "provides    = [\"media.serve\", \"komga:kobo-sync\"]",
+            "provides    = [\"indexer.proxy\"]",
+        ),
+    )
+}
+
+#[test]
+fn a_challenge_solver_outside_the_fence_is_refused() {
+    let said = solving("");
+    assert!(
+        names(
+            &said,
+            &[
+                &format!("service {UPSTREAM}.network"),
+                "indexer.proxy",
+                "fenced = true"
+            ]
+        ),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn a_fenced_challenge_solver_is_not_refused_for_its_network() {
+    let said = solving("network     = { fenced = true }\n");
+    assert!(
+        !names(
+            &said,
+            &[&format!("service {UPSTREAM}.network"), "is not fenced"]
+        ),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn an_upstream_no_solver_fronts_need_not_be_fenced() {
+    let said = fronting("native = \"komga\"\n", "");
+    assert!(!names(&said, &["is not fenced"]), "{said:?}");
+}
+
 #[test]
 fn the_upstream_an_adapter_fronts_may_name_its_native_api() {
     let said = fronting("native = \"komga\"\n", "");

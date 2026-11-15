@@ -180,6 +180,7 @@ fn filler(stack: Option<&std::path::Path>) -> crate::wiring::Filler {
         native: None,
         replaces: None,
         via: None,
+        fenced: false,
     }
 }
 
