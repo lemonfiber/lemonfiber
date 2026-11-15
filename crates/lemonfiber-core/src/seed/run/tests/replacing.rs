@@ -177,6 +177,7 @@ fn replacing_a_part_changes_nothing_that_asks() {
         [
             "download.torrent",
             "download.usenet",
+            "indexer.proxy",
             "indexer.search",
             "library.curate"
         ]

@@ -1,0 +1,76 @@
+//! The indexer told the challenge solver it fetches through, in the API the solver answers
+//! in.
+
+use super::super::{pairings, unmatched, Connection};
+use super::moved;
+use crate::seed::State;
+use crate::wiring::Chosen;
+
+/// The port the challenge solver listens on inside the stack's network.
+const LISTENS: u16 = 8191;
+
+/// What the indexer's ask for a challenge solver comes to with the solver answering in
+/// `api` on [`LISTENS`]: the connection made, or why there is none.
+fn solving_in(api: &str) -> (Vec<Option<Connection>>, Vec<String>) {
+    let fillers = moved(
+        &[],
+        &Chosen::default(),
+        |_| (),
+        |parts| {
+            for upstream in parts
+                .iter_mut()
+                .flat_map(|part| part.services.iter_mut())
+                .filter(|placed| placed.service == "flaresolverr")
+            {
+                upstream.native = Some(api.to_owned());
+                upstream.listens = Some(LISTENS);
+            }
+        },
+    );
+    let made = pairings(&fillers)
+        .iter()
+        .filter(|pairing| pairing.asker.id == "prowlarr" && pairing.filler.id == "flaresolverr")
+        .map(|pairing| {
+            pairing
+                .made
+                .clone()
+                .ok()
+                .map(|(connection, _, _)| connection)
+        })
+        .collect();
+    let said = unmatched(&fillers)
+        .into_iter()
+        .filter(|wiring| wiring.connection == "FlareSolverr into Prowlarr")
+        .filter_map(|wiring| match wiring.state {
+            State::Unmatched { reason } => Some(reason),
+            _ => None,
+        })
+        .collect();
+    (made, said)
+}
+
+/// A solver answering in the `FlareSolverr` API is told to the indexer, over the contract
+/// the indexer's adapter speaks.
+#[test]
+fn the_indexer_is_told_a_solver_answering_in_the_flaresolverr_api() {
+    assert_eq!(
+        solving_in("flaresolverr"),
+        (vec![Some(Connection::Solver)], Vec::new())
+    );
+}
+
+/// A solver answering in an API no indexer asks a solver in comes to nothing, and is said.
+#[test]
+fn a_solver_answering_in_another_api_is_reported() {
+    assert_eq!(
+        solving_in("sabnzbd"),
+        (
+            vec![None],
+            vec![
+                "FlareSolverr fills indexer.proxy, which Prowlarr asks for, and nothing in \
+                 lemonfiber tells Prowlarr about a service answering in FlareSolverr's API"
+                    .to_owned()
+            ]
+        )
+    );
+}

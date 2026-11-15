@@ -227,6 +227,11 @@ pub fn parties(media_types: &[String]) -> Vec<Party> {
             host: indexer::SITE_HOST,
             answering: indexer::site_answering(),
         },
+        Party {
+            named: "challenge solver",
+            host: indexer::SOLVER_HOST,
+            answering: indexer::solver_answering(),
+        },
     ]
 }
 

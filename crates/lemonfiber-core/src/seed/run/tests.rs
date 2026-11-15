@@ -737,6 +737,7 @@ mod recounting;
 mod replacing;
 mod requests;
 mod showing;
+mod solvers;
 mod subtitles;
 mod taken_back;
 mod targets;

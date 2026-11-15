@@ -346,6 +346,8 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             ("library.curate@1".to_owned(), "unqueue"),
             ("library.curate@1".to_owned(), "grab"),
             ("library.curate@1".to_owned(), "events"),
+            ("indexer.search@1".to_owned(), "proxies"),
+            ("indexer.search@1".to_owned(), "add_proxy"),
             ("indexer.pull@1".to_owned(), "pull"),
             ("request.intake@1".to_owned(), "minted_as"),
             ("identity.source@1".to_owned(), "sign_in_by_code"),

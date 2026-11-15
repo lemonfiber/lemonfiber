@@ -57,8 +57,8 @@
         1
       ],
       "openapi": "indexer.search/v1/openapi.json",
-      "operations": 7,
-      "sha256": "3bcedd73b8553524c58e9c9e25598d9c57b70eb50fa65ebb6d4173c609790c14"
+      "operations": 9,
+      "sha256": "32effd75e4feb5656cf3edb8df3fabc81d1c860db5f1f3cfc190e218a56b8a9c"
     },
     {
       "capability": "indexer.pull",

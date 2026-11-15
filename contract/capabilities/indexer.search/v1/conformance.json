@@ -9,6 +9,8 @@
     {"asked":{"held":{"base_url":"{indexer.search@1/applications-answers#/0/base_url}","id":"{indexer.search@1/applications-answers#/0/id}"},"key":"{minted}"},"case":"rekey_application-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"rekey_application","since":0},
     {"asked":{"now":{"nanos_since_epoch":0,"secs_since_epoch":1767225600}},"case":"indexers-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"indexers","since":0},
     {"asked":{},"case":"aggregators-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"aggregators","since":0},
-    {"asked":{"aggregator":{"key":"{minted}","name":"conformance","url":"http://conformance-aggregator"}},"case":"add_aggregator-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"add_aggregator","since":0}
+    {"asked":{"aggregator":{"key":"{minted}","name":"conformance","url":"http://conformance-aggregator"}},"case":"add_aggregator-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"add_aggregator","since":0},
+    {"asked":{},"case":"proxies-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"proxies","since":1},
+    {"asked":{"solver":{"name":"conformance","protocol":"flaresolverr","tag":"lemonfiber-solver","url":"http://conformance-solver:58191"}},"case":"add_proxy-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"add_proxy","since":1}
   ]
 }

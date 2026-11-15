@@ -123,7 +123,7 @@ pub use screening::{
 };
 pub use searching::{Asked, Detail, Found, Page, Searching, Season, Wish};
 pub use showing::{Entry, EntryWidget, Group, PageWidget, Panels, Showing};
-pub use solving::{Cookie, Solved, Solving};
+pub use solving::{Cookie, KnownSolver, Solved, SolverAt, Solvers, Solving};
 pub use subtitles::{Subtitles, Watched, Watching};
 pub use syncing::{Edited, Profiled, Reapplied, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};

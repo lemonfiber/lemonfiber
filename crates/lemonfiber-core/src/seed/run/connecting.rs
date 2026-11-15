@@ -12,8 +12,9 @@
 //!
 //! **It answers for every asker speaking a contract it is paired by, and for no other.**
 //! A curator speaking `library.curate` is told its download clients, one speaking
-//! `indexer.pull` its aggregator, and one speaking `indexer.search`, `request.intake`,
-//! `subtitles.fetch`, `quality.sync` or `archive.extract` the curators. An asker speaking
+//! `indexer.pull` its aggregator, one speaking `indexer.search` its challenge solver, and
+//! one speaking `indexer.search`, `request.intake`, `subtitles.fetch`, `quality.sync` or
+//! `archive.extract` the curators. An asker speaking
 //! none of them — one of the stack's own services, or a plugin's that declares no
 //! contract — is wired by the pass that reads what it needs, and that pass says where it
 //! cannot: the credentials it reads out of another service's in [`super::crossing`], and
@@ -25,7 +26,7 @@
 
 use lemonfiber_contract::capabilities::archive::extract;
 use lemonfiber_contract::capabilities::download::{torrent, usenet};
-use lemonfiber_contract::capabilities::indexer::{pull, search};
+use lemonfiber_contract::capabilities::indexer::{proxy, pull, search};
 use lemonfiber_contract::capabilities::library::curate;
 use lemonfiber_contract::capabilities::quality::sync;
 use lemonfiber_contract::capabilities::request::intake;
@@ -51,6 +52,10 @@ const CURATES: &str = curate::CAPABILITY;
 /// pulls from.
 const SEARCHES: &str = search::CAPABILITY;
 
+/// Solving a challenge, which the indexer asks of the service it fetches an indexer site
+/// behind bot protection through.
+const SOLVES: &str = proxy::CAPABILITY;
+
 /// Television, as the stack manifest names the media a curator files.
 pub(super) const TELEVISION: &str = Kind::Tv.media_type();
 /// Film, likewise.
@@ -66,16 +71,17 @@ pub(super) const BOOKS: &str = crate::ports::media::BOOKS;
 /// An ask for anything else, and one whose asker speaks no such contract, is connected by
 /// the pass that wires it, which reports where it cannot, and is not reported here as
 /// reached by nothing.
-const ANSWERED: [&str; 4] = [USENET, TORRENT, CURATES, SEARCHES];
+const ANSWERED: [&str; 5] = [USENET, TORRENT, CURATES, SEARCHES, SOLVES];
 
 /// Every contract an asker is paired by, each with the capability of the asks it is paired
 /// by it for: a curator is told its download clients over `library.curate`, a curator
-/// pulling its indexers its aggregator over `indexer.pull`, and each of the rest the
-/// curators over its own.
-const CONTRACTED: [(&str, &str, u32); 8] = [
+/// pulling its indexers its aggregator over `indexer.pull`, the indexer its challenge
+/// solver over `indexer.search`, and each of the rest the curators over its own.
+const CONTRACTED: [(&str, &str, u32); 9] = [
     (USENET, curate::CAPABILITY, curate::MAJOR),
     (TORRENT, curate::CAPABILITY, curate::MAJOR),
     (SEARCHES, pull::CAPABILITY, pull::MAJOR),
+    (SOLVES, search::CAPABILITY, search::MAJOR),
     (CURATES, extract::CAPABILITY, extract::MAJOR),
     (CURATES, fetch::CAPABILITY, fetch::MAJOR),
     (CURATES, search::CAPABILITY, search::MAJOR),
@@ -114,6 +120,9 @@ pub(super) enum Connection {
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
     /// filler's own key to read it with.
     Aggregator,
+    /// The filler, told to the indexer as a challenge solver it fetches through, under the
+    /// tag that sends an indexer site through it.
+    Solver,
     /// The filler, whose completed downloads the extractor unpacks and hands back to it.
     Extraction {
         /// The media it files.
@@ -239,6 +248,7 @@ fn connection(
             .ok_or(Unmade::Files),
         (pull::CAPABILITY, SEARCHES, _) if synced(asker) => Err(Unmade::Synced),
         (pull::CAPABILITY, SEARCHES, _) => Ok(Connection::Aggregator),
+        (search::CAPABILITY, SOLVES, ApiKind::Flaresolverr) => Ok(Connection::Solver),
         (extract::CAPABILITY, CURATES, ApiKind::Servarr) => media
             .first()
             .and_then(|kind| {

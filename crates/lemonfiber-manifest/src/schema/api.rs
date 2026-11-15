@@ -38,6 +38,9 @@ pub enum ApiKind {
     /// `NZBHydra2` — the Usenet indexer aggregator, which starts with no authentication,
     /// so lemonfiber turns it on with an administrator it names and a password it mints.
     Nzbhydra2,
+    /// `FlareSolverr`'s API, which Byparr answers too — a challenge solver an indexer
+    /// fetches through.
+    Flaresolverr,
 }
 
 impl ApiKind {
@@ -56,6 +59,7 @@ impl ApiKind {
             Self::Bazarr => "bazarr",
             Self::Audiobookshelf => "audiobookshelf",
             Self::Nzbhydra2 => "nzbhydra2",
+            Self::Flaresolverr => "flaresolverr",
         }
     }
 
@@ -66,7 +70,7 @@ impl ApiKind {
     }
 
     /// Every API lemonfiber speaks.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Servarr,
         Self::Sabnzbd,
         Self::Qbittorrent,
@@ -78,5 +82,6 @@ impl ApiKind {
         Self::Bazarr,
         Self::Audiobookshelf,
         Self::Nzbhydra2,
+        Self::Flaresolverr,
     ];
 }

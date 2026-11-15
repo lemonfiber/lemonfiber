@@ -62,6 +62,7 @@ pub(crate) mod identity;
 mod reset;
 mod restarting;
 mod securing;
+mod solvers;
 mod withholding;
 
 use applications::{seed_applications, skipped};
@@ -217,6 +218,7 @@ pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, 
     // A curator the aggregator cannot register itself into: it keeps its own list of
     // aggregators and pulls from them, so it is told where one is instead.
     wirings.extend(aggregators::seed_aggregators(ctx, &fillers).await);
+    wirings.extend(solvers::seed_solvers(ctx, &fillers).await);
 
     wirings.extend(owning::owned(ctx, &fillers, &installed, &mut baseline).await);
     let kept_off = owning::kept_off(&fillers, &installed, &baseline);
