@@ -1,0 +1,24 @@
+{
+  "api_version": 1,
+  "data": {
+    "id": "flaresolverr",
+    "images": [
+      {
+        "digest": "sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767",
+        "image": "ghcr.io/flaresolverr/flaresolverr",
+        "provenance": "unproven",
+        "service": "flaresolverr",
+        "why": "ghcr.io/flaresolverr/flaresolverr offers no signature for sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767; its publisher has made no claim about it, which is not the same as one that did not hold"
+      },
+      {
+        "digest": "sha256:89e25ca638e29dc2e3784d21dbfd418817e79ab06a6e325b2eda8cfa9f75de64",
+        "image": "ghcr.io/lemonfiber/flaresolverr-adapter",
+        "provenance": "unproven",
+        "service": "flaresolverr-adapter",
+        "why": "ghcr.io/lemonfiber/flaresolverr-adapter offers no signature for sha256:89e25ca638e29dc2e3784d21dbfd418817e79ab06a6e325b2eda8cfa9f75de64; its publisher has made no claim about it, which is not the same as one that did not hold"
+      }
+    ],
+    "installable": true
+  },
+  "kind": "plugin-provenance"
+}

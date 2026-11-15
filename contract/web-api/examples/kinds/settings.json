@@ -1,0 +1,579 @@
+{
+  "api_version": 1,
+  "data": {
+    "change": null,
+    "rehearsed": false,
+    "secrets": [],
+    "settings": [
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_DASHBOARD_SEARCH",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_DEVICE_KEY_APPS",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "PLEX_LINK_MODE",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "DOMAIN",
+        "name": "domain",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "FLARESOLVERR_LOG_LEVEL",
+        "name": "flaresolverr:log-level",
+        "readers": [
+          {
+            "default": "info",
+            "met": true,
+            "needs": {},
+            "service": "flaresolverr",
+            "variable": "LOG_LEVEL"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "flaresolverr",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "gluetun:addresses",
+        "readers": [
+          {
+            "default": "",
+            "met": true,
+            "needs": {
+              "gluetun:vpn-type": [
+                "wireguard"
+              ]
+            },
+            "service": "gluetun",
+            "variable": "WIREGUARD_ADDRESSES"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "VPN_COUNTRIES",
+        "name": "gluetun:countries",
+        "readers": [
+          {
+            "default": "Netherlands",
+            "met": true,
+            "needs": {},
+            "service": "gluetun",
+            "variable": "SERVER_COUNTRIES"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "gluetun:endpoint-ip",
+        "readers": [
+          {
+            "default": "",
+            "met": false,
+            "needs": {
+              "gluetun:provider": [
+                "custom"
+              ]
+            },
+            "service": "gluetun",
+            "variable": "WIREGUARD_ENDPOINT_IP"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "gluetun:endpoint-key",
+        "readers": [
+          {
+            "default": "",
+            "met": false,
+            "needs": {
+              "gluetun:provider": [
+                "custom"
+              ]
+            },
+            "service": "gluetun",
+            "variable": "WIREGUARD_PUBLIC_KEY"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "gluetun:endpoint-port",
+        "readers": [
+          {
+            "default": "",
+            "met": false,
+            "needs": {
+              "gluetun:provider": [
+                "custom"
+              ]
+            },
+            "service": "gluetun",
+            "variable": "WIREGUARD_ENDPOINT_PORT"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "off"
+          },
+          {
+            "needs": {
+              "gluetun:provider": [
+                "perfect privacy",
+                "private internet access",
+                "privatevpn",
+                "protonvpn"
+              ]
+            },
+            "open": false,
+            "value": "on"
+          }
+        ],
+        "environment": "VPN_PORT_FORWARDING",
+        "name": "gluetun:port-forwarding",
+        "readers": [
+          {
+            "default": "off",
+            "met": false,
+            "needs": {
+              "gluetun:provider": [
+                "private internet access",
+                "protonvpn"
+              ]
+            },
+            "service": "gluetun",
+            "variable": "PORT_FORWARD_ONLY"
+          },
+          {
+            "default": "off",
+            "met": true,
+            "needs": {},
+            "service": "gluetun",
+            "variable": "VPN_PORT_FORWARDING"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "fastestvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "ivpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "mullvad"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "nordvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "protonvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "surfshark"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "windscribe"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "wireguard"
+              ]
+            },
+            "open": true,
+            "value": "airvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "wireguard"
+              ]
+            },
+            "open": true,
+            "value": "custom"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "expressvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "giganews"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "hidemyass"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "ipvanish"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "perfect privacy"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "privado"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "private internet access"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "privatevpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "purevpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "slickvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "torguard"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "vyprvpn"
+          }
+        ],
+        "environment": "VPN_PROVIDER",
+        "name": "gluetun:provider",
+        "readers": [
+          {
+            "default": "",
+            "met": true,
+            "needs": {},
+            "service": "gluetun",
+            "variable": "VPN_SERVICE_PROVIDER"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "wireguard"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "openvpn"
+          }
+        ],
+        "environment": null,
+        "name": "gluetun:vpn-type",
+        "readers": [
+          {
+            "default": "wireguard",
+            "met": true,
+            "needs": {},
+            "service": "gluetun",
+            "variable": "VPN_TYPE"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "gluetun",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "HOMEPAGE_ALLOWED_HOSTS",
+        "name": "homepage:allowed-hosts",
+        "readers": [
+          {
+            "default": "localhost:3000",
+            "met": true,
+            "needs": {},
+            "service": "homepage",
+            "variable": "HOMEPAGE_ALLOWED_HOSTS"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "homepage",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "HOMEPAGE_VAR_LAN_HOST",
+        "name": "lan-host",
+        "readers": [
+          {
+            "default": "localhost",
+            "met": true,
+            "needs": {},
+            "service": "homepage",
+            "variable": "HOMEPAGE_VAR_LAN_HOST"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "RECYCLARR_CRON",
+        "name": "recyclarr:cron",
+        "readers": [
+          {
+            "default": "@daily",
+            "met": true,
+            "needs": {},
+            "service": "recyclarr",
+            "variable": "CRON_SCHEDULE"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "recyclarr",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "SEERR_LOG_LEVEL",
+        "name": "seerr:log-level",
+        "readers": [
+          {
+            "default": "info",
+            "met": true,
+            "needs": {},
+            "service": "seerr",
+            "variable": "LOG_LEVEL"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "seerr",
+          "of": "namespace"
+        }
+      },
+      {
+        "choices": null,
+        "environment": "UMASK",
+        "name": "unpackerr:umask",
+        "readers": [
+          {
+            "default": "002",
+            "met": true,
+            "needs": {},
+            "service": "unpackerr",
+            "variable": "UMASK"
+          }
+        ],
+        "value": null,
+        "whose": {
+          "namespace": "unpackerr",
+          "of": "namespace"
+        }
+      }
+    ],
+    "waiting": [
+      {
+        "service": "gluetun",
+        "wants": [
+          {
+            "choices": [
+              "fastestvpn",
+              "ivpn",
+              "mullvad",
+              "nordvpn",
+              "protonvpn",
+              "surfshark",
+              "windscribe",
+              "airvpn",
+              "custom"
+            ],
+            "kind": "setting",
+            "setting": "gluetun:provider"
+          },
+          {
+            "choices": [
+              "wireguard",
+              "openvpn"
+            ],
+            "kind": "setting",
+            "setting": "gluetun:vpn-type"
+          },
+          {
+            "choices": null,
+            "kind": "setting",
+            "setting": "gluetun:addresses"
+          }
+        ]
+      },
+      {
+        "service": "qbittorrent",
+        "wants": [
+          {
+            "kind": "service",
+            "service": "gluetun"
+          }
+        ]
+      }
+    ]
+  },
+  "kind": "settings"
+}

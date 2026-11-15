@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "request": "music-7"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "household-approve",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

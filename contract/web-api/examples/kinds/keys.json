@@ -1,0 +1,31 @@
+{
+  "api_version": 1,
+  "data": {
+    "keys": [
+      {
+        "member_minted": false,
+        "minted": 1893456000,
+        "name": "home",
+        "purpose": "home-assistant",
+        "revoked": null,
+        "scope": "read",
+        "state": "active",
+        "used": null
+      },
+      {
+        "member_minted": false,
+        "minted": 1893456000,
+        "name": "mcp",
+        "purpose": "mcp",
+        "revoked": null,
+        "scope": "read",
+        "state": "waiting",
+        "used": null
+      }
+    ],
+    "purposes": "A key's purpose is what whoever minted it said it is for. Nothing checks what a program does with a key.",
+    "rehearsed": false,
+    "revoked": null
+  },
+  "kind": "keys"
+}

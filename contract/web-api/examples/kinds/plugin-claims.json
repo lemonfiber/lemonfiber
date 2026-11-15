@@ -1,0 +1,40 @@
+{
+  "api_version": 1,
+  "data": {
+    "against": "recordings",
+    "capabilities": [
+      {
+        "filling": {
+          "answer": "by",
+          "service": "flaresolverr"
+        },
+        "name": "indexer.proxy",
+        "own": false,
+        "probes": [],
+        "service": "flaresolverr-adapter",
+        "shown": "unproven"
+      }
+    ],
+    "checks": [],
+    "contributions": [],
+    "extension_points_version": 1,
+    "id": "flaresolverr",
+    "installable": true,
+    "name": "FlareSolverr",
+    "proofs": [
+      {
+        "id": "flaresolverr.identifies",
+        "kind": "proof",
+        "says": "FlareSolverr answers that it is ready, and names its version",
+        "service": "flaresolverr",
+        "verdict": {
+          "outcome": "passed"
+        }
+      }
+    ],
+    "refusals": [],
+    "version": "1.0.0",
+    "vocabulary_version": 1
+  },
+  "kind": "plugin-claims"
+}

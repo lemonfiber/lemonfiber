@@ -1,0 +1,14 @@
+{
+  "api_version": 1,
+  "data": {
+    "grace_s": 1800,
+    "healing": "off",
+    "incomplete": false,
+    "items": [],
+    "rehearsed": false,
+    "runs": [],
+    "strikes_needed": 3,
+    "unreachable": []
+  },
+  "kind": "queue"
+}

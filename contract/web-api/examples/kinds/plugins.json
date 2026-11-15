@@ -1,0 +1,15 @@
+{
+  "api_version": 1,
+  "data": {
+    "agreement": null,
+    "demand": null,
+    "install": null,
+    "installed": [],
+    "nonconforming": [],
+    "rehearsed": false,
+    "sources": [],
+    "substituted": [],
+    "unproxied": false
+  },
+  "kind": "plugins"
+}

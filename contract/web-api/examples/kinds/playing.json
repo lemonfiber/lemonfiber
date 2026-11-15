@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "available": true,
+    "findings": [],
+    "member": "",
+    "sessions": []
+  },
+  "kind": "playing"
+}

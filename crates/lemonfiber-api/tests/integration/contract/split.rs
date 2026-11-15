@@ -42,6 +42,7 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
                 )
             })
             .collect(),
+        examples: lemonfiber_api::contract::example::Examples::default(),
     }
 }
 
@@ -137,6 +138,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
             "actions": {},
             "bodies": {},
             "events": { "heartbeat_seconds": 15, "kinds": {} },
+            "examples": { "actions": {}, "kinds": {} },
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",

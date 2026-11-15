@@ -1,0 +1,14 @@
+{
+  "api_version": 1,
+  "data": {
+    "agreement": "",
+    "project": null,
+    "refusal": "there is no single setup here holding services lemonfiber runs, so there is nothing to stand in place of — name what you meant, or stand a stack up instead",
+    "rehearsed": false,
+    "stance": "blocked",
+    "still_running": [],
+    "stopped": [],
+    "would_stop": []
+  },
+  "kind": "replacement"
+}

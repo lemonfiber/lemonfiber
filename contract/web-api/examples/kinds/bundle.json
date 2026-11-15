@@ -1,0 +1,47 @@
+{
+  "api_version": 1,
+  "data": {
+    "bytes": 3652,
+    "contents": {
+      "missing": [
+        "no configuration has been written yet"
+      ],
+      "pieces": [
+        {
+          "body": "ENV-2 Docker engine: Docker is installed but its daemon is not running\nDocker API version: the daemon did not answer, so neither version could be read\nDocker Compose: the Compose plugin reported a version that could not be read\nOrbStack network bridge: the stack's engine is not OrbStack\nThe stack comes back after a restart: disabled: starting on boot was not asked for, so nothing here is expected to bring the stack back\nWhere the stack is actually listening: nothing in this stack is publishing a port, so there is no binding to check — start it and ask again\nHardlinks: ext4, 2 names to one file\nStorage mode: local — imports hardlink instantly\nFree space: 3.0 TiB free of 4.0 TiB\nService access: Docker maps file ownership on this platform, so the host's permissions do not gate the services\nOne mount beneath the data location: neither the project nor your overlay gives a service two mounts beneath the data location, so imports inside the containers link rather than copy\nVPN verification: torrent downloads are not configured\nIndexer credential: no indexer is configured, so there is none to prove\nProviders: there are no accounts in use to read — no Usenet account the download client is pulling through, and no indexer being queried\nQuality guide source: the quality guide source could not be confirmed reachable, so whether the profiles can stay current is unknown: connection refused\nRoom for the chosen quality: the free space holds about 1319 hours of content at the balanced preset\nReleases for the chosen quality: no television, film or music service is configured, so there are no releases to check\nEvery series opens onto its seasons: the media server could not be reached\nWhat the household is told: this stack has no request service, so there is nothing to ask and nobody asking\nWho holds each service claimed first: no service here belongs to whoever claims it first\nWhat the request gate refused and removed: the request gate cannot be asked over its contract, so what it refused cannot be read\nWhat the decline service's key was used for: there is no media server to ask, or it cannot be asked over its contracts, so when the decline service's key was last used cannot be read\nWhat the media server holds under the stack's services' names: Jellyfin could not be reached\nHow the request service is linked to Plex: Plex is not the media server the request service reaches through the request gate\nPLUGIN-42 Parts this release runs as plugins: Moving jellyfin, prowlarr, qbittorrent, radarr, sonarr onto its plugin is on offer\nSETTING-8 Services waiting for what only you can give: gluetun, qbittorrent are held back until you give what they need to start\nCredential files readable only by you: none of the files lemonfiber keeps credentials in is on this machine yet, so there are no permissions to read\nThe operator's overlay: no overlay is merged over the project",
+          "name": "diagnosis.txt"
+        },
+        {
+          "body": "jellyfin: Running, health Healthy\nsonarr: Running, health Healthy\nradarr: Running, health Healthy\nprowlarr: Running, health Healthy\nqbittorrent: Running, health Healthy",
+          "name": "services.txt"
+        },
+        {
+          "body": "lemonfiber 0.17.0\nplatform MacOs",
+          "name": "platform.txt"
+        },
+        {
+          "body": "no plugin is installed",
+          "name": "plugins.txt"
+        },
+        {
+          "body": "sonarr | Application started.",
+          "name": "logs.txt"
+        }
+      ],
+      "taken": {
+        "at": 1893456000,
+        "lemonfiber": "0.17.0",
+        "stack": "0.17.0"
+      },
+      "terms": {
+        "filenames": false,
+        "revealed": [],
+        "window": "the last 200 lines of each service"
+      }
+    },
+    "path": null,
+    "rehearsed": false,
+    "would_go": "/srv/lemonfiber/support/lemonfiber-support-2030-01-01T00-00-00.tar.gz"
+  },
+  "kind": "bundle"
+}

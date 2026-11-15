@@ -1,0 +1,162 @@
+{
+  "api_version": 1,
+  "data": {
+    "unfilled": [],
+    "wired": [
+      {
+        "by": "bindery",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "capability": "indexer.search",
+          "how": "asked",
+          "origins": {
+            "nzbhydra2": {
+              "origin": "bundled"
+            },
+            "prowlarr": {
+              "origin": "bundled"
+            }
+          },
+          "services": [
+            "prowlarr"
+          ],
+          "settled": {
+            "over": [
+              "nzbhydra2"
+            ],
+            "settled": "chosen",
+            "whose": "stack",
+            "why": "Two services here answer as an indexer and this asks for one of them. Prowlarr is the stack's choice because it is the one the book *arr can pull a keyed feed from; NZBHydra2 searches Usenet only. Change it and everything that asked follows."
+          }
+        }
+      },
+      {
+        "by": "door",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "capability": "media.serve",
+          "how": "asked",
+          "origins": {
+            "audiobookshelf": {
+              "origin": "bundled"
+            },
+            "calibre-web-automated": {
+              "origin": "bundled"
+            },
+            "jellyfin": {
+              "origin": "bundled"
+            },
+            "navidrome": {
+              "origin": "bundled"
+            }
+          },
+          "services": [
+            "jellyfin"
+          ],
+          "settled": {
+            "over": [
+              "audiobookshelf",
+              "calibre-web-automated",
+              "navidrome"
+            ],
+            "settled": "chosen",
+            "whose": "stack",
+            "why": "Four services here serve media and the guarded door fronts one of them. Jellyfin is the stack's choice because it is the media server whose declaration the door enforces, and the one a household's players reach through the door. Change it and the door guards what fills it instead."
+          }
+        }
+      },
+      {
+        "by": "unpackerr",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "sonarr",
+          "why": "The image is configured per application — UN_SONARR_0_URL and its key — and what it knows is Sonarr, not whatever curates a library. The link is spelled in the service's own terms, so it is about that service."
+        }
+      },
+      {
+        "by": "unpackerr",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "radarr",
+          "why": "The same, in Radarr's terms."
+        }
+      },
+      {
+        "by": "unpackerr",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "lidarr",
+          "why": "The same, in Lidarr's terms."
+        }
+      },
+      {
+        "by": "recyclarr",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "sonarr",
+          "why": "It writes Sonarr-shaped quality profiles from Sonarr-shaped guides, into a section of its own configuration named for the service. Nothing about it generalises to a library curator."
+        }
+      },
+      {
+        "by": "recyclarr",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "radarr",
+          "why": "The same, in Radarr's terms."
+        }
+      },
+      {
+        "by": "decline",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "how": "by-name",
+          "service": "jellyfin",
+          "why": "It makes three of Jellyfin's own calls, reading an account and its activity log and writing the account's policy back disabled, with a key lemonfiber minted for it alone. What it acts on is Jellyfin, not whatever serves identity."
+        }
+      },
+      {
+        "by": "qbittorrent",
+        "origin": {
+          "origin": "bundled"
+        },
+        "reaches": {
+          "capability": "network.egress-guard",
+          "how": "asked",
+          "origins": {
+            "gluetun": {
+              "origin": "bundled"
+            }
+          },
+          "services": [
+            "gluetun"
+          ],
+          "settled": {
+            "settled": "outright"
+          }
+        }
+      }
+    ]
+  },
+  "kind": "wiring"
+}

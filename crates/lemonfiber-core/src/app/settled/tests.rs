@@ -1,11 +1,19 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use lemonfiber_fixtures::probing::Probing;
 
 use super::settled;
 use crate::config::{store, Protocols, Settings, TORRENT_KEY, USENET_KEY};
 use crate::model::{SetUp, UserFrom};
 use crate::platform::Environment;
+use crate::plugin::adapting::HANDED_TO;
+use crate::ports::filesystem::Ownership;
+use crate::project::entry::OPERATOR_FALLBACK;
 use crate::test_support::a_context;
 use crate::wizard::{Phase, Wizard};
+
+const OWNER: u32 = 4321;
 
 fn machine(name: &str) -> (crate::app::Ctx, PathBuf) {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("settled-{name}")).kept();
@@ -24,6 +32,18 @@ fn machine(name: &str) -> (crate::app::Ctx, PathBuf) {
     (ctx, config)
 }
 
+fn owned_by(ctx: crate::app::Ctx, id: u32) -> crate::app::Ctx {
+    let owner = Ownership {
+        uid: id,
+        gid: id,
+        mode: 0o755,
+    };
+    ctx.with_filesystem(Arc::new(Probing {
+        owner: Some(owner),
+        ..Probing::linking()
+    }))
+}
+
 fn configured(config: &Path, text: &str) {
     assert!(store::write(&config.join(".env"), text).is_ok());
 }
@@ -40,11 +60,11 @@ fn begun(ctx: &crate::app::Ctx, phase: Phase) {
     }));
 }
 
-#[test]
-fn a_machine_with_nothing_configured_and_no_setup_begun_is_not_set_up() {
+#[tokio::test]
+async fn a_machine_with_nothing_configured_and_no_setup_begun_is_not_set_up() {
     let (ctx, _) = machine("none");
 
-    let read = settled(&ctx);
+    let read = settled(&ctx).await;
 
     let Ok(read) = read else {
         unreachable!("the read was refused: {read:?}");
@@ -55,8 +75,8 @@ fn a_machine_with_nothing_configured_and_no_setup_begun_is_not_set_up() {
     assert_eq!(read.service_user.from, UserFrom::StackOwner);
 }
 
-#[test]
-fn a_configured_machine_says_what_setup_settled() {
+#[tokio::test]
+async fn a_configured_machine_says_what_setup_settled() {
     let (ctx, config) = machine("done");
     configured(
         &config,
@@ -65,7 +85,7 @@ fn a_configured_machine_says_what_setup_settled() {
         ),
     );
 
-    let read = settled(&ctx);
+    let read = settled(&ctx).await;
 
     let Ok(read) = read else {
         unreachable!("the read was refused: {read:?}");
@@ -84,12 +104,12 @@ fn a_configured_machine_says_what_setup_settled() {
     );
 }
 
-#[test]
-fn an_nfs_data_root_is_said_as_it_is_written() {
+#[tokio::test]
+async fn an_nfs_data_root_is_said_as_it_is_written() {
     let (ctx, config) = machine("nfs");
     configured(&config, "DATA_ROOT=nfs://nas.local/volume1/media\n");
 
-    let read = settled(&ctx).map(|read| read.data_root);
+    let read = settled(&ctx).await.map(|read| read.data_root);
 
     assert_eq!(
         read.ok().flatten().as_deref(),
@@ -97,35 +117,55 @@ fn an_nfs_data_root_is_said_as_it_is_written() {
     );
 }
 
-#[test]
-fn an_unset_service_user_is_the_owner_of_the_stack_directory() {
+#[tokio::test]
+async fn an_unset_service_user_is_the_owner_of_the_stack_directory() {
     let (ctx, config) = machine("owner");
     configured(&config, "DATA_ROOT=/srv/media\n");
-    let owner = crate::app::project::directory(&ctx)
-        .as_deref()
-        .and_then(crate::plugin::adapting::running_as);
+    let ctx = owned_by(ctx, OWNER);
 
-    let read = settled(&ctx).map(|read| read.service_user);
+    let read = settled(&ctx).await.map(|read| read.service_user);
 
     let Ok(user) = read else {
         unreachable!("the read was refused: {read:?}");
     };
-    assert_eq!(user.from, UserFrom::StackOwner);
     assert_eq!(
-        Some((user.uid, user.gid)),
-        owner.or(Some((
-            crate::project::entry::OPERATOR_FALLBACK,
-            crate::project::entry::OPERATOR_FALLBACK
-        )))
+        (user.uid, user.gid, user.from),
+        (OWNER, OWNER, UserFrom::StackOwner)
     );
 }
 
-#[test]
-fn one_id_set_is_said_as_part_set_with_the_other_the_owners() {
+#[tokio::test]
+async fn a_stack_directory_root_owns_is_said_as_the_user_root_hands_over_to() {
+    let (ctx, _) = machine("root-owned");
+    let ctx = owned_by(ctx, 0);
+
+    let read = settled(&ctx).await.map(|read| read.service_user);
+
+    let Ok(user) = read else {
+        unreachable!("the read was refused: {read:?}");
+    };
+    assert_eq!((user.uid, user.gid), HANDED_TO);
+}
+
+#[tokio::test]
+async fn a_stack_directory_naming_no_owner_is_said_as_the_fallback_user() {
+    let (ctx, _) = machine("unowned");
+    let ctx = ctx.with_filesystem(Arc::new(Probing::linking()));
+
+    let read = settled(&ctx).await.map(|read| read.service_user);
+
+    let Ok(user) = read else {
+        unreachable!("the read was refused: {read:?}");
+    };
+    assert_eq!((user.uid, user.gid), (OPERATOR_FALLBACK, OPERATOR_FALLBACK));
+}
+
+#[tokio::test]
+async fn one_id_set_is_said_as_part_set_with_the_other_the_owners() {
     let (ctx, config) = machine("part-set");
     configured(&config, "PUID=1234\n");
 
-    let read = settled(&ctx).map(|read| read.service_user);
+    let read = settled(&ctx).await.map(|read| read.service_user);
 
     let Ok(user) = read else {
         unreachable!("the read was refused: {read:?}");
@@ -133,8 +173,8 @@ fn one_id_set_is_said_as_part_set_with_the_other_the_owners() {
     assert_eq!((user.uid, user.from), (1234, UserFrom::PartSet));
 }
 
-#[test]
-fn a_setup_begun_or_stopped_part_way_is_part_way_even_over_a_written_file() {
+#[tokio::test]
+async fn a_setup_begun_or_stopped_part_way_is_part_way_even_over_a_written_file() {
     for (name, phase, written) in [
         ("gathering", Phase::InProgress, false),
         ("reviewing", Phase::Reviewing, false),
@@ -146,26 +186,26 @@ fn a_setup_begun_or_stopped_part_way_is_part_way_even_over_a_written_file() {
         }
         begun(&ctx, phase);
 
-        let read = settled(&ctx).map(|read| read.setup);
+        let read = settled(&ctx).await.map(|read| read.setup);
 
         assert_eq!(read.ok(), Some(SetUp::PartWay), "{name}");
     }
 }
 
-#[test]
-fn a_finished_setup_on_a_written_file_is_done() {
+#[tokio::test]
+async fn a_finished_setup_on_a_written_file_is_done() {
     let (ctx, config) = machine("applied");
     configured(&config, "DATA_ROOT=/srv/media\n");
     begun(&ctx, Phase::Applied);
 
-    let read = settled(&ctx).map(|read| read.setup);
+    let read = settled(&ctx).await.map(|read| read.setup);
 
     assert_eq!(read.ok(), Some(SetUp::Done));
 }
 
-#[test]
-fn nowhere_to_keep_configuration_is_refused() {
+#[tokio::test]
+async fn nowhere_to_keep_configuration_is_refused() {
     let ctx = a_context().settings(Settings::default()).build();
 
-    assert!(settled(&ctx).is_err());
+    assert!(settled(&ctx).await.is_err());
 }

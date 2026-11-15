@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "line": "Application started.",
+    "service": "sonarr",
+    "stamped": "2029-12-31T23:59:59Z",
+    "stream": "stdout"
+  },
+  "kind": "log"
+}

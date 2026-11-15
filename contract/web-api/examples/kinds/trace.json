@@ -1,0 +1,15 @@
+{
+  "api_version": 1,
+  "data": {
+    "confidence": "certain",
+    "coverage": null,
+    "findings": [],
+    "furthest": "not-monitored",
+    "history": [],
+    "item": "Sintel",
+    "matched": false,
+    "stages": [],
+    "stall": "nobody has asked for it — no service is monitoring it"
+  },
+  "kind": "trace"
+}

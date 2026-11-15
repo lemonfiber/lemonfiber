@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "back_up": [],
+    "backed_up": null,
+    "project": null,
+    "refusal": "there is no single setup here holding services lemonfiber runs, so there is nothing to take over — name what you meant, or stand a stack up instead",
+    "rehearsed": false,
+    "stance": "blocked",
+    "upgrades": []
+  },
+  "kind": "adoption"
+}

@@ -1,0 +1,71 @@
+{
+  "api_version": 1,
+  "data": {
+    "address": "http://192.168.1.20:8096",
+    "caution": "That address is a number, and routers hand out different ones — so it can stop working without anything here having changed.",
+    "clients": [
+      {
+        "client": "the official Jellyfin app, from Google Play",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "Android phone or tablet",
+        "open_source": true
+      },
+      {
+        "client": "the official Jellyfin app, from the App Store",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "iPhone or iPad",
+        "open_source": true
+      },
+      {
+        "client": "the official Jellyfin app, from the device's own store",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "Android TV or Fire TV",
+        "open_source": true
+      },
+      {
+        "client": "the official Jellyfin app",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "Apple TV",
+        "open_source": true
+      },
+      {
+        "client": "no app at all — open the address",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "A web browser",
+        "open_source": true
+      },
+      {
+        "client": "an app exists for some models",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "Smart TV (LG, Samsung)",
+        "open_source": true
+      },
+      {
+        "client": "the Jellyfin plugin",
+        "code": "http://192.168.1.20:8096",
+        "deep_link": false,
+        "device": "Kodi",
+        "open_source": true
+      }
+    ],
+    "issued": null,
+    "name": "ana",
+    "quick_connect": false,
+    "reason": "The media server would not say which devices are signed in, so whether theirs arrived is not known. Nothing on their device is at fault for that.",
+    "rehearsed": false,
+    "remedy": "ask-again",
+    "sessions": [],
+    "state": "failed",
+    "steps": [
+      "Open the app on their device and give it the server: scan the code, or type http://192.168.1.20:8096.",
+      "Sign in as ana with their own password."
+    ]
+  },
+  "kind": "handoff"
+}

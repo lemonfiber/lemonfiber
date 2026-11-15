@@ -1,0 +1,14 @@
+{
+  "api_version": 1,
+  "data": {
+    "changed": false,
+    "exceptions": [],
+    "kinds": [
+      "problem"
+    ],
+    "means": "Told when something is wrong. Silence means healthy.",
+    "preset": "problems-only",
+    "rehearsed": false
+  },
+  "kind": "alerts"
+}

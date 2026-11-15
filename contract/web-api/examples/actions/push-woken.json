@@ -1,0 +1,25 @@
+{
+  "arguments": {
+    "id": "0123456789abcdef0123456789abcdef",
+    "name": "ana"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "cause": null,
+      "code": "NOTIFY-9",
+      "detail": null,
+      "meaning": "Nothing was confirmed.",
+      "remedies": [
+        {
+          "action": "Confirm the id the wake carried, from the phone it woke",
+          "detail": null
+        }
+      ],
+      "severity": "error",
+      "state": "guided",
+      "summary": "No wake by that id was sent to ana"
+    },
+    "kind": "error"
+  }
+}

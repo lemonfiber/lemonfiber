@@ -1,0 +1,20 @@
+{
+  "api_version": 1,
+  "data": {
+    "changes": "A quality choice shapes what is fetched from now on. Nothing already in the library changes; lemonfiber quality upgrade is what fetches it again at the quality chosen.",
+    "choice": {
+      "format": "lossless",
+      "means": "A perfect copy of the CD — every bit of the recording kept.",
+      "note": "identical to the CD; a remote device may transcode it to stream",
+      "scope": "music",
+      "size_per_hour": "about 300–600 MB per hour",
+      "targets": "FLAC or ALAC, CD quality (16-bit)"
+    },
+    "disposition": "recorded",
+    "outcome": {
+      "state": "not-started"
+    },
+    "rehearsed": false
+  },
+  "kind": "music"
+}

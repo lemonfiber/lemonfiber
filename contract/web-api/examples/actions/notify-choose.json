@@ -1,0 +1,26 @@
+{
+  "arguments": {
+    "backends": [
+      "home-ntfy"
+    ]
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "cause": null,
+      "code": "NOTIFY-8",
+      "detail": null,
+      "meaning": "Nothing was changed.",
+      "remedies": [
+        {
+          "action": "Choose from the ones offered",
+          "detail": null
+        }
+      ],
+      "severity": "error",
+      "state": "guided",
+      "summary": "home-ntfy is not one of the ways offered to be told"
+    },
+    "kind": "error"
+  }
+}

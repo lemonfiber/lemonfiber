@@ -1,0 +1,397 @@
+{
+  "api_version": 1,
+  "data": {
+    "alerts": [],
+    "door": {
+      "data": {
+        "address": {
+          "caution": "That address is a number, and routers hand out different ones — so it can stop working without anything here having changed.",
+          "url": "http://192.168.1.20:8096"
+        },
+        "beside": [
+          {
+            "address": null,
+            "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+            "facing": "unstated",
+            "reaches": "unknown",
+            "service": "Audiobookshelf",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "how the others are reached, rather than one of them",
+            "facing": "carriage",
+            "reaches": "unknown",
+            "service": "Caddy",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+            "facing": "unstated",
+            "reaches": "unknown",
+            "service": "Calibre-Web-Automated",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+            "facing": "unstated",
+            "reaches": "unknown",
+            "service": "Decline service",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "an index over every service, including the ones nobody in the house should learn exist — the operator's convenience, never a way in",
+            "facing": "operators",
+            "reaches": "unknown",
+            "service": "Homepage",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+            "facing": "unstated",
+            "reaches": "unknown",
+            "service": "Navidrome",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          },
+          {
+            "address": null,
+            "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+            "facing": "unstated",
+            "reaches": "unknown",
+            "service": "Seerr",
+            "unaddressed": "It is not handed to the household, so no address is given for it."
+          }
+        ],
+        "chosen": {
+          "chosen": "derived"
+        },
+        "facing": "watching",
+        "meaning": "Jellyfin is the front door and it is not answering, so there is nowhere to send anybody yet. Nothing else here is a stand-in for it.",
+        "reaches": "here",
+        "service": "Jellyfin",
+        "standing": "unreachable"
+      },
+      "panel": "ready"
+    },
+    "downloaders": {
+      "data": [],
+      "panel": "ready"
+    },
+    "health": {
+      "affected": [],
+      "standing": "healthy",
+      "wanting_attention": 0,
+      "worst": null
+    },
+    "household": {
+      "data": {
+        "allows": null,
+        "available": false,
+        "filtering": null,
+        "findings": [
+          {
+            "code": "PLAY-4",
+            "remedy": "Add a media server to the stack and run lemonfiber setup.",
+            "said": "there is no media server to ask who is in the household, or it cannot be asked over its contracts — so who is here cannot be read"
+          }
+        ],
+        "members": [],
+        "noted": [],
+        "policy": null,
+        "rehearsed": false
+      },
+      "panel": "ready"
+    },
+    "queue": {
+      "data": [],
+      "panel": "ready"
+    },
+    "services": {
+      "data": [
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Listening to audiobooks, with progress synced",
+          "exit": null,
+          "forms": [],
+          "id": "audiobookshelf",
+          "name": "Audiobookshelf",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Finds and downloads subtitles",
+          "exit": null,
+          "forms": [],
+          "id": "bazarr",
+          "name": "Bazarr",
+          "profile": "subs",
+          "state": "absent"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Watches for books and audiobooks and fetches them",
+          "exit": null,
+          "forms": [],
+          "id": "bindery",
+          "name": "Bindery",
+          "profile": "books",
+          "state": "absent"
+        },
+        {
+          "criticality": "optional",
+          "depends_on": [],
+          "describes": "Friendly hostnames instead of ports",
+          "exit": null,
+          "forms": [],
+          "id": "caddy",
+          "name": "Caddy",
+          "profile": "proxy",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Reading and organising your ebook library",
+          "exit": null,
+          "forms": [],
+          "id": "calibre-web-automated",
+          "name": "Calibre-Web-Automated",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Lets somebody you invited turn the invitation down, and switches the account off the moment they do",
+          "exit": null,
+          "forms": [],
+          "id": "decline",
+          "name": "Decline service",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "important",
+          "depends_on": [],
+          "describes": "Lets the household reach the media server, and lets an item's stream or picture out only to someone allowed to see it",
+          "exit": null,
+          "forms": [],
+          "id": "door",
+          "name": "Door",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Gets past bot-protection on some indexers",
+          "exit": null,
+          "forms": [],
+          "id": "flaresolverr",
+          "name": "FlareSolverr",
+          "profile": "search",
+          "state": "absent"
+        },
+        {
+          "criticality": "critical",
+          "depends_on": [],
+          "describes": "Routes torrent traffic through your VPN and blocks it if the VPN drops",
+          "exit": null,
+          "forms": [],
+          "id": "gluetun",
+          "name": "Gluetun",
+          "profile": "torrent",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "One page linking everything, with live status",
+          "exit": null,
+          "forms": [],
+          "id": "homepage",
+          "name": "Homepage",
+          "profile": "dash",
+          "state": "absent"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Watches for music and fetches it",
+          "exit": null,
+          "forms": [],
+          "id": "lidarr",
+          "name": "Lidarr",
+          "profile": "music",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Plays your music library in a browser, on a phone, and in any Subsonic client",
+          "exit": null,
+          "forms": [],
+          "id": "navidrome",
+          "name": "Navidrome",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "A search box across all your Usenet indexers at once",
+          "exit": null,
+          "forms": [],
+          "id": "nzbhydra2",
+          "name": "NZBHydra2",
+          "profile": "search",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Keeps quality settings in line with community guidance",
+          "exit": null,
+          "forms": [],
+          "id": "recyclarr",
+          "name": "Recyclarr",
+          "profile": "tuning",
+          "state": "absent"
+        },
+        {
+          "criticality": "important",
+          "depends_on": [],
+          "describes": "Stands between Seerr and the curators and the media server, so Seerr holds none of their keys",
+          "exit": null,
+          "forms": [],
+          "id": "request-gate",
+          "name": "Request gate",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Downloads from Usenet",
+          "exit": null,
+          "forms": [],
+          "id": "sabnzbd",
+          "name": "SABnzbd",
+          "profile": "usenet",
+          "state": "absent"
+        },
+        {
+          "criticality": "important",
+          "depends_on": [],
+          "describes": "Where the household asks for things",
+          "exit": null,
+          "forms": [],
+          "id": "seerr",
+          "name": "Seerr",
+          "profile": "media",
+          "state": "absent"
+        },
+        {
+          "criticality": "enhancing",
+          "depends_on": [],
+          "describes": "Extracts archived releases so they can be imported",
+          "exit": null,
+          "forms": [],
+          "id": "unpackerr",
+          "name": "Unpackerr",
+          "profile": "tuning",
+          "state": "absent"
+        },
+        {
+          "criticality": "important",
+          "depends_on": [],
+          "describes": "Plays your library on TVs, phones and browsers",
+          "exit": null,
+          "forms": [],
+          "id": "jellyfin",
+          "name": "Jellyfin",
+          "profile": "media",
+          "state": "healthy"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Holds your indexer accounts in one place and shares them with everything else",
+          "exit": null,
+          "forms": [],
+          "id": "prowlarr",
+          "name": "Prowlarr",
+          "profile": "search",
+          "state": "healthy"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [
+            "gluetun"
+          ],
+          "describes": "Downloads the torrents everything else asks for",
+          "exit": null,
+          "forms": [],
+          "id": "qbittorrent",
+          "name": "qBittorrent",
+          "profile": "torrent",
+          "state": "healthy"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Watches for films and fetches them",
+          "exit": null,
+          "forms": [],
+          "id": "radarr",
+          "name": "Radarr",
+          "profile": "movies",
+          "state": "healthy"
+        },
+        {
+          "criticality": "core",
+          "depends_on": [],
+          "describes": "Watches for new episodes and fetches them",
+          "exit": null,
+          "forms": [],
+          "id": "sonarr",
+          "name": "Sonarr",
+          "profile": "tv",
+          "state": "healthy"
+        }
+      ],
+      "panel": "ready"
+    },
+    "storage": {
+      "data": {
+        "config_free": {
+          "reading": "known",
+          "value": 3298534883328
+        },
+        "exhaustion": null,
+        "free": {
+          "reading": "known",
+          "value": 3298534883328
+        },
+        "hardlink": "linking"
+      },
+      "panel": "ready"
+    },
+    "stuck": [],
+    "telemetry": "live",
+    "transfers": {
+      "data": [],
+      "panel": "ready"
+    },
+    "vpn": null
+  },
+  "kind": "dashboard"
+}

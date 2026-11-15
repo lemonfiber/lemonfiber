@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "tier": "services"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "uninstall",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

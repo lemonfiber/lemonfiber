@@ -22,9 +22,9 @@ use lemonfiber_core::wizard::{Library, Plan};
 
 use lemonfiber_core::config::display::in_full;
 
-use super::flags::parse_ids;
 use super::Answers;
 use crate::say::say;
+use lemonfiber::setting_up::flags::parse_ids;
 
 /// A prompt that reads the operator's answers from the terminal.
 pub struct Terminal {

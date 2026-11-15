@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "data": {
+    "asks-through-the-request-service": false,
+    "confirmed": false,
+    "findings": [
+      "the request service could not be asked what it holds for them, so what it holds is not counted and not removed"
+    ],
+    "name": "ana",
+    "offer": "f5a4fb5b-9e9f240c-d6acf5f2",
+    "rehearsed": false,
+    "requests": 0,
+    "revoked": "nothing",
+    "watch-history": "Their watch history goes with the account, and cannot be got back."
+  },
+  "kind": "removal"
+}

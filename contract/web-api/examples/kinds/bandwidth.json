@@ -1,0 +1,46 @@
+{
+  "api_version": 1,
+  "data": {
+    "acting": null,
+    "applied": false,
+    "cap": null,
+    "capacity": null,
+    "cautions": [],
+    "clients": [],
+    "down": {
+      "limit": {
+        "as": "unlimited"
+      },
+      "resolved": {
+        "is": "unlimited"
+      },
+      "says": "no limit"
+    },
+    "means": "nothing holds the stack back, so it will take whatever the line has",
+    "metered": null,
+    "ratio": null,
+    "reached": null,
+    "rehearsed": false,
+    "respite": {
+      "standing": "none"
+    },
+    "respite_says": null,
+    "restraint": "unlimited",
+    "rhythm": null,
+    "untouched": [
+      "Anybody watching from your own library, over your own network. That traffic never goes out over the line, so nothing here can slow it down and nothing here tries.",
+      "Everything else this machine does. lemonfiber sets limits inside its own download clients and nowhere else — it does not shape the machine's traffic, which would want privileges it should not hold and would reach applications that are none of its business."
+    ],
+    "up": {
+      "limit": {
+        "as": "unlimited"
+      },
+      "resolved": {
+        "is": "unlimited"
+      },
+      "says": "no limit"
+    },
+    "zone": null
+  },
+  "kind": "bandwidth"
+}

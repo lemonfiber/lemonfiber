@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "data": {
+    "data_root": null,
+    "protocols": {
+      "torrent": false,
+      "usenet": false
+    },
+    "service_user": {
+      "from": "stack-owner",
+      "gid": 1000,
+      "uid": 1000
+    },
+    "setup": "none"
+  },
+  "kind": "settled"
+}

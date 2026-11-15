@@ -1,0 +1,11 @@
+{
+  "api_version": 1,
+  "data": {
+    "app": "android:com.google.android.gsf@f0fd6c5b410f25cb25c3b53346c8972fae30f8ee7411df910480ad6b2d60db83",
+    "backing": "tee",
+    "fingerprint": "b28dae296735a1c8979992272a74123f5db729a9771de9118d105d1954528971",
+    "name": "pixel",
+    "registered": 1736294400
+  },
+  "kind": "device-key"
+}

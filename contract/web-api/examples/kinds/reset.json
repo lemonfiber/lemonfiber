@@ -1,0 +1,11 @@
+{
+  "api_version": 1,
+  "data": {
+    "confirmed": false,
+    "offer": "00000000-00000000",
+    "rehearsed": false,
+    "reverted": [],
+    "reverted_connections": []
+  },
+  "kind": "reset"
+}

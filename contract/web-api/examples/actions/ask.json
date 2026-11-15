@@ -1,0 +1,25 @@
+{
+  "arguments": {
+    "id": "603",
+    "kind": "movies",
+    "name": "ana"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "kind": "movies",
+      "leaves": {
+        "films": 0,
+        "television": 5
+      },
+      "member": "ana",
+      "outcome": "asked",
+      "rehearsed": false,
+      "released": true,
+      "said": "Asked. It's on its way. After this, there's room for no more films and 5 more seasons of television.",
+      "seasons": [],
+      "title": "603"
+    },
+    "kind": "asked"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "api_version": 1,
+  "data": {
+    "monitors": [],
+    "reachable": false,
+    "read_at": 1893456000,
+    "uncovered": [
+      {
+        "service": "bindery"
+      },
+      {
+        "service": "gluetun"
+      },
+      {
+        "service": "lidarr"
+      },
+      {
+        "service": "prowlarr"
+      },
+      {
+        "service": "qbittorrent"
+      },
+      {
+        "service": "radarr"
+      },
+      {
+        "service": "sabnzbd"
+      },
+      {
+        "service": "sonarr"
+      },
+      {
+        "entry-point": "door"
+      }
+    ],
+    "unreachable_because": "nothing fills status.watch"
+  },
+  "kind": "watcher"
+}

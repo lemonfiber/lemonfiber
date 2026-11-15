@@ -1,0 +1,19 @@
+{
+  "api_version": 1,
+  "data": {
+    "cause": null,
+    "code": "READ-13",
+    "detail": null,
+    "meaning": "The read cannot be answered as it was asked, and answering a different question in its place would read like the answer to this one.",
+    "remedies": [
+      {
+        "action": "Ask again as the sentence says",
+        "detail": null
+      }
+    ],
+    "severity": "error",
+    "state": "actionable",
+    "summary": "Which of stack or self to move forward must be named."
+  },
+  "kind": "error"
+}

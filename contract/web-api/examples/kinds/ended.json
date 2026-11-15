@@ -1,0 +1,9 @@
+{
+  "api_version": 1,
+  "data": {
+    "action": "up",
+    "ended": "released",
+    "job": "6162636465666768"
+  },
+  "kind": "ended"
+}

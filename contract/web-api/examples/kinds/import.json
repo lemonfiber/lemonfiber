@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "carried": [],
+    "not_carried": [],
+    "project": null,
+    "refusal": "there is no single setup here holding services lemonfiber runs, so there is nothing to carry across",
+    "rehearsed": false,
+    "stance": "blocked",
+    "would_carry": []
+  },
+  "kind": "import"
+}

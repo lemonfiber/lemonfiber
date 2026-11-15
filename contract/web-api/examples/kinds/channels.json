@@ -1,0 +1,21 @@
+{
+  "api_version": 1,
+  "data": {
+    "channels": [
+      {
+        "id": "c1",
+        "name": "Channel One",
+        "now": {
+          "certificate": null,
+          "ends": null,
+          "title": "The Evening News"
+        },
+        "number": "1"
+      }
+    ],
+    "id": "a7f3",
+    "member": "ana",
+    "rehearsed": false
+  },
+  "kind": "channels"
+}

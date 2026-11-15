@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "data": {
+    "caution": "That address is a number, and routers hand out different ones — so it can stop working without anything here having changed.",
+    "compare": "UQEN-VAUM-7FUP-7XSS",
+    "material": {
+      "address": "https://192.168.1.20:8471",
+      "expires": 1893456600,
+      "fingerprint": "c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d",
+      "stack": "6162636465666768696a6b6c6d6e6f70"
+    },
+    "replacing": "The certificate this address presents was made by lemonfiber and nothing renews it. It changes only when somebody replaces it. Every phone paired with this machine refuses it from then on, as it should for a certificate it was never shown, until it is paired again with new material.",
+    "until": 1893456600,
+    "written": "{\"address\":\"https://192.168.1.20:8471\",\"fingerprint\":\"c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d\",\"expires\":1893456600,\"stack\":\"6162636465666768696a6b6c6d6e6f70\"}"
+  },
+  "kind": "pairing"
+}

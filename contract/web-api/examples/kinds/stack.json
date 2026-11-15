@@ -1,0 +1,114 @@
+{
+  "api_version": 1,
+  "data": {
+    "env": "/srv/lemonfiber/.env",
+    "exceptions": [
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "caddy"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "calibre-web-automated"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "decline"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "flaresolverr"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "homepage"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "audiobookshelf"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "lidarr"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "navidrome"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "door"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "nzbhydra2"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "bindery"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "bazarr"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "recyclarr"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "request-gate"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "seerr"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "unpackerr"
+      }
+    ],
+    "non_interactive": {
+      "form": "lemonfiber <command>"
+    },
+    "plain_up": [
+      "docker",
+      "compose",
+      "--project-name",
+      "lemonfiber",
+      "--project-directory",
+      "/srv/lemonfiber/stack",
+      "--file",
+      "/srv/lemonfiber/stack/compose.generated.yml",
+      "--profile",
+      "books",
+      "--profile",
+      "dash",
+      "--profile",
+      "media",
+      "--profile",
+      "movies",
+      "--profile",
+      "music",
+      "--profile",
+      "notify",
+      "--profile",
+      "proxy",
+      "--profile",
+      "search",
+      "--profile",
+      "subs",
+      "--profile",
+      "tuning",
+      "--profile",
+      "tv",
+      "up",
+      "--detach"
+    ],
+    "project": "/srv/lemonfiber/stack",
+    "source": {
+      "own": "/srv/lemonfiber/stack"
+    }
+  },
+  "kind": "stack"
+}

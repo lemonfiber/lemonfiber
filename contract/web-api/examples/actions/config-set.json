@@ -1,0 +1,39 @@
+{
+  "arguments": {
+    "key": "LEMONFIBER_EXPLANATIONS",
+    "value": "off"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "changed": true,
+      "rehearsed": false,
+      "review": {
+        "change": {
+          "cost": "cheap",
+          "key": "LEMONFIBER_EXPLANATIONS",
+          "to": "off"
+        },
+        "findings": {
+          "active": [],
+          "keeps": [],
+          "library": [],
+          "opens": [],
+          "stops": []
+        },
+        "stance": "applied"
+      },
+      "settings": [
+        {
+          "key": "LEMONFIBER_EXPLANATIONS",
+          "origin": {
+            "origin": "operator"
+          },
+          "secret": false,
+          "value": "off"
+        }
+      ]
+    },
+    "kind": "config"
+  }
+}

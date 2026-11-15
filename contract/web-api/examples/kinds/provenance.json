@@ -1,0 +1,215 @@
+{
+  "api_version": 1,
+  "data": {
+    "services": [
+      {
+        "digest": "sha256:581d68b2a6fc7ebf58d81c878a9f387cbbc0d88ac9d37b298b9cee10168af85b",
+        "id": "audiobookshelf",
+        "image": "ghcr.io/advplyr/audiobookshelf",
+        "license": "GPL-3.0-only",
+        "name": "Audiobookshelf",
+        "pinned": "2.37.1",
+        "upstream": "https://github.com/advplyr/audiobookshelf"
+      },
+      {
+        "digest": "sha256:c1673816321156b904af9b7e6415ea547ae9622e4acc375358f1e1eb9ed1e904",
+        "id": "bazarr",
+        "image": "lscr.io/linuxserver/bazarr",
+        "license": "GPL-3.0-only",
+        "name": "Bazarr",
+        "pinned": "v1.6.2-ls367",
+        "upstream": "https://github.com/morpheus65535/bazarr"
+      },
+      {
+        "digest": "sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489",
+        "id": "bindery",
+        "image": "ghcr.io/vavallee/bindery",
+        "license": "MIT",
+        "name": "Bindery",
+        "pinned": "v1.43.1",
+        "upstream": "https://github.com/vavallee/bindery"
+      },
+      {
+        "digest": "sha256:6fb83b5215f34ce6c48d81bc4b42f2ca973343b5a330c46463f470e189bbc147",
+        "id": "caddy",
+        "image": "ghcr.io/lemonfiber/caddy",
+        "license": "Apache-2.0",
+        "name": "Caddy",
+        "pinned": "main-7e36d4e7166c",
+        "upstream": "https://github.com/caddyserver/caddy"
+      },
+      {
+        "digest": "sha256:577e846f104fd21453ef306eefb4a95dd95b3b9ddd2463a150944494284da0fd",
+        "id": "calibre-web-automated",
+        "image": "crocodilestick/calibre-web-automated",
+        "license": "GPL-3.0-only",
+        "name": "Calibre-Web-Automated",
+        "pinned": "V3.1.4",
+        "upstream": "https://github.com/crocodilestick/Calibre-Web-Automated"
+      },
+      {
+        "digest": "sha256:ee908ae2c4cb7d41682f4d8410c65dc6a09038a75a1153a037d6292c89f6a6e8",
+        "id": "decline",
+        "image": "ghcr.io/lemonfiber/decline",
+        "license": "Hippocratic-3.0",
+        "name": "Decline service",
+        "pinned": "main-41947a4c7bbf",
+        "upstream": "https://github.com/lemonfiber/lemonfiber-decline"
+      },
+      {
+        "digest": "sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def",
+        "id": "door",
+        "image": "ghcr.io/lemonfiber/door",
+        "license": "Hippocratic-3.0",
+        "name": "Door",
+        "pinned": "main-5b65b742fdf9",
+        "upstream": "https://github.com/lemonfiber/lemonfiber-door"
+      },
+      {
+        "digest": "sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767",
+        "id": "flaresolverr",
+        "image": "ghcr.io/flaresolverr/flaresolverr",
+        "license": "MIT",
+        "name": "FlareSolverr",
+        "pinned": "v3.5.2",
+        "upstream": "https://github.com/FlareSolverr/FlareSolverr"
+      },
+      {
+        "digest": "sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027",
+        "id": "gluetun",
+        "image": "qmcgaw/gluetun",
+        "license": "MIT",
+        "name": "Gluetun",
+        "pinned": "v3.41.3",
+        "upstream": "https://github.com/qdm12/gluetun"
+      },
+      {
+        "digest": "sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28",
+        "id": "homepage",
+        "image": "ghcr.io/gethomepage/homepage",
+        "license": "GPL-3.0-only",
+        "name": "Homepage",
+        "pinned": "v1.13.2",
+        "upstream": "https://github.com/gethomepage/homepage"
+      },
+      {
+        "digest": "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db",
+        "id": "jellyfin",
+        "image": "docker.io/jellyfin/jellyfin",
+        "license": "GPL-2.0-only",
+        "name": "Jellyfin",
+        "pinned": "10.11.11",
+        "upstream": "https://github.com/jellyfin/jellyfin"
+      },
+      {
+        "digest": "sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0",
+        "id": "lidarr",
+        "image": "lscr.io/linuxserver/lidarr",
+        "license": "GPL-3.0-only",
+        "name": "Lidarr",
+        "pinned": "2.14.5.4836-ls9",
+        "upstream": "https://github.com/Lidarr/Lidarr"
+      },
+      {
+        "digest": "sha256:38dc2727bfcfd5ede290f8ada114fc90368146f265ae4701ddddbcbe2a44ee52",
+        "id": "navidrome",
+        "image": "ghcr.io/navidrome/navidrome",
+        "license": "GPL-3.0-only",
+        "name": "Navidrome",
+        "pinned": "0.64.2",
+        "upstream": "https://github.com/navidrome/navidrome"
+      },
+      {
+        "digest": "sha256:3cdcea6fc97861bb30ef2551884f1c371e08a884c2f75230c7a3a2e14c5f0516",
+        "id": "nzbhydra2",
+        "image": "lscr.io/linuxserver/nzbhydra2",
+        "license": "Apache-2.0",
+        "name": "NZBHydra2",
+        "pinned": "v8.9.0-ls104",
+        "upstream": "https://github.com/theotherp/nzbhydra2"
+      },
+      {
+        "digest": "sha256:4e992f9b9229bc8c97c666b10b042a7360bce1d99b196e8aa29fd9805849cbf1",
+        "id": "prowlarr",
+        "image": "lscr.io/linuxserver/prowlarr",
+        "license": "GPL-3.0-only",
+        "name": "Prowlarr",
+        "pinned": "2.6.5.5623-ls164",
+        "upstream": "https://github.com/Prowlarr/Prowlarr"
+      },
+      {
+        "digest": "sha256:97333cc1ccf903e0bbcd8eb67e3332e4970e9c1ecabe145e499e9c0847ebcaed",
+        "id": "qbittorrent",
+        "image": "lscr.io/linuxserver/qbittorrent",
+        "license": "GPL-2.0-only",
+        "name": "qBittorrent",
+        "pinned": "5.2.4_v2.0.15-ls480",
+        "upstream": "https://github.com/qbittorrent/qBittorrent"
+      },
+      {
+        "digest": "sha256:c984533510abe0219a70e80d15bd0d212b7df21baa0913759c4ce6cc9092240b",
+        "id": "radarr",
+        "image": "lscr.io/linuxserver/radarr",
+        "license": "GPL-3.0-only",
+        "name": "Radarr",
+        "pinned": "5.28.0.10274-ls286",
+        "upstream": "https://github.com/Radarr/Radarr"
+      },
+      {
+        "digest": "sha256:9c6c74d52cfc6f740a5a3624aa83867e171bb70b90453ddb7a4048b8c80445f9",
+        "id": "recyclarr",
+        "image": "ghcr.io/recyclarr/recyclarr",
+        "license": "MIT",
+        "name": "Recyclarr",
+        "pinned": "8.7.3",
+        "upstream": "https://github.com/recyclarr/recyclarr"
+      },
+      {
+        "digest": "sha256:70b128574814b4d6df92182f4542c1a192094f98fa83a0a30941bd49b70d17d4",
+        "id": "request-gate",
+        "image": "ghcr.io/lemonfiber/request-gate",
+        "license": "Hippocratic-3.0",
+        "name": "Request gate",
+        "pinned": "main-08b9bd470700",
+        "upstream": "https://github.com/lemonfiber/lemonfiber-request-gate"
+      },
+      {
+        "digest": "sha256:374051b90f64d107f8658dcd9b9065c28826afe14562647214f45057e119fc04",
+        "id": "sabnzbd",
+        "image": "lscr.io/linuxserver/sabnzbd",
+        "license": "GPL-2.0-only",
+        "name": "SABnzbd",
+        "pinned": "4.5.5-ls250",
+        "upstream": "https://github.com/sabnzbd/sabnzbd"
+      },
+      {
+        "digest": "sha256:27602401178d54f1964442287b9f23f67a3fa2252645ee8065839ea1c3f69e45",
+        "id": "seerr",
+        "image": "ghcr.io/seerr-team/seerr",
+        "license": "MIT",
+        "name": "Seerr",
+        "pinned": "v3.5.0",
+        "upstream": "https://github.com/seerr-team/seerr"
+      },
+      {
+        "digest": "sha256:dffc730adcb8b4f4342792fbb27fcad9c62fb8660523f2aeb082416980d7fe0c",
+        "id": "sonarr",
+        "image": "lscr.io/linuxserver/sonarr",
+        "license": "GPL-3.0-only",
+        "name": "Sonarr",
+        "pinned": "4.0.20.3014-ls327",
+        "upstream": "https://github.com/Sonarr/Sonarr"
+      },
+      {
+        "digest": "sha256:724c702e81727e3d90c42cf2b3d900674203906a6d135ba07416c9a3f9f67fbb",
+        "id": "unpackerr",
+        "image": "ghcr.io/hotio/unpackerr",
+        "license": "MIT",
+        "name": "Unpackerr",
+        "pinned": "release-0.15.2",
+        "upstream": "https://github.com/Unpackerr/unpackerr"
+      }
+    ]
+  },
+  "kind": "provenance"
+}

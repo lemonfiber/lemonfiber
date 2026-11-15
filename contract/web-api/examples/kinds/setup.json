@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "data_root": "/srv/lemonfiber/media",
+    "outcome": "applied",
+    "protocols": {
+      "torrent": true,
+      "usenet": false
+    },
+    "service_user": null
+  },
+  "kind": "setup"
+}

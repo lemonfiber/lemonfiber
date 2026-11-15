@@ -1,0 +1,19 @@
+{
+  "api_version": 1,
+  "data": {
+    "address": "http://192.168.1.20:8096",
+    "applied": null,
+    "caution": "That address is a number, and routers hand out different ones — so it can stop working without anything here having changed.",
+    "decline": null,
+    "hours": 48,
+    "join": null,
+    "linked": "not-tried",
+    "name": "bo",
+    "rehearsed": true,
+    "standing": "made",
+    "suspended": [],
+    "unjoinable": null,
+    "withdrawn": []
+  },
+  "kind": "invitation"
+}

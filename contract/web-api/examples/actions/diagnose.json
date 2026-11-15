@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "disruptive": true
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "diagnose",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

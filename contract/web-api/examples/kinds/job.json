@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "data": {
+    "action": "logs",
+    "job": "6162636465666768"
+  },
+  "kind": "job"
+}

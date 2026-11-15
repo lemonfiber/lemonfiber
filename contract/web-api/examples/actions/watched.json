@@ -1,0 +1,17 @@
+{
+  "arguments": {
+    "id": "0123456789abcdef0123456789abcdef",
+    "name": "ana",
+    "position": 1234
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "ended": false,
+      "id": "0123456789abcdef0123456789abcdef",
+      "position": 1234,
+      "rehearsed": false
+    },
+    "kind": "watched"
+  }
+}

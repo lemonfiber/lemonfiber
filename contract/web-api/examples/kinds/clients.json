@@ -1,0 +1,131 @@
+{
+  "api_version": 1,
+  "data": {
+    "devices": [
+      {
+        "caution": null,
+        "client": "the official Jellyfin app, from Google Play",
+        "deep_link": null,
+        "device": "Android phone or tablet",
+        "instead": null,
+        "open_source": true,
+        "support": "good"
+      },
+      {
+        "caution": null,
+        "client": "the official Jellyfin app, from the App Store",
+        "deep_link": null,
+        "device": "iPhone or iPad",
+        "instead": null,
+        "open_source": true,
+        "support": "good"
+      },
+      {
+        "caution": null,
+        "client": "the official Jellyfin app, from the device's own store",
+        "deep_link": null,
+        "device": "Android TV or Fire TV",
+        "instead": null,
+        "open_source": true,
+        "support": "good"
+      },
+      {
+        "caution": "Other apps are widely used here and some people prefer them. The official one is the answer if you do not already have an opinion.",
+        "client": "the official Jellyfin app",
+        "deep_link": null,
+        "device": "Apple TV",
+        "instead": null,
+        "open_source": true,
+        "support": "workable"
+      },
+      {
+        "caution": "Nothing to install, and it works on anything with a screen. This is the answer whenever an app for the device is missing, broken, or more trouble than it is worth.",
+        "client": "no app at all — open the address",
+        "deep_link": null,
+        "device": "A web browser",
+        "instead": null,
+        "open_source": true,
+        "support": "fallback"
+      },
+      {
+        "caution": "This is the weakest part of the landscape. Whether there is a working app depends on the make and on how old the television is, and a set that worked last year can stop after an update nobody asked for.",
+        "client": "an app exists for some models",
+        "deep_link": null,
+        "device": "Smart TV (LG, Samsung)",
+        "instead": "A streaming stick plugged into the television is about the price of a takeaway and turns this into the well-served case above. Casting from a phone works too, and costs nothing to try first.",
+        "open_source": true,
+        "support": "poor"
+      },
+      {
+        "caution": "For somebody who already runs Kodi and wants to keep it. Not worth installing Kodi in order to reach this stack.",
+        "client": "the Jellyfin plugin",
+        "deep_link": null,
+        "device": "Kodi",
+        "instead": null,
+        "open_source": true,
+        "support": "workable"
+      }
+    ],
+    "nothing_is_installed": "lemonfiber does not install anything on your device and cannot. What is here is where to look and what to choose; the installing is yours.",
+    "only_at_home": "All of this works on your home network and nowhere else. Away from the house, none of these apps will find the server — that is how it is meant to be for now, not a fault.",
+    "straining": null,
+    "trouble": [
+      {
+        "causes": [
+          {
+            "because": "The address is wrong, or it has changed.",
+            "fix": "Check it against what lemonfiber front-door says now. That address is read from this machine at the moment of asking, so a machine that was renamed answers differently from the note somebody wrote down.",
+            "tell": "Every device fails the same way, including one that worked yesterday."
+          },
+          {
+            "because": "The device is on a different network from the server.",
+            "fix": "Put it back on the home Wi-Fi. A phone that fell back to mobile data is the common one, and it looks like a broken address rather than a network it is on.",
+            "tell": "The device has working internet, and another device in the house can reach the server."
+          },
+          {
+            "because": "The server is not running.",
+            "fix": "lemonfiber status says whether it is, and lemonfiber up starts it.",
+            "tell": "No device can reach it, and this is the one you can answer without leaving your chair."
+          }
+        ],
+        "symptom": "The app cannot find the server"
+      },
+      {
+        "causes": [
+          {
+            "because": "Guest networks keep devices from reaching each other, which is what they are for.",
+            "fix": "Join the ordinary home network. There is nothing to change on the server: a guest network is doing its job.",
+            "tell": "The device has working internet and the address is right, and nothing answers — which looks exactly like a wrong address."
+          }
+        ],
+        "symptom": "The device is on the guest Wi-Fi"
+      },
+      {
+        "causes": [
+          {
+            "because": "Nothing has been scanned yet.",
+            "fix": "A new library, or one whose files moved, has nothing until it is scanned. The media server scans on a schedule and can be told to now.",
+            "tell": "Nobody sees anything, including you."
+          },
+          {
+            "because": "The account has been given access to no library.",
+            "fix": "The account exists and can sign in — what it lacks is permission. Give it the libraries it should see in the media server's user settings.",
+            "tell": "Somebody else sees content and this person does not."
+          }
+        ],
+        "symptom": "The library is empty after signing in"
+      },
+      {
+        "causes": [
+          {
+            "because": "The address changed and the app remembers the old one.",
+            "fix": "Change the saved server in the app to what lemonfiber front-door says now. Where an app offers no way to edit it, remove the server and add it again.",
+            "tell": "It stopped for everybody at once, and a browser opened at the current address still works."
+          }
+        ],
+        "symptom": "It worked and now the app cannot connect"
+      }
+    ]
+  },
+  "kind": "clients"
+}

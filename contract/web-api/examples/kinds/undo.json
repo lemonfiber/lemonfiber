@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "left": [],
+    "noted": [],
+    "rehearsed": false,
+    "reversed": []
+  },
+  "kind": "undo"
+}

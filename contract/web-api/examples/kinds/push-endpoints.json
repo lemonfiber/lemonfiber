@@ -1,0 +1,15 @@
+{
+  "api_version": 1,
+  "data": {
+    "endpoints": [
+      {
+        "endpoint": "https://push.example/send/a-phone",
+        "name": "a-phone",
+        "registered": 1893456000
+      }
+    ],
+    "rehearsed": false,
+    "removed": null
+  },
+  "kind": "push-endpoints"
+}

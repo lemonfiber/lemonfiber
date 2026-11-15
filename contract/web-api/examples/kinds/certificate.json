@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "consequence": "Every phone paired with this machine refuses it from then on, as it should for a certificate it was never shown, until it is paired again with new material.",
+    "fingerprint": "c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d",
+    "rehearsed": false,
+    "replaced": false
+  },
+  "kind": "certificate"
+}

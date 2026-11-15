@@ -1,0 +1,74 @@
+{
+  "api_version": 1,
+  "data": {
+    "forms": [
+      {
+        "composable": true,
+        "description": "Find things. Nothing else runs.",
+        "id": "search",
+        "name": "Search"
+      },
+      {
+        "composable": true,
+        "description": "You have a link — fetch it.",
+        "id": "dl",
+        "name": "Download"
+      },
+      {
+        "composable": true,
+        "description": "Search and grab, manually.",
+        "id": "hunt",
+        "name": "Hunt"
+      },
+      {
+        "composable": true,
+        "description": "Search, download and automate television",
+        "id": "tv",
+        "name": "TV"
+      },
+      {
+        "composable": true,
+        "description": "Search, download and automate film",
+        "id": "movies",
+        "name": "Movies"
+      },
+      {
+        "composable": true,
+        "description": "Search, download and automate music",
+        "id": "music",
+        "name": "Music"
+      },
+      {
+        "composable": true,
+        "description": "Search, download and automate books and audiobooks",
+        "id": "books",
+        "name": "Books"
+      },
+      {
+        "composable": true,
+        "description": "Everything automated, nothing served",
+        "id": "auto",
+        "name": "Auto"
+      },
+      {
+        "composable": true,
+        "description": "Serve what exists. Requires no third-party accounts.",
+        "id": "library",
+        "name": "Library"
+      },
+      {
+        "composable": true,
+        "description": "The lot.",
+        "id": "full",
+        "name": "Full"
+      },
+      {
+        "composable": true,
+        "description": "Friendly hostnames. Layers onto any other form.",
+        "id": "proxy",
+        "name": "Proxy"
+      }
+    ]
+  },
+  "kind": "forms"
+}

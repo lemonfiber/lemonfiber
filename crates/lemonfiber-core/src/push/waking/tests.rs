@@ -3,12 +3,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::phones::{a_phone_key, a_phone_secret};
 use lemonfiber_fixtures::ports::Chance;
-use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
-use ring::rand::SystemRandom;
 
 use super::{delivered, woke};
 use crate::app::Ctx;
@@ -22,10 +19,7 @@ fn record(auth: &str) -> Record {
     Record {
         name: "pixel".to_owned(),
         endpoint: "https://push.example/a".to_owned(),
-        p256dh: EphemeralPrivateKey::generate(&ECDH_P256, &SystemRandom::new())
-            .and_then(|key| key.compute_public_key())
-            .map(|public| URL_SAFE_NO_PAD.encode(public.as_ref()))
-            .unwrap_or_default(),
+        p256dh: a_phone_key(),
         auth: auth.to_owned(),
         registered: Instant::EPOCH,
         owed: 1,
@@ -38,7 +32,7 @@ fn record(auth: &str) -> Record {
 }
 
 fn readable() -> Record {
-    record(&URL_SAFE_NO_PAD.encode([9_u8; 16]))
+    record(&a_phone_secret())
 }
 
 fn reaching(http: &Arc<Fake>) -> Ctx {

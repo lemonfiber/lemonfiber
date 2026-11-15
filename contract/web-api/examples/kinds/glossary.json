@@ -1,0 +1,205 @@
+{
+  "api_version": 1,
+  "data": {
+    "words": [
+      {
+        "also_called": [
+          "search provider"
+        ],
+        "deep": "An indexer keeps track of what has been posted and where. lemonfiber asks yours whenever something is wanted; without one, nothing can be found to download, however much else is configured. The bundled indexer aggregator lists Usenet indexers and torrent sites together under the one word, which is why one screen holds both. A torrent site is often called a tracker after the part of it that introduces peers to each other, and on a private one that same part is what watches your ratio — so the two words overlap without meaning the same thing.",
+        "forms": [],
+        "short": "Search engines that find what you are looking for. You need at least one, and most cost a small yearly fee.",
+        "word": "indexer"
+      },
+      {
+        "also_called": [],
+        "deep": "Both names point at the same data. Deleting one leaves the other working. This is why the download folder and the library should sit on one volume: across two, the file has to be copied instead, which takes time and twice the room.",
+        "forms": [
+          "hardlinked"
+        ],
+        "short": "Lets one file appear in two places while taking up the space once — so importing is instant and costs no extra disk.",
+        "word": "hardlink"
+      },
+      {
+        "also_called": [],
+        "deep": "Measured in days, and it is the age of the post rather than of the film or episode. A provider with short retention is fine for new things and will quietly fail to find old ones.",
+        "forms": [],
+        "short": "How far back your Usenet provider keeps things. Longer retention means older releases can still be downloaded.",
+        "word": "retention"
+      },
+      {
+        "also_called": [
+          "nntp"
+        ],
+        "deep": null,
+        "forms": [],
+        "short": "One of the two ways this stack downloads. You pay a provider, downloads are fast and private, and nothing is expected of you afterwards.",
+        "word": "usenet"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "The other way this stack downloads. Free, and you share back what you take — which is why it goes through the VPN.",
+        "word": "torrent"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "Somebody else sharing the same torrent. You take from them and they take from you, which is why a torrent with nobody on it never finishes.",
+        "word": "peer"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "What your indexer hands the download client so it can fetch the pieces of a Usenet download. You rarely handle one yourself, and nothing expects you to.",
+        "word": "NZB"
+      },
+      {
+        "also_called": [],
+        "deep": "lemonfiber checks that the torrent client's traffic genuinely leaves through the tunnel rather than trusting that it was configured to. A tunnel that is up but not carrying the traffic is the failure that looks like success.",
+        "forms": [],
+        "short": "A tunnel your torrent traffic leaves through, so your own connection is not the one seen doing it.",
+        "word": "VPN"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "Stops the torrent client reaching the internet at all if the VPN drops, rather than letting it carry on unprotected.",
+        "word": "killswitch"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "The network a Usenet provider actually stores its articles on. Two providers sharing one hold the same things, so a second account there finds nothing the first could not.",
+        "word": "backbone"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "Usenet data bought as a fixed amount rather than a monthly allowance. Useful as a second provider, since you spend it only on what the first could not find.",
+        "word": "block account"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "A way back in for other peers, opened by your VPN. Without it they cannot start a connection to you, so torrents are slower and your ratio suffers.",
+        "word": "port forwarding"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "How much you have shared back compared with what you took. Some trackers expect a minimum before they let you keep downloading.",
+        "word": "ratio"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [
+          "seeding"
+        ],
+        "short": "To keep sharing a finished torrent so others can take it. Stopping too early is what a ratio requirement is about.",
+        "word": "seed"
+      },
+      {
+        "also_called": [
+          "snatch"
+        ],
+        "deep": null,
+        "forms": [
+          "grabbed",
+          "grabbing"
+        ],
+        "short": "To send a release to the download client. It is the moment something stops being a search result and starts being a download.",
+        "word": "grab"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "Whether a service is still looking for something. Unmonitored means it will not go and find it even when it is missing, which is the usual reason nothing is happening.",
+        "word": "monitored"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "A download that has stopped making progress without failing outright. It sits there until something moves it, which is why it is worth saying rather than counting as running.",
+        "word": "stalled"
+      },
+      {
+        "also_called": [
+          "library folder"
+        ],
+        "deep": null,
+        "forms": [],
+        "short": "Where a service files what it has finished with — the library it manages, rather than the folder downloads land in.",
+        "word": "root folder"
+      },
+      {
+        "also_called": [],
+        "deep": "Resolution is only part of it. A profile also weighs the source, the encoder and the audio, which is why two files of the same resolution are not equally welcome. The services' own screens file these under Profiles, which is not quite the same word: this stack also has Compose profiles, and they decide which services run rather than which releases are wanted.",
+        "forms": [],
+        "short": "The rules deciding which version of something is good enough to grab, and which is worth replacing later.",
+        "word": "quality profile"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "Rebuilding a video into a form the device asking for it can play. It costs a great deal of processing, so a machine doing it often is one that feels slow.",
+        "word": "transcode"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "How much data each second of sound or video uses. Higher means better quality and larger files, which is the whole of the trade.",
+        "word": "bitrate"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "A wider range of brightness and colour than a screen normally shows. It needs a display that can take it; on one that cannot, the picture can look washed out.",
+        "word": "HDR"
+      },
+      {
+        "also_called": [],
+        "deep": null,
+        "forms": [],
+        "short": "A rule that nudges a profile for or against particular releases — a preferred group, or a thing you never want.",
+        "word": "custom format"
+      },
+      {
+        "also_called": [],
+        "deep": "lemonfiber reads one where you name a key to check a plugin's images against. It wants the public half — the file whose first line says PUBLIC KEY — and refuses anything else by name rather than reading the end of it as a key and reporting that nothing matched.",
+        "forms": [],
+        "short": "How a key is written down as text rather than as bytes. A file in this form opens with a line of dashes saying what it holds, which is how you can tell at a glance that you have the right one.",
+        "word": "PEM"
+      },
+      {
+        "also_called": [],
+        "deep": "Where it is not set, the services run as whoever owns the stack's directory, so the files they write stay yours.",
+        "forms": [],
+        "short": "The number of the user the stack's services run as, which decides who owns the files they write. You can set it in the stack's environment file.",
+        "word": "PUID"
+      },
+      {
+        "also_called": [],
+        "deep": "Where it is not set, the services run in the group of whoever owns the stack's directory.",
+        "forms": [],
+        "short": "The number of the group the stack's services run as, beside PUID. You can set it in the stack's environment file.",
+        "word": "PGID"
+      }
+    ]
+  },
+  "kind": "glossary"
+}

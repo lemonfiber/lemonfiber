@@ -1,0 +1,32 @@
+{
+  "api_version": 1,
+  "data": {
+    "dropped": [],
+    "filtered": [],
+    "footprint": {
+      "estimated_mib": 1564,
+      "unestimated": []
+    },
+    "forms": [
+      "library"
+    ],
+    "profiles": [
+      "media",
+      "notify"
+    ],
+    "running": [
+      "jellyfin"
+    ],
+    "services": [
+      "audiobookshelf",
+      "calibre-web-automated",
+      "decline",
+      "door",
+      "jellyfin",
+      "navidrome",
+      "request-gate",
+      "seerr"
+    ]
+  },
+  "kind": "preview"
+}

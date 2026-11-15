@@ -282,3 +282,15 @@ mod credentials;
 mod guarded;
 mod location;
 mod protocols;
+
+#[test]
+fn a_run_is_reported_as_the_way_it_ended() {
+    assert_eq!(
+        crate::model::SetupOutcome::from(super::Outcome::Applied),
+        crate::model::SetupOutcome::Applied
+    );
+    assert_eq!(
+        crate::model::SetupOutcome::from(super::Outcome::Abandoned),
+        crate::model::SetupOutcome::Abandoned
+    );
+}

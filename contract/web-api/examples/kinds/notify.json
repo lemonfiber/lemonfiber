@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "backends": [],
+    "rehearsed": false,
+    "state": "unconfigured",
+    "unread": []
+  },
+  "kind": "notify"
+}

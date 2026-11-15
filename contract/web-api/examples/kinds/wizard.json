@@ -1,0 +1,270 @@
+{
+  "api_version": 1,
+  "data": {
+    "asks": false,
+    "at": "welcome",
+    "guard": [
+      {
+        "asks": "choice",
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "wireguard"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "openvpn"
+          }
+        ],
+        "default": "wireguard",
+        "setting": "gluetun:vpn-type"
+      },
+      {
+        "asks": "choice",
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "fastestvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "ivpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "mullvad"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "nordvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "protonvpn"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "surfshark"
+          },
+          {
+            "needs": {},
+            "open": true,
+            "value": "windscribe"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "wireguard"
+              ]
+            },
+            "open": true,
+            "value": "airvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "wireguard"
+              ]
+            },
+            "open": true,
+            "value": "custom"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "expressvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "giganews"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "hidemyass"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "ipvanish"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "perfect privacy"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "privado"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "private internet access"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "privatevpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "purevpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "slickvpn"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "torguard"
+          },
+          {
+            "needs": {
+              "gluetun:vpn-type": [
+                "openvpn"
+              ]
+            },
+            "open": false,
+            "value": "vyprvpn"
+          }
+        ],
+        "default": "",
+        "setting": "gluetun:provider"
+      },
+      {
+        "asks": "choice",
+        "choices": [
+          {
+            "needs": {},
+            "open": true,
+            "value": "off"
+          },
+          {
+            "needs": {
+              "gluetun:provider": [
+                "perfect privacy",
+                "private internet access",
+                "privatevpn",
+                "protonvpn"
+              ]
+            },
+            "open": false,
+            "value": "on"
+          }
+        ],
+        "default": "off",
+        "setting": "gluetun:port-forwarding"
+      },
+      {
+        "asks": "value",
+        "needs": {
+          "gluetun:vpn-type": [
+            "wireguard"
+          ]
+        },
+        "setting": "gluetun:addresses"
+      },
+      {
+        "asks": "value",
+        "needs": {
+          "gluetun:provider": [
+            "custom"
+          ]
+        },
+        "setting": "gluetun:endpoint-ip"
+      },
+      {
+        "asks": "value",
+        "needs": {
+          "gluetun:provider": [
+            "custom"
+          ]
+        },
+        "setting": "gluetun:endpoint-port"
+      },
+      {
+        "asks": "value",
+        "needs": {
+          "gluetun:provider": [
+            "custom"
+          ]
+        },
+        "setting": "gluetun:endpoint-key"
+      }
+    ],
+    "offered": true,
+    "phase": "in-progress",
+    "plan": [],
+    "proof": null,
+    "ready_for_review": false,
+    "rehearsed": false,
+    "unanswered": [
+      "protocols",
+      "data-location",
+      "library",
+      "household",
+      "notifications",
+      "autostart"
+    ],
+    "written": []
+  },
+  "kind": "wizard"
+}

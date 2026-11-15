@@ -1,0 +1,76 @@
+{
+  "api_version": 1,
+  "data": {
+    "address": {
+      "caution": "That address is a number, and routers hand out different ones — so it can stop working without anything here having changed.",
+      "url": "http://192.168.1.20:8096"
+    },
+    "beside": [
+      {
+        "address": null,
+        "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+        "facing": "unstated",
+        "reaches": "unknown",
+        "service": "Audiobookshelf",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "how the others are reached, rather than one of them",
+        "facing": "carriage",
+        "reaches": "unknown",
+        "service": "Caddy",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+        "facing": "unstated",
+        "reaches": "unknown",
+        "service": "Calibre-Web-Automated",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+        "facing": "unstated",
+        "reaches": "unknown",
+        "service": "Decline service",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "an index over every service, including the ones nobody in the house should learn exist — the operator's convenience, never a way in",
+        "facing": "operators",
+        "reaches": "unknown",
+        "service": "Homepage",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+        "facing": "unstated",
+        "reaches": "unknown",
+        "service": "Navidrome",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      },
+      {
+        "address": null,
+        "because": "nothing here says what this is to the household, so it is not offered as somewhere to begin",
+        "facing": "unstated",
+        "reaches": "unknown",
+        "service": "Seerr",
+        "unaddressed": "It is not handed to the household, so no address is given for it."
+      }
+    ],
+    "chosen": {
+      "chosen": "derived"
+    },
+    "facing": "watching",
+    "meaning": "Jellyfin is the front door and it is not answering, so there is nowhere to send anybody yet. Nothing else here is a stand-in for it.",
+    "reaches": "here",
+    "service": "Jellyfin",
+    "standing": "unreachable"
+  },
+  "kind": "front-door"
+}

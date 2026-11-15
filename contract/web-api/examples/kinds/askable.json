@@ -1,0 +1,39 @@
+{
+  "api_version": 1,
+  "data": {
+    "approval": "Everything you ask for arrives without anybody saying yes first, as long as your allowance has room for it.",
+    "asking": {
+      "films": {
+        "limit": 2,
+        "period": "a month",
+        "remaining": 1,
+        "used": 1
+      },
+      "frees_up": null,
+      "policy": "within-a-limit",
+      "standing": "near-quota",
+      "television": {
+        "limit": 5,
+        "period": "a month",
+        "remaining": 5,
+        "used": 0
+      }
+    },
+    "kinds": [
+      "tv",
+      "movies"
+    ],
+    "member": "ana",
+    "term": "Matrix",
+    "titles": [
+      {
+        "id": "603",
+        "kind": "movies",
+        "stands": "askable",
+        "title": "The Matrix",
+        "year": 1999
+      }
+    ]
+  },
+  "kind": "askable"
+}

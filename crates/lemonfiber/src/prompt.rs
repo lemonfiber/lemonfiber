@@ -8,10 +8,9 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
 
-pub(crate) mod flags;
 pub(crate) mod terminal;
 
-pub(crate) use flags::{Flags, SetupFlags};
+pub(crate) use lemonfiber::setting_up::SetupFlags;
 pub(crate) use terminal::Terminal;
 
 /// Where the answers to these questions come from.

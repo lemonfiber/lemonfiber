@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "data": {
+    "challenge": "YWJjZGVmZ2hpamtsbW5vcGFiY2RlZmdoaWprbG1ub3A",
+    "expires": 1736294460
+  },
+  "kind": "device-challenge"
+}

@@ -1,0 +1,101 @@
+{
+  "api_version": 1,
+  "data": {
+    "manifest": {
+      "agreement": "a1fd3c9f",
+      "backup": null,
+      "bytes": 0,
+      "coming": [],
+      "confidence": {
+        "complete": true,
+        "unread": []
+      },
+      "foreign": [],
+      "items": [
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber-jellyfin",
+          "secret": false,
+          "sort": "container",
+          "what": "a container this stack is running"
+        },
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber-sonarr",
+          "secret": false,
+          "sort": "container",
+          "what": "a container this stack is running"
+        },
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber-radarr",
+          "secret": false,
+          "sort": "container",
+          "what": "a container this stack is running"
+        },
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber-prowlarr",
+          "secret": false,
+          "sort": "container",
+          "what": "a container this stack is running"
+        },
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber-qbittorrent",
+          "secret": false,
+          "sort": "container",
+          "what": "a container this stack is running"
+        },
+        {
+          "bytes": null,
+          "kept": null,
+          "name": "lemonfiber_default",
+          "secret": false,
+          "sort": "network",
+          "what": "the network the containers were on"
+        }
+      ],
+      "keeps": "Every setting, every service's own configuration, and your whole library.",
+      "outside": [
+        {
+          "by_hand": "Quit Docker Desktop, then drag Docker from Applications to the Bin — or brew uninstall --cask docker if you installed it that way",
+          "found": false,
+          "what": "Docker itself",
+          "why": "lemonfiber runs on the container engine and did not install it. Removing it would take every other project's containers with it."
+        },
+        {
+          "by_hand": "Quit Jellyfin, drag it from Applications to the Bin, and remove ~/.local/share/jellyfin — which holds its own library database",
+          "found": false,
+          "what": "a media server you installed natively",
+          "why": "Running the media server outside a container is something you chose and set up yourself, so nothing here knows what it was told or what it wrote."
+        },
+        {
+          "by_hand": "Quit Tailscale and drag it from Applications to the Bin",
+          "found": false,
+          "what": "a tunnel client such as Tailscale",
+          "why": "Reaching this machine from outside the house is arranged with software you installed, and other things on this machine may be reached through it."
+        },
+        {
+          "by_hand": "brew uninstall lemonfiber if you installed it that way, or delete the binary — rm $(command -v lemonfiber)",
+          "found": false,
+          "what": "the lemonfiber binary itself",
+          "why": "This program is running, and a program does not remove itself out from under the command you are reading this in."
+        }
+      ],
+      "removes": "The containers, the networks they were on, and the images that were pulled for them.",
+      "tier": "services",
+      "volume": null
+    },
+    "rehearsed": false,
+    "removal": {
+      "state": "surveyed"
+    }
+  },
+  "kind": "uninstall"
+}

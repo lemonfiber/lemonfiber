@@ -40,6 +40,7 @@
 //!
 //! [`Outcome`]: lemonfiber_core::app::Outcome
 
+pub mod example;
 pub mod layout;
 pub mod openapi;
 mod path;
@@ -129,6 +130,10 @@ pub struct Contract {
     /// branches on is which of these a refusal is, so they are listed where a
     /// generator can give each one a name rather than copy it.
     pub refusals: BTreeMap<String, Listed>,
+    /// One example of each kind and each action, as a run against the core's fixture
+    /// fakes answered it.
+    #[serde(skip)]
+    pub examples: example::Examples,
 }
 
 /// The event stream, as the contract describes it.
@@ -220,7 +225,14 @@ impl Contract {
             kinds,
             reads: published::every(),
             refusals: refusals(),
+            examples: example::Examples::default(),
         }
+    }
+
+    /// The same contract, carrying `examples`.
+    #[must_use]
+    pub fn with_examples(self, examples: example::Examples) -> Self {
+        Self { examples, ..self }
     }
 }
 

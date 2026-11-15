@@ -1,0 +1,12 @@
+{
+  "api_version": 1,
+  "data": {
+    "acted": false,
+    "agreement": "00000000",
+    "beyond": [],
+    "mended": [],
+    "offered": [],
+    "rehearsed": false
+  },
+  "kind": "repair"
+}

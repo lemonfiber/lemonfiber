@@ -1,0 +1,18 @@
+{
+  "api_version": 1,
+  "data": {
+    "pace": {
+      "brisk": true,
+      "budget": 629145600,
+      "moved": 90358
+    },
+    "path": "/srv/lemonfiber/backups/lemonfiber-full-1893456000.tar.gz",
+    "pruned": [],
+    "rehearsed": false,
+    "scope": {
+      "scope": "whole_stack"
+    },
+    "sensitive": true
+  },
+  "kind": "backup"
+}

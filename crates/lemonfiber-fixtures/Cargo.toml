@@ -28,6 +28,8 @@ toml = { workspace = true }
 # Writing a port's value as it crosses a contract, for the upstream that records it.
 serde = { workspace = true }
 serde_json = { workspace = true }
+# A phone's keys, written as a phone writes them.
+base64 = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
 

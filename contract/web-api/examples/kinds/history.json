@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "data": {
+    "changes": [],
+    "horizon": "the last 100 runs of lemonfiber's own changes are kept; this record holds 0 of them, so nothing has been dropped"
+  },
+  "kind": "history"
+}

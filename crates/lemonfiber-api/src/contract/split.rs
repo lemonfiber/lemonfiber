@@ -12,6 +12,7 @@ use schemars::Schema;
 use serde::Serialize;
 use serde_json::Value;
 
+use super::example::{of_action, of_kind, Kept};
 use super::layout::{rendered, Files};
 use super::path::INDEX;
 use super::Contract;
@@ -83,6 +84,8 @@ struct Index {
     reads: &'static str,
     /// Each code family, to the file listing the codes of it a refusal may carry.
     refusals: BTreeMap<String, String>,
+    /// Each kind and each action, to the file holding its example.
+    examples: Kept,
 }
 
 impl Contract {
@@ -159,6 +162,17 @@ impl Contract {
             put(&mut files, &path, &listed);
             refusals.insert(family.to_owned(), path);
         }
+        let mut examples = Kept::default();
+        for (kind, envelope) in &self.examples.kinds {
+            let path = of_kind(kind);
+            put(&mut files, &path, envelope);
+            examples.kinds.insert(kind.clone(), path);
+        }
+        for (action, acted) in &self.examples.actions {
+            let path = of_action(action);
+            put(&mut files, &path, acted);
+            examples.actions.insert(action.clone(), path);
+        }
         let index = Index {
             api_version: self.api_version,
             actions,
@@ -168,6 +182,7 @@ impl Contract {
             kinds,
             reads: READS,
             refusals,
+            examples,
         };
         put(&mut files, INDEX, &index);
 
