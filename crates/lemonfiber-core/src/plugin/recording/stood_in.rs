@@ -38,11 +38,6 @@ impl StandIns {
         Ok(stand_ins)
     }
 
-    /// What stands in for `secret`, where it declares a stand-in.
-    pub(super) fn secret(&self, secret: &str) -> Option<&str> {
-        self.secrets.get(secret).map(String::as_str)
-    }
-
     /// Each variable of `placed`'s environment holding a setting that declares a stand-in,
     /// as `NAME=value`.
     pub(super) fn settings(
@@ -59,22 +54,6 @@ impl StandIns {
             }
         }
         Ok(env)
-    }
-
-    /// Each variable of `placed`'s environment holding a secret stood in for, as
-    /// `NAME=value`.
-    pub(super) fn secrets(&self, placed: &Placed) -> Vec<String> {
-        placed
-            .fields
-            .env
-            .iter()
-            .filter_map(|(name, value)| match value {
-                Value::Secret(of) => self
-                    .secret(&of.secret)
-                    .map(|stood| format!("{name}={stood}")),
-                Value::Constant(_) | Value::Setting(_) | Value::Url(_) => None,
-            })
-            .collect()
     }
 
     /// Each secret stood in for, with what stands in for it.

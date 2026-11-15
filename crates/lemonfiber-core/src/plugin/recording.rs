@@ -11,6 +11,7 @@ mod addressed;
 mod alike;
 mod asked;
 mod fronted;
+mod minted;
 mod ran;
 mod scrubbed;
 mod served;
