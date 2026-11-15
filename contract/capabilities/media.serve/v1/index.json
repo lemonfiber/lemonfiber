@@ -63,7 +63,7 @@
     },
     {
       "path": "media.serve/v1/operations/dated.json",
-      "sha256": "630a14d1edf3d8df375477f9475a381cbeb297e993deeb184fc5315ca8985ad0"
+      "sha256": "50f1bc1e59637d2c5955fdcfe63c94da4aa5a60b1439bda3d67a3f704ed6be1c"
     },
     {
       "path": "media.serve/v1/operations/answers_to.json",
@@ -127,7 +127,7 @@
     },
     {
       "path": "media.serve/v1/operations/channels.json",
-      "sha256": "1700e69dd8ee0c83355e999603b8d34ab1954787b0f5e136b80672a3ecca7e98"
+      "sha256": "d111b8d53cc891277eebedc6eac8877e705b04a97d51bf7063fcf10824c74a52"
     },
     {
       "path": "media.serve/v1/operations/tune.json",

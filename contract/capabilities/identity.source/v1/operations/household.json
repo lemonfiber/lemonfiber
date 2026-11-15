@@ -67,6 +67,12 @@
                   ],
                   "type": "object"
                 },
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "Member": {
                   "additionalProperties": false,
                   "description": "Somebody the media server holds an account for.",
@@ -84,14 +90,16 @@
                       "type": "string"
                     },
                     "last_seen": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When the server last saw them.\n\n`None` before anybody has signed in, so an absence here is a fact about the\naccount rather than a gap in what was read.\n\nAbsent on every unclaimed invitation and on nothing else, so it is what a\nhousehold read shows as never having arrived.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When the server last saw them.\n\n`None` before anybody has signed in, so an absence here is a fact about the\naccount rather than a gap in what was read.\n\nAbsent on every unclaimed invitation and on nothing else, so it is what a\nhousehold read shows as never having arrived."
                     },
                     "name": {
                       "description": "What they are called.",

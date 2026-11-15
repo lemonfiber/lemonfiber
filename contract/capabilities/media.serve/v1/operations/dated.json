@@ -35,27 +35,37 @@
                   "description": "When a key was made and last used.",
                   "properties": {
                     "created": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When it was made, where the server says.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When it was made, where the server says."
                     },
                     "last_used": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When it was last used, absent where the server says it never was.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When it was last used, absent where the server says it never was."
                     }
                   },
                   "type": "object"
+                },
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
                 }
               },
               "$schema": "https://json-schema.org/draft/2020-12/schema",

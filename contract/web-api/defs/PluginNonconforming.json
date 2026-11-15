@@ -5,9 +5,7 @@
   "properties": {
     "at": {
       "description": "When it answered so.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "capability": {
       "description": "The capability it was asked as.",

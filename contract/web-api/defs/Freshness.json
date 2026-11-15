@@ -24,9 +24,7 @@
           "const": "as_of"
         },
         "at": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
+          "$ref": "Instant.json"
         }
       },
       "required": [

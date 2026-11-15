@@ -26,12 +26,14 @@
     },
     "issued": {
       "description": "When a code was first issued for them. Absent until one is.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "name": {
       "description": "Who it is for, as the media server spells their account where it holds one, and as\nit was asked for otherwise.",

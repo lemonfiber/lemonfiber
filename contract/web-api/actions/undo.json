@@ -4,14 +4,16 @@
     {
       "name": "at",
       "type": {
+        "anyOf": [
+          {
+            "$ref": "../defs/Instant.json"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "default": null,
-        "description": "When the run to put back was made, as the history writes it.",
-        "format": "uint64",
-        "minimum": 0,
-        "type": [
-          "integer",
-          "null"
-        ]
+        "description": "When the run to put back was made, as the history writes it."
       }
     }
   ],

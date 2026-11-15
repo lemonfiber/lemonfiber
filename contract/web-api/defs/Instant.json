@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+  "type": "integer",
+  "format": "uint64",
+  "minimum": 0
+}

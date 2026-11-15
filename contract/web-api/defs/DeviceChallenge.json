@@ -9,9 +9,7 @@
     },
     "expires": {
       "description": "When it stops standing, one minute after it was issued.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     }
   },
   "required": [

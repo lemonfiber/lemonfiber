@@ -9,9 +9,7 @@
     },
     "minted": {
       "description": "When it was minted.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "name": {
       "description": "The name it was minted under.",
@@ -30,12 +28,14 @@
     },
     "revoked": {
       "description": "When it was revoked, where it has been.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "scope": {
       "description": "What it admits: `read`, `act` or `member:<name>`.",
@@ -47,12 +47,14 @@
     },
     "used": {
       "description": "When it was last admitted, where it has been.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

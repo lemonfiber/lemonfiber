@@ -5,9 +5,7 @@
   "properties": {
     "at": {
       "description": "When it was written.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "lemonfiber": {
       "description": "The lemonfiber that wrote it.",

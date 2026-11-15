@@ -118,6 +118,29 @@ impl Contract {
             bodies.insert(route.clone(), path);
         }
 
+        let mut actions = BTreeMap::new();
+        for action in &self.actions {
+            let path = format!("{ACTIONS}/{}.json", action.action);
+            let mut listed = serde_json::to_value(action).unwrap_or_default();
+            for argument in listed
+                .get_mut("arguments")
+                .and_then(Value::as_array_mut)
+                .into_iter()
+                .flatten()
+            {
+                let carried = argument
+                    .get_mut("type")
+                    .and_then(Value::as_object_mut)
+                    .and_then(|shape| shape.remove("$defs"));
+                if let Some(Value::Object(carried)) = carried {
+                    held.carried(carried, &path);
+                }
+            }
+            pointed(&mut listed, "../defs/", &path, held.faults);
+            put(&mut files, &path, &listed);
+            actions.insert(action.action.to_owned(), path);
+        }
+
         for (name, mut shape) in defs {
             let path = format!("{DEFS}/{name}.json");
             pointed(&mut shape, "", &path, &mut faults);
@@ -128,12 +151,6 @@ impl Contract {
             put(&mut files, &path, &dialect(schema, written_in.as_ref()));
         }
 
-        let mut actions = BTreeMap::new();
-        for action in &self.actions {
-            let path = format!("{ACTIONS}/{}.json", action.action);
-            put(&mut files, &path, action);
-            actions.insert(action.action.to_owned(), path);
-        }
         put(&mut files, KEY_CALLABLE, &self.key_callable);
         put(&mut files, READS, &self.reads);
         let mut refusals = BTreeMap::new();
@@ -232,18 +249,7 @@ impl Held<'_> {
             _ => {}
         }
         if let Some(Value::Object(carried)) = envelope.remove("$defs") {
-            for (name, shape) in carried {
-                match self.defs.get(&name) {
-                    Some(held) if *held != shape => self.faults.push(format!(
-                        "{name} is described one way by {named} and another way by a schema \
-                         before it, and one file can hold only one of them"
-                    )),
-                    Some(_) => {}
-                    None => {
-                        self.defs.insert(name, shape);
-                    }
-                }
-            }
+            self.carried(carried, named);
         }
         for value in envelope
             .as_object_mut()
@@ -253,6 +259,23 @@ impl Held<'_> {
             pointed(value, "../defs/", path, self.faults);
         }
         put(files, path, &envelope);
+    }
+
+    /// Hold each definition of `carried` in the shared directory; `named` is what a fault
+    /// calls what carried them.
+    fn carried(&mut self, carried: serde_json::Map<String, Value>, named: &str) {
+        for (name, shape) in carried {
+            match self.defs.get(&name) {
+                Some(held) if *held != shape => self.faults.push(format!(
+                    "{name} is described one way by {named} and another way by a schema \
+                     before it, and one file can hold only one of them"
+                )),
+                Some(_) => {}
+                None => {
+                    self.defs.insert(name, shape);
+                }
+            }
+        }
     }
 }
 

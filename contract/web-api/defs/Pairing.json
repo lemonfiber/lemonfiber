@@ -24,9 +24,7 @@
     },
     "until": {
       "description": "When it stops being good.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "written": {
       "description": "The material as the one line a code carries and a person types.",

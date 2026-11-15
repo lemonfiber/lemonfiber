@@ -29,6 +29,14 @@
         "content": {
           "application/json": {
             "schema": {
+              "$defs": {
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "$schema": "https://json-schema.org/draft/2020-12/schema",
               "additionalProperties": false,
               "description": "A code the outside service holding the source's accounts issued for one device to sign\nin by, which the member approves there.",
@@ -46,10 +54,8 @@
                   "type": "string"
                 },
                 "lapses_at": {
-                  "description": "When the code lapses.",
-                  "format": "uint64",
-                  "minimum": 0,
-                  "type": "integer"
+                  "$ref": "#/$defs/Instant",
+                  "description": "When the code lapses."
                 }
               },
               "required": [

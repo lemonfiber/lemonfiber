@@ -5,12 +5,14 @@
   "properties": {
     "asked": {
       "description": "When it was asked for, where that is known.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "by": {
       "description": "Who asked for it, by the name the media server holds them under.",

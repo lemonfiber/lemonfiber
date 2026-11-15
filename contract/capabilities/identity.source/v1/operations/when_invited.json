@@ -5,15 +5,21 @@
       "content": {
         "application/json": {
           "schema": {
+            "$defs": {
+              "Instant": {
+                "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "additionalProperties": false,
             "description": "What the operation is asked with.",
             "properties": {
               "since": {
-                "description": "The port's `since`.",
-                "format": "uint64",
-                "minimum": 0,
-                "type": "integer"
+                "$ref": "#/$defs/Instant",
+                "description": "The port's `since`."
               }
             },
             "required": [
@@ -32,19 +38,27 @@
           "application/json": {
             "schema": {
               "$defs": {
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "Invited": {
                   "additionalProperties": false,
                   "description": "When one account was made, as the media server recorded it happening.",
                   "properties": {
                     "at": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When it was made, where the server's record says.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When it was made, where the server's record says."
                     },
                     "member": {
                       "description": "The account it is about, matching a [`Member::id`].",

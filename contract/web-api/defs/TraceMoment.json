@@ -5,12 +5,14 @@
   "properties": {
     "at": {
       "description": "When it happened, where the service reported it.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "outcome": {
       "description": "What happened.",

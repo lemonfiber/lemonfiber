@@ -44,6 +44,31 @@ pub struct Argument {
     pub shape: Value,
 }
 
+/// The schema of the carrier every action's arguments are read through.
+fn carrier() -> Option<Value> {
+    serde_json::to_value(schemars::schema_for!(Arguments)).ok()
+}
+
+/// `shape` carrying `defined` beside it where it refers to a definition, as a schema
+/// carries the definitions it refers to.
+fn carrying(mut shape: Value, defined: Option<&Value>) -> Value {
+    if refers(&shape) {
+        if let (Value::Object(fields), Some(defined)) = (&mut shape, defined) {
+            fields.insert("$defs".to_owned(), defined.clone());
+        }
+    }
+    shape
+}
+
+/// Whether `shape` refers to a definition anywhere in it.
+fn refers(shape: &Value) -> bool {
+    match shape {
+        Value::Object(fields) => fields.contains_key("$ref") || fields.values().any(refers),
+        Value::Array(items) => items.iter().any(refers),
+        _ => false,
+    }
+}
+
 /// The shape `only` takes on `space`, where the carrier publishes the one a diagnosis takes.
 fn categories() -> Value {
     serde_json::json!({
@@ -60,17 +85,21 @@ fn categories() -> Value {
 /// rehearsal, as the core decides for the command each reaches.
 #[must_use]
 pub fn every(rehearsable: impl Fn(&str) -> bool) -> Vec<Action> {
-    let carrier = serde_json::to_value(schemars::schema_for!(Arguments)).ok();
+    let carrier = carrier();
     let typed = |action: &str, name: &str| {
         if action == "space" && name == "only" {
             return categories();
         }
-        carrier
+        let shape = carrier
             .as_ref()
             .and_then(|schema| schema.get("properties"))
             .and_then(|properties| properties.get(name))
             .cloned()
-            .unwrap_or(Value::Null)
+            .unwrap_or(Value::Null);
+        carrying(
+            shape,
+            carrier.as_ref().and_then(|schema| schema.get("$defs")),
+        )
     };
     OFFERED
         .iter()

@@ -8,7 +8,7 @@
     },
     "minted": {
       "type": [
-        "integer/uint64"
+        "ref:Instant"
       ],
       "required": true
     },
@@ -32,7 +32,7 @@
     },
     "revoked": {
       "type": [
-        "integer|null/uint64"
+        "anyOf(null,ref:Instant)"
       ],
       "required": false
     },
@@ -50,7 +50,7 @@
     },
     "used": {
       "type": [
-        "integer|null/uint64"
+        "anyOf(null,ref:Instant)"
       ],
       "required": false
     }

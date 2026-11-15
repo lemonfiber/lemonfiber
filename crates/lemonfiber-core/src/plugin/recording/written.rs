@@ -70,9 +70,45 @@ fn noted(own: &str, stood_in: &[String]) -> String {
     }
 }
 
+/// No place a request names in `varies`.
+static UNDECLARED: BTreeMap<String, String> = BTreeMap::new();
+
+/// Where an answer taken again may differ from its recording: each place its request
+/// names in `varies`, held to the shape it names, and each place the schema of what a
+/// contract answers types as an instant, held to a whole number of seconds.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Varying<'v> {
+    declared: &'v BTreeMap<String, String>,
+    answered: Option<&'v Value>,
+}
+
+impl<'v> Varying<'v> {
+    /// Nowhere: every value is held to exactly what was recorded.
+    pub(super) const NOWHERE: Varying<'static> = Varying {
+        declared: &UNDECLARED,
+        answered: None,
+    };
+
+    /// Each place a request's `varies` names.
+    pub(super) const fn declared(declared: &'v BTreeMap<String, String>) -> Self {
+        Self {
+            declared,
+            answered: None,
+        }
+    }
+
+    /// Each place the schema `answered` of what a contract answers types as an instant.
+    pub(super) const fn answered(answered: &'v Value) -> Self {
+        Self {
+            declared: &UNDECLARED,
+            answered: Some(answered),
+        }
+    }
+}
+
 /// Write a recording of `of`, taken from `pinned` with stand-ins for each variable
 /// `stood_in` names, at `fixture` beneath `root`, with the note the recording already there
-/// holds, or hold the one there to it where `taking` writes nothing, each place `varies`
+/// holds, or hold the one there to it where `taking` writes nothing, each place `varying`
 /// names held to its shape alone.
 pub(super) fn written(
     root: &Path,
@@ -81,7 +117,7 @@ pub(super) fn written(
     of: Of,
     taking: &Retaking,
     stood_in: &[String],
-    varies: &BTreeMap<String, String>,
+    varying: Varying<'_>,
 ) -> Took {
     let at = match landing(root, fixture) {
         Ok(at) => at,
@@ -98,7 +134,7 @@ pub(super) fn written(
     };
     let held = std::fs::read_to_string(&at).ok();
     if taking.check {
-        return checked(fixture, held.as_deref(), &recording, unnoted, varies);
+        return checked(fixture, held.as_deref(), &recording, unnoted, varying);
     }
     let made = crate::plugin::rendered(&recording)
         .ok_or(std::io::ErrorKind::InvalidData)
@@ -122,14 +158,14 @@ pub(super) fn written(
     }
 }
 
-/// What holding the recording `held` at `fixture` to `taken` comes to, each place `varies`
+/// What holding the recording `held` at `fixture` to `taken` comes to, each place `varying`
 /// names held to its shape alone.
 fn checked(
     fixture: &str,
     held: Option<&str>,
     taken: &Recording,
     unnoted: bool,
-    varies: &BTreeMap<String, String>,
+    varying: Varying<'_>,
 ) -> Took {
     let Some(held) = held else {
         return Took::Unreproduced {
@@ -139,8 +175,10 @@ fn checked(
     let read = |text: &str| serde_json::from_str::<serde_json::Value>(text).ok();
     let same = read(held)
         .zip(crate::plugin::rendered(taken).as_deref().and_then(read))
-        .and_then(|(held, taken)| Some((unvaried(held, varies)?, unvaried(taken, varies)?)))
-        .is_some_and(|(held, taken)| alike(&held, &taken));
+        .and_then(|(held, taken)| Some((unvaried(held, varying)?, unvaried(taken, varying)?)))
+        .is_some_and(|((held, held_at), (taken, taken_at))| {
+            held_at == taken_at && alike(&held, &taken)
+        });
     match (same, unnoted) {
         (false, _) => Took::Unreproduced {
             why: format!("{fixture} is not what was taken again"),
@@ -153,17 +191,40 @@ fn checked(
 /// Where a recording keeps the JSON its answer held.
 const ANSWERED: &str = "/response/json";
 
-/// `recording` with the value at each place `varies` names taken out, where each is a
-/// string its shape matches whole; nothing where one is not.
-fn unvaried(mut recording: Value, varies: &BTreeMap<String, String>) -> Option<Value> {
-    for (place, shape) in varies {
+/// Where a recording keeps the status its answer came with.
+const STATUS: &str = "/response/status";
+
+/// The statuses of an answer that is what was asked for rather than a refusal.
+const SUCCEEDED: std::ops::Range<u64> = 200..300;
+
+/// `recording` with the value at each place `varying` names taken out, where each is a
+/// string its declared shape matches whole or a whole number of seconds where an answer
+/// that succeeded holds an instant, and each place an instant was taken out at; nothing
+/// where a declared place does not hold its shape.
+fn unvaried(mut recording: Value, varying: Varying<'_>) -> Option<(Value, Vec<String>)> {
+    for (place, shape) in varying.declared {
         let at = recording.pointer_mut(&format!("{ANSWERED}{place}"))?;
         if !lemonfiber_plugin::varying::held(shape, Some(at)) {
             return None;
         }
         *at = Value::Null;
     }
-    Some(recording)
+    let succeeded = recording
+        .pointer(STATUS)
+        .and_then(Value::as_u64)
+        .is_some_and(|status| SUCCEEDED.contains(&status));
+    let instants = varying
+        .answered
+        .filter(|_| succeeded)
+        .zip(recording.pointer(ANSWERED))
+        .map(|(schema, answer)| lemonfiber_contract::instants::held(schema, answer))
+        .unwrap_or_default();
+    for place in &instants {
+        if let Some(at) = recording.pointer_mut(&format!("{ANSWERED}{place}")) {
+            *at = Value::Null;
+        }
+    }
+    Some((recording, instants))
 }
 
 #[cfg(test)]

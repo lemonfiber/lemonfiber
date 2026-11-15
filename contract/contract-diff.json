@@ -87,6 +87,7 @@
       "HealingSwitch",
       "Heartbeat",
       "Indexer",
+      "Instant",
       "JobEnding",
       "Judged",
       "KeyClaim",
