@@ -322,6 +322,7 @@ fn running_inside_a_fillers_network_is_an_ask_of_that_capability() {
     placed.fields.network = Some(lemonfiber_manifest::container::Network {
         via: Some(lemonfiber_manifest::container::EGRESS_GUARD.to_owned()),
         fenced: false,
+        egress_for: None,
     });
     let manifest = written(&service(
         "tunnel",

@@ -62,6 +62,7 @@ pub(super) fn wrong(container: &Container<'_>) -> Vec<String> {
         .collect()
 }
 
+mod egress;
 mod mounts;
 
 fn env(pairs: Vec<(&str, Value)>) -> BTreeMap<String, Value> {
@@ -246,10 +247,12 @@ fn only_the_egress_guard_is_a_network_to_run_inside_and_never_ones_own() {
     let guard = Network {
         via: Some("network.egress-guard".to_owned()),
         fenced: false,
+        egress_for: None,
     };
     let other = Network {
         via: Some("media.serve".to_owned()),
         fenced: false,
+        egress_for: None,
     };
     let provides = ["network.egress-guard".to_owned()];
     let mut inside = plain(&none);
@@ -270,10 +273,12 @@ fn a_network_is_fenced_or_via_and_never_both_or_neither() {
     let fenced = Network {
         via: None,
         fenced: true,
+        egress_for: None,
     };
     let both = Network {
         via: Some("network.egress-guard".to_owned()),
         fenced: true,
+        egress_for: None,
     };
     let neither = Network::default();
     let mut behind = plain(&none);
@@ -286,7 +291,7 @@ fn a_network_is_fenced_or_via_and_never_both_or_neither() {
     behind.network = Some(&neither);
     assert!(wrong(&behind)
         .iter()
-        .any(|said| said.contains("network: says neither via nor fenced")));
+        .any(|said| said.contains("network: says none of via, fenced and egress_for")));
     let read: Result<Network, _> = toml::from_str("fenced = true");
     assert_eq!(read.ok(), Some(fenced));
 }

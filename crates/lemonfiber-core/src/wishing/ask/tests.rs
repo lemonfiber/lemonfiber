@@ -17,6 +17,8 @@ use crate::wishing::tests::{
     titled_as, Route, ACCOUNT,
 };
 
+mod owner;
+
 /// The report an ask answered with, or nothing where it was refused.
 fn report(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<AskedReport> {
     match outcome {
@@ -260,7 +262,6 @@ async fn a_member_the_request_service_does_not_know_yet_is_given_an_account_and_
 async fn a_member_the_request_service_cannot_be_given_an_account_for_is_not_working() {
     let unknown = || answered(&None::<String>);
     for (accounts, linked, why) in [
-        (vec![unknown()], taken(), "still unknown once linked"),
         (vec![unknown()], unavailable(), "linking refused"),
         (
             vec![unknown(), unavailable()],

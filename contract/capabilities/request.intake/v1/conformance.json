@@ -3,9 +3,9 @@
   "major": 1,
   "cases": [
     {"asked":{},"case":"refuses-without-the-key","expect":{"status":[401]},"keyed":false,"live":true,"operation":"establish","since":0},
-    {"asked":{"source":{"at":"http://conformance-identity:58096","credential":{"user-pass":{"password":"{minted}","username":"conformance"}},"protocol":"jellyfin"}},"case":"establish-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"establish","since":0},
+    {"asked":{"source":{"at":"http://conformance-identity:58096","credential":{"user-pass":{"password":"{minted}","username":"conformance"}},"members_sign_in":true,"protocol":"jellyfin"}},"case":"establish-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"establish","since":0},
     {"asked":{},"case":"initialized-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"initialized","since":0},
-    {"asked":{"source":{"at":"http://conformance-identity:58096","credential":{"user-pass":{"password":"{minted}","username":"conformance"}},"protocol":"jellyfin"}},"case":"configure_identity-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"configure_identity","since":0},
+    {"asked":{"source":{"at":"http://conformance-identity:58096","credential":{"user-pass":{"password":"{minted}","username":"conformance"}},"members_sign_in":true,"protocol":"jellyfin"}},"case":"configure_identity-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"configure_identity","since":0},
     {"asked":{},"case":"answers-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"answers","since":0},
     {"asked":{},"case":"requests-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"requests","since":0},
     {"asked":{"members":["c0f04a7e5e1d4b2a9c3f0e8d7b6a5c4d"]},"case":"link_members-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"link_members","since":0},

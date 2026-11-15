@@ -23,6 +23,7 @@ async fn script<R: Requests + Approving + Addressing + Noticing + Searching>(
             username: "admin".to_owned(),
             password: "admin-password".to_owned(),
         }),
+        members_sign_in: false,
     };
     let telling = Telling {
         enabled: true,
@@ -121,11 +122,24 @@ async fn searched<R: Searching>(service: &R) -> Vec<String> {
             "{:?}",
             service
                 .ask(
-                    "4",
+                    Some("4"),
                     &Wish {
                         id: "603".to_owned(),
                         kind: Kind::Tv,
                         seasons: vec![1, 2],
+                    }
+                )
+                .await
+        ),
+        format!(
+            "{:?}",
+            service
+                .ask(
+                    None,
+                    &Wish {
+                        id: "603".to_owned(),
+                        kind: Kind::Movies,
+                        seasons: Vec::new(),
                     }
                 )
                 .await
@@ -140,7 +154,7 @@ async fn a_request_service_answers_and_is_told_through_its_contract_as_it_is_in_
         intake::Adapter,
         [
             "identity", "link", "approval", "remove", "tell", "add", "move", "test", "relink",
-            "asking", "quota", "quota", "approves", "decide", "release", "notices", "ask"
+            "asking", "quota", "quota", "approves", "decide", "release", "notices", "ask", "ask"
         ]
     );
 }

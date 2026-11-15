@@ -15,6 +15,7 @@ async fn what_the_upstream_is_told_is_written_down_and_its_answers_name_what_was
         at: "http://media:8096".to_owned(),
         protocol: Protocol("jellyfin".to_owned()),
         credential: None,
+        members_sign_in: false,
     };
     let watched = Watched {
         which: Kind::Tv,

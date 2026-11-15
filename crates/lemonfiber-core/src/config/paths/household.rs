@@ -1,11 +1,11 @@
 //! Where the household's own records are kept: why a request was turned down, the asks
-//! for music and books the core keeps, when a code was first handed over, when an
-//! invitation was offered, and what the household agreed about the requests nobody rules
-//! on.
+//! for music and books the core keeps, the requests filed as the request service's owner,
+//! when a code was first handed over, when an invitation was offered, and what the
+//! household agreed about the requests nobody rules on.
 
 use std::path::PathBuf;
 
-use super::{Paths, ASKS, EXPIRING, HANDOFFS, INVITATIONS, REFUSALS};
+use super::{Paths, ASKED_AS_OWNER, ASKS, EXPIRING, HANDOFFS, INVITATIONS, REFUSALS};
 
 impl Paths {
     /// Why a request was turned down, by the reference the request is named by. Kept
@@ -24,6 +24,14 @@ impl Paths {
     #[must_use]
     pub fn asks(&self) -> PathBuf {
         self.config.join(ASKS)
+    }
+
+    /// Each request the core filed as the request service's owner, beside the member it was
+    /// for. Kept with configuration because the request service records every such request
+    /// as its owner's, and this is the only record of whose it is.
+    #[must_use]
+    pub fn asked_as_owner(&self) -> PathBuf {
+        self.config.join(ASKED_AS_OWNER)
     }
 
     /// When each person was first handed a code to sign a device in with. Kept with

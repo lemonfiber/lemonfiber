@@ -40,6 +40,7 @@ async fn a_request_service_answers_its_setup_as_scripted() {
         at: "http://media:8096".to_owned(),
         protocol: Protocol("media".to_owned()),
         credential: None,
+        members_sign_in: false,
     };
     let service = RequestSetup::new(Init::Fresh, Init::Done, Configure::Ok);
     assert!(service.initialized().await.is_ok_and(|done| !done));

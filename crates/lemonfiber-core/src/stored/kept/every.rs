@@ -1,0 +1,515 @@
+//! Every place lemonfiber keeps something, each said in the operator's words.
+
+use crate::config::paths::Paths;
+
+use super::Entry;
+
+/// Everything lemonfiber keeps: what an operator answered first, then what can be
+/// made again.
+pub const EVERY: &[Entry] = &[
+    Entry {
+        accessor: "env_file",
+        what: "the settings file",
+        why: "Every answer setup collected, and everything the stack is run with. It is handed \
+              to Compose as it stands, and it is the one file to keep if you keep one.",
+        secret: true,
+        at: Paths::env_file,
+    },
+    Entry {
+        accessor: "settings",
+        what: "the settings you recorded for plugins",
+        why: "Each value you chose for a setting a plugin's service reads, by its name. A \
+              setting you never recorded is not here, and its service is written with the \
+              plugin's default.",
+        secret: false,
+        at: Paths::settings,
+    },
+    Entry {
+        accessor: "secrets",
+        what: "the secrets lemonfiber holds",
+        why: "Every credential lemonfiber holds, its own included: each value a plugin's \
+              recipe captured, lemonfiber minted or you entered, by its name, with the one \
+              earlier value of each that undoing a change puts back, and the key the change \
+              journal's fingerprints of them are taken under. It is never written into the \
+              stack, and nothing records it anywhere else.",
+        secret: true,
+        at: Paths::secrets,
+    },
+    Entry {
+        accessor: "secrets_files",
+        what: "each service's own secrets file",
+        why: "One file per service that names a secret, written from the secrets above and \
+              handed to Compose for that service alone. Any run that writes the service's \
+              entry writes its file again.",
+        secret: true,
+        at: Paths::secrets_files,
+    },
+    Entry {
+        accessor: "setup_progress",
+        what: "setup's saved progress",
+        why: "What you had answered when you last stopped part-way through setup, so leaving \
+              resumes rather than restarts. It carries the credentials you had entered by then, \
+              and it is deleted the moment setup finishes.",
+        secret: true,
+        at: Paths::setup_progress,
+    },
+    Entry {
+        accessor: "admission",
+        what: "the web interface's password",
+        why: "What proves the password you set for the web interface, kept as an Argon2id \
+              verifier and never as the password itself — there is no key that would turn it \
+              back. It is what lets the surface be offered to your network at all, and \
+              removing it takes that offer away.",
+        secret: true,
+        at: Paths::admission,
+    },
+    Entry {
+        accessor: "companion",
+        what: "what pairing a phone rests on",
+        why: "The certificate the web interface presents when it is served encrypted, and its \
+              key; this stack's own identifier, which a paired phone knows it by; and the port \
+              it was last served on. Removing it means every paired phone refuses this machine \
+              until it is paired again.",
+        secret: true,
+        at: Paths::companion,
+    },
+    Entry {
+        accessor: "outbound",
+        what: "the record of what left this machine",
+        why: "When each outbound request went, what kind it was, and where it went — so what \
+              the enumeration says would be sent can be checked against what was. It carries no \
+              header, no body and no query, which is the whole of why it is safe to keep.",
+        secret: false,
+        at: Paths::outbound,
+    },
+    Entry {
+        accessor: "updates",
+        what: "what the release list last said",
+        why: "When lemonfiber last asked which version of itself is newest, what the answer \
+              was, and how many of those asks went unanswered — which is what keeps a machine \
+              with no route out from reaching for the network on every run. Nothing about you \
+              and nothing about this machine ever goes the other way.",
+        secret: false,
+        at: Paths::updates,
+    },
+    Entry {
+        accessor: "bandwidth",
+        what: "what the line was declared to carry",
+        why: "The share of the connection the stack was told to keep to, the hours it keeps \
+              them, and what the line has been seen to carry. Nothing about what was moved \
+              over it — only how much, and when.",
+        secret: false,
+        at: Paths::bandwidth,
+    },
+    Entry {
+        accessor: "journal",
+        what: "the change journal",
+        why: "What the last run wrote, so a repair can be put back. The fields that changed and \
+              what they were — nothing about you and nothing about what you watch. A change to \
+              a credential is recorded by the fingerprints of its values, never by a value.",
+        secret: false,
+        at: Paths::journal,
+    },
+    Entry {
+        accessor: "journal_key",
+        what: "the change journal's key",
+        why: "What a change journal an earlier release wrote sealed its credentials with. It is \
+              read only to open them, so they are recorded by their fingerprints, and it is \
+              taken away the next time the journal is written.",
+        secret: true,
+        at: Paths::journal_key,
+    },
+    Entry {
+        accessor: "baseline",
+        what: "the expected-state baseline",
+        why: "What lemonfiber last wrote into each service, which is the only way a later run \
+              can tell a value you changed from one it set itself and would otherwise write \
+              over.",
+        secret: false,
+        at: Paths::baseline,
+    },
+    Entry {
+        accessor: "materialised",
+        what: "the record of what was written to the stack directory",
+        why: "A checksum for each compose file lemonfiber wrote, so a file you edited by hand is \
+              recognised as yours rather than replaced on the next run.",
+        secret: false,
+        at: Paths::materialised,
+    },
+    Entry {
+        accessor: "quality",
+        what: "the quality choice",
+        why: "Which preset is in force, for everything and per media type, so a later run \
+              applies the choice you made rather than the default.",
+        secret: false,
+        at: Paths::quality,
+    },
+    Entry {
+        accessor: "notifications",
+        what: "the notification choice",
+        why: "How much you asked to be told about, and the individual events you set apart from \
+              that answer.",
+        secret: false,
+        at: Paths::notifications,
+    },
+    Entry {
+        accessor: "autostart",
+        what: "your answer about starting on boot",
+        why: "Whether you asked for the stack to come back after this machine restarts, which \
+              form that means, and whether the last thing you asked for was a stop. It is the \
+              answer you gave and not a claim that it works — on a Mac or a Windows machine, \
+              half of what makes it work is a Docker Desktop setting lemonfiber cannot write.",
+        secret: false,
+        at: Paths::autostart,
+    },
+    Entry {
+        accessor: "boot",
+        what: "which restart of this machine was last acted on",
+        why: "So a run can tell a machine that has just restarted from one that has not, and \
+              report a boot that failed once rather than every time you type something. It is \
+              what this machine did, kept apart from what you asked for.",
+        secret: false,
+        at: Paths::boot,
+    },
+    Entry {
+        accessor: "watcher",
+        what: "the monitors lemonfiber made in the outside watcher",
+        why: "The id the watcher answered for each monitor lemonfiber provisioned, what each \
+              was asked to watch and what it watches instead where it could not. It is the \
+              only way a monitor is paired with the service, entry point or job it covers: \
+              never by its name or its address, which you may change in the watcher itself.",
+        secret: false,
+        at: Paths::watcher,
+    },
+    Entry {
+        accessor: "accepted",
+        what: "the questions you have already settled",
+        why: "The choices whose cost was stated to you once — running with no VPN, or with a \
+              provider that forwards no port — so they are not put to you again every run.",
+        secret: false,
+        at: Paths::accepted,
+    },
+    Entry {
+        accessor: "refusals",
+        what: "why you turned a request down",
+        why: "The request service has nowhere to keep a reason, so a refusal it sends carries \
+              none. This is lemonfiber's own note of what you said, so the person who asked can \
+              still be told why.",
+        secret: false,
+        at: Paths::refusals,
+    },
+    Entry {
+        accessor: "asks",
+        what: "what each person asked for of music and books",
+        why: "No request service holds an ask for music or books, so lemonfiber keeps each one \
+              itself: what was asked, by whom, and whether you let it through or turned it down.",
+        secret: false,
+        at: Paths::asks,
+    },
+    Entry {
+        accessor: "asked_as_owner",
+        what: "which member each request asked as the request service's owner was for",
+        why: "Where members ask as the request service's owner, the request service records \
+              each of those requests as the owner's, so lemonfiber keeps whose each one is: it \
+              counts toward that member's allowance and is listed as theirs.",
+        secret: false,
+        at: Paths::asked_as_owner,
+    },
+    Entry {
+        accessor: "cover_hosts",
+        what: "where music and book covers were fetched from",
+        why: "A cover is fetched from wherever the curator says it is, so lemonfiber notes \
+              each host it fetched one from, and the account of what leaves this machine names \
+              them.",
+        secret: false,
+        at: Paths::cover_hosts,
+    },
+    Entry {
+        accessor: "notify_backends",
+        what: "where alerts are delivered",
+        why: "Each notification back-end you added, who chose it, how far it is proven and what \
+              became of its deliveries, so a message that never arrived is told apart from one \
+              that was never sent.",
+        secret: false,
+        at: Paths::notify_backends,
+    },
+    Entry {
+        accessor: "notify_secrets",
+        what: "what each notification back-end is reached with",
+        why: "The token each back-end takes messages with, kept apart from the list of back-ends \
+              so nothing that shows you where alerts go ever reads one.",
+        secret: true,
+        at: Paths::notify_secrets,
+    },
+    Entry {
+        accessor: "notify_events",
+        what: "what each service tells the core what happened with",
+        why: "The digest of the key each curator and the media server send what happened with, \
+              so an event is taken only from the service the key was handed to and the key \
+              itself is kept nowhere but there.",
+        secret: false,
+        at: Paths::notify_events,
+    },
+    Entry {
+        accessor: "handoffs",
+        what: "when each person was handed a code",
+        why: "The media server says which devices are signed in and nothing about a code \
+              handed over and not yet used. This is what tells somebody still to sign in \
+              from somebody never handed anything.",
+        secret: false,
+        at: Paths::handoffs,
+    },
+    Entry {
+        accessor: "gate_read",
+        what: "where the request gate's record was last read",
+        why: "The doctor reports what the request gate refused and removed since it last \
+              looked. This is the place it reached, so each refusal and removal is reported \
+              once.",
+        secret: false,
+        at: Paths::gate_read,
+    },
+    Entry {
+        accessor: "plugins",
+        what: "what is installed of somebody else's",
+        why: "Each plugin you installed, and what installing it settled: the images it runs, \
+              the digest that fixes each one, the tier each is published on and where inside \
+              its container it keeps its own state. It is the only record that a stranger's \
+              service is on this machine, so losing it does not leave you with no plugins — it \
+              leaves you with plugins nothing can account for.",
+        secret: false,
+        at: Paths::plugins,
+    },
+    Entry {
+        accessor: "nonconforming",
+        what: "what a plugin answered outside its contract",
+        why: "Each answer an installed plugin's adapter gave that its contract does not \
+              allow. The plugin fills none of that capability until a proof it passes clears \
+              it, so losing this would let it fill one again unproven.",
+        secret: false,
+        at: Paths::nonconforming,
+    },
+    Entry {
+        accessor: "plugin_starting",
+        what: "what each installed plugin is run with again",
+        why: "Each installed plugin's manifest and the starting files its run proofs use, \
+              kept once the install holds so the doctor and its demand recipes work after \
+              its source is gone. Removing a plugin takes its directory away.",
+        secret: false,
+        at: Paths::plugin_starting,
+    },
+    Entry {
+        accessor: "run_verdicts",
+        what: "what each plugin's run proofs last came to",
+        why: "Each run proof's last verdict, against the image, the arguments and the \
+              starting files it ran with, so the doctor runs it again only when one of those \
+              moves rather than on every diagnosis.",
+        secret: false,
+        at: Paths::run_verdicts,
+    },
+    Entry {
+        accessor: "catalogue",
+        what: "the newest plugin catalogue this machine verified",
+        why: "Which release of the signed plugin catalogue was the newest one checked here. \
+              An older release is still validly signed, and this is what refuses one that \
+              was replaced.",
+        secret: false,
+        at: Paths::catalogue,
+    },
+    Entry {
+        accessor: "keys",
+        what: "the keys other programs reach the web interface with",
+        why: "Each key's name, scope and the SHA-256 digest of its secret, never the secret \
+              itself. Removing an entry revokes that key, and removing the file revokes \
+              every one.",
+        secret: true,
+        at: Paths::keys,
+    },
+    Entry {
+        accessor: "keys_used",
+        what: "when each key was last used",
+        why: "When each key last reached the web interface, kept apart from the keys so \
+              writing it never rewrites them. It holds no part of any secret.",
+        secret: false,
+        at: Paths::keys_used,
+    },
+    Entry {
+        accessor: "device_keys",
+        what: "the phones that may prove they are you",
+        why: "The public half of each key a phone registered to stand in for your password \
+              when a key is minted, with what attested where it lives. Nothing here could \
+              sign anything.",
+        secret: false,
+        at: Paths::device_keys,
+    },
+    Entry {
+        accessor: "push_endpoints",
+        what: "the phones that asked to be woken",
+        why: "The address each phone's distributor gave, the keys a message is encrypted to, \
+              and how many it is owed. Without it no phone hears of an alert until it is \
+              opened.",
+        secret: true,
+        at: Paths::push_endpoints,
+    },
+    Entry {
+        accessor: "invitations",
+        what: "when each invitation was offered",
+        why: "When each account nobody has claimed yet was offered. The media server's own \
+              record of when an account was made can lose it, and an invitation nobody can \
+              date is withdrawn.",
+        secret: false,
+        at: Paths::invitations,
+    },
+    Entry {
+        accessor: "expiring",
+        what: "how long a request may wait for a decision",
+        why: "What the household agreed about requests nobody rules on: how long one waits \
+              before it is closed. Without it nothing is closed, because nobody agreed to \
+              it.",
+        secret: false,
+        at: Paths::expiring,
+    },
+    Entry {
+        accessor: "held_back",
+        what: "whose asking was taken away while the disk was full",
+        why: "Each member whose permission to ask was taken away while the disk had no room, \
+              and what came off them, so exactly that is given back once there is room \
+              again.",
+        secret: false,
+        at: Paths::held_back,
+    },
+    Entry {
+        accessor: "forwarded",
+        what: "the port the egress guard last forwarded",
+        why: "The port the VPN's egress guard last forwarded, which every torrent client was \
+              set to take, so a client is set again only when the guard's answer changes.",
+        secret: false,
+        at: Paths::forwarded,
+    },
+    Entry {
+        accessor: "healing",
+        what: "how the queue has been healed",
+        why: "Each unhealthy download's strikes, so one is acted on only after enough looks \
+              in a row find it wedged for the same reason; what the latest look found; and \
+              the newest runs, each with what was dropped, blocklisted and searched for \
+              again, and why.",
+        secret: false,
+        at: Paths::healing,
+    },
+    Entry {
+        accessor: "outbox",
+        what: "what you have been told, and what is still owed you",
+        why: "Every alert decided and not yet delivered, and what was already said, so an \
+              alert held while a channel was down is delivered once it is back rather than \
+              lost.",
+        secret: false,
+        at: Paths::outbox,
+    },
+    Entry {
+        accessor: "conditions",
+        what: "what is wrong, and since when",
+        why: "Each condition the doctor found, since when it has held and whether you were \
+              told, so how long something has been broken and whether it comes and goes are \
+              answered across runs.",
+        secret: false,
+        at: Paths::conditions,
+    },
+    Entry {
+        accessor: "halted",
+        what: "which containers lemonfiber stopped itself",
+        why: "Each container lemonfiber stopped, so one that exits with an error when told \
+              to stop reads as stopped rather than as a fault. Starting it again lets go of \
+              it.",
+        secret: false,
+        at: Paths::halted,
+    },
+    Entry {
+        accessor: "repairs",
+        what: "every repair lemonfiber carried out",
+        why: "Each repair and what it came to, the ones that changed nothing included, so a \
+              repair that keeps failing to hold a fault down can be seen for what it is.",
+        secret: false,
+        at: Paths::repairs,
+    },
+    Entry {
+        accessor: "grants",
+        what: "how long each member's devices may play",
+        why: "The last day each member's client spoke to the media server. A grant lasts a \
+              set number of days from then, and the devices on one that ran out are signed \
+              out.",
+        secret: false,
+        at: Paths::grants,
+    },
+    Entry {
+        accessor: "tuned",
+        what: "the live streams opened for members",
+        why: "Each live stream the media server opened for a member, with whom it was opened \
+              for, the channel and what closes it, so one whose pass lapsed unrenewed, or a \
+              removed member's, is closed. No pass is kept, and a stream is forgotten once it \
+              is closed.",
+        secret: false,
+        at: Paths::tuned,
+    },
+    Entry {
+        accessor: "acknowledged",
+        what: "the words you have gone and looked up",
+        why: "So a report names a word you already know instead of explaining it again. What \
+              one person has been told is not what another has, which is why this is kept here \
+              rather than beside the stack.",
+        secret: false,
+        at: Paths::acknowledged,
+    },
+    Entry {
+        accessor: "stack",
+        what: "the materialised stack",
+        why: "The project Compose is pointed at and every service's starting files, written \
+              out of the stack description this build carries. Any run that starts something \
+              writes them again.",
+        secret: false,
+        at: Paths::stack,
+    },
+    Entry {
+        accessor: "service_config",
+        what: "each service's own configuration",
+        why: "The directories the containers mount and write their own settings, databases and \
+              API keys into. What is in them is theirs rather than lemonfiber's, and this is the \
+              largest thing here by far.",
+        secret: true,
+        at: Paths::service_config,
+    },
+    Entry {
+        accessor: "backups",
+        what: "the backup archives",
+        why: "Each one a copy of the configuration above, so an archive holds whatever that held \
+              — the credentials included. Nothing sends one anywhere.",
+        secret: true,
+        at: Paths::backups,
+    },
+    Entry {
+        accessor: "bundles",
+        what: "the support bundles kept for a browser",
+        why: "A bundle asked for from the web surface is written here so it can be handed back \
+              to the browser that asked for it. Every value in one is replaced by a stand-in \
+              before it is written, and nothing sends one anywhere either.",
+        secret: false,
+        at: Paths::bundles,
+    },
+    Entry {
+        accessor: "hosted",
+        what: "what a command this machine keeps running has said",
+        why: "A command handed to this machine's service manager has no terminal to speak in, so \
+              what it would have said goes here instead — one file per command, appended to. It \
+              is the only record of what a guard or a clock did while nobody was watching. \
+              Removing it loses that history and stops nothing.",
+        secret: false,
+        at: Paths::hosted,
+    },
+    Entry {
+        accessor: "storage_state",
+        what: "what the disk could do last time",
+        why: "Whether importing by hardlink worked when it was last looked at, so losing that \
+              capability is noticed rather than showing up as a disk filling twice as fast. \
+              Losing this costs one run's history and nothing else.",
+        secret: false,
+        at: Paths::storage_state,
+    },
+];
