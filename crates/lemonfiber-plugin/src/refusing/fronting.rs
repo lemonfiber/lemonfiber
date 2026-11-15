@@ -27,7 +27,35 @@ pub(super) fn native(service: &Service, services: &[Service], found: &mut Vec<Vi
                       service of this plugin fronts may name"
                 .to_owned(),
         });
+    } else if solves(service, services) && !fenced(service) {
+        found.push(Violation {
+            location: format!("service {}.network", service.id),
+            message: format!(
+                "is the challenge solver this plugin fills {SOLVES} with and is not fenced, \
+                 and an indexer hands it the addresses it fetches directly, past the adapter's \
+                 screen: declare network = {{ fenced = true }}"
+            ),
+        });
     }
+}
+
+/// The capability whose filler an indexer hands the addresses it fetches.
+const SOLVES: &str = lemonfiber_contract::capabilities::indexer::proxy::CAPABILITY;
+
+/// Whether an adapter of the same plugin fronting `service` fills [`SOLVES`].
+fn solves(service: &Service, services: &[Service]) -> bool {
+    services.iter().any(|adapter| {
+        adapter.fronts.as_deref() == Some(&service.id)
+            && adapter.provides.iter().any(|provided| provided == SOLVES)
+    })
+}
+
+/// Whether `service` runs inside the fence.
+fn fenced(service: &Service) -> bool {
+    service
+        .network
+        .as_ref()
+        .is_some_and(|network| network.fenced)
 }
 
 /// The longest DNS name, and the longest label in one.

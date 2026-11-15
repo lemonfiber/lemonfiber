@@ -141,6 +141,12 @@ impl Connection {
     const fn hands_over_the_askers_key(&self) -> bool {
         matches!(self, Self::Application(_))
     }
+
+    /// Whether the asker hands the filler the addresses it fetches, straight to the
+    /// filler and past any adapter's screen, so only a fenced filler is told about.
+    const fn fetches_for_the_asker(&self) -> bool {
+        matches!(self, Self::Solver)
+    }
 }
 
 /// Why one asker and one filler come to nothing.
@@ -169,6 +175,9 @@ pub(super) enum Unmade {
     /// Every connection here hands the asker the filler's credential, and the gate does
     /// not let it reach this asker.
     Asked,
+    /// The asker would hand the filler the addresses it fetches, and the filler does not
+    /// run inside the fence.
+    Unfenced,
 }
 
 /// An asker the gate let every credential its connection hands it reach.
@@ -340,6 +349,9 @@ fn made<'a>(
     {
         return Err(Unmade::Withheld);
     }
+    if made.fetches_for_the_asker() && !filler.fenced {
+        return Err(Unmade::Unfenced);
+    }
     Ok((made, at, cleared))
 }
 
@@ -451,6 +463,10 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         Unmade::Asked => format!(
             "{fills} and is a third-party plugin's service, whose credential is handed only to \
              the stack's own services and to its own plugin's"
+        ),
+        Unmade::Unfenced => format!(
+            "{fills} and is not fenced; {asker} would hand it the addresses it fetches, past any \
+             adapter's screen, so lemonfiber tells {asker} only about a fenced solver"
         ),
     }
 }

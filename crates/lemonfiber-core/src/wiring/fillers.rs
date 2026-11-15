@@ -105,6 +105,8 @@ pub struct Filler {
     pub replaces: Option<String>,
     /// The capability whose filler's network it runs inside, where it takes `network.via`.
     pub via: Option<String>,
+    /// Whether it runs inside the fence that refuses every private address.
+    pub fenced: bool,
 }
 
 impl Filler {
@@ -473,6 +475,7 @@ fn bundled(service: &Service, services: &[Service], project: Option<&Path>) -> F
             .network
             .as_ref()
             .and_then(|network| network.via.clone()),
+        fenced: service.fenced(),
     }
 }
 
@@ -522,6 +525,11 @@ fn brought(one: &Installed, placed: &Placed, project: Option<&Path>, first_party
             .network
             .as_ref()
             .and_then(|network| network.via.clone()),
+        fenced: placed
+            .fields
+            .network
+            .as_ref()
+            .is_some_and(|network| network.fenced),
     }
 }
 
