@@ -119,7 +119,7 @@ async fn with_nothing_to_ask_the_request_service_with_the_requests_are_what_is_l
     let asked = reaching(&context, &manifest).await;
 
     assert!(
-        asked.is_err_and(|reason| reason.contains("no request service")),
+        asked.is_err_and(|reason| reason.said.contains("no request service")),
         "a stack with nothing to sign in with did not say so"
     );
 }

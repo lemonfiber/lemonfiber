@@ -514,7 +514,7 @@ async fn arranging_a_period_as_a_command_answers_with_the_household() {
 
     assert!(
         matches!(report, Some(crate::app::Outcome::Household(ref held))
-            if held.findings.iter().any(|line| line.contains("30 days"))),
+            if held.noted.iter().any(|line| line.contains("30 days"))),
         "{report:?}"
     );
     assert_eq!(crate::app::arrangement::load(&ctx).after(), Some(30));
@@ -548,7 +548,7 @@ async fn a_rehearsed_run_closes_nothing() {
 
     assert!(
         report.is_some_and(|held| held
-            .findings
+            .noted
             .iter()
             .any(|line| line.contains("would close 1 request"))),
         "a rehearsal did not say what it would close"

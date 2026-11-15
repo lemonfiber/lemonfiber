@@ -4445,11 +4445,15 @@
             "type": "string"
           },
           "unlocated": {
-            "description": "Why no location is stated, where none is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why no location is stated, where none is, by the code that names it."
           },
           "year": {
             "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
@@ -6021,11 +6025,15 @@
             "type": "string"
           },
           "unlocated": {
-            "description": "Why no location is stated, where none is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why no location is stated, where none is, by the code that names it."
           },
           "year": {
             "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
@@ -6053,9 +6061,9 @@
             "type": "boolean"
           },
           "findings": {
-            "description": "What is worth saying about this shelf, in the words its reader would use.\n\nAlways written, empty or not. A field the schema requires and the document\nsometimes omits is one a reader has to guess about, and an empty list already\nsays the thing it would say: there is nothing to report about this shelf.",
+            "description": "What stood in the way of reading this shelf, each by the code that names it.\n\nAlways written, empty or not. A field the schema requires and the document\nsometimes omits is one a reader has to guess about, and an empty list already\nsays the thing it would say: nothing stood in the way.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Obstacle"
             },
             "type": "array"
           },
@@ -6425,9 +6433,9 @@
             ]
           },
           "findings": {
-            "description": "What could not be read, and anything else worth the operator's attention.",
+            "description": "What could not be read, each by the code that names it.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Obstacle"
             },
             "type": "array"
           },
@@ -6435,6 +6443,13 @@
             "description": "Everybody the media server holds an account for, in name order — including\nthose who have never asked for anything, and the invitations nobody has taken\nup yet.",
             "items": {
               "$ref": "#/components/schemas/HouseholdMember"
+            },
+            "type": "array"
+          },
+          "noted": {
+            "description": "What else is worth the operator's attention about the household: who has used\ntheir limit, what is waiting on them, what nobody has claimed. Written for the\noperator alone, so a member's own reading carries none.",
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -6458,6 +6473,7 @@
           "members",
           "available",
           "findings",
+          "noted",
           "rehearsed"
         ],
         "type": "object"
@@ -9455,6 +9471,29 @@
         ],
         "type": "object"
       },
+      "Obstacle": {
+        "description": "Something in the way of one part of an answer, said by its code.\n\nWhat a read carries beside the part it could not give, rather than a sentence of its\nown: a sentence carries no code, so nothing could word it again for whoever reads it.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/Code",
+            "description": "The code that names what is in the way."
+          },
+          "remedy": {
+            "description": "What to do about it.",
+            "type": "string"
+          },
+          "said": {
+            "description": "What is in the way, in one sentence.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "said",
+          "remedy"
+        ],
+        "type": "object"
+      },
       "OccupantReport": {
         "description": "One container of somebody else's stack, as the engine reports it.",
         "properties": {
@@ -10518,11 +10557,15 @@
             "type": "string"
           },
           "unlocated": {
-            "description": "Why no location is stated, where none is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why no location is stated, where none is, by the code that names it."
           },
           "year": {
             "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
@@ -10551,9 +10594,9 @@
             "type": "boolean"
           },
           "findings": {
-            "description": "What is worth saying about this read, in the words its reader would use.",
+            "description": "What stood in the way of this read, each by the code that names it.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Obstacle"
             },
             "type": "array"
           },
@@ -10882,11 +10925,15 @@
             ]
           },
           "unlocated": {
-            "description": "Why nothing is located, where nothing is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why nothing is located, where nothing is."
           }
         },
         "required": [
@@ -10967,9 +11014,9 @@
             "type": "boolean"
           },
           "findings": {
-            "description": "What is worth saying about this reading, in the words its reader would use.\n\nAlways written, empty or not, so a reader never has to guess what an absent\nfield means.",
+            "description": "What stood in the way of this reading, each by the code that names it.\n\nAlways written, empty or not, so a reader never has to guess what an absent\nfield means.",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Obstacle"
             },
             "type": "array"
           },
@@ -19309,11 +19356,15 @@
             "type": "string"
           },
           "unlocated": {
-            "description": "Why no location is stated, where none is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why no location is stated, where none is, by the code that names it."
           },
           "year": {
             "description": "The year it came out, where the server knows one. Absent rather than guessed:\ntwo films share a title far more often than they share a title and a year.",
@@ -19954,11 +20005,15 @@
             ]
           },
           "unlocated": {
-            "description": "Why nothing is located, where nothing is.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Obstacle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why nothing is located, where nothing is."
           }
         },
         "required": [

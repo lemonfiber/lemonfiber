@@ -51,7 +51,7 @@ pub(crate) async fn allowing(ctx: &Ctx, chosen: &Chosen) -> Result<HouseholdRepo
     };
 
     let mut report = crate::household::run::household(ctx, None).await?;
-    report.findings.splice(0..0, said);
+    report.noted.splice(0..0, said);
     Ok(report)
 }
 

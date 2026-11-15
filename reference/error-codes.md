@@ -319,10 +319,16 @@ that it is a fault of the stack.
 | `PLAY-7` | `NOT_IN_THE_HOUSEHOLD` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `PLAY-8` | `SIGNS_NO_DEVICE_IN` | error | 1 | 503 | 0.18.0 | Said where the media server will not sign a device in by code. | This device can't be signed in with a code right now. Ask whoever runs the house about it. |
 | `PLAY-9` | `NO_SUCH_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title on the member's shelf has no picture of the kind asked for. | That title has no picture to show. You can still choose it by its name. |
-| `PLAY-10` | `MISNAMED` | warning | 1 | 502 | 0.18.0 | Said where the media server named an item by something that is not an item id. | A fault of the stack: not working right now, with whoever runs the house told. |
-| `PLAY-11` | `UNDECLARED` | warning | 1 | 502 | 0.18.0 | Said where the media server would not say where it serves each title, or said it in a way the front door cannot hold it to. | A fault of the stack: not working right now, with whoever runs the house told. |
-| `PLAY-12` | `DOOR_UNREADY` | warning | 1 | 503 | 0.18.0 | Said where the front door has no certificate to present: no stack directory, none made yet, or one that cannot be read. | A fault of the stack: not working right now, with whoever runs the house told. |
-| `PLAY-13` | `NO_HOUSEHOLD_ADDRESS` | warning | 1 | 503 | 0.18.0 | Said where the address the household reaches this machine at is not known. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-10` | `NO_LIVE_TV` | error | 1 | 404 | 0.18.0 | Said where the member's own account may not watch live TV, or the server has none. | There is no live TV for you here. Ask whoever runs the house to let you watch live TV. |
+| `PLAY-11` | `NOT_THEIR_STREAM` | error | 1 | 404 | 0.18.0 | Said where the live stream named is not one the core opened for this member. | That channel has already closed. Choose the channel again. |
+| `PLAY-12` | `NOT_THEIR_PASS` | error | 1 | 403 | 0.18.0 | Said where the pass handed back does not open for this member and title. | That can't be played from here any more. Choose it again to start playing. |
+| `PLAY-13` | `MISNAMED` | warning | 1 | 502 | 0.18.0 | Said where the media server named an item by something that is not an item id. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-14` | `UNDECLARED` | warning | 1 | 502 | 0.18.0 | Said where the media server would not say where it serves each title, or said it in a way the front door cannot hold it to. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-15` | `DOOR_UNREADY` | warning | 1 | 503 | 0.18.0 | Said where the front door has no certificate to present: no stack directory, none made yet, or one that cannot be read. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-16` | `NO_HOUSEHOLD_ADDRESS` | warning | 1 | 503 | 0.18.0 | Said where the address the household reaches this machine at is not known. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-17` | `PASSLESS` | warning | 1 | 503 | 0.18.0 | Said where the pass service has no key to issue a pass with, no pass could be sealed, or a renewal could not be told to it. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-18` | `UNPLACED` | warning | 1 | 502 | 0.18.0 | Said where the paths the media server answered or declared do not stay on the front door once an item is filled in, or no declared path covers them. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLAY-19` | `NO_BROWSER_ROUTE` | warning | 1 | 503 | 0.18.0 | Said where no proxy fronts the household's services, or the guard publishes no route a browser reaches it at. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `PLUGIN` — installing and running plugins
 
@@ -378,6 +384,8 @@ that it is a fault of the stack.
 | `PLUGIN-48` | `EARLIER_TAKEN` | error | 1 | 400 | 0.18.0 | Raised when a plugin's setting or secret names, as the variable an earlier release kept its value under, one another installed plugin's setting or secret names. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `PLUGIN-49` | `ANOTHER_SOURCE` | error | 1 | 403 | 0.18.0 | Raised when a plugin carrying the id of a part this build pins comes from anywhere but that pin. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `PLUGIN-50` | `UNCONFORMING` | error | 1 | 400 | 0.18.0 | Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLUGIN-51` | `KEY_UNREADABLE` | error | 1 | 400 | 0.18.0 | Raised when a key an author names to verify a plugin's images against cannot be read, or is not a PEM public key on the P-256 curve. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLUGIN-52` | `UNDECLARED_FORM` | error | 1 | 400 | 0.18.0 | Raised when a plugin's manifest names a form the stack does not declare. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `PROC` — the program underneath
 
@@ -710,6 +718,7 @@ that it is a fault of the stack.
 | `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-13` | `NO_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title a member may ask for has no picture to show them. | That title has no picture to show. You can still ask for it by its name. |
+| `WISH-14` | `THROUGH_THE_HOUSE` | error | 1 | 409 | 0.18.0 | Said where a member whose asks wait for approval has no account of their own on what files the household's asks, so nothing could wait for anybody's yes. | Your asks go through whoever runs the house here. Ask whoever runs the house for it. |
 
 ## `WORD` — the glossary
 

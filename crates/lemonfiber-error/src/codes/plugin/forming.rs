@@ -11,5 +11,6 @@ codes! {
             written; the message names each form and the ones the stack declares.",
         remedy: "Install a version of the plugin whose forms are among the ones this stack \
             declares, which lemonfiber forms lists.",
+        household: fault,
     }
 }

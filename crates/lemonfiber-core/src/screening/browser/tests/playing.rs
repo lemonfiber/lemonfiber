@@ -8,7 +8,7 @@ use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 use lemonfiber_fixtures::ports::Chance;
 
 use super::{ctx_over, key, server, FILM};
-use crate::app::{Asker, Ctx, PlayFrom};
+use crate::app::{Ctx, PlayFrom};
 use crate::model::PlayReport;
 use crate::pass::{File, SERVICE};
 use crate::ports::service::{Holds, Item, ItemDetail, Medium};
@@ -73,7 +73,7 @@ fn configuration(ctx: &Ctx) -> std::path::PathBuf {
 }
 
 async fn playing(ctx: &Ctx, from: PlayFrom) -> Option<PlayReport> {
-    played(ctx, "Ada", FILM, from, Asker::Member).await.ok()
+    played(ctx, "Ada", FILM, from).await.ok()
 }
 
 /// The pass a location carries.
@@ -149,14 +149,7 @@ async fn a_title_off_the_shelf_a_silent_server_and_one_signing_no_device_in_are_
         ),
     ] {
         let (ctx, _) = reached(tag, true, more);
-        let answered = played(
-            &ctx,
-            "Ada",
-            FILM,
-            PlayFrom::Device(DEVICE.to_owned()),
-            Asker::Member,
-        )
-        .await;
+        let answered = played(&ctx, "Ada", FILM, PlayFrom::Device(DEVICE.to_owned())).await;
         assert_eq!(
             answered.err().map(|problem| problem.code.to_string()),
             Some(said),
@@ -198,14 +191,7 @@ async fn with_no_key_randomness_playlist_declaration_or_domain_nothing_plays() {
 #[tokio::test]
 async fn an_id_no_server_could_hold_is_refused_before_anything_is_asked() {
     let (ctx, transport) = reached("not-an-item", true, Vec::new());
-    let answered = played(
-        &ctx,
-        "Ada",
-        "../users",
-        PlayFrom::Device(DEVICE.to_owned()),
-        Asker::Member,
-    )
-    .await;
+    let answered = played(&ctx, "Ada", "../users", PlayFrom::Device(DEVICE.to_owned())).await;
     assert_eq!(
         answered.err().map(|problem| problem.code.to_string()),
         Some(crate::error::codes::play::NOT_AN_ITEM.to_string())

@@ -8,7 +8,7 @@
     },
     "findings": {
       "type": [
-        "array[string]"
+        "array[ref:Obstacle]"
       ],
       "required": true
     },

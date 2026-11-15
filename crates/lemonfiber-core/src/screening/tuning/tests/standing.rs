@@ -8,7 +8,7 @@ use lemonfiber_fixtures::declaring::enforceable;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{answering_in_turn, code, ctx_over, evening, key, was_asked};
-use crate::app::{Asker, Ctx, Live};
+use crate::app::{Ctx, Live};
 use crate::model::TunedReport;
 use crate::pass::{File, SERVICE};
 use crate::ports::service::{Tuned, Unrated};
@@ -91,7 +91,7 @@ fn kept(ctx: &Ctx) -> Vec<Open> {
 }
 
 async fn tuning(ctx: &Ctx, live: Live) -> Option<TunedReport> {
-    asked(ctx, "Ada", live, Asker::Member).await.ok()
+    asked(ctx, "Ada", live).await.ok()
 }
 
 #[tokio::test]
@@ -181,7 +181,7 @@ async fn a_server_that_opens_nothing_is_no_live_tv_and_one_that_fails_is_unanswe
         ("opens-failing", media::unavailable(), silent.clone()),
     ] {
         let (ctx, _) = standing(tag, true, opened, Vec::new());
-        let answered = asked(&ctx, "Ada", Live::Open("kids".to_owned()), Asker::Member).await;
+        let answered = asked(&ctx, "Ada", Live::Open("kids".to_owned())).await;
         assert_eq!(code(answered), Some(said), "{tag}");
         assert!(kept(&ctx).is_empty(), "{tag}");
     }

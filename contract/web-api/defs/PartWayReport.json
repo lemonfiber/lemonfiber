@@ -8,10 +8,10 @@
       "type": "boolean"
     },
     "findings": {
-      "description": "What is worth saying about this read, in the words its reader would use.",
+      "description": "What stood in the way of this read, each by the code that names it.",
       "type": "array",
       "items": {
-        "type": "string"
+        "$ref": "Obstacle.json"
       }
     },
     "id": {

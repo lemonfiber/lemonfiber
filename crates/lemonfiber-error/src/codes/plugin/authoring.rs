@@ -12,5 +12,6 @@ codes! {
             than were named would call an image somebody signed unproven; the message names \
             the key and what is wrong with it.",
         remedy: "Name a PEM public key on the P-256 curve with --key, or leave the key out.",
+        household: fault,
     }
 }

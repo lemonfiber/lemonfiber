@@ -48,7 +48,7 @@ pub(crate) async fn deciding(
         Reference::Kept(medium, number) => {
             let said = crate::collected::run::decided(ctx, medium, number, reason).await?;
             let mut report = crate::household::run::household(ctx, None).await?;
-            report.findings.insert(0, said);
+            report.noted.insert(0, said);
             return Ok(report);
         }
     };
@@ -89,16 +89,16 @@ pub(crate) async fn deciding(
 
     let mut report = crate::household::run::household(ctx, None).await?;
     // The decision first and what became of its words directly under it, ahead of
-    // whatever the reading itself could not do: an operator opened this to rule on
-    // something, and the answer to that is the line they are looking for.
+    // whatever else the reading notes: an operator opened this to rule on something,
+    // and the answer to that is the line they are looking for.
     let mut leading = vec![if ctx.dry_run {
         format!("{said} — rehearsed, and nothing was sent or decided")
     } else {
         said
     }];
     leading.extend(notes);
-    leading.append(&mut report.findings);
-    report.findings = leading;
+    leading.append(&mut report.noted);
+    report.noted = leading;
     Ok(report)
 }
 

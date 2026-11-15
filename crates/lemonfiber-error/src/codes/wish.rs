@@ -166,5 +166,9 @@ codes! {
         meaning: "This member's asks wait for a yes from whoever runs the house, and here \
             they go through that person, so nothing was asked for.",
         remedy: "Ask whoever runs the house for it.",
+        household: {
+            said: "Your asks go through whoever runs the house here.",
+            remedy: "Ask whoever runs the house for it.",
+        },
     }
 }

@@ -26,7 +26,7 @@ async fn decided(ctx: &Ctx, answer: Answer) -> Result<Outcome, Box<crate::error:
 
 fn said(outcome: &Result<Outcome, Box<crate::error::Problem>>) -> Option<String> {
     match outcome {
-        Ok(Outcome::Household(report)) => report.findings.first().cloned(),
+        Ok(Outcome::Household(report)) => report.noted.first().cloned(),
         _ => None,
     }
 }

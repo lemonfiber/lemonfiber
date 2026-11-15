@@ -9,16 +9,18 @@
 //! back is opened and, where it is for the member and the title it names, the same pass
 //! is held good for longer, so a player goes on fetching the address it began with.
 
-use crate::app::{Asker, Ctx, PlayFrom};
+use crate::app::{Ctx, PlayFrom};
 use crate::error::codes::play::{
-    NOT_A_DEVICE, NOT_ON_THEIR_SHELF, NOT_THEIR_PASS, SIGNS_NO_DEVICE_IN,
+    NOT_A_DEVICE, NOT_ON_THEIR_SHELF, NOT_THEIR_PASS, PASSLESS, SIGNS_NO_DEVICE_IN, UNDECLARED,
+    UNPLACED,
 };
+use crate::error::household::Obstacle;
 use crate::error::Problem;
 use crate::model::PlayReport;
 use crate::pass::{Key, Renewals, Session, LIFETIME, NONCE_BYTES};
 use crate::ports::service::{Locations, Member};
 
-use super::door::{self, told, PLAY_BYTES};
+use super::door::{self, PLAY_BYTES};
 use super::{a_device, an_item, grants, member, not_an_item, refused, server, unanswered};
 
 /// Where `id` plays from in `named`'s browser, on a pass made from what `from` names.
@@ -34,7 +36,6 @@ pub(super) async fn played(
     named: &str,
     id: &str,
     from: PlayFrom,
-    asker: Asker,
 ) -> Result<PlayReport, Box<Problem>> {
     if !an_item(id) {
         return Err(not_an_item());
@@ -52,7 +53,7 @@ pub(super) async fn played(
         unlocated: Some(why),
         ..PlayReport::default()
     };
-    let ready = match ready(ctx, &server, asker, id).await {
+    let ready = match ready(ctx, &server, id).await {
         Ok(ready) => ready,
         Err(why) => return Ok(unlocated(why)),
     };
@@ -77,7 +78,7 @@ pub(super) async fn played(
                 lapses,
             )
             .then_some(pass)
-            .ok_or(UNRENEWED)
+            .ok_or_else(|| Obstacle::new(PASSLESS, UNRENEWED))
         }
         PlayFrom::Device(device) => {
             server
@@ -96,18 +97,18 @@ pub(super) async fn played(
             ready
                 .key
                 .seal(id, &session, ready.nonce, now)
-                .ok_or(UNSEALED)
+                .ok_or_else(|| Obstacle::new(PASSLESS, UNSEALED))
         }
     };
     let placed = pass.and_then(|pass| {
         grants::renewed(ctx, &member.id);
         Locations::played(&ready.template, &ready.base, id, &play_of(&pass))
             .map(|playlist| door::passed(&playlist, &pass))
-            .ok_or(UNPLACED)
+            .ok_or_else(|| Obstacle::new(UNPLACED, ASTRAY))
     });
     let stream_from = match placed {
         Ok(at) => at,
-        Err(why) => return Ok(unlocated(told(asker, why.to_owned()))),
+        Err(why) => return Ok(unlocated(why)),
     };
     Ok(PlayReport {
         id: id.to_owned(),
@@ -183,30 +184,28 @@ struct Ready {
 }
 
 /// Everything `id`'s location in a browser is built from, or why nothing can be
-/// located, in the words `asker` is told.
+/// located.
 async fn ready(
     ctx: &Ctx,
     server: &crate::app::targets::Media,
-    asker: Asker,
     id: &str,
-) -> Result<Ready, String> {
+) -> Result<Ready, Obstacle> {
     let template = door::declared(server.serve.as_ref())
-        .await
-        .map_err(|why| told(asker, why))?
+        .await?
         .locations
         .playlist
-        .ok_or_else(|| told(asker, NO_PLAYLIST.to_owned()))?;
-    let base = door::for_a_browser(ctx).map_err(|why| told(asker, why))?;
+        .ok_or_else(|| Obstacle::new(UNDECLARED, NO_PLAYLIST))?;
+    let base = door::for_a_browser(ctx)?;
     Locations::played(
         &template,
         &base,
         id,
         &crate::secret::render(&[0; PLAY_BYTES]),
     )
-    .ok_or(told(asker, UNPLACED.to_owned()))?;
+    .ok_or_else(|| Obstacle::new(UNPLACED, ASTRAY))?;
     let key =
-        crate::app::project::passing::key(ctx).ok_or_else(|| told(asker, KEYLESS.to_owned()))?;
-    let nonce = nonce(ctx).ok_or_else(|| told(asker, UNSEALED.to_owned()))?;
+        crate::app::project::passing::key(ctx).ok_or_else(|| Obstacle::new(PASSLESS, KEYLESS))?;
+    let nonce = nonce(ctx).ok_or_else(|| Obstacle::new(PASSLESS, UNSEALED))?;
     Ok(Ready {
         template,
         base,
@@ -235,9 +234,9 @@ const UNRENEWED: &str = "The pass service could not be told the pass is held for
                          written.";
 
 /// Said where the playlist does not stay on the front door's address once built.
-const UNPLACED: &str = "The playlist the media server declared does not stay on the front \
-                        door's address once the title is filled in, so nothing is located \
-                        for a browser.";
+const ASTRAY: &str = "The playlist the media server declared does not stay on the front \
+                      door's address once the title is filled in, so nothing is located \
+                      for a browser.";
 
 #[cfg(test)]
 mod tests;

@@ -128,7 +128,10 @@ fn a_request_service_that_was_not_read_says_so_rather_than_looking_empty() {
         rehearsed: false,
         members: Vec::new(),
         available: false,
-        findings: vec!["seerr did not answer".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::quota::UNREACHABLE,
+            "seerr did not answer",
+        )],
         noted: Vec::new(),
         filtering: None,
         policy: None,

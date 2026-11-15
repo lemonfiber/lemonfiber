@@ -199,7 +199,7 @@ pub struct TunedReport {
     pub lapses: Option<u64>,
     /// Why nothing is located, where nothing is.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
+    pub unlocated: Option<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
@@ -238,7 +238,7 @@ pub struct PlayReport {
     pub lapses: Option<u64>,
     /// Why nothing is located, where nothing is.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
+    pub unlocated: Option<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }

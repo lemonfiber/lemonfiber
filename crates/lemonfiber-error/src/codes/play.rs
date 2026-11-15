@@ -111,8 +111,47 @@ codes! {
             remedy: "You can still choose it by its name.",
         },
     }
+    /// Said where the member's own account may not watch live TV, or the server has none.
+    NO_LIVE_TV = "PLAY-10" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "There is no live TV for this member. Either their account may not watch it, \
+            or the media server has none, so no channel was opened.",
+        remedy: "Ask whoever looks after the household to let this member watch live TV.",
+        household: {
+            said: "There is no live TV for you here.",
+            remedy: "Ask whoever runs the house to let you watch live TV.",
+        },
+    }
+    /// Said where the live stream named is not one the core opened for this member.
+    NOT_THEIR_STREAM = "PLAY-11" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "That live stream is not one opened for this member, or it has already \
+            closed, so there is nothing to renew or stop.",
+        remedy: "Choose the channel again to open it anew.",
+        household: {
+            said: "That channel has already closed.",
+            remedy: "Choose the channel again.",
+        },
+    }
+    /// Said where the pass handed back does not open for this member and title.
+    NOT_THEIR_PASS = "PLAY-12" {
+        severity: Error,
+        status: 403,
+        since: "0.18.0",
+        meaning: "That pass is not this member's for this title, so no new one was made \
+            from it.",
+        remedy: "Choose the title again to start playing it anew.",
+        household: {
+            said: "That can't be played from here any more.",
+            remedy: "Choose it again to start playing.",
+        },
+    }
     /// Said where the media server named an item by something that is not an item id.
-    MISNAMED = "PLAY-10" {
+    MISNAMED = "PLAY-13" {
         severity: Warning,
         status: 502,
         since: "0.18.0",
@@ -124,7 +163,7 @@ codes! {
     }
     /// Said where the media server would not say where it serves each title, or said it in a
     /// way the front door cannot hold it to.
-    UNDECLARED = "PLAY-11" {
+    UNDECLARED = "PLAY-14" {
         severity: Warning,
         status: 502,
         since: "0.18.0",
@@ -136,7 +175,7 @@ codes! {
     }
     /// Said where the front door has no certificate to present: no stack directory, none
     /// made yet, or one that cannot be read.
-    DOOR_UNREADY = "PLAY-12" {
+    DOOR_UNREADY = "PLAY-15" {
         severity: Warning,
         status: 503,
         since: "0.18.0",
@@ -147,7 +186,7 @@ codes! {
         household: fault,
     }
     /// Said where the address the household reaches this machine at is not known.
-    NO_HOUSEHOLD_ADDRESS = "PLAY-13" {
+    NO_HOUSEHOLD_ADDRESS = "PLAY-16" {
         severity: Warning,
         status: 503,
         since: "0.18.0",
@@ -157,31 +196,42 @@ codes! {
             where it is served.",
         household: fault,
     }
-    /// Said where the member's own account may not watch live TV, or the server has none.
-    NO_LIVE_TV = "PLAY-10" {
-        severity: Error,
-        status: 404,
+    /// Said where the pass service has no key to issue a pass with, no pass could be sealed,
+    /// or a renewal could not be told to it.
+    PASSLESS = "PLAY-17" {
+        severity: Warning,
+        status: 503,
         since: "0.18.0",
-        meaning: "There is no live TV for this member. Either their account may not watch it, \
-            or the media server has none, so no channel was opened.",
-        remedy: "Ask whoever looks after the household to let this member watch live TV.",
+        meaning: "The pass service could not issue, seal or renew a pass, so nothing is located \
+            at the front door for this. Its key is made when the stack starts with a guard in \
+            front of the media server.",
+        remedy: "Start the stack with lemonfiber up, check the project directory can be \
+            written, and run lemonfiber doctor if it says this again.",
+        household: fault,
     }
-    /// Said where the live stream named is not one the core opened for this member.
-    NOT_THEIR_STREAM = "PLAY-11" {
-        severity: Error,
-        status: 404,
+    /// Said where the paths the media server answered or declared do not stay on the front
+    /// door once an item is filled in, or no declared path covers them.
+    UNPLACED = "PLAY-18" {
+        severity: Warning,
+        status: 502,
         since: "0.18.0",
-        meaning: "That live stream is not one opened for this member, or it has already \
-            closed, so there is nothing to renew or stop.",
-        remedy: "Choose the channel again to open it anew.",
+        meaning: "The paths the media server answered or declared do not stay on the front \
+            door's address once the item is filled in, or none of the paths it declared covers \
+            them, so nothing is located at the front door for it.",
+        remedy: "Update the media server's plugin, then read the shelf again.",
+        household: fault,
     }
-    /// Said where the pass handed back does not open for this member and title.
-    NOT_THEIR_PASS = "PLAY-12" {
-        severity: Error,
-        status: 403,
+    /// Said where no proxy fronts the household's services, or the guard publishes no route
+    /// a browser reaches it at.
+    NO_BROWSER_ROUTE = "PLAY-19" {
+        severity: Warning,
+        status: 503,
         since: "0.18.0",
-        meaning: "That pass is not this member's for this title, so no new one was made \
-            from it.",
-        remedy: "Choose the title again to start playing it anew.",
+        meaning: "A browser has no address with a certificate it trusts to play from: no proxy \
+            fronts the household's services, the guard in front of the media server publishes \
+            no route, or no domain is configured for the household's proxy.",
+        remedy: "Install the household's proxy and set the household's domain, and every \
+            title plays in a browser.",
+        household: fault,
     }
 }

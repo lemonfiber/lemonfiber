@@ -2,7 +2,7 @@
 //! is read, and what they may ask for.
 
 use lemonfiber_core::app::{
-    Allowance, Answer, Arranged, Asker, Chosen, Command, Decision, Inviting, Live, PlayFrom, Shelf,
+    Allowance, Answer, Arranged, Chosen, Command, Decision, Inviting, Live, PlayFrom, Shelf,
     Viewing, Whom, Wishing,
 };
 use lemonfiber_core::asking::Policy;
@@ -76,17 +76,12 @@ pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
     // Taken from the served read rather than restated, so a terminal and a browser
     // looking at one household cannot come to see two different shelves. A number
     // written down twice is a number that drifts the first time one of them moves.
-    let asker = Asker::Operator;
     if let Some(id) = title {
-        return Ok(Command::Viewing(Viewing::Title { member, id, asker }));
+        return Ok(Command::Viewing(Viewing::Title { member, id }));
     }
     if part_way {
         let most = most.unwrap_or(lemonfiber_core::screening::A_FEW);
-        return Ok(Command::Viewing(Viewing::PartWay {
-            member,
-            most,
-            asker,
-        }));
+        return Ok(Command::Viewing(Viewing::PartWay { member, most }));
     }
     let most = most.unwrap_or(lemonfiber_api::read::table::A_SHELF);
     if most == 0 || most > lemonfiber_api::read::table::MOST_AT_ONCE {
@@ -96,11 +91,7 @@ pub(crate) fn held(whom: RawWhom, shelf: RawShelf) -> Result<Command, u8> {
         );
         return Err(USAGE);
     }
-    Ok(Command::Held(Shelf {
-        member,
-        most,
-        asker,
-    }))
+    Ok(Command::Held(Shelf { member, most }))
 }
 
 /// What a word about watching asks: what is playing, a member's channels, a channel opened
@@ -146,7 +137,6 @@ fn tuning(asked: RawTune) -> Result<Command, u8> {
     Ok(Command::Viewing(Viewing::Tune {
         member: member.unwrap_or_default(),
         live,
-        asker: Asker::Operator,
     }))
 }
 
@@ -174,7 +164,6 @@ fn playing(asked: RawPlay) -> Result<Command, u8> {
         member: member.unwrap_or_default(),
         id: item,
         from,
-        asker: Asker::Operator,
     }))
 }
 

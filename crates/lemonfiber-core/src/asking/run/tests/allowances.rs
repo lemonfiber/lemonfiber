@@ -16,7 +16,7 @@ async fn a_choice_for_the_household_answers_with_the_household() {
     .await
     .unwrap_or_default();
 
-    let said = report.findings.first().cloned().unwrap_or_default();
+    let said = report.noted.first().cloned().unwrap_or_default();
     assert!(said.contains("5 requests a week"), "{said}");
     assert!(said.starts_with("the household"), "{said}");
 }
@@ -42,10 +42,10 @@ async fn a_member_keeping_their_own_is_named_with_how_to_change_theirs() {
     .unwrap_or_default();
 
     assert_eq!(
-        unlimited.findings.get(1),
+        unlimited.noted.get(1),
         Some(&kept_line("Alex")),
         "{:?}",
-        unlimited.findings
+        unlimited.noted
     );
     assert!(
         kept_line("Alex").ends_with("lemonfiber household allow --member Alex changes theirs"),
@@ -53,9 +53,9 @@ async fn a_member_keeping_their_own_is_named_with_how_to_change_theirs() {
         kept_line("Alex")
     );
     assert!(
-        !matching.findings.contains(&kept_line("Alex")),
+        !matching.noted.contains(&kept_line("Alex")),
         "{:?}",
-        matching.findings
+        matching.noted
     );
 }
 
@@ -106,12 +106,12 @@ async fn an_unread_arrangement_names_nobody_and_the_choice_is_written() {
         .await
         .unwrap_or_default();
 
-        let first = report.findings.first().cloned().unwrap_or_default();
+        let first = report.noted.first().cloned().unwrap_or_default();
         assert!(first.starts_with("the household"), "{tag}: {first}");
         assert!(
-            !report.findings.contains(&kept_line("Alex")),
+            !report.noted.contains(&kept_line("Alex")),
             "{tag}: {:?}",
-            report.findings
+            report.noted
         );
     }
 }
@@ -130,7 +130,7 @@ async fn a_choice_for_one_person_names_them() {
     .await
     .unwrap_or_default();
 
-    let said = report.findings.first().cloned().unwrap_or_default();
+    let said = report.noted.first().cloned().unwrap_or_default();
     assert!(said.starts_with("Alex"), "{said}");
     assert!(said.contains("waits for you"), "{said}");
     // Their own limit and not the household's. This fixture's household has none
@@ -212,12 +212,12 @@ async fn a_rehearsal_says_what_it_would_do_and_writes_nothing() {
     .unwrap_or_default();
 
     assert!(
-        report.findings.contains(&kept_line("Alex")),
+        report.noted.contains(&kept_line("Alex")),
         "{:?}",
-        report.findings
+        report.noted
     );
     for said in [report, one_person] {
-        let first = said.findings.first().cloned().unwrap_or_default();
+        let first = said.noted.first().cloned().unwrap_or_default();
         assert!(first.contains("rehearsed"), "{first}");
     }
 }

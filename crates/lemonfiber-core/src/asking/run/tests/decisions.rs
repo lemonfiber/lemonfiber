@@ -17,7 +17,7 @@ async fn approving_a_waiting_request_says_what_happened() {
     .await
     .unwrap_or_default();
 
-    let said = report.findings.first().cloned().unwrap_or_default();
+    let said = report.noted.first().cloned().unwrap_or_default();
     assert!(said.contains("Alex"), "{said}");
     assert!(said.contains("approved"), "{said}");
 }
@@ -42,11 +42,11 @@ async fn turning_one_down_says_the_reason_back_and_where_it_went() {
     .await
     .unwrap_or_default();
 
-    let said = report.findings.first().cloned().unwrap_or_default();
+    let said = report.noted.first().cloned().unwrap_or_default();
     assert!(said.contains("no room this month"), "{said}");
     assert!(said.contains("kept here"), "{said}");
 
-    let carried = report.findings.get(1).cloned().unwrap_or_default();
+    let carried = report.noted.get(1).cloned().unwrap_or_default();
     assert!(
         carried.contains("told why, on Pushover and Pushbullet"),
         "{carried}"
@@ -145,7 +145,7 @@ async fn a_household_this_machine_may_not_reach_is_said_rather_than_reached() {
     .await
     .unwrap_or_default();
 
-    let carried = report.findings.get(1).cloned().unwrap_or_default();
+    let carried = report.noted.get(1).cloned().unwrap_or_default();
     assert!(
         carried.contains(crate::config::REACH_HOUSEHOLD_KEY),
         "{carried}"
@@ -166,7 +166,7 @@ async fn turning_down(tag: &str, routes: Vec<(&'static str, Answer)>) -> String 
     )
     .await
     .unwrap_or_default()
-    .findings
+    .noted
     .get(1)
     .cloned()
     .unwrap_or_default()
@@ -185,7 +185,7 @@ async fn a_rehearsed_decision_rules_on_nothing() {
     .await
     .unwrap_or_default();
 
-    let said = report.findings.first().cloned().unwrap_or_default();
+    let said = report.noted.first().cloned().unwrap_or_default();
     assert!(said.contains("nothing was sent or decided"), "{said}");
 }
 

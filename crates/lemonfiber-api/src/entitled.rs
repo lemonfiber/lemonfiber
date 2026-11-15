@@ -20,7 +20,7 @@
 //! another's requests asks for.
 
 use lemonfiber_core::app::{
-    Asker, Command, Diagnosing, Doorway, MigrateAction, Shelf, Viewing, Whom, Wishing,
+    Command, Diagnosing, Doorway, MigrateAction, Shelf, Viewing, Whom, Wishing,
 };
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
@@ -165,7 +165,6 @@ pub(crate) fn their_shelf(id: &str, most: u32) -> Command {
     Command::Held(Shelf {
         member: Whom::Named(id.to_owned()),
         most,
-        asker: Asker::Member,
     })
 }
 
@@ -182,18 +181,12 @@ pub(crate) fn their_playing(id: &str) -> Command {
 #[must_use]
 pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
     let them = Whom::Named(id.to_owned());
-    let asker = Asker::Member;
     match viewing.clone() {
         Viewing::Title { id: title, .. } => Viewing::Title {
             member: them,
             id: title,
-            asker,
         },
-        Viewing::PartWay { most, .. } => Viewing::PartWay {
-            member: them,
-            most,
-            asker,
-        },
+        Viewing::PartWay { most, .. } => Viewing::PartWay { member: them, most },
         Viewing::Grant { device, .. } => Viewing::Grant {
             member: id.to_owned(),
             device,
@@ -211,7 +204,6 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
         Viewing::Tune { live, .. } => Viewing::Tune {
             member: id.to_owned(),
             live,
-            asker,
         },
         Viewing::Play {
             id: title, from, ..
@@ -219,7 +211,6 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
             member: id.to_owned(),
             id: title,
             from,
-            asker,
         },
     }
 }

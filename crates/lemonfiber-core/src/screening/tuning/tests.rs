@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{channels, located, passed, tuned, Ready};
-use crate::app::{Asker, Ctx, Live};
+use crate::app::{Ctx, Live};
 use crate::pass::{Key, LivePath, Paths, Renewals, Watching, KEY_BYTES, LIFETIME};
 use crate::ports::service::{Certificate, Channel, Programme, Unrated};
 use crate::screening::tuned::Open;
@@ -140,7 +140,7 @@ async fn a_channel_showing_nothing_certified_is_held_to_the_members_unrated_poli
         .unwrap_or_default();
     assert_eq!(ids, vec!["kids".to_owned()]);
     for channel in ["quiet", "uncertified"] {
-        let opened = tuned(&ctx, "Ada", Live::Open(channel.to_owned()), Asker::Member).await;
+        let opened = tuned(&ctx, "Ada", Live::Open(channel.to_owned())).await;
         assert_eq!(code(opened).as_deref(), Some("PLAY-2"), "{channel}");
     }
     assert!(!was_asked(&transport, "tune"));
@@ -163,7 +163,7 @@ async fn a_member_whose_account_may_not_watch_live_tv_is_answered_none_and_opene
     let ctx = ctx_over(Arc::clone(&transport), "no-live-tv");
     let answered = channels(&ctx, "Ada").await;
     assert!(answered.is_ok_and(|report| report.channels.is_empty()));
-    let opened = tuned(&ctx, "Ada", Live::Open("kids".to_owned()), Asker::Member).await;
+    let opened = tuned(&ctx, "Ada", Live::Open("kids".to_owned())).await;
     assert_eq!(code(opened).as_deref(), Some("PLAY-10"));
     assert!(!was_asked(&transport, "tune"));
 }
@@ -172,7 +172,7 @@ async fn a_member_whose_account_may_not_watch_live_tv_is_answered_none_and_opene
 async fn a_channel_outside_the_members_limits_is_refused_and_opened_nothing() {
     let transport = server(&evening(), Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "outside");
-    let opened = tuned(&ctx, "Ada", Live::Open("late".to_owned()), Asker::Member).await;
+    let opened = tuned(&ctx, "Ada", Live::Open("late".to_owned())).await;
     assert_eq!(code(opened).as_deref(), Some("PLAY-2"));
     assert!(!was_asked(&transport, "tune"));
 }
@@ -185,27 +185,24 @@ async fn a_live_stream_not_opened_for_the_member_is_neither_renewed_nor_closed()
         Live::Renew("somebody-elses".to_owned()),
         Live::Stop("somebody-elses".to_owned()),
     ] {
-        let answered = tuned(&ctx, "Ada", live, Asker::Member).await;
+        let answered = tuned(&ctx, "Ada", live).await;
         assert_eq!(code(answered).as_deref(), Some("PLAY-11"));
     }
     assert!(!was_asked(&transport, "untune"));
 }
 
 #[tokio::test]
-async fn with_nowhere_to_locate_it_nothing_is_opened_and_a_member_hears_why_in_household_words() {
+async fn with_nowhere_to_locate_it_nothing_is_opened_and_why_is_a_fault_the_household_is_not_told_the_detail_of(
+) {
     let transport = server(&evening(), Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "unlocated");
-    let member = tuned(&ctx, "Ada", Live::Open("kids".to_owned()), Asker::Member).await;
-    let operator = tuned(&ctx, "Ada", Live::Open("kids".to_owned()), Asker::Operator).await;
-    let (Ok(member), Ok(operator)) = (member, operator) else {
-        unreachable!("both are answered as unlocated");
+    let Ok(report) = tuned(&ctx, "Ada", Live::Open("kids".to_owned())).await else {
+        unreachable!("answered as unlocated");
     };
-    assert_eq!(
-        member.unlocated.as_deref(),
-        Some(crate::screening::door::told(Asker::Member, String::new()).as_str())
-    );
-    assert!(operator.unlocated.is_some() && operator.unlocated != member.unlocated);
-    assert!(member.direct.is_none() && member.transcoded.is_none());
+    assert!(report
+        .unlocated
+        .is_some_and(|why| crate::error::household::Words::of(why.code).fault));
+    assert!(report.direct.is_none() && report.transcoded.is_none());
     assert!(!was_asked(&transport, "tune"));
 }
 

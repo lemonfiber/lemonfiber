@@ -5,7 +5,7 @@ use crate::error::codes::quota::UNREACHABLE;
 use crate::error::household::{unhoused, Obstacle, Words};
 use crate::model::{
     Held, HeldReport, HouseholdMember, HouseholdReport, Located, MemberRequest, PartWay,
-    PartWayReport, PlayingReport, Title, TitleReport,
+    PartWayReport, PlayReport, PlayingReport, Title, TitleReport, TunedReport,
 };
 use crate::ports::service::Medium;
 
@@ -48,7 +48,7 @@ fn a_members_shelf_is_worded_for_the_household() {
         ..HeldReport::default()
     })
     .for_household() else {
-        panic!("a shelf stopped being a shelf");
+        unreachable!("a shelf stopped being a shelf");
     };
     assert_eq!(shelf.findings, vec![household(SERVER_SILENT)]);
     assert_eq!(
@@ -68,7 +68,7 @@ fn every_member_read_is_worded_for_the_household() {
         ..PlayingReport::default()
     })
     .for_household() else {
-        panic!("what is playing stopped being what is playing");
+        unreachable!("what is playing stopped being what is playing");
     };
     assert_eq!(playing.findings, vec![household(SERVER_SILENT)]);
 
@@ -82,7 +82,7 @@ fn every_member_read_is_worded_for_the_household() {
         ..PartWayReport::default()
     })
     .for_household() else {
-        panic!("what was part-way through stopped being that");
+        unreachable!("what was part-way through stopped being that");
     };
     assert_eq!(part_way.findings, vec![household(SERVER_SILENT)]);
     assert_eq!(
@@ -106,7 +106,7 @@ fn every_member_read_is_worded_for_the_household() {
         ..TitleReport::default()
     })
     .for_household() else {
-        panic!("a title stopped being a title");
+        unreachable!("a title stopped being a title");
     };
     assert_eq!(
         titled.title.and_then(|title| title.held.at.unlocated),
@@ -122,6 +122,8 @@ fn a_members_household_row_carries_nothing_written_for_the_operator() {
         id: "1".to_owned(),
         asked: None,
         title: Some("Dune".to_owned()),
+        kind: None,
+        unit: None,
         year: None,
         arrived: None,
         shelf_id: None,
@@ -153,7 +155,7 @@ fn a_members_household_row_carries_nothing_written_for_the_operator() {
         ..HouseholdReport::default()
     })
     .for_household() else {
-        panic!("a household row stopped being one");
+        unreachable!("a household row stopped being one");
     };
     assert_eq!(row.findings, vec![household(UNREACHABLE)]);
     assert!(row.noted.is_empty());
@@ -181,7 +183,7 @@ fn what_a_member_is_told_is_in_the_way_is_in_the_households_words() {
         ..HeldReport::default()
     })
     .for_household() else {
-        panic!("a shelf stopped being a shelf");
+        unreachable!("a shelf stopped being a shelf");
     };
     let told = shelf.findings.into_iter().chain(
         shelf
@@ -193,6 +195,35 @@ fn what_a_member_is_told_is_in_the_way_is_in_the_households_words() {
         assert_eq!(unhoused(&obstacle.said), None, "{obstacle}");
         assert_eq!(unhoused(&obstacle.remedy), None, "{obstacle}");
     }
+}
+
+/// Why a live stream or a browser's playlist is not located is worded for a member too.
+#[test]
+fn why_a_member_has_nowhere_to_watch_is_in_the_households_words() {
+    let tuned = Outcome::Tuned(TunedReport {
+        unlocated: Some(operator(MISNAMED)),
+        ..TunedReport::default()
+    })
+    .for_household();
+    let played = Outcome::Play(PlayReport {
+        unlocated: Some(operator(MISNAMED)),
+        ..PlayReport::default()
+    })
+    .for_household();
+    assert_eq!(
+        tuned,
+        Outcome::Tuned(TunedReport {
+            unlocated: Some(household(MISNAMED)),
+            ..TunedReport::default()
+        })
+    );
+    assert_eq!(
+        played,
+        Outcome::Play(PlayReport {
+            unlocated: Some(household(MISNAMED)),
+            ..PlayReport::default()
+        })
+    );
 }
 
 /// An outcome that carries nothing to word again is left as it is.

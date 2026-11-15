@@ -18,7 +18,7 @@ mod tuned;
 mod tuning;
 
 use crate::app::targets::{media, Media};
-use crate::app::{Asker, Ctx, Outcome, Viewing, Whom};
+use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
     NOT_ON_THEIR_SHELF, NOT_THEIR_PASS, NOT_THEIR_STREAM, NO_LIVE_TV, NO_SUCH_PICTURE,
@@ -118,16 +118,10 @@ pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
 /// The [`Problem`] the request is refused with.
 pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<Problem>> {
     match viewing {
-        Viewing::Title { member, id, asker } => {
-            title(ctx, &member, &id, asker).await.map(Outcome::Title)
+        Viewing::Title { member, id } => title(ctx, &member, &id).await.map(Outcome::Title),
+        Viewing::PartWay { member, most } => {
+            part_way(ctx, &member, most).await.map(Outcome::PartWay)
         }
-        Viewing::PartWay {
-            member,
-            most,
-            asker,
-        } => part_way(ctx, &member, most, asker)
-            .await
-            .map(Outcome::PartWay),
         Viewing::Grant { member, device } => {
             granted(ctx, &member, &device).await.map(Outcome::Granted)
         }
@@ -139,19 +133,10 @@ pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<P
             .await
             .map(Outcome::Watched),
         Viewing::Channels { member } => tuning::channels(ctx, &member).await.map(Outcome::Channels),
-        Viewing::Tune {
-            member,
-            live,
-            asker,
-        } => tuning::tuned(ctx, &member, live, asker)
-            .await
-            .map(Outcome::Tuned),
-        Viewing::Play {
-            member,
-            id,
-            from,
-            asker,
-        } => browser::played(ctx, &member, &id, from, asker)
+        Viewing::Tune { member, live } => {
+            tuning::tuned(ctx, &member, live).await.map(Outcome::Tuned)
+        }
+        Viewing::Play { member, id, from } => browser::played(ctx, &member, &id, from)
             .await
             .map(Outcome::Play),
     }
@@ -163,12 +148,7 @@ pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<P
 ///
 /// A [`Problem`] where the id names nothing the server could hold, where the title is
 /// not on the member's shelf, and where there is no server or it does not answer.
-async fn title(
-    ctx: &Ctx,
-    whose: &Whom,
-    id: &str,
-    asker: Asker,
-) -> Result<TitleReport, Box<Problem>> {
+async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Problem>> {
     if !an_item(id) {
         return Err(not_an_item());
     }
@@ -183,7 +163,7 @@ async fn title(
         .await
         .map_err(|_| unanswered())?
         .ok_or_else(|| refused(NOT_ON_THEIR_SHELF, "That title is not on this shelf"))?;
-    let door = door::standing(ctx, server.serve.as_ref(), asker).await;
+    let door = door::standing(ctx, server.serve.as_ref()).await;
     let (member, id) = member.map_or_else(Default::default, |member| (member.name, member.id));
     Ok(TitleReport {
         member,
@@ -230,12 +210,7 @@ pub async fn picture(
 ///
 /// A [`Problem`] where nobody is named, where there is no server, and where the member
 /// is not in the household. A server that will not say is answered as unread.
-async fn part_way(
-    ctx: &Ctx,
-    whose: &Whom,
-    most: u32,
-    asker: Asker,
-) -> Result<PartWayReport, Box<Problem>> {
+async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, Box<Problem>> {
     let Whom::Named(named) = whose else {
         return Err(nobody());
     };
@@ -252,7 +227,7 @@ async fn part_way(
             ..PartWayReport::default()
         });
     };
-    let door = door::standing(ctx, server.serve.as_ref(), asker).await;
+    let door = door::standing(ctx, server.serve.as_ref()).await;
     Ok(PartWayReport {
         member: member.name,
         id: member.id,

@@ -17,7 +17,7 @@
 //! the member's side without reading any member's.
 
 use super::targets::media;
-use super::{Asker, Ctx, Outcome, Shelf, Whom};
+use super::{Ctx, Outcome, Shelf, Whom};
 
 use crate::error::codes::play::{NOTHING_TO_PLAY_FROM, NOT_IN_THE_HOUSEHOLD, SERVER_SILENT};
 use crate::error::household::Obstacle;
@@ -34,20 +34,11 @@ use crate::screening::door::{located, Door};
 /// One resolution for both rather than two paths that could come to disagree about who
 /// was meant.
 pub(crate) async fn asked(ctx: &Ctx, shelf: Shelf) -> Result<Outcome, Box<Problem>> {
-    let Shelf {
-        member,
-        most,
-        asker,
-    } = shelf;
-    held(ctx, &member, most, asker).await.map(Outcome::Held)
+    let Shelf { member, most } = shelf;
+    held(ctx, &member, most).await.map(Outcome::Held)
 }
 
-async fn held(
-    ctx: &Ctx,
-    whose: &Whom,
-    most: u32,
-    asker: Asker,
-) -> Result<HeldReport, Box<Problem>> {
+async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -62,7 +53,7 @@ async fn held(
         ));
     };
 
-    let door = crate::screening::door::standing(ctx, server.serve.as_ref(), asker).await;
+    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
             server.serve.holdings(None, most).await,

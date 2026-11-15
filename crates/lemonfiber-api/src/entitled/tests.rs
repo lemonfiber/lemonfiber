@@ -1,4 +1,4 @@
-use lemonfiber_core::app::{Asker, Command, Diagnosing, Shelf, Whom};
+use lemonfiber_core::app::{Command, Diagnosing, Shelf, Whom};
 
 use super::{callable_by_a_key, may, Door, Permitted};
 use crate::admission::Caller;
@@ -41,13 +41,11 @@ fn a_member_asking_for_the_defaults_is_given_their_own() {
             Command::Held(Shelf {
                 member: Whom::Defaults,
                 most: 25,
-                asker: Asker::Operator,
             })
         ),
         Permitted::This(Command::Held(Shelf {
             member: named(ASKING),
             most: 25,
-            asker: Asker::Member,
         }))
     );
 }
@@ -59,7 +57,6 @@ fn the_operator_is_answered_as_the_defaults() {
     let defaults = Command::Held(Shelf {
         member: Whom::Defaults,
         most: 25,
-        asker: Asker::Operator,
     });
     assert_eq!(
         may(&Caller::Operator, Door::Reading, defaults.clone()),
@@ -113,13 +110,11 @@ fn a_member_naming_somebody_elses_shelf_is_given_their_own() {
             Command::Held(Shelf {
                 member: named(SOMEBODY_ELSE),
                 most: 25,
-                asker: Asker::Operator,
             })
         ),
         Permitted::This(Command::Held(Shelf {
             member: named(ASKING),
             most: 25,
-            asker: Asker::Member,
         }))
     );
 }
@@ -135,13 +130,11 @@ fn how_much_of_the_shelf_a_member_asked_for_is_carried_through() {
             Command::Held(Shelf {
                 member: named(ASKING),
                 most: 7,
-                asker: Asker::Operator,
             })
         ),
         Permitted::This(Command::Held(Shelf {
             member: named(ASKING),
             most: 7,
-            asker: Asker::Member,
         })),
         "the count a member asked for was not carried through"
     );

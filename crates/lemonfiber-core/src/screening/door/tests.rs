@@ -3,9 +3,10 @@ use super::{
     upstream, Door, GUARDED, NOT_AN_ITEM, NOT_DECLARED, NOT_MADE, NO_ADDRESS, NO_STACK,
     REFUSED_DECLARATION, UNREADABLE,
 };
-use crate::app::Asker;
 use crate::certificate::Unkept;
-use crate::error::codes::play::{DOOR_UNREADY, NO_HOUSEHOLD_ADDRESS, UNDECLARED};
+use crate::error::codes::play::{
+    DOOR_UNREADY, MISNAMED, NO_BROWSER_ROUTE, NO_HOUSEHOLD_ADDRESS, UNDECLARED,
+};
 use crate::error::household::Obstacle;
 use crate::model::Located;
 use crate::ports::service::{Holds, Item, Medium};
@@ -30,7 +31,6 @@ fn the_door() -> Door {
         base: "https://house.local:8920".to_owned(),
         fingerprint: "ab12".to_owned(),
         locations: enforceable().locations,
-        asker: Asker::Operator,
     }
 }
 
@@ -243,17 +243,11 @@ async fn a_standing_door_locates_where_the_server_behind_it_declared() {
     let addressed = standing_at(Some(HOUSEHOLD_HOST));
 
     assert_eq!(
-        super::standing(
-            &addressed,
-            &Declares::declaring(enforceable()),
-            Asker::Operator
-        )
-        .await,
+        super::standing(&addressed, &Declares::declaring(enforceable()),).await,
         Door::At {
             base: format!("https://{HOUSEHOLD_HOST}:{GUARDED}"),
             fingerprint: fingerprint.unwrap_or_default(),
             locations: enforceable().locations,
-            asker: Asker::Operator,
         }
     );
     assert_eq!(
@@ -322,24 +316,19 @@ fn an_item_named_by_anything_but_an_item_id_is_not_located() {
 }
 
 #[test]
-fn a_member_is_told_only_that_it_does_not_play_here_yet_and_the_operator_what_to_fix() {
-    assert_eq!(told(Asker::Operator, NO_ADDRESS.to_owned()), NO_ADDRESS);
-    assert_eq!(told(Asker::Member, NO_ADDRESS.to_owned()), UNPLAYABLE);
-    let member = Door::At {
-        base: "https://house.local:8920".to_owned(),
-        fingerprint: "ab12".to_owned(),
-        locations: enforceable().locations,
-        asker: Asker::Member,
-    };
+fn a_door_that_cannot_be_built_is_why_nothing_is_located_whatever_the_item_is_named() {
+    let unknown = Obstacle::new(NO_HOUSEHOLD_ADDRESS, NO_ADDRESS);
     let mut odd = held(Medium::Film, EVERYTHING);
     odd.id = "not an id".to_owned();
     assert_eq!(
-        located_at(odd.clone(), &member).at.unlocated.as_deref(),
-        Some(UNPLAYABLE)
+        located_at(odd.clone(), &Door::Unknown(unknown.clone()))
+            .at
+            .unlocated,
+        Some(unknown)
     );
     assert_eq!(
-        located_at(odd, &the_door()).at.unlocated.as_deref(),
-        Some(NOT_AN_ITEM)
+        located_at(odd, &the_door()).at.unlocated,
+        Some(Obstacle::new(MISNAMED, NOT_AN_ITEM))
     );
 }
 
@@ -351,7 +340,6 @@ fn every_stream_location_names_a_play_of_its_own_drawn_fresh() {
         base: "https://house.local:8920".to_owned(),
         fingerprint: "ab12".to_owned(),
         locations,
-        asker: Asker::Operator,
     };
     let play = drawn_play(&Chance::cycling()).unwrap_or_default();
     assert_eq!(play, "6162636465666768696a6b6c6d6e6f70");
@@ -419,7 +407,7 @@ fn a_browser_reaches_the_guard_under_the_households_domain_or_is_told_why_not() 
     );
     assert_eq!(
         super::for_a_browser(&bundled("no-domain", None)),
-        Err(super::NO_DOMAIN.to_owned())
+        Err(Obstacle::new(NO_BROWSER_ROUTE, super::NO_DOMAIN))
     );
 }
 
@@ -447,14 +435,14 @@ fn with_no_proxy_in_front_or_a_register_that_will_not_read_a_browser_has_no_addr
     .is_ok());
     assert_eq!(
         super::for_a_browser(&unproxied),
-        Err(super::NO_PROXY.to_owned())
+        Err(Obstacle::new(NO_BROWSER_ROUTE, super::NO_PROXY))
     );
 
     let unread = bundled("unread-register", Some("home.lan"));
     assert!(std::fs::write(register_of(&unread), "{").is_ok());
     assert_eq!(
         super::for_a_browser(&unread),
-        Err(super::NO_BROWSER_ROUTE.to_owned())
+        Err(Obstacle::new(NO_BROWSER_ROUTE, super::UNROUTED))
     );
 }
 

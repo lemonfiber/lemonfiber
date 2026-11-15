@@ -10,9 +10,11 @@ use std::path::{Path, PathBuf};
 use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::stream::guard;
 
-use crate::app::{Asker, Ctx};
+use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
-use crate::error::codes::play::{DOOR_UNREADY, MISNAMED, NO_HOUSEHOLD_ADDRESS, UNDECLARED};
+use crate::error::codes::play::{
+    DOOR_UNREADY, MISNAMED, NO_BROWSER_ROUTE, NO_HOUSEHOLD_ADDRESS, UNDECLARED,
+};
 use crate::error::household::Obstacle;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
 use crate::ports::random::Random;
@@ -69,8 +71,6 @@ pub(crate) enum Door {
         fingerprint: String,
         /// Where the media server behind the door serves each item, as it declared it.
         locations: Locations,
-        /// Who asked, which decides the words an item not located says why in.
-        asker: Asker,
     },
     /// Why nothing can be located at the door.
     Unknown(Obstacle),
@@ -113,17 +113,8 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     }
 }
 
-/// The door as this machine stands now, in front of `server`, saying why nothing can
-/// be located there in the words `asker` is told.
-pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
-    match seen(ctx, server, asker).await {
-        Door::Unknown(why) => Door::Unknown(told(asker, why)),
-        door @ Door::At { .. } => door,
-    }
-}
-
 /// The door as this machine stands now, in front of `server`.
-async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
+pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
@@ -142,7 +133,6 @@ async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
             base,
             fingerprint,
             locations,
-            asker,
         },
         Err(why) => Door::Unknown(why),
     }
@@ -181,17 +171,6 @@ pub(crate) async fn declared(
         .map_err(|why| Obstacle::new(UNDECLARED, format!("{REFUSED_DECLARATION} {why}")))
 }
 
-/// `why` nothing is located, in the words `asker` is told: what to fix for the operator,
-/// and for a member only that it does not play here yet, which nothing they can do
-/// changes.
-#[must_use]
-pub(crate) fn told(asker: Asker, why: String) -> String {
-    match asker {
-        Asker::Operator => why,
-        Asker::Member => UNPLAYABLE.to_owned(),
-    }
-}
-
 /// A fresh id for one play of an item, which a stream or playlist location names where
 /// its template holds `{play}`: thirty-two lower-case hex digits, or nothing where no
 /// randomness could be drawn.
@@ -213,22 +192,19 @@ pub(crate) fn passed(at: &str, pass: &str) -> String {
     format!("{at}{joiner}{}={pass}", lemonfiber_sidecar::pass::PARAMETER)
 }
 
-/// What a member is told where nothing can be located for them.
-const UNPLAYABLE: &str = "This cannot be played here yet. Whoever looks after the household \
-                          can set it up.";
-
 /// The address the stack's front door serves the guard at for a browser, with a
 /// certificate a browser trusts: the label the guard's route is published under, in front
 /// of the domain the household's proxy serves; or why there is none.
-pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
+pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, Obstacle> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
-    let register = crate::app::plugins::read(ctx).map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
+        .map_err(|_| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
+    let register =
+        crate::app::plugins::read(ctx).map_err(|_| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
     let fillers = crate::app::targets::fillers_here(ctx, &manifest);
     if fillers.filling(front::CAPABILITY).is_none() {
-        return Err(NO_PROXY.to_owned());
+        return Err(Obstacle::new(NO_BROWSER_ROUTE, NO_PROXY));
     }
     let label = fillers
         .filling(guard::CAPABILITY)
@@ -240,10 +216,10 @@ pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
                 .find(|placed| placed.service == guarding.id)
         })
         .and_then(|placed| placed.reached.as_ref()?.hostname().map(str::to_owned))
-        .ok_or_else(|| NO_BROWSER_ROUTE.to_owned())?;
+        .ok_or_else(|| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
     crate::door::proxied(&label, ctx.settings.household_domain.as_deref())
         .map(|address| address.url)
-        .ok_or_else(|| NO_DOMAIN.to_owned())
+        .ok_or_else(|| Obstacle::new(NO_BROWSER_ROUTE, NO_DOMAIN))
 }
 
 /// Said where no proxy fronts the household's services, so no browser reaches the door.
@@ -252,7 +228,7 @@ const NO_PROXY: &str = "No proxy fronts the household's services, so a browser h
                         proxy, and every title plays in a browser.";
 
 /// Said where the guard publishes no route through the household's proxy.
-const NO_BROWSER_ROUTE: &str = "The guard in front of the media server publishes no route \
+const UNROUTED: &str = "The guard in front of the media server publishes no route \
                                 through the household's proxy, so a browser has nowhere to \
                                 play from. Install the door plugin, which publishes one.";
 
@@ -296,16 +272,12 @@ const NOT_AN_ITEM: &str = "The media server named this item by something that is
 #[must_use]
 pub(crate) fn located(item: Item, door: &Door, random: &dyn Random) -> Held {
     let at = match door {
-        _ if !super::an_item(&item.id) => Located {
-            unlocated: Some(Obstacle::new(MISNAMED, NOT_AN_ITEM)),
-            ..Located::default()
-        },
         Door::Unknown(why) => Located {
             unlocated: Some(why.clone()),
             ..Located::default()
         },
-        Door::At { asker, .. } if !super::an_item(&item.id) => Located {
-            unlocated: Some(told(*asker, NOT_AN_ITEM.to_owned())),
+        Door::At { .. } if !super::an_item(&item.id) => Located {
+            unlocated: Some(Obstacle::new(MISNAMED, NOT_AN_ITEM)),
             ..Located::default()
         },
         Door::At {

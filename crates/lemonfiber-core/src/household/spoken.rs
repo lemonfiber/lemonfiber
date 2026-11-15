@@ -11,7 +11,7 @@ use crate::app::Outcome;
 use crate::error::household::Obstacle;
 use crate::model::{
     Episode, Held, HeldReport, HouseholdMember, HouseholdReport, MemberRequest, PartWayReport,
-    PlayingReport, Season, Title, TitleReport,
+    PlayReport, PlayingReport, Season, Title, TitleReport, TunedReport,
 };
 
 impl Outcome {
@@ -25,11 +25,11 @@ impl Outcome {
             Self::Household(report) => Self::Household(household(report)),
             Self::Held(report) => Self::Held(HeldReport {
                 holdings: report.holdings.into_iter().map(held).collect(),
-                findings: spoken(report.findings),
+                findings: spoken(&report.findings),
                 ..report
             }),
             Self::Playing(report) => Self::Playing(PlayingReport {
-                findings: spoken(report.findings),
+                findings: spoken(&report.findings),
                 ..report
             }),
             Self::Title(report) => Self::Title(TitleReport {
@@ -45,7 +45,15 @@ impl Outcome {
                         one
                     })
                     .collect(),
-                findings: spoken(report.findings),
+                findings: spoken(&report.findings),
+                ..report
+            }),
+            Self::Tuned(report) => Self::Tuned(TunedReport {
+                unlocated: report.unlocated.as_ref().map(Obstacle::spoken),
+                ..report
+            }),
+            Self::Play(report) => Self::Play(PlayReport {
+                unlocated: report.unlocated.as_ref().map(Obstacle::spoken),
                 ..report
             }),
             other => other,
@@ -54,7 +62,7 @@ impl Outcome {
 }
 
 /// Every obstacle, worded for the household.
-fn spoken(findings: Vec<Obstacle>) -> Vec<Obstacle> {
+fn spoken(findings: &[Obstacle]) -> Vec<Obstacle> {
     findings.iter().map(Obstacle::spoken).collect()
 }
 
@@ -92,7 +100,7 @@ fn title(title: Title) -> Title {
 fn household(report: HouseholdReport) -> HouseholdReport {
     HouseholdReport {
         members: report.members.into_iter().map(member).collect(),
-        findings: spoken(report.findings),
+        findings: spoken(&report.findings),
         noted: Vec::new(),
         filtering: None,
         ..report

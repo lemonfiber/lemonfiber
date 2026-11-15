@@ -73,10 +73,14 @@
       "type": "string"
     },
     "unlocated": {
-      "description": "Why no location is stated, where none is.",
-      "type": [
-        "string",
-        "null"
+      "description": "Why no location is stated, where none is, by the code that names it.",
+      "anyOf": [
+        {
+          "$ref": "Obstacle.json"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "year": {

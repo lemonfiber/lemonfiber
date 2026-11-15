@@ -45,7 +45,7 @@ fn a_code_with_words_of_its_own_is_told_in_them() {
     let declared = wish::ALREADY_HERE.declaration();
     let Some(Household::Said { said, remedy }) = declared.map(crate::codes::Declared::household)
     else {
-        panic!("WISH-5 carries no household words of its own");
+        unreachable!("WISH-5 carries no household words of its own");
     };
     let words = Words::of(wish::ALREADY_HERE);
     assert_eq!(

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{play_of, played, reopened};
-use crate::app::{Asker, Ctx, PlayFrom};
+use crate::app::{Ctx, PlayFrom};
 use crate::pass::{Key, Session, KEY_BYTES, NONCE_BYTES};
 use crate::test_support::{media, moved_household};
 
@@ -85,14 +85,7 @@ fn server(routes: Vec<(&'static str, Answer)>) -> Arc<Transport> {
 async fn a_browser_named_by_something_else_is_refused_before_anything_is_asked() {
     let transport = server(Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "not-a-device");
-    let answered = played(
-        &ctx,
-        "Ada",
-        FILM,
-        PlayFrom::Device("a\"b".to_owned()),
-        Asker::Member,
-    )
-    .await;
+    let answered = played(&ctx, "Ada", FILM, PlayFrom::Device("a\"b".to_owned())).await;
     assert_eq!(
         answered
             .err()
@@ -104,7 +97,8 @@ async fn a_browser_named_by_something_else_is_refused_before_anything_is_asked()
 }
 
 #[tokio::test]
-async fn with_nowhere_to_play_it_no_session_is_opened_and_a_member_hears_why_in_household_words() {
+async fn with_nowhere_to_play_it_no_session_is_opened_and_why_is_a_fault_the_household_is_not_told_the_detail_of(
+) {
     let transport = server(Vec::new());
     let ctx = ctx_over(Arc::clone(&transport), "unlocated");
     let answered = played(
@@ -112,16 +106,14 @@ async fn with_nowhere_to_play_it_no_session_is_opened_and_a_member_hears_why_in_
         "Ada",
         FILM,
         PlayFrom::Device("a-browser-0123".to_owned()),
-        Asker::Member,
     )
     .await;
     let Ok(report) = answered else {
         unreachable!("answered as unlocated");
     };
-    assert_eq!(
-        report.unlocated.as_deref(),
-        Some(crate::screening::door::told(Asker::Member, String::new()).as_str())
-    );
+    assert!(report
+        .unlocated
+        .is_some_and(|why| crate::error::household::Words::of(why.code).fault));
     assert!(report.stream_from.is_none());
     assert!(!transport
         .requests()

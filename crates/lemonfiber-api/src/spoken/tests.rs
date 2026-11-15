@@ -70,7 +70,10 @@ async fn a_refusal_reaches_a_member_in_the_households_words() {
     }
     let envelope: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
     for said in ["summary", "meaning"] {
-        let sentence = envelope["data"][said].as_str().unwrap_or_default();
+        let sentence = envelope
+            .pointer(&format!("/data/{said}"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
         assert_eq!(unhoused(sentence), None, "{sentence}");
     }
 }
