@@ -7,8 +7,8 @@ use super::{Duration, Failure};
 use crate::media::Kind;
 use async_trait::async_trait;
 
-/// The protocol a download client is reached in: the name of the API a curator speaks
-/// to it, as the download client declares it.
+/// The protocol a service is reached in: the name of the API it is asked in, as it
+/// declares it — a download client by the curator, a challenge solver by the indexer.
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]

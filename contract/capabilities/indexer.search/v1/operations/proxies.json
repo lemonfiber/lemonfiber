@@ -29,6 +29,14 @@
                       "description": "The identifier the indexer gave it.",
                       "type": "string"
                     },
+                    "name": {
+                      "description": "What it is called where somebody reads the list.",
+                      "type": "string"
+                    },
+                    "protocol": {
+                      "$ref": "#/$defs/Protocol",
+                      "description": "The API the indexer asks it in."
+                    },
                     "tags": {
                       "description": "The tags that send an indexer site through it.",
                       "items": {
@@ -43,10 +51,16 @@
                   },
                   "required": [
                     "id",
+                    "name",
                     "url",
+                    "protocol",
                     "tags"
                   ],
                   "type": "object"
+                },
+                "Protocol": {
+                  "description": "The protocol a service is reached in: the name of the API it is asked in, as it\ndeclares it — a download client by the curator, a challenge solver by the indexer.",
+                  "type": "string"
                 }
               },
               "$schema": "https://json-schema.org/draft/2020-12/schema",

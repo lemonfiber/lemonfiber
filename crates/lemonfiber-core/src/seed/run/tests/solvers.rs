@@ -69,7 +69,9 @@ fn added(sent: &[crate::ports::http::Request]) -> Vec<SolverAt> {
 fn known(url: &str, tags: &[&str]) -> KnownSolver {
     KnownSolver {
         id: "1".to_owned(),
+        name: "FlareSolverr".to_owned(),
         url: url.to_owned(),
+        protocol: Protocol("flaresolverr".to_owned()),
         tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
     }
 }

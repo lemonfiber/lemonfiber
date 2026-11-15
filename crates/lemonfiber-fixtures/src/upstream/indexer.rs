@@ -5,8 +5,8 @@ use std::time::{Duration, SystemTime};
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
     Aggregator, AggregatorAt, Aggregators, AppSync, Application, Cookie, Failure, IndexerUse,
-    Indexers, KnownAggregator, KnownSolver, Limits, PullsIndexers, RegisteredApplication, Solved,
-    SolverAt, Solvers, Solving,
+    Indexers, KnownAggregator, KnownSolver, Limits, Protocol, PullsIndexers, RegisteredApplication,
+    Solved, SolverAt, Solvers, Solving,
 };
 
 use super::{Upstream, SERVICE};
@@ -82,7 +82,9 @@ impl Solvers for Upstream {
     async fn proxies(&self) -> Result<Vec<KnownSolver>, Failure> {
         Ok(vec![KnownSolver {
             id: "3".to_owned(),
+            name: "FlareSolverr".to_owned(),
             url: "http://solver:8191".to_owned(),
+            protocol: Protocol("flaresolverr".to_owned()),
             tags: vec!["lemonfiber-solver".to_owned()],
         }])
     }

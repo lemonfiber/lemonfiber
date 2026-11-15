@@ -80,8 +80,12 @@ pub struct SolverAt {
 pub struct KnownSolver {
     /// The identifier the indexer gave it.
     pub id: String,
+    /// What it is called where somebody reads the list.
+    pub name: String,
     /// Where the indexer says it is.
     pub url: String,
+    /// The API the indexer asks it in.
+    pub protocol: Protocol,
     /// The tags that send an indexer site through it.
     pub tags: Vec<String>,
 }

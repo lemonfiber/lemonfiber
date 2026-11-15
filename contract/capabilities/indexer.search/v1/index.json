@@ -35,11 +35,11 @@
     },
     {
       "path": "indexer.search/v1/operations/proxies.json",
-      "sha256": "f6b7461fbb1d7fe215117a06f7180b216ec07a80c0f20fd7e58ab914b69dc16d"
+      "sha256": "a732e6a87104c20662725e6f3149b70e3a1e58d8929a981cd4c126df88e01a1c"
     },
     {
       "path": "indexer.search/v1/operations/add_proxy.json",
-      "sha256": "3e816da8efe2ed42a4d2f507551de14d60fff76a07b5f07dbdbbf9720789f901"
+      "sha256": "3387735a61d59cc190bcd2ab781d7270862bf56f54f075a25f50e8c29f746653"
     },
     {
       "path": "indexer.search/v1/holds.json",

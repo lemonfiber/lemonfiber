@@ -11,7 +11,7 @@
     },
     {
       "path": "indexer.pull/v1/operations/add_aggregator.json",
-      "sha256": "8e0fdd23ae1fa5b5b6fd8de03633b33b7d36e868ff94994e174165fcab803aaf"
+      "sha256": "3388e029f89f0184be38fb379b6d0c16687de952fa7fe22c04445d79e980777e"
     },
     {
       "path": "indexer.pull/v1/operations/pull.json",
