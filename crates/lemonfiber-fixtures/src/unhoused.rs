@@ -8,7 +8,6 @@
 /// the engines and the tunnel it runs on.
 const UNPINNED: &[&str] = &[
     "apprise",
-    "byparr",
     "calibre",
     "docker",
     "gotify",

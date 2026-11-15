@@ -292,7 +292,6 @@ fn every_curation_ask_the_shipped_stack_makes_is_connected_or_said() {
         said,
         vec![
             "Lidarr into Bazarr",
-            "FlareSolverr into Prowlarr",
             "Lidarr into Recyclarr",
             "Bindery into Seerr",
             "Lidarr into Seerr",

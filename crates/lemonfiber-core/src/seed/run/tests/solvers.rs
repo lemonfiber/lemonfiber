@@ -6,29 +6,14 @@ use crate::test_support::adapted::{asked_at, refused};
 use crate::test_support::indexer::{answering, searching, taken};
 use lemonfiber_contract::wire::Kind;
 
-/// The port the challenge solver listens on inside the stack's network.
-const LISTENS: u16 = 8191;
-
 /// Where the indexer reaches the challenge solver.
 const AT: &str = "http://flaresolverr:8191";
 
-/// The bundle's challenge solver moved into its plugin, answering in the `FlareSolverr` API
-/// on [`LISTENS`].
+/// The bundle's challenge solver moved into its plugin, answering in the `FlareSolverr` API.
 fn solving() -> Vec<crate::plugin::Installed> {
     crate::test_support::adapted::installed_parts()
         .into_iter()
         .filter(|part| part.plugin == "flaresolverr")
-        .map(|mut part| {
-            for upstream in part
-                .services
-                .iter_mut()
-                .filter(|placed| placed.service == "flaresolverr")
-            {
-                upstream.native = Some("flaresolverr".to_owned());
-                upstream.listens = Some(LISTENS);
-            }
-            part
-        })
         .collect()
 }
 
