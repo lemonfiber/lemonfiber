@@ -415,3 +415,9 @@ fn the_guards_questions_take_a_number_a_value_a_default_or_a_hidden_secret() {
         Some("a-key".to_owned())
     );
 }
+
+#[test]
+fn the_container_user_is_read_as_a_pair_or_left_to_the_image() {
+    assert_eq!(answered(&["1000:1000"]).service_user(), Some((1000, 1000)));
+    assert_eq!(answered(&[""]).service_user(), None);
+}

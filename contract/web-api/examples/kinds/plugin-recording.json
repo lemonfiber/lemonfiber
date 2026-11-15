@@ -1,0 +1,51 @@
+{
+  "api_version": 1,
+  "data": {
+    "failed": [
+      {
+        "log": [],
+        "service": "flaresolverr",
+        "step": "container",
+        "why": "the container engine could not be reached: no engine in a test"
+      }
+    ],
+    "holds": false,
+    "id": "flaresolverr",
+    "recordings": [
+      {
+        "fixture": "recordings/flaresolverr/indexer-proxy-identifies.json",
+        "named": "proof flaresolverr.identifies",
+        "took": {
+          "outcome": "unrecorded",
+          "why": "flaresolverr was not recorded: it failed at container"
+        }
+      },
+      {
+        "fixture": "conformance/indexer.proxy@1/refuses-without-the-key.json",
+        "named": "conformance indexer.proxy@1/refuses-without-the-key",
+        "took": {
+          "outcome": "unrecorded",
+          "why": "flaresolverr was not recorded: it failed at container"
+        }
+      },
+      {
+        "fixture": "conformance/indexer.proxy@1/solve-refuses.json",
+        "named": "conformance indexer.proxy@1/solve-refuses",
+        "took": {
+          "outcome": "unrecorded",
+          "why": "flaresolverr was not recorded: it failed at container"
+        }
+      },
+      {
+        "fixture": "conformance/indexer.proxy@1/answers-answers.json",
+        "named": "conformance indexer.proxy@1/answers-answers",
+        "took": {
+          "outcome": "unrecorded",
+          "why": "flaresolverr was not recorded: it failed at container"
+        }
+      }
+    ],
+    "refusals": []
+  },
+  "kind": "plugin-recording"
+}

@@ -1,0 +1,179 @@
+{
+  "api_version": 1,
+  "data": {
+    "applied": [],
+    "changelog": {
+      "releases": [
+        {
+          "delivers": "Plugins — what one is, installing one, and what that leaves readable",
+          "patches": null,
+          "released_on": "2026-09-24",
+          "user_facing": true,
+          "version": "0.16.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Away from the keyboard — remote control, autostart, customisation",
+          "patches": null,
+          "released_on": "2026-09-15",
+          "user_facing": true,
+          "version": "0.15.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Keeping it running — updates, backup, rollback, the journal",
+          "patches": null,
+          "released_on": "2026-09-12",
+          "user_facing": true,
+          "version": "0.14.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Changing your mind — reconfigure, migrate, uninstall, credentials",
+          "patches": null,
+          "released_on": "2026-09-09",
+          "user_facing": true,
+          "version": "0.13.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Living within limits — disk, retention, bandwidth",
+          "patches": null,
+          "released_on": "2026-09-07",
+          "user_facing": true,
+          "version": "0.12.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "The household asks — requests, identity, client apps",
+          "patches": null,
+          "released_on": "2026-09-04",
+          "user_facing": true,
+          "version": "0.11.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "The front door, its security, and the privacy stance",
+          "patches": null,
+          "released_on": "2026-08-27",
+          "user_facing": true,
+          "version": "0.10.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+          "patches": "0.9.0",
+          "released_on": "2026-08-26",
+          "user_facing": true,
+          "version": "0.9.1",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+          "patches": null,
+          "released_on": "2026-08-26",
+          "user_facing": true,
+          "version": "0.9.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Live TUI: forms, lifecycle, logs and diagnostics as surfaces",
+          "patches": null,
+          "released_on": "2026-08-22",
+          "user_facing": true,
+          "version": "0.8.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Trust checks: providers, support bundle, auto-remediation",
+          "patches": null,
+          "released_on": "2026-08-21",
+          "user_facing": true,
+          "version": "0.7.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Trust checks: VPN, storage, queue health",
+          "patches": null,
+          "released_on": "2026-08-16",
+          "user_facing": true,
+          "version": "0.6.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "How the product speaks — errors, notifications, health, dashboard data",
+          "patches": null,
+          "released_on": "2026-08-09",
+          "user_facing": true,
+          "version": "0.5.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Auto-wiring, seed, quality, trace and the first-content walk",
+          "patches": null,
+          "released_on": "2026-08-08",
+          "user_facing": true,
+          "version": "0.4.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Backup & restore",
+          "patches": null,
+          "released_on": "2026-07-31",
+          "user_facing": true,
+          "version": "0.3.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Setup wizard + doctor",
+          "patches": null,
+          "released_on": "2026-07-30",
+          "user_facing": true,
+          "version": "0.2.0",
+          "withdrawn": null
+        },
+        {
+          "delivers": "Core: manifest, compose driver, CLI",
+          "patches": null,
+          "released_on": "2026-07-26",
+          "user_facing": true,
+          "version": "0.1.0",
+          "withdrawn": null
+        }
+      ],
+      "requirements": {},
+      "running": null,
+      "state": "pending"
+    },
+    "changes": [],
+    "confirmed": false,
+    "in_flight": [],
+    "moves": [
+      {
+        "plugin": "jellyfin",
+        "service": "jellyfin"
+      },
+      {
+        "plugin": "prowlarr",
+        "service": "prowlarr"
+      },
+      {
+        "plugin": "qbittorrent",
+        "service": "qbittorrent"
+      },
+      {
+        "plugin": "radarr",
+        "service": "radarr"
+      },
+      {
+        "plugin": "sonarr",
+        "service": "sonarr"
+      }
+    ],
+    "offer": "939ce89e",
+    "rehearsed": false,
+    "stack_edits": [],
+    "state": "current"
+  },
+  "kind": "update"
+}

@@ -121,7 +121,9 @@ fmt:
     cargo fmt
 
 # Rewrite the machine-readable contract from the types that serialise the reply: the
-# `contract/web-api/` directory, an index beside one file per kind and per definition.
+# `contract/web-api/` directory, an index beside one file per kind and per definition,
+# and an example of every kind and every action, written by running each against the
+# core's fixture fakes.
 contract:
     cargo run --quiet --example contract -p lemonfiber-api
 

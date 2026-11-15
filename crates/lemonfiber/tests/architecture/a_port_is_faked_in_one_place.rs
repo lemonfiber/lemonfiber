@@ -67,7 +67,8 @@ impl<'ast> Visit<'ast> for Declared {
 }
 
 /// The crates only ever built for tests: named under some `[dev-dependencies]` or under the
-/// `[dependencies]` of crates only ever built for tests, and under no other `[dependencies]`.
+/// `[dependencies]` of crates only ever built for tests, under no other `[dependencies]`, and
+/// building no binary a release ships.
 fn test_crates() -> BTreeSet<String> {
     let crates = workspace_root().join("crates");
     let Ok(entries) = fs::read_dir(&crates) else {
@@ -75,6 +76,7 @@ fn test_crates() -> BTreeSet<String> {
     };
     let mut users: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut tested = BTreeSet::new();
+    let mut shipped = BTreeSet::new();
     for entry in entries.flatten() {
         let Ok(manifest) = fs::read_to_string(entry.path().join("Cargo.toml")) else {
             continue;
@@ -106,12 +108,20 @@ fn test_crates() -> BTreeSet<String> {
                 .cloned()
                 .collect()
         };
+        if read.contains_key("bin") || entry.path().join("src/main.rs").is_file() {
+            shipped.insert(name.clone());
+        }
         for dependency in named("dependencies") {
             users.entry(dependency).or_default().insert(name.clone());
         }
         tested.extend(named("dev-dependencies"));
     }
-    let named: BTreeSet<String> = tested.iter().chain(users.keys()).cloned().collect();
+    let named: BTreeSet<String> = tested
+        .iter()
+        .chain(users.keys())
+        .filter(|one| !shipped.contains(*one))
+        .cloned()
+        .collect();
     let mut only = BTreeSet::new();
     loop {
         let grown: BTreeSet<String> = named

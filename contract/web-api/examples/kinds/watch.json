@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "forms": [
+      "library"
+    ],
+    "reason": "the data location is no longer present",
+    "rehearsed": false,
+    "stopped": true,
+    "would": null
+  },
+  "kind": "watch"
+}

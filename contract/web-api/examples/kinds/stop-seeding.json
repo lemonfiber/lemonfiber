@@ -1,0 +1,19 @@
+{
+  "api_version": 1,
+  "data": {
+    "agreement": "f1e4128b",
+    "download": {
+      "bytes": 734003200,
+      "consequence": "Removing it stops it seeding. On a private tracker the ratio it is still earning is what your account is kept on, and losing it can cost the account rather than the file.",
+      "name": "A.Show.S01E01.1080p",
+      "standing": {
+        "ratio": 175,
+        "standing": "seeding"
+      }
+    },
+    "goes": "The copy in the downloads tree goes with it, which is where the room comes back from. Anything the library holds its own name for stays — that name is the media, and this does not touch it.",
+    "gone": null,
+    "rehearsed": false
+  },
+  "kind": "stop-seeding"
+}

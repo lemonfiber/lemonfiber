@@ -1,0 +1,15 @@
+{
+  "arguments": {
+    "down": "37%",
+    "line": "60MiB/6MiB",
+    "up": "37%"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "bandwidth",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

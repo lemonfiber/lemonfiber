@@ -102,8 +102,7 @@ pub use installed::{
 };
 pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owned_by, owner, owns};
-pub(crate) use placing::configuration;
-pub use placing::{key_file, mount_sources, mount_tree, writes, Lands, Write};
+pub use placing::{configuration, key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use profiled::{joining, profile_of, profiled, Profiled};
 pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
 pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};

@@ -1,0 +1,20 @@
+{
+  "api_version": 1,
+  "data": {
+    "afterwards": "Nothing in the stack is stopped, restarted or changed by this: containers run on their own and this program only starts them. The copy already running stays the old one until you run it again.",
+    "asked": null,
+    "at": "/srv/lemonfiber/lemonfiber",
+    "carries": "A release carries its own pinned stack as well as the program, and this copy reads manifest schema 1. Updating writes none of it: the copy you install materialises its own stack the next time you start one, and where that stack pins newer service images, starting it is what fetches them. The release on offer declares no manifest schema, so whether it brings a newer stack description than this copy reads cannot be told from here.",
+    "command": null,
+    "configuration": null,
+    "installed": "elsewhere",
+    "instead": "Which version to move to is not known, and every release of lemonfiber is published as a pre-release — so a command naming no version would ask for one that is not served. Run this again when the check can reach the release list.",
+    "offered": null,
+    "owner": null,
+    "replaceable": true,
+    "running": "0.17.0",
+    "standing": "check-failed",
+    "untold": "The release list did not answer, or answered with nothing a version could be read out of. Nothing waits on it, and the next attempt is further off than the last one was."
+  },
+  "kind": "self-update"
+}

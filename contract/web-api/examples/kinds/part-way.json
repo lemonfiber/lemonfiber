@@ -1,0 +1,12 @@
+{
+  "api_version": 1,
+  "data": {
+    "available": true,
+    "findings": [],
+    "id": "a7f3",
+    "member": "ana",
+    "part_way": [],
+    "rehearsed": false
+  },
+  "kind": "part-way"
+}

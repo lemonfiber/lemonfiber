@@ -418,7 +418,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Hosting(asked) => hosting::hosting(ctx, asked).await.map(Outcome::Hosting),
         Command::FrontDoor(doorway) => door::front_door(ctx, doorway).await.map(Outcome::FrontDoor),
         Command::Stack => underneath::stack(ctx).await.map(Outcome::Stack),
-        Command::Settled => settled::settled(ctx).map(Outcome::Settled),
+        Command::Settled => settled::settled(ctx).await.map(Outcome::Settled),
         // A read that cannot fail: a kind that could not be read is named in the
         // answer rather than failing the rest.
         Command::News => Ok(Outcome::News(crate::news::run::news(ctx).await)),

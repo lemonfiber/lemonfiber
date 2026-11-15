@@ -1,0 +1,35 @@
+{
+  "api_version": 1,
+  "data": {
+    "cases": [
+      {
+        "case": "refuses-without-the-key",
+        "contract": "indexer.proxy@1",
+        "recording": "conformance/indexer.proxy@1/refuses-without-the-key.json",
+        "verdict": {
+          "outcome": "passed"
+        }
+      },
+      {
+        "case": "solve-refuses",
+        "contract": "indexer.proxy@1",
+        "recording": "conformance/indexer.proxy@1/solve-refuses.json",
+        "verdict": {
+          "outcome": "passed"
+        }
+      },
+      {
+        "case": "answers-answers",
+        "contract": "indexer.proxy@1",
+        "recording": "conformance/indexer.proxy@1/answers-answers.json",
+        "verdict": {
+          "outcome": "passed"
+        }
+      }
+    ],
+    "conforms": true,
+    "id": "flaresolverr",
+    "refusals": []
+  },
+  "kind": "plugin-conformance"
+}

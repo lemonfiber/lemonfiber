@@ -1,0 +1,50 @@
+{
+  "api_version": 1,
+  "data": {
+    "allows": null,
+    "available": true,
+    "filtering": null,
+    "findings": [
+      {
+        "code": "QUOTA-1",
+        "remedy": "Check the request service is running, then run this again.",
+        "said": "the request service would not accept lemonfiber's key, so what it has been asked for is not shown"
+      },
+      {
+        "code": "QUOTA-1",
+        "remedy": "Check the request service is running, then run this again.",
+        "said": "what the household may ask for could not be read, so no policy and no limit are shown — reported as unread rather than as unlimited"
+      },
+      {
+        "code": "PLAY-5",
+        "remedy": "Check the media server is running with lemonfiber status, then ask again.",
+        "said": "a library could not be read, so some requests are named by what they are rather than by their title"
+      }
+    ],
+    "members": [
+      {
+        "access": {
+          "administrator": false,
+          "age_limit": null,
+          "disabled": false,
+          "every_library": true,
+          "libraries": [],
+          "rated": null,
+          "restriction": "unrestricted",
+          "unrated": "let-through"
+        },
+        "asking": null,
+        "claimed": true,
+        "last_seen": 1767225600,
+        "name": "ana",
+        "requests": [],
+        "standing": "active",
+        "to_hand_over": []
+      }
+    ],
+    "noted": [],
+    "policy": null,
+    "rehearsed": false
+  },
+  "kind": "household"
+}

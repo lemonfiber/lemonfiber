@@ -9,8 +9,33 @@ use lemonfiber_core::prerequisites::prerequisites;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Step};
 
+use lemonfiber_core::platform::Environment;
+use lemonfiber_core::wizard::Wizard;
+
 use super::{parse_ids, Flags, RawSetup, SetupFlags};
-use crate::prompt::fixtures::{answered, raw, wizard, workable};
+
+/// A fresh wizard, as a first run on a Mac begins one.
+fn wizard() -> Wizard {
+    Wizard::new(Environment::MacOs)
+}
+
+/// Raw flags with nothing set, for a test to fill only what it means to.
+fn raw() -> RawSetup {
+    RawSetup::default()
+}
+
+/// A fully-flagged, workable run.
+fn workable() -> RawSetup {
+    RawSetup {
+        yes: true,
+        protocols: Some("both".to_owned()),
+        data_location: Some("/srv/media".into()),
+        library: Some("docker".to_owned()),
+        household: Some(true),
+        autostart: Some(false),
+        ..raw()
+    }
+}
 
 #[test]
 fn a_flag_run_answers_from_what_it_was_given() {
@@ -182,9 +207,7 @@ fn a_step_that_is_no_question_asks_for_no_flag() {
 }
 
 #[test]
-fn the_container_user_is_read_as_a_pair_or_left_to_the_image() {
-    assert_eq!(answered(&["1000:1000"]).service_user(), Some((1000, 1000)));
-    assert_eq!(answered(&[""]).service_user(), None);
+fn a_container_user_is_read_as_a_pair_and_nothing_else() {
     assert_eq!(parse_ids("1000:1000"), Some((1000, 1000)));
     assert_eq!(parse_ids("1000"), None);
     assert_eq!(parse_ids("x:y"), None);

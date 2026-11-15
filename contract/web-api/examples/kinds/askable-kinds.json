@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "data": {
+    "kinds": [
+      {
+        "kind": "tv",
+        "units": []
+      },
+      {
+        "kind": "movies",
+        "units": []
+      }
+    ],
+    "member": "ana"
+  },
+  "kind": "askable-kinds"
+}

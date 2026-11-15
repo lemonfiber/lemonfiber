@@ -1,0 +1,16 @@
+{
+  "arguments": {
+    "days": 30,
+    "name": "ana",
+    "policy": "within-a-limit",
+    "requests": 5
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "household-allow",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

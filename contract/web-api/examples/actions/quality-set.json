@@ -1,0 +1,47 @@
+{
+  "arguments": {
+    "confirm": true,
+    "media_type": "tv",
+    "preset": "balanced"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "changes": "A quality choice shapes what is fetched from now on. Nothing already in the library changes; lemonfiber quality upgrade is what fetches it again at the quality chosen.",
+      "choices": [
+        {
+          "means": "Looks right on a TV, at sensible file sizes.",
+          "needs_transcoding_here": false,
+          "preset": "balanced",
+          "resolution": "1080p, good encodes",
+          "scope": "everything",
+          "size_per_hour": "about 2–3 GB per hour",
+          "transcoding": "plays directly on most devices"
+        }
+      ],
+      "customised": false,
+      "disposition": "recorded",
+      "music": null,
+      "offered": {
+        "formats": [
+          "compact",
+          "lossless",
+          "hi-res"
+        ],
+        "media_types": [
+          "tv",
+          "movies",
+          "music"
+        ],
+        "presets": [
+          "space-saving",
+          "balanced",
+          "high-quality",
+          "maximum"
+        ]
+      },
+      "rehearsed": false
+    },
+    "kind": "quality"
+  }
+}

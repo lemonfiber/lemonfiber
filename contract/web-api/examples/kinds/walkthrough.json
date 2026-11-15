@@ -1,0 +1,28 @@
+{
+  "api_version": 1,
+  "data": {
+    "already_here": false,
+    "handover": null,
+    "in_background": false,
+    "item": "Sintel",
+    "lines": [
+      {
+        "detail": "looking at what is on disk now",
+        "said": "Telling the library to look",
+        "step": "scanning"
+      }
+    ],
+    "link": null,
+    "proves": "that the media server can see the media you already have, and play it",
+    "shape": "library-only",
+    "state": "failed",
+    "stopped": {
+      "logs": [],
+      "reason": "not-visible",
+      "remedy": "Give the library a moment and look again, or rescan it from its own interface",
+      "step": "scanning"
+    },
+    "suggestions": []
+  },
+  "kind": "walkthrough"
+}

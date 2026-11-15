@@ -1,0 +1,20 @@
+{
+  "api_version": 1,
+  "data": {
+    "assessment": "assessed",
+    "rehearsed": false,
+    "wirings": [
+      {
+        "connection": "The request gate's routes",
+        "severity": {
+          "severity": "informational"
+        },
+        "state": {
+          "reason": "the request gate cannot be asked over its contract, so it is handed no routes",
+          "state": "skipped"
+        }
+      }
+    ]
+  },
+  "kind": "seed"
+}

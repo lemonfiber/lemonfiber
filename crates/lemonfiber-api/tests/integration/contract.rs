@@ -13,11 +13,13 @@ mod released;
 mod samples;
 mod split;
 mod surface;
+mod witnessed;
 
 use std::collections::{BTreeSet, HashSet};
 
 use serde_json::Value;
 
+use lemonfiber_api::contract::example::{self, Acted, Examples};
 use lemonfiber_api::contract::layout::{self, Files};
 use lemonfiber_api::contract::{Contract, CONTRACT_DIR};
 use lemonfiber_api::events::wire::{EventKind, BEAT};
@@ -31,9 +33,61 @@ fn committed() -> Files {
     layout::read(&root.join(CONTRACT_DIR)).unwrap_or_default()
 }
 
-/// The directory this build writes, with whatever kept it from being written.
+/// The directory this build writes, its examples gathered by the harness, with whatever
+/// kept it from being written.
+fn gathered() -> Files {
+    directory(&Contract::describe().with_examples(lemonfiber_examples::gathered()))
+}
+
+/// The directory this build writes around the committed examples, with whatever kept it
+/// from being written: the test above holds those examples to what the harness gathers,
+/// so no other test runs the harness again.
 fn fresh() -> Files {
-    let written = Contract::describe().files();
+    directory(&Contract::describe().with_examples(examples_in(&committed())))
+}
+
+/// The examples `files` holds, each kind's and each action's read back from its file.
+fn examples_in(files: &Files) -> Examples {
+    let read = |text: &String| serde_json::from_str::<Value>(text).unwrap_or_default();
+    let mut examples = Examples::default();
+    for (path, text) in files {
+        if let Some(kind) = named(path, &example::of_kind("")) {
+            examples.kinds.insert(kind, read(text));
+        } else if let Some(action) = named(path, &example::of_action("")) {
+            let acted = read(text);
+            examples.actions.insert(
+                action,
+                Acted {
+                    arguments: acted
+                        .get("arguments")
+                        .and_then(Value::as_object)
+                        .cloned()
+                        .unwrap_or_default(),
+                    answered: acted.get("answered").cloned().unwrap_or_default(),
+                },
+            );
+        }
+    }
+    examples
+}
+
+/// The name of the example `path` keeps, where it is kept beside `one`.
+fn named(path: &str, one: &str) -> Option<String> {
+    let path = std::path::Path::new(path);
+    (path.parent() == std::path::Path::new(one).parent())
+        .then(|| path.file_stem())
+        .flatten()
+        .map(|stem| stem.to_string_lossy().into_owned())
+}
+
+/// The directory of schemas alone, with whatever kept it from being written.
+fn described() -> Files {
+    directory(&Contract::describe())
+}
+
+/// The directory `contract` is written as, with whatever kept it from being written.
+fn directory(contract: &Contract) -> Files {
+    let written = contract.files();
     assert!(
         written.is_ok(),
         "the contract cannot be written: {written:?}"
@@ -102,7 +156,7 @@ fn written(outcome: Outcome) -> (String, BTreeSet<String>) {
 /// rather than reaching an SDK.
 #[test]
 fn the_committed_contract_still_matches_the_types() {
-    let apart = layout::differing(&committed(), &fresh());
+    let apart = layout::differing(&committed(), &gathered());
 
     assert!(
         apart.is_empty(),
@@ -159,7 +213,7 @@ fn normalised(path: &std::path::Path) -> String {
 /// leaves that reader a field it cannot describe.
 #[test]
 fn every_reference_names_a_file_the_directory_holds() {
-    let files = fresh();
+    let files = described();
     let dangling: Vec<String> = references(&files)
         .into_iter()
         .filter(|(_, named)| !files.contains_key(named))
@@ -196,6 +250,11 @@ fn every_file_is_reached_from_the_index() {
     ["kinds", "actions", "bodies", "refusals"]
         .iter()
         .filter_map(|key| index.get(key).and_then(Value::as_object))
+        .flat_map(|listed| listed.values())
+        .for_each(&mut named);
+    ["/examples/kinds", "/examples/actions"]
+        .iter()
+        .filter_map(|pointer| index.pointer(pointer).and_then(Value::as_object))
         .flat_map(|listed| listed.values())
         .for_each(&mut named);
     reached.extend(references(&files).into_iter().map(|(_, named)| named));
@@ -323,7 +382,7 @@ fn it_describes_the_wire_version_it_belongs_to() {
 
 #[test]
 fn every_kind_carries_the_whole_envelope_not_just_its_payload() {
-    let files = fresh();
+    let files = described();
     let word: Value = files
         .get("kinds/word.json")
         .and_then(|text| serde_json::from_str(text).ok())

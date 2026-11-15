@@ -41,6 +41,12 @@ lemonfiber-adapters = { workspace = true }
 # an event.
 lemonfiber-fixtures = { workspace = true }
 lemonfiber-testing = { workspace = true }
+# The harness that writes the contract's examples from runs against the fakes, for the
+# tests that hold the committed examples to what it writes.
+lemonfiber-examples = { workspace = true }
+# A JSON Schema validator, draft 2020-12, resolving a `$ref` against the file it is in,
+# for the test that holds every example to the schema it is an example of.
+boon = { workspace = true }
 # Reading a response body back is asynchronous, and the tests that check what a
 # request is answered with are the reason this is a crate rather than a module.
 # `test-util` moves the clock rather than waiting on it: a fifteen-second heartbeat

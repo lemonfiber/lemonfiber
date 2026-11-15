@@ -1,0 +1,177 @@
+{
+  "api_version": 1,
+  "data": {
+    "removed": [
+      {
+        "id": "readarr",
+        "reason": "Discontinued upstream in 2025. Its repository is archived, so the pin could only ever age.",
+        "removed_in": "0.1.0",
+        "replaced_by": "bindery"
+      }
+    ],
+    "services": [
+      {
+        "criticality": "enhancing",
+        "describes": "Listening to audiobooks, with progress synced",
+        "id": "audiobookshelf",
+        "name": "Audiobookshelf",
+        "without_it": "No audiobook player"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Finds and downloads subtitles",
+        "id": "bazarr",
+        "name": "Bazarr",
+        "without_it": "No automatic subtitles"
+      },
+      {
+        "criticality": "core",
+        "describes": "Watches for books and audiobooks and fetches them",
+        "id": "bindery",
+        "name": "Bindery",
+        "without_it": "No book automation (Readarr is discontinued)"
+      },
+      {
+        "criticality": "optional",
+        "describes": "Friendly hostnames instead of ports",
+        "id": "caddy",
+        "name": "Caddy",
+        "without_it": "Use localhost:8989 and friends"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Reading and organising your ebook library",
+        "id": "calibre-web-automated",
+        "name": "Calibre-Web-Automated",
+        "without_it": "No ebook reader"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Lets somebody you invited turn the invitation down, and switches the account off the moment they do",
+        "id": "decline",
+        "name": "Decline service",
+        "without_it": "An invitation carries no way to refuse it, and stays claimable until it lapses"
+      },
+      {
+        "criticality": "important",
+        "describes": "Lets the household reach the media server, and lets an item's stream or picture out only to someone allowed to see it",
+        "id": "door",
+        "name": "Door",
+        "without_it": "The media server answers on this machine only, and nothing else in the house can play from it"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Gets past bot-protection on some indexers",
+        "id": "flaresolverr",
+        "name": "FlareSolverr",
+        "without_it": "Those indexers return nothing"
+      },
+      {
+        "criticality": "critical",
+        "describes": "Routes torrent traffic through your VPN and blocks it if the VPN drops",
+        "id": "gluetun",
+        "name": "Gluetun",
+        "without_it": "Your home IP is visible to every peer"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "One page linking everything, with live status",
+        "id": "homepage",
+        "name": "Homepage",
+        "without_it": "Remember a dozen URLs and ports"
+      },
+      {
+        "criticality": "important",
+        "describes": "Plays your library on TVs, phones and browsers",
+        "id": "jellyfin",
+        "name": "Jellyfin",
+        "without_it": "Files on disk, no way to watch them"
+      },
+      {
+        "criticality": "core",
+        "describes": "Watches for music and fetches it",
+        "id": "lidarr",
+        "name": "Lidarr",
+        "without_it": "Find and download music yourself"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Plays your music library in a browser, on a phone, and in any Subsonic client",
+        "id": "navidrome",
+        "name": "Navidrome",
+        "without_it": "Music arrives and only the thing that fetched it ever looks at it"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "A search box across all your Usenet indexers at once",
+        "id": "nzbhydra2",
+        "name": "NZBHydra2",
+        "without_it": "Search one indexer at a time"
+      },
+      {
+        "criticality": "core",
+        "describes": "Holds your indexer accounts in one place and shares them with everything else",
+        "id": "prowlarr",
+        "name": "Prowlarr",
+        "without_it": "Every app needs indexers configured separately"
+      },
+      {
+        "criticality": "core",
+        "describes": "Downloads the torrents everything else asks for",
+        "id": "qbittorrent",
+        "name": "qBittorrent",
+        "without_it": "No torrent downloads"
+      },
+      {
+        "criticality": "core",
+        "describes": "Watches for films and fetches them",
+        "id": "radarr",
+        "name": "Radarr",
+        "without_it": "Find and download films yourself"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Keeps quality settings in line with community guidance",
+        "id": "recyclarr",
+        "name": "Recyclarr",
+        "without_it": "Tune quality profiles by hand"
+      },
+      {
+        "criticality": "important",
+        "describes": "Stands between Seerr and the curators and the media server, so Seerr holds none of their keys",
+        "id": "request-gate",
+        "name": "Request gate",
+        "without_it": "Seerr cannot reach the curators or the media server: requests are not sent, and members cannot sign in to Seerr"
+      },
+      {
+        "criticality": "core",
+        "describes": "Downloads from Usenet",
+        "id": "sabnzbd",
+        "name": "SABnzbd",
+        "without_it": "No Usenet downloads"
+      },
+      {
+        "criticality": "important",
+        "describes": "Where the household asks for things",
+        "id": "seerr",
+        "name": "Seerr",
+        "without_it": "Requests come to you in person"
+      },
+      {
+        "criticality": "core",
+        "describes": "Watches for new episodes and fetches them",
+        "id": "sonarr",
+        "name": "Sonarr",
+        "without_it": "Find and download episodes yourself"
+      },
+      {
+        "criticality": "enhancing",
+        "describes": "Extracts archived releases so they can be imported",
+        "id": "unpackerr",
+        "name": "Unpackerr",
+        "without_it": "Some downloads never import"
+      }
+    ]
+  },
+  "kind": "catalogue"
+}

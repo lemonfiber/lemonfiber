@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "data": {
+    "token": "6162636465666768696a6b6c6d6e6f706162636465666768696a6b6c6d6e6f70",
+    "until": 1893499200
+  },
+  "kind": "admission"
+}

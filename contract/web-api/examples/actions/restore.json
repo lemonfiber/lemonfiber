@@ -1,0 +1,42 @@
+{
+  "arguments": {
+    "archive": "lemonfiber-full-1893456000.tar.gz"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "done": null,
+      "rehearsed": false,
+      "would": {
+        "agreement": "56592662",
+        "downgrade": false,
+        "manifest": {
+          "created_at": 1893456000,
+          "data_root": "/srv/lemonfiber/data",
+          "members": [
+            {
+              "archive_path": "config",
+              "label": "lemonfiber configuration"
+            },
+            {
+              "archive_path": "services",
+              "label": "service configuration"
+            },
+            {
+              "archive_path": "stack",
+              "label": "materialised stack"
+            }
+          ],
+          "product_version": "0.17.0",
+          "schema": 1,
+          "scope": {
+            "scope": "whole_stack"
+          },
+          "sensitive": true
+        },
+        "relocation": null
+      }
+    },
+    "kind": "restore"
+  }
+}

@@ -9,7 +9,9 @@ multiple-versions = "deny"
 skip = [
   { crate = "base64@0.22", reason = "bollard is on the 0.22 line" },
   { crate = "getrandom@0.2", reason = "ring, under rustls, is on the 0.2 line" },
+  { crate = "getrandom@0.3", reason = "ahash, under boon, the validator the contract's examples are held to in tests, is on the 0.3 line" },
   { crate = "hashbrown@0.16", reason = "kasuari, under ratatui, is on the 0.16 line" },
+  { crate = "r-efi@5", reason = "getrandom 0.3, under boon, is on the 5 line" },
   { crate = "syn@2", reason = "several proc-macro crates are on the 2.x line" },
   { crate = "windows-sys@0.52", reason = "ring is on the 0.52 line" },
   { crate = "windows-sys@0.59", reason = "rtoolbox, under rpassword, is on the 0.59 line" },

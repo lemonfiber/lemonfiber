@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "detail": "looking at what is on disk now",
+    "said": "Telling the library to look",
+    "step": "scanning"
+  },
+  "job": "6162636465666768",
+  "kind": "step"
+}

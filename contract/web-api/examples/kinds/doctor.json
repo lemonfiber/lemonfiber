@@ -1,0 +1,413 @@
+{
+  "api_version": 1,
+  "data": {
+    "findings": [
+      {
+        "category": "environment",
+        "check": "environment.engine",
+        "onset": 1893456000,
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Docker engine",
+        "verdict": {
+          "cause": null,
+          "code": "ENV-2",
+          "detail": "the daemon did not answer",
+          "meaning": "The client is here, so this is the daemon being stopped rather than a missing install — starting it is usually all this needs.",
+          "outcome": "fail",
+          "remedies": [
+            {
+              "action": "Start Docker Desktop, or the docker service on Linux",
+              "detail": null
+            }
+          ],
+          "severity": "error",
+          "state": "guided",
+          "summary": "Docker is installed but its daemon is not running"
+        }
+      },
+      {
+        "category": "environment",
+        "check": "environment.api",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Docker API version",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "the daemon did not answer, so neither version could be read"
+        }
+      },
+      {
+        "category": "environment",
+        "check": "environment.compose",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Docker Compose",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "the Compose plugin reported a version that could not be read",
+          "remedy": {
+            "action": "Run it again once Docker is responding",
+            "detail": null
+          }
+        }
+      },
+      {
+        "category": "environment",
+        "check": "environment.network-bridge",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "OrbStack network bridge",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "the stack's engine is not OrbStack"
+        }
+      },
+      {
+        "category": "environment",
+        "check": "environment.autostart",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "The stack comes back after a restart",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "disabled: starting on boot was not asked for, so nothing here is expected to bring the stack back"
+        }
+      },
+      {
+        "category": "network",
+        "check": "network.bindings",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Where the stack is actually listening",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "nothing in this stack is publishing a port, so there is no binding to check — start it and ask again"
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.hardlinks",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Hardlinks",
+        "verdict": {
+          "note": "ext4, 2 names to one file",
+          "outcome": "pass"
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.mode",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Storage mode",
+        "verdict": {
+          "note": "local — imports hardlink instantly",
+          "outcome": "pass"
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.space",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Free space",
+        "verdict": {
+          "note": "3.0 TiB free of 4.0 TiB",
+          "outcome": "pass"
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.permissions",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Service access",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "Docker maps file ownership on this platform, so the host's permissions do not gate the services"
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.single-mount",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "One mount beneath the data location",
+        "verdict": {
+          "note": "neither the project nor your overlay gives a service two mounts beneath the data location, so imports inside the containers link rather than copy",
+          "outcome": "pass"
+        }
+      },
+      {
+        "category": "vpn",
+        "check": "vpn",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "VPN verification",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "torrent downloads are not configured"
+        }
+      },
+      {
+        "category": "credentials",
+        "check": "credentials.indexer",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Indexer credential",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "no indexer is configured, so there is none to prove"
+        }
+      },
+      {
+        "category": "providers",
+        "check": "providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Providers",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "there are no accounts in use to read — no Usenet account the download client is pulling through, and no indexer being queried"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.quality-guides",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Quality guide source",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "the quality guide source could not be confirmed reachable, so whether the profiles can stay current is unknown: connection refused",
+          "remedy": {
+            "action": "Check this machine can reach the internet and that the upstream is up, then check again; the profiles in place remain in force meanwhile",
+            "detail": null
+          }
+        }
+      },
+      {
+        "category": "storage",
+        "check": "storage.quality-headroom",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Room for the chosen quality",
+        "verdict": {
+          "note": "the free space holds about 1319 hours of content at the balanced preset",
+          "outcome": "pass"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.releases",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Releases for the chosen quality",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "no television, film or music service is configured, so there are no releases to check"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.seasons",
+        "origin": {
+          "origin": "bundled"
+        },
+        "service": "jellyfin",
+        "service_name": "Jellyfin",
+        "title": "Every series opens onto its seasons",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "the media server could not be reached",
+          "remedy": {
+            "action": "Check the media server is up and has finished starting",
+            "detail": "lemonfiber status"
+          }
+        }
+      },
+      {
+        "category": "services",
+        "check": "config.household-telling",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "What the household is told",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "this stack has no request service, so there is nothing to ask and nobody asking"
+        }
+      },
+      {
+        "category": "config",
+        "check": "config.claimed",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Who holds each service claimed first",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "no service here belongs to whoever claims it first"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.request-gate-record",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "What the request gate refused and removed",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "the request gate cannot be asked over its contract, so what it refused cannot be read",
+          "remedy": {
+            "action": "Check the request gate is running",
+            "detail": "lemonfiber status"
+          }
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.decline-key",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "What the decline service's key was used for",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "there is no media server to ask, or it cannot be asked over its contracts, so when the decline service's key was last used cannot be read",
+          "remedy": {
+            "action": "Check the media server is running",
+            "detail": "lemonfiber status"
+          }
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.astray",
+        "origin": {
+          "origin": "bundled"
+        },
+        "service": "jellyfin",
+        "service_name": "Jellyfin",
+        "title": "What the media server holds under the stack's services' names",
+        "verdict": {
+          "outcome": "unverified",
+          "reason": "Jellyfin could not be reached",
+          "remedy": {
+            "action": "Check the media server is up and has finished starting",
+            "detail": "lemonfiber status"
+          }
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.plex-link",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "How the request service is linked to Plex",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "Plex is not the media server the request service reaches through the request gate"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.move-offered",
+        "onset": 1893456000,
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Parts this release runs as plugins",
+        "verdict": {
+          "cause": null,
+          "code": "PLUGIN-42",
+          "detail": null,
+          "meaning": "This release runs each of these as a plugin, and this machine still runs it as the stack's own service. It keeps running as it is until it is moved, and the move keeps its container name, configuration, data and credentials.",
+          "outcome": "warn",
+          "remedies": [
+            {
+              "action": "Rehearse the update, which shows the move, then confirm it",
+              "detail": "lemonfiber update stack"
+            }
+          ],
+          "severity": "warning",
+          "state": "guided",
+          "summary": "Moving jellyfin, prowlarr, qbittorrent, radarr, sonarr onto its plugin is on offer"
+        }
+      },
+      {
+        "category": "services",
+        "check": "services.waiting",
+        "onset": 1893456000,
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Services waiting for what only you can give",
+        "verdict": {
+          "cause": null,
+          "code": "SETTING-8",
+          "detail": null,
+          "meaning": "gluetun waits for the setting gluetun:provider, one of fastestvpn, ivpn, mullvad, nordvpn, protonvpn, surfshark, windscribe, airvpn, custom; the setting gluetun:vpn-type, one of wireguard, openvpn; the setting gluetun:addresses. qbittorrent waits for gluetun, which it runs through. The rest of the stack runs; each starts once the last thing it waits for is given.",
+          "outcome": "warn",
+          "remedies": [
+            {
+              "action": "Give each setting a service waits for",
+              "detail": "lemonfiber settings set <setting>=<value>"
+            }
+          ],
+          "severity": "warning",
+          "state": "guided",
+          "summary": "gluetun, qbittorrent are held back until you give what they need to start"
+        }
+      },
+      {
+        "category": "config",
+        "check": "config.credential-permissions",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "Credential files readable only by you",
+        "verdict": {
+          "outcome": "skipped",
+          "reason": "none of the files lemonfiber keeps credentials in is on this machine yet, so there are no permissions to read"
+        }
+      },
+      {
+        "category": "config",
+        "check": "config.overlay",
+        "origin": {
+          "origin": "bundled"
+        },
+        "title": "The operator's overlay",
+        "verdict": {
+          "note": "no overlay is merged over the project",
+          "outcome": "pass"
+        }
+      }
+    ],
+    "overall": "broken",
+    "rehearsed": false
+  },
+  "kind": "doctor"
+}

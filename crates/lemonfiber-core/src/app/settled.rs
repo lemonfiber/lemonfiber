@@ -1,6 +1,8 @@
 //! What setup settled, read from the configuration as it stands, and whether this stack is
 //! set up.
 
+use futures_util::future::OptionFuture;
+
 use crate::app::targets::layout;
 use crate::app::Ctx;
 use crate::config::env::EnvFile;
@@ -8,6 +10,7 @@ use crate::config::store;
 use crate::config::Protocols;
 use crate::error::{Diagnose as _, Problem};
 use crate::model::{ServiceUser, SetUp, SettledReport, UserFrom};
+use crate::plugin::adapting::as_adapter;
 use crate::project::entry::{operated_ids, OperatedIds};
 use crate::wizard::Status;
 
@@ -16,7 +19,7 @@ use crate::wizard::Status;
 /// # Errors
 ///
 /// Where there is nowhere to keep configuration.
-pub(crate) fn settled(ctx: &Ctx) -> Result<SettledReport, Box<Problem>> {
+pub(crate) async fn settled(ctx: &Ctx) -> Result<SettledReport, Box<Problem>> {
     let Some(paths) = layout(ctx) else {
         return Err(Box::new(store::Failure::Nowhere.problem()));
     };
@@ -32,9 +35,14 @@ pub(crate) fn settled(ctx: &Ctx) -> Result<SettledReport, Box<Problem>> {
     let file = store::read(&env_file)
         .map(|file| crate::settings::legacy::overlaid(ctx, file))
         .unwrap_or_default();
-    let owner = super::project::directory(ctx)
+    let stack = super::project::directory(ctx);
+    let asked = stack
         .as_deref()
-        .and_then(crate::plugin::adapting::running_as);
+        .map(|stack| ctx.seams.filesystem.ownership(stack));
+    let owner = OptionFuture::from(asked)
+        .await
+        .flatten()
+        .map(|held| as_adapter((held.uid, held.gid)));
     Ok(SettledReport {
         setup,
         data_root: data_root(&file),

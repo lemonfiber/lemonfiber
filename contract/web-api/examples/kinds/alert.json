@@ -1,0 +1,21 @@
+{
+  "api_version": 1,
+  "data": {
+    "affected": [
+      "key.home"
+    ],
+    "check": "key.home",
+    "exit": null,
+    "id": "key.home#minted",
+    "kind": "integration-key",
+    "meaning": "Whoever holds it can reach lemonfiber as far as read admits, from now until it is revoked.",
+    "moment": "onset",
+    "notification": "problem",
+    "remedies": [
+      "If nobody meant to mint it, revoke it: lemonfiber key revoke home"
+    ],
+    "severity": "warning",
+    "summary": "A key named home was minted, with the scope read"
+  },
+  "kind": "alert"
+}

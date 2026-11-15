@@ -1,0 +1,44 @@
+{
+  "api_version": 1,
+  "data": {
+    "agreement": "00000000",
+    "candidates": [],
+    "consumption": [],
+    "halted": false,
+    "interrupted": [],
+    "level": "ample",
+    "outsized": [],
+    "reclaimable": [],
+    "reclaimed": null,
+    "rehearsed": false,
+    "volumes": [
+      {
+        "at": "/srv/lemonfiber/data",
+        "committed": 0,
+        "free": 3298534883328,
+        "level": "ample",
+        "limit": 4398046511104,
+        "point": "/",
+        "projected": 3298534883328,
+        "reading": {
+          "as": "live"
+        },
+        "role": "data"
+      },
+      {
+        "at": "/srv/lemonfiber/stack/config",
+        "committed": 0,
+        "free": 3298534883328,
+        "level": "ample",
+        "limit": 4398046511104,
+        "point": "/",
+        "projected": 3298534883328,
+        "reading": {
+          "as": "live"
+        },
+        "role": "services"
+      }
+    ]
+  },
+  "kind": "space"
+}

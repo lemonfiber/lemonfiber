@@ -1,4 +1,5 @@
-//! Writes the machine-readable contract over the committed directory, its `OpenAPI`
+//! Writes the machine-readable contract over the committed directory, its examples
+//! gathered by running every command against the core's fixture fakes, its `OpenAPI`
 //! rendering, and what it moved against the previous release's.
 //!
 //! `just contract` runs it. It writes beside the directory and swaps it in, so a run
@@ -12,7 +13,10 @@ use lemonfiber_api::contract::released::{Diff, Snapshot, DIFF, RELEASED_DIR, VER
 use lemonfiber_api::contract::{layout, Contract, CONTRACT_DIR};
 
 fn main() {
-    let files = match Contract::describe().files() {
+    let files = match Contract::describe()
+        .with_examples(lemonfiber_examples::gathered())
+        .files()
+    {
         Ok(files) => files,
         Err(faults) => {
             eprintln!(

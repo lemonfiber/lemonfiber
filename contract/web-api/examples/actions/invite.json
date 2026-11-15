@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "name": "bo"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "invite",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

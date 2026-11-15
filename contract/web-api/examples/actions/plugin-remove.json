@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "plugin": "komga"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "plugin-remove",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "api_version": 1,
+  "data": {
+    "beside": [],
+    "carrying": [],
+    "conflicts": [],
+    "linking": null,
+    "modes": [
+      {
+        "disturbs": false,
+        "mode": "adopt",
+        "preselected": true,
+        "what": "lemonfiber manages the containers already here and reads their configuration. Nothing is recreated and nothing is moved."
+      },
+      {
+        "disturbs": false,
+        "mode": "import",
+        "preselected": false,
+        "what": "lemonfiber stands up its own stack and copies indexers, root folders and monitored items across through each service's own API. The existing stack is left running."
+      },
+      {
+        "disturbs": false,
+        "mode": "side-by-side",
+        "preselected": false,
+        "what": "lemonfiber runs on ports nothing else is using, alongside the setup already here, so it can be tried without committing to it."
+      },
+      {
+        "disturbs": true,
+        "mode": "replace",
+        "preselected": false,
+        "what": "lemonfiber stands up a clean stack and stops the old one. Nothing of it is deleted, so it can be started again."
+      }
+    ],
+    "not_carried": [
+      {
+        "because": "they are scoring rules particular to your library, and lemonfiber sets its own from the quality preset you choose",
+        "what": "custom formats you wrote yourself"
+      },
+      {
+        "because": "seed ratios, limits and priorities are set against indexers lemonfiber does not know you hold accounts with",
+        "what": "per-indexer tuning"
+      },
+      {
+        "because": "a connect script runs a program on your machine, and carrying one across would run somebody's program somewhere it was never pointed at",
+        "what": "scripts hooked into a curator's events"
+      },
+      {
+        "because": "they live in the media server's own database rather than in the wiring lemonfiber sets up, and nothing here reads them",
+        "what": "watch histories and play state"
+      }
+    ],
+    "read": true,
+    "standing": [],
+    "unsupported": []
+  },
+  "kind": "migration"
+}

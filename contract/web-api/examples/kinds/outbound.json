@@ -1,0 +1,374 @@
+{
+  "api_version": 1,
+  "data": {
+    "on_behalf": [],
+    "ours": [
+      {
+        "allowed": true,
+        "cost": "Nothing can be installed or updated. A service whose image is not already on this machine will not start, and one that is stays at the version it already has.",
+        "destination": [
+          "docker.io",
+          "ghcr.io",
+          "lscr.io"
+        ],
+        "purpose": "Fetch the service images this stack runs, and the newer ones when it is updated.",
+        "reach": "registry",
+        "sends": "The name and tag of each image, to whichever registry that image names. Nothing about this machine, this stack, or the person running it.",
+        "switch": "LEMONFIBER_REACH_REGISTRY"
+      },
+      {
+        "allowed": true,
+        "cost": "The diagnosis stops confirming the quality-guide source is reachable and reports that it did not look. The quality sync tool goes on syncing to its own schedule and the profiles already in place are unaffected.",
+        "destination": [
+          "https://github.com/TRaSH-Guides/Guides"
+        ],
+        "purpose": "Confirm the source the quality sync tool syncs the community quality profiles from can be reached, so a sync that would bring nothing back is noticed rather than mistaken for a preset that has no effect.",
+        "reach": "guides",
+        "sends": "An unauthenticated request for the repository page, and nothing else. No credential, no version, nothing that would distinguish this installation from any other.",
+        "switch": "LEMONFIBER_REACH_GUIDES"
+      },
+      {
+        "allowed": true,
+        "cost": "Leak detection stops. A tunnel that has quietly fallen back to this machine's own address goes unnoticed, which is the one failure here whose consequences reach outside the machine.",
+        "destination": [
+          "https://ifconfig.me",
+          "https://icanhazip.com"
+        ],
+        "purpose": "Read the public address the download client's traffic comes out of, so it can be compared with this machine's own and a tunnel that is not carrying it is caught.",
+        "reach": "echo",
+        "sends": "Nothing but the request itself. It is made from inside the download client's own container rather than by lemonfiber, because the address worth knowing is the one that container's traffic leaves from.",
+        "switch": "LEMONFIBER_IP_ECHO"
+      },
+      {
+        "allowed": true,
+        "cost": "An indexer key is recorded as unverified rather than proven. A key that has rotted then shows up as searches that find nothing, weeks after it stopped working.",
+        "destination": [],
+        "purpose": "Prove the indexer key works by making one search with it, so a key that will not work is caught while somebody is still sitting at the setup rather than weeks later.",
+        "reach": "indexer",
+        "sends": "One search, with the API key the operator gave. The indexer sees that search and that key, which is what proving the key means; nothing about this machine goes with it.",
+        "switch": "LEMONFIBER_REACH_INDEXER"
+      },
+      {
+        "allowed": true,
+        "cost": "A Usenet login is recorded as unverified rather than proven, and a wrong password shows up as downloads that never start rather than as an answer at setup.",
+        "destination": [],
+        "purpose": "Prove the Usenet login works by making it, so a password that will not work is caught at setup rather than as downloads that never start.",
+        "reach": "usenet",
+        "sends": "The username and password the operator gave, over TLS. A plaintext connection is refused rather than downgraded, so the password is never sent in the clear.",
+        "switch": "LEMONFIBER_REACH_USENET"
+      },
+      {
+        "allowed": true,
+        "cost": "A reason reaches nobody but you. The refusal itself still arrives — the request service sends that — so somebody is told no and never told why, and passing the words on becomes yours to do by hand. The reason is still written down here and still said back to you when you turn a request down.",
+        "destination": [
+          "https://api.pushover.net/1/messages.json",
+          "https://api.pushbullet.com/v2/pushes"
+        ],
+        "purpose": "Carry the reason a request was turned down to the person who asked for it, because the request service tells them it was declined and has nowhere to put a reason — so a refusal that reached them alone is the silent one this exists to prevent.",
+        "reach": "household",
+        "sends": "One short message and the member's own token for the service it goes to. The message is the word \"Why\" and the reason you typed, and nothing else: not this program's name, not an address, not what was asked for — the request service keeps no title — and nothing about this machine or the household. It goes only where that member already told the request service to reach them, and only if they left refusals switched on there.",
+        "switch": "LEMONFIBER_REACH_HOUSEHOLD"
+      },
+      {
+        "allowed": true,
+        "cost": "A phone hears of an alert only when it is opened. The alert is kept and shown then, and everything else works exactly as before.",
+        "destination": [
+          "the address each registered phone's distributor gave"
+        ],
+        "purpose": "Tell a phone that asked to be woken that this stack has something to say, so it hears of an alert while it is closed. Made only for a phone registered here, on each alert's onset and resolution, while the web surface is serving.",
+        "reach": "waking",
+        "sends": "One message per alert to the address the phone's distributor gave, encrypted to that phone. It says only that the stack has something to say, so the distributor learns when this stack spoke and from what address, and never what it said.",
+        "switch": "LEMONFIBER_REACH_WAKING"
+      },
+      {
+        "allowed": true,
+        "cost": "Back-ends of this kind are told nothing, and a test of one sends nothing. Alerts are kept and shown on the dashboard and to the phones, and every other back-end goes on being told.",
+        "destination": [],
+        "purpose": "Deliver each alert worth telling to a back-end you added with notify add, and read its history where it keeps one, to see the message arrive. Made only for a back-end you added, while the web surface is serving or when you run notify test.",
+        "reach": "ntfy",
+        "sends": "One message per alert, carrying its kind and its summary as the stack words it, and the secret the back-end is reached with. Never a member's name, what anybody is watching or a title somebody asked for. A back-end on a hosted service also learns this machine's address each time a message is delivered.",
+        "switch": "LEMONFIBER_REACH_NTFY"
+      },
+      {
+        "allowed": true,
+        "cost": "Back-ends of this kind are told nothing, and a test of one sends nothing. Alerts are kept and shown on the dashboard and to the phones, and every other back-end goes on being told.",
+        "destination": [],
+        "purpose": "Deliver each alert worth telling to a back-end you added with notify add, and read its history where it keeps one, to see the message arrive. Made only for a back-end you added, while the web surface is serving or when you run notify test.",
+        "reach": "gotify",
+        "sends": "One message per alert, carrying its kind and its summary as the stack words it, and the secret the back-end is reached with. Never a member's name, what anybody is watching or a title somebody asked for. A back-end on a hosted service also learns this machine's address each time a message is delivered.",
+        "switch": "LEMONFIBER_REACH_GOTIFY"
+      },
+      {
+        "allowed": true,
+        "cost": "Back-ends of this kind are told nothing, and a test of one sends nothing. Alerts are kept and shown on the dashboard and to the phones, and every other back-end goes on being told.",
+        "destination": [],
+        "purpose": "Deliver each alert worth telling to a back-end you added with notify add, and read its history where it keeps one, to see the message arrive. Made only for a back-end you added, while the web surface is serving or when you run notify test.",
+        "reach": "webhook",
+        "sends": "One message per alert, carrying its kind and its summary as the stack words it, and the secret the back-end is reached with. Never a member's name, what anybody is watching or a title somebody asked for. A back-end on a hosted service also learns this machine's address each time a message is delivered.",
+        "switch": "LEMONFIBER_REACH_WEBHOOK"
+      },
+      {
+        "allowed": true,
+        "cost": "Back-ends of this kind are told nothing, and a test of one sends nothing. Alerts are kept and shown on the dashboard and to the phones, and every other back-end goes on being told.",
+        "destination": [],
+        "purpose": "Deliver each alert worth telling to a back-end you added with notify add, and read its history where it keeps one, to see the message arrive. Made only for a back-end you added, while the web surface is serving or when you run notify test.",
+        "reach": "apprise",
+        "sends": "One message per alert, carrying its kind and its summary as the stack words it, and the secret the back-end is reached with. Never a member's name, what anybody is watching or a title somebody asked for. A back-end on a hosted service also learns this machine's address each time a message is delivered.",
+        "switch": "LEMONFIBER_REACH_APPRISE"
+      },
+      {
+        "allowed": true,
+        "cost": "A member's search shows each title by its name and year alone. Searching and asking work exactly as before, and the pictures of titles the house already holds still come from the media server.",
+        "destination": [
+          "https://image.tmdb.org/t/p/w342"
+        ],
+        "purpose": "Show a member the poster of a title their search found and the house does not hold yet, or the cover of music or a book they found or asked for. Their client is handed the picture by this machine, so their own device never reaches the catalogue or the cover's host. Made only when a member's client asks for the picture. A cover is fetched over https from wherever the curator says it is, and each host one was fetched from is listed here.",
+        "reach": "posters",
+        "sends": "One unauthenticated request for one title's poster or cover, from this machine's address. No credential and nothing about the member, who is never named, but the address names the picture, so the catalogue or the cover's host can tell that somebody here looked at that title.",
+        "switch": "LEMONFIBER_REACH_POSTERS"
+      },
+      {
+        "allowed": true,
+        "cost": "The version report stops saying whether this copy is the newest, and answers that it could not tell. Nothing else changes: lemonfiber never replaces itself and every other thing it does works exactly as well on an old one.",
+        "destination": [
+          "https://api.github.com/repos/lemonfiber/lemonfiber/releases"
+        ],
+        "purpose": "Read which version of lemonfiber has been released, so an operator asking whether theirs is current gets an answer rather than a shrug. Nothing waits on it and nothing stops without it.",
+        "reach": "updates",
+        "sends": "One unauthenticated request for a list of releases. No credential, no setting, nothing about this machine and not even the version running — the answer is compared here rather than there. The one thing that travels is a name, which the address requires of anybody asking and which is the same word in every copy of this program.",
+        "switch": "LEMONFIBER_REACH_UPDATES"
+      },
+      {
+        "allowed": true,
+        "cost": "A plugin can be installed only from a directory on this machine. Nothing installed stops, and a git source you name, or the origin a name resolves to in the catalogue, is refused before anything is fetched.",
+        "destination": [],
+        "purpose": "Fetch the one revision of a plugin you install from a git source you name, or from the origin the catalogue names for a plugin you install by name, and nothing else from it. Made only when you install one.",
+        "reach": "plugin-source",
+        "sends": "A git fetch of one commit from the address you named: the address, the branch, tag or commit you named, and git's own request for that commit. Nothing about this machine or the stack, and nothing of the repository is run.",
+        "switch": "LEMONFIBER_REACH_PLUGIN_SOURCE"
+      },
+      {
+        "allowed": true,
+        "cost": "A plugin cannot be installed by name, and is refused before anything is fetched. Nothing installed stops, and installing from a git source or a directory you name is unaffected.",
+        "destination": [
+          "https://github.com/lemonfiber/lemonfiber-plugins/releases/latest/download/index.json",
+          "https://github.com/lemonfiber/lemonfiber-plugins/releases/latest/download/index.json.sig"
+        ],
+        "purpose": "Read the newest catalogue release's index and the signature over it, so a plugin you install by name is resolved only through an index this build has verified. Made only when you install one by name.",
+        "reach": "catalogue",
+        "sends": "Two unauthenticated requests, one for the index and one for its signature, and the one GitHub answers each with: the address its download host serves that file from, which is asked in turn. No credential, nothing about this machine, and not the name you are installing — the whole index is fetched and the name is looked up here.",
+        "switch": "LEMONFIBER_REACH_CATALOGUE"
+      }
+    ],
+    "theirs": [
+      {
+        "destination": "audiobook metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads covers, chapters and descriptions for the audiobooks in your library when you ask it to.",
+        "recorded": true,
+        "service": "audiobookshelf"
+      },
+      {
+        "destination": "the subtitle providers you enable",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Searches for subtitles matching what is in your library, signing in where a provider requires an account.",
+        "recorded": true,
+        "service": "bazarr"
+      },
+      {
+        "destination": "book and audiobook metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads author, title and cover information for the books it watches for.",
+        "recorded": true,
+        "service": "bindery"
+      },
+      {
+        "destination": "",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Nothing. It answers names on this machine and forwards to the services beside it; no certificate is fetched, because nothing here is published to the internet.",
+        "recorded": true,
+        "service": "caddy"
+      },
+      {
+        "destination": "book metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads covers and descriptions for the ebooks in your library when you ask it to.",
+        "recorded": true,
+        "service": "calibre-web-automated"
+      },
+      {
+        "destination": "",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Nothing beyond this machine. When an invitee refuses, it switches that one account off in Jellyfin, over a network the two share alone, and records the refusal for lemonfiber.",
+        "recorded": true,
+        "service": "decline"
+      },
+      {
+        "destination": "",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Nothing beyond this machine. It asks the media server, beside it, whether the session a request presents may see the item it asks for, asks lemonfiber's pass service, beside it, whether the pass a live stream's request carries is good for that live stream, and fetches no certificate: it serves the one lemonfiber writes into its configuration, which it only reads.",
+        "recorded": true,
+        "service": "door"
+      },
+      {
+        "destination": "the indexer sites that challenge it",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Fetches a page through a headless browser when an indexer sits behind bot protection, which means it visits that indexer directly.",
+        "recorded": true,
+        "service": "flaresolverr"
+      },
+      {
+        "destination": "your VPN provider's servers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Dials the tunnel everything torrent-shaped is routed through, and asks the provider for a forwarded port where you asked for one.",
+        "recorded": true,
+        "service": "gluetun"
+      },
+      {
+        "destination": "",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Nothing beyond this machine. It reads the other services' own APIs over the stack's internal network to draw their status.",
+        "recorded": true,
+        "service": "homepage"
+      },
+      {
+        "destination": "metadata providers and its own plugin repository",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads artwork and descriptions for what is in your library, and checks its plugin repository for updates unless you turn that off in its own settings.",
+        "recorded": true,
+        "service": "jellyfin"
+      },
+      {
+        "destination": "music metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads artist, album and track information for the music in your library.",
+        "recorded": true,
+        "service": "lidarr"
+      },
+      {
+        "destination": "music metadata providers, and the background collection its sign-in page draws from",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads artist images, biographies and similar-artist lists for the music in your library — Deezer and ListenBrainz, neither of which needs an account of yours. Its anonymous usage report is the one thing it would send about this machine, and the compose entry turns that off rather than leaving it on.",
+        "recorded": true,
+        "service": "navidrome"
+      },
+      {
+        "destination": "the Usenet indexers you configured",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Searches several indexers at once and merges what they answer, with the keys you gave it.",
+        "recorded": true,
+        "service": "nzbhydra2"
+      },
+      {
+        "destination": "the indexers you configured",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Runs the searches everything else asks for, and reads each indexer's capabilities and remaining allowance, authenticating with the keys you gave it.",
+        "recorded": true,
+        "service": "prowlarr"
+      },
+      {
+        "destination": "trackers and peers, through the tunnel",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Announces to a torrent's trackers and exchanges data with peers, which is what a torrent client is; all of it inside gluetun's network, so it stops when the tunnel does.",
+        "recorded": true,
+        "service": "qbittorrent"
+      },
+      {
+        "destination": "film metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads titles, release dates and artwork for the films in your library and the ones you add.",
+        "recorded": true,
+        "service": "radarr"
+      },
+      {
+        "destination": "the community quality-guide repository",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Syncs the quality profiles on its own schedule — its own errand, not one anything else here sets off.",
+        "recorded": true,
+        "service": "recyclarr"
+      },
+      {
+        "destination": "plex.tv",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Where Plex is the media server, plex.tv's account read alone: whose a token Seerr presents is, once per token, when Seerr's owner is the operator's own Plex account, and a member's own Plex sign-in, passed on unchanged, when Seerr reaches plex.tv through the gate. Otherwise nothing beyond this machine. It answers only Seerr, and makes the calls Seerr's requests, scans and sign-ins need of each curator's adapter and the media server, over networks it shares with them alone.",
+        "recorded": true,
+        "service": "request-gate"
+      },
+      {
+        "destination": "your Usenet provider",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Signs in with your account and fetches the articles a download is made of.",
+        "recorded": true,
+        "service": "sabnzbd"
+      },
+      {
+        "destination": "the metadata provider it lists titles from",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads the catalogue the household browses and requests from, and the artwork beside it.",
+        "recorded": true,
+        "service": "seerr"
+      },
+      {
+        "destination": "television metadata providers",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Reads series, season and episode information, artwork and air dates for what is in your library and what you add to it.",
+        "recorded": true,
+        "service": "sonarr"
+      },
+      {
+        "destination": "",
+        "origin": {
+          "origin": "bundled"
+        },
+        "purpose": "Nothing. It watches the download directories and extracts archived releases where it finds them, entirely on this machine.",
+        "recorded": true,
+        "service": "unpackerr"
+      }
+    ]
+  },
+  "kind": "outbound"
+}

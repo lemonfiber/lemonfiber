@@ -1,0 +1,9 @@
+{
+  "api_version": 1,
+  "data": {
+    "confirmed": true,
+    "media": [],
+    "rehearsed": false
+  },
+  "kind": "upgrade"
+}

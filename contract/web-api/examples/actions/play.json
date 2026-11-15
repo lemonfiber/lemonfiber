@@ -1,0 +1,17 @@
+{
+  "arguments": {
+    "device": "a-phone-2468",
+    "id": "0123456789abcdef0123456789abcdef"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "id": "0123456789abcdef0123456789abcdef",
+      "lapses": 1893456300,
+      "member": "ana",
+      "rehearsed": false,
+      "stream_from": "https://watch.home.lan/media/0123456789abcdef0123456789abcdef/playlist.m3u8?lfpass=YWJjZGVmZ2hpamts.1893456300.eQIUOpcJCVojypvocOtaJzh47qGWHJ9pq9i4NXejx4h8CDAMI3Jb5qgA3uvTphODOYjz6Q"
+    },
+    "kind": "play"
+  }
+}

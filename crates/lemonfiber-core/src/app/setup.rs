@@ -172,6 +172,15 @@ pub enum Outcome {
     Abandoned,
 }
 
+impl From<Outcome> for crate::model::SetupOutcome {
+    fn from(outcome: Outcome) -> Self {
+        match outcome {
+            Outcome::Applied => Self::Applied,
+            Outcome::Abandoned => Self::Abandoned,
+        }
+    }
+}
+
 /// Gather answers through `prompt`, and — if the operator confirms the plan they
 /// make — apply them.
 ///

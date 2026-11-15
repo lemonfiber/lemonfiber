@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use lemonfiber::cli::RawSetup;
+use crate::cli::RawSetup;
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::{
     Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
@@ -18,7 +18,11 @@ use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Guarded, Library, Plan, Step, Wizard};
 
 /// Read `--protocols` into a protocol choice, or name what was expected.
-pub(super) fn parse_protocols(value: &str) -> Result<Protocols, String> {
+///
+/// # Errors
+///
+/// The sentence naming the words it accepts, where `value` is none of them.
+pub fn parse_protocols(value: &str) -> Result<Protocols, String> {
     match value.to_lowercase().as_str() {
         "both" => Ok(Protocols::both()),
         "usenet" => Ok(Protocols {
@@ -37,7 +41,11 @@ pub(super) fn parse_protocols(value: &str) -> Result<Protocols, String> {
 }
 
 /// Read `--library` into a library choice, or name what was expected.
-pub(super) fn parse_library(value: &str) -> Result<Library, String> {
+///
+/// # Errors
+///
+/// The sentence naming the words it accepts, where `value` is none of them.
+pub fn parse_library(value: &str) -> Result<Library, String> {
     match value.to_lowercase().as_str() {
         "docker" => Ok(Library::Docker),
         "native" => Ok(Library::Native),
@@ -52,7 +60,11 @@ pub(super) fn parse_library(value: &str) -> Result<Library, String> {
 ///
 /// Takes the plain word rather than the stored label, since that is what an
 /// operator types: `problems`, not `problems only`.
-pub(super) fn parse_appetite(value: &str) -> Result<Appetite, String> {
+///
+/// # Errors
+///
+/// The sentence naming the words it accepts, where `value` is none of them.
+pub fn parse_appetite(value: &str) -> Result<Appetite, String> {
     match value.to_lowercase().as_str() {
         "problems" => Ok(Appetite::ProblemsOnly),
         "completions" => Ok(Appetite::WithCompletions),
@@ -77,7 +89,8 @@ fn pairs(given: Vec<String>, flag: &str, shown: bool) -> Result<BTreeMap<String,
 }
 
 /// Read a `UID:GID` pair, or nothing where it is blank or malformed.
-pub(super) fn parse_ids(answer: &str) -> Option<(u32, u32)> {
+#[must_use]
+pub fn parse_ids(answer: &str) -> Option<(u32, u32)> {
     let (uid, gid) = answer.split_once(':')?;
     Some((uid.trim().parse().ok()?, gid.trim().parse().ok()?))
 }
@@ -132,6 +145,10 @@ impl SetupFlags {
     /// not be understood — a malformed flag is a mistake to name, not a default to
     /// quietly assume. Takes the raw flags as one value rather than nine loose
     /// arguments.
+    ///
+    /// # Errors
+    ///
+    /// The sentence naming the first flag that could not be understood.
     pub fn parse(raw: RawSetup) -> Result<Self, String> {
         Ok(Self {
             yes: raw.yes,
@@ -190,6 +207,7 @@ impl SetupFlags {
 
     /// The flags a non-interactive run still needs: the ones for questions it has
     /// not answered and cannot skip. Empty means it can proceed without a terminal.
+    #[must_use]
     pub fn missing(&self, wizard: &Wizard) -> Vec<&'static str> {
         let mut missing: Vec<&'static str> = wizard
             .unanswered()
@@ -245,6 +263,7 @@ pub struct Flags {
 
 impl Flags {
     /// A flag-answered prompt, proposing `default_data` where none was given.
+    #[must_use]
     pub const fn new(flags: SetupFlags, default_data: PathBuf) -> Self {
         Self {
             flags,

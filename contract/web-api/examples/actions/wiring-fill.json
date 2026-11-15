@@ -1,0 +1,42 @@
+{
+  "arguments": {
+    "capability": "indexer.search",
+    "service": "nzbhydra2"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "agreement": "229056d8-0622ed83-12feb78e-00000000",
+      "applied": false,
+      "rehearsed": false,
+      "substitution": {
+        "asked_by": [
+          "bindery"
+        ],
+        "capability": "indexer.search",
+        "leaves_behind": [
+          {
+            "capability": "indexer.search",
+            "kind": "indexers",
+            "said": "Indexers added by hand"
+          },
+          {
+            "capability": "indexer.search",
+            "kind": "search-history",
+            "said": "Search history"
+          }
+        ],
+        "leaves_unfilled": [],
+        "now": "nzbhydra2",
+        "setting": "indexer.search=nzbhydra2",
+        "starts": [],
+        "stops": [
+          "prowlarr"
+        ],
+        "was": "prowlarr",
+        "why": null
+      }
+    },
+    "kind": "substitution"
+  }
+}

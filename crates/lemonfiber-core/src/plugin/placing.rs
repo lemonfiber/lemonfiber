@@ -140,7 +140,8 @@ pub fn mount_sources(installed: &Installed, stack: &Path) -> Vec<PathBuf> {
 }
 
 /// Where one of a plugin's services keeps its own configuration.
-pub(crate) fn configuration(stack: &Path, service: &str) -> PathBuf {
+#[must_use]
+pub fn configuration(stack: &Path, service: &str) -> PathBuf {
     stack.join(CONFIGURATION_TREE).join(service)
 }
 

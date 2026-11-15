@@ -1,0 +1,43 @@
+{
+  "api_version": 1,
+  "data": {
+    "caveat": "A user service runs while you are logged in. Surviving a logout needs lingering turned on for your account, which is a setting on the account rather than on this service — lemonfiber does not turn it on for you.",
+    "changed": null,
+    "commands": [
+      {
+        "command": "lemonfiber watch",
+        "definition": null,
+        "guarantees": "stops the stack if the data location disappears",
+        "missing": null,
+        "name": "watch",
+        "output": null,
+        "runs": null,
+        "standing": "not-hosted"
+      },
+      {
+        "command": "lemonfiber household expiring",
+        "definition": null,
+        "guarantees": "closes requests nobody has ruled on, and tells whoever asked why",
+        "missing": null,
+        "name": "expiring",
+        "output": null,
+        "runs": null,
+        "standing": "not-hosted"
+      },
+      {
+        "command": "lemonfiber up --at-boot",
+        "definition": null,
+        "guarantees": "brings the stack back after this machine restarts, and says so if it could not",
+        "missing": null,
+        "name": "boot",
+        "output": null,
+        "runs": null,
+        "standing": "not-hosted"
+      }
+    ],
+    "instruction": null,
+    "manager": "systemd",
+    "rehearsed": false
+  },
+  "kind": "hosting"
+}

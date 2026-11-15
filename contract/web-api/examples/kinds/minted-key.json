@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "address": "https://192.168.1.20:8471",
+    "caution": null,
+    "name": "home",
+    "pin": "c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d",
+    "purpose": "home-assistant",
+    "scope": "read",
+    "secret": "lfk_6162636465666768696a6b6c6d6e6f706162636465666768696a6b6c6d6e6f70"
+  },
+  "kind": "minted-key"
+}

@@ -1,11 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
-use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
-use ring::rand::SystemRandom;
+use lemonfiber_fixtures::phones::{a_phone_key, a_phone_secret};
 
 use super::{any_waiting, asked, Asked, Waking};
 use crate::alert::{Alert, Moment, Notification};
@@ -40,21 +37,13 @@ fn machine(name: &str, status: u16) -> (Ctx, Arc<Fake>) {
     (ctx, distributor)
 }
 
-/// A key a phone could hold, in base64url.
-fn p256dh() -> String {
-    EphemeralPrivateKey::generate(&ECDH_P256, &SystemRandom::new())
-        .and_then(|key| key.compute_public_key())
-        .map(|public| URL_SAFE_NO_PAD.encode(public.as_ref()))
-        .unwrap_or_default()
-}
-
 /// A registration under `name`, at `endpoint`.
 fn registering(name: &str, endpoint: &str) -> Asked {
     Asked::Register {
         name: name.to_owned(),
         endpoint: endpoint.to_owned(),
-        p256dh: p256dh(),
-        auth: URL_SAFE_NO_PAD.encode([9_u8; 16]),
+        p256dh: a_phone_key(),
+        auth: a_phone_secret(),
         owner: None,
     }
 }
@@ -109,10 +98,7 @@ fn a_registration_is_listed_and_journaled_without_its_keys() {
 
     let said = journal(&ctx);
     assert!(said.contains("pixel"), "{said}");
-    assert!(
-        !said.contains(&URL_SAFE_NO_PAD.encode([9_u8; 16])),
-        "{said}"
-    );
+    assert!(!said.contains(&a_phone_secret()), "{said}");
     assert!(!said.contains("push.example"), "{said}");
 }
 

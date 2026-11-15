@@ -1,0 +1,97 @@
+{
+  "api_version": 1,
+  "data": {
+    "problems": [
+      {
+        "check": "environment.engine",
+        "onset": 1893456000,
+        "summary": "Docker is installed but its daemon is not running"
+      },
+      {
+        "check": "services.move-offered",
+        "onset": 1893456000,
+        "summary": "Moving jellyfin, prowlarr, qbittorrent, radarr, sonarr onto its plugin is on offer"
+      },
+      {
+        "check": "services.waiting",
+        "onset": 1893456000,
+        "summary": "gluetun, qbittorrent are held back until you give what they need to start"
+      }
+    ],
+    "requests": [],
+    "unread": [
+      "requests"
+    ],
+    "updates": [
+      {
+        "delivers": "Plugins — what one is, installing one, and what that leaves readable",
+        "version": "0.16.0"
+      },
+      {
+        "delivers": "Away from the keyboard — remote control, autostart, customisation",
+        "version": "0.15.0"
+      },
+      {
+        "delivers": "Keeping it running — updates, backup, rollback, the journal",
+        "version": "0.14.0"
+      },
+      {
+        "delivers": "Changing your mind — reconfigure, migrate, uninstall, credentials",
+        "version": "0.13.0"
+      },
+      {
+        "delivers": "Living within limits — disk, retention, bandwidth",
+        "version": "0.12.0"
+      },
+      {
+        "delivers": "The household asks — requests, identity, client apps",
+        "version": "0.11.0"
+      },
+      {
+        "delivers": "The front door, its security, and the privacy stance",
+        "version": "0.10.0"
+      },
+      {
+        "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+        "version": "0.9.1"
+      },
+      {
+        "delivers": "Speaking plainly — interface tiers and the plain-language layer",
+        "version": "0.9.0"
+      },
+      {
+        "delivers": "Live TUI: forms, lifecycle, logs and diagnostics as surfaces",
+        "version": "0.8.0"
+      },
+      {
+        "delivers": "Trust checks: providers, support bundle, auto-remediation",
+        "version": "0.7.0"
+      },
+      {
+        "delivers": "Trust checks: VPN, storage, queue health",
+        "version": "0.6.0"
+      },
+      {
+        "delivers": "How the product speaks — errors, notifications, health, dashboard data",
+        "version": "0.5.0"
+      },
+      {
+        "delivers": "Auto-wiring, seed, quality, trace and the first-content walk",
+        "version": "0.4.0"
+      },
+      {
+        "delivers": "Backup & restore",
+        "version": "0.3.0"
+      },
+      {
+        "delivers": "Setup wizard + doctor",
+        "version": "0.2.0"
+      },
+      {
+        "delivers": "Core: manifest, compose driver, CLI",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "kind": "news-items"
+}

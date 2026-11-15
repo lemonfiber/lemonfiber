@@ -1,11 +1,8 @@
 //! The routes the phones that asked to be woken are kept through.
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::phones::{a_phone_key, a_phone_secret};
 use lemonfiber_fixtures::ports::Chance;
-use ring::agreement::{EphemeralPrivateKey, ECDH_P256};
-use ring::rand::SystemRandom;
 
 use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::Gathers as _;
@@ -37,15 +34,11 @@ fn a_machine(named: &str) -> (axum::Router, String) {
 
 /// A registration under `name` at `endpoint`, as a phone asks it.
 fn registering(name: &str, endpoint: &str) -> String {
-    let p256dh = EphemeralPrivateKey::generate(&ECDH_P256, &SystemRandom::new())
-        .and_then(|key| key.compute_public_key())
-        .map(|public| URL_SAFE_NO_PAD.encode(public.as_ref()))
-        .unwrap_or_default();
     serde_json::json!({
         "name": name,
         "endpoint": endpoint,
-        "p256dh": p256dh,
-        "auth": URL_SAFE_NO_PAD.encode([9_u8; 16]),
+        "p256dh": a_phone_key(),
+        "auth": a_phone_secret(),
     })
     .to_string()
 }

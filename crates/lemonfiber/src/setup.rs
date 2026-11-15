@@ -10,15 +10,11 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use lemonfiber_core::app::apply::Applying;
 use lemonfiber_core::app::{setup as core_setup, Ctx};
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::instant::Instant;
-use lemonfiber_core::model::kind;
-use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
+use lemonfiber_core::model::SetupOutcome;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
 use lemonfiber_core::PRODUCT;
@@ -33,8 +29,9 @@ use interrupted::recover_setup;
 
 use crate::context::settings_at;
 use crate::exit::{complain, USAGE};
-use crate::prompt::{Flags, SetupFlags};
+use crate::prompt::SetupFlags;
 use crate::say::{complain, say};
+use lemonfiber::setting_up::{self, default_data_location};
 
 /// The three ways setup reaches a person: whether one is there, what they typed,
 /// and what does the asking.
@@ -84,17 +81,9 @@ fn concluded(outcome: SetupOutcome, settings: &Settings, prose: &[String], parse
 /// Built from the settings as they stand once the run is over, so what a script is
 /// told is what the machine now holds rather than what was typed at it.
 fn document(outcome: SetupOutcome, settings: &Settings) -> crate::render::Lines {
-    let report = SetupReport {
-        outcome,
-        protocols: settings.protocols,
-        data_root: settings.data_root.clone(),
-        service_user: settings
-            .service_user
-            .map(|(user, group)| format!("{user}:{group}")),
-    };
     let mut lines = crate::render::Lines::for_a_parser();
     lines.put(
-        Envelope::new(kind::SETUP, &report)
+        setting_up::report(outcome, settings)
             .to_json()
             .unwrap_or(crate::render::UNRENDERABLE.to_owned()),
     );
@@ -310,49 +299,26 @@ async fn drive(
         return code;
     }
 
-    // Credentials are proven against their live services as they are entered — the
-    // indexer and any existing service over HTTP, a Usenet provider over a real,
-    // TLS-wrapped NNTP connection. The context carries the one that does it, so a
-    // run driven a question at a time from a browser proves them the same way.
-    let validator = Arc::clone(&ctx.validator);
-
     // A terminal answers the questions; without one the flags do, and where a flag
     // a question needs is missing the run is told which rather than left waiting on
     // input that never comes.
     let prompt: Box<dyn core_setup::Prompt> = if surface.interactive() {
         surface.asking(ctx.environment, default_data_location(paths))
     } else {
-        let missing = flags.missing(&wizard);
-        if !missing.is_empty() {
-            complain!("error: setup here is non-interactive, so it needs values as flags:");
-            for flag in missing {
-                complain!("  {flag}");
+        match setting_up::answering(&wizard, flags, paths) {
+            Ok(flags) => Box::new(flags),
+            Err(missing) => {
+                complain!("error: setup here is non-interactive, so it needs values as flags:");
+                for flag in missing {
+                    complain!("  {flag}");
+                }
+                complain!("\nRun it in a terminal to answer interactively instead.");
+                return ExitCode::from(USAGE);
             }
-            complain!("\nRun it in a terminal to answer interactively instead.");
-            return ExitCode::from(USAGE);
         }
-        Box::new(Flags::new(flags, default_data_location(paths)))
     };
 
-    let at = Instant::of(ctx.seams.clock.now());
-    let guard = core_setup::guard(&ctx);
-    let applying = Applying {
-        paths,
-        source: ctx.stack,
-        stamp: at,
-        random: ctx.seams.random.as_ref(),
-        confined: ctx.seams.confined.as_ref(),
-        guard: guard.as_ref(),
-    };
-    match core_setup::run(
-        &mut wizard,
-        (prompt.as_ref(), guard.as_ref()),
-        ctx.seams.filesystem.as_ref(),
-        validator.as_ref(),
-        &applying,
-    )
-    .await
-    {
+    match setting_up::walked(&ctx, paths, &mut wizard, prompt.as_ref()).await {
         Ok(core_setup::Outcome::Applied) => {
             // The settings read at startup predate the file setup just wrote, so
             // they are refreshed before the stack is brought up against them.
@@ -376,15 +342,6 @@ async fn drive(
         }
         Err(problem) => complain(&problem),
     }
-}
-
-/// The data location setup proposes when the operator does not name one.
-///
-/// A directory under this machine's data base, so a default run lands somewhere
-/// real and writable; an operator with a NAS or a separate disk names that
-/// instead.
-fn default_data_location(paths: &Paths) -> PathBuf {
-    paths.data_dir().join("media")
 }
 
 #[cfg(test)]

@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "download": "A.Show.S01E01.1080p"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "stop-seeding",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

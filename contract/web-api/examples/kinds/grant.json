@@ -1,0 +1,11 @@
+{
+  "api_version": 1,
+  "data": {
+    "granted": true,
+    "lasts_until": "2030-01-31",
+    "member": "ana",
+    "rehearsed": false,
+    "token": "a-device-session"
+  },
+  "kind": "grant"
+}

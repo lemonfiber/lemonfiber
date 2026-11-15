@@ -1,0 +1,13 @@
+{
+  "api_version": 1,
+  "data": {
+    "channel": "c1",
+    "direct": "https://192.168.1.20:8920/media/live/fedcba9876543210fedcba9876543210/stream.ts?lfpass=YTdmMw.1893456300.IxsT1y2fZOhy1LCMHlihmRdrJ9g7Hq8wR5kW9tMgOSk",
+    "fingerprint": "c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d",
+    "lapses": 1893456300,
+    "member": "ana",
+    "rehearsed": false,
+    "stream": "fedcba9876543210fedcba9876543210"
+  },
+  "kind": "tuned"
+}

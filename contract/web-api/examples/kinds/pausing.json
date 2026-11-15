@@ -1,0 +1,18 @@
+{
+  "api_version": 1,
+  "data": {
+    "asked": "pause",
+    "caution": null,
+    "clients": [
+      {
+        "client": "qbittorrent-adapter",
+        "now": "stopped",
+        "unreached": null,
+        "was": "stopped"
+      }
+    ],
+    "offer": "fe0b4fe8",
+    "rehearsed": false
+  },
+  "kind": "pausing"
+}
