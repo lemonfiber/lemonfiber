@@ -353,6 +353,7 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
             ("media.serve@1".to_owned(), "astray"),
             ("media.serve@1".to_owned(), "account"),
             ("media.serve@1".to_owned(), "listed_as"),
+            ("media.serve@1".to_owned(), "allow_origins"),
             ("media.serve@1".to_owned(), "events"),
             ("media.serve@1".to_owned(), "channels"),
             ("media.serve@1".to_owned(), "tune"),

@@ -136,6 +136,19 @@
     "file": false
   },
   {
+    "path": "/api/channels",
+    "parameters": [
+      {
+        "name": "member",
+        "repeatable": false
+      }
+    ],
+    "kinds": [
+      "channels"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/askable",
     "parameters": [
       {

@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "lapses": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stream_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

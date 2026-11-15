@@ -23,7 +23,7 @@ use super::fixtures::{bound, exited, missing};
 use super::reach::{held, Offered, Reach};
 use super::said::opening;
 use super::LOOK;
-use super::{address, app, run, serving, surface, tokenless, Asked, Browser, NOT_A_PORT};
+use super::{address, app, run, serving, surface, tokenless, untuning, Asked, Browser, NOT_A_PORT};
 use clap::Parser as _;
 use lemonfiber_core::admission as credential;
 use lemonfiber_fixtures::support::a_password;
@@ -712,3 +712,16 @@ async fn a_password_taken_away_gives_up_the_network_and_keeps_this_machine() {
 }
 
 mod encrypted;
+
+/// The sweep of lapsed live streams runs once a period has passed and keeps running for as
+/// long as the surface serves.
+#[tokio::test(start_paused = true)]
+async fn the_lapsed_live_stream_sweep_runs_every_period_while_the_surface_serves() {
+    let sweeping = tokio::spawn(untuning(Arc::new(ctx(None))));
+    for _ in 0..2 {
+        tokio::time::advance(lemonfiber_core::screening::UNTUNED_EVERY).await;
+        tokio::task::yield_now().await;
+    }
+    assert!(!sweeping.is_finished());
+    sweeping.abort();
+}

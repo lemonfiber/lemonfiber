@@ -16,6 +16,9 @@
 //! Apart from [`super`] because the two grow for different reasons: the carrier gains
 //! a field when a request gains an argument, and this gains a list every time.
 
+mod watching;
+pub use watching::{TAKES_DEVICE, TAKES_PASS, TAKES_PROGRESS, TAKES_STREAM, TAKES_TITLE};
+
 /// The actions whose command carries the forms it was given.
 ///
 /// The lifecycle five, and the guard. Seeding, adopting, resetting, changing a
@@ -528,19 +531,6 @@ pub const TAKES_SOURCE: &[&str] = &["plugin-install", "plugin-update"];
 /// Apart from the offer, so agreeing to what a plugin does is never agreeing to what it
 /// sends. A removal sends nothing anywhere, so it approves nothing.
 pub const TAKES_APPROVED: &[&str] = &["plugin-install", "plugin-update", "plugin-run"];
-
-/// The action whose command carries the id a player keeps for the device it plays on.
-///
-/// A grant and nothing else: the device is what the session it opens belongs to, so
-/// asking again for the same one replaces that session rather than adding another.
-pub const TAKES_DEVICE: &[&str] = &["grant"];
-
-/// The action whose command carries how far a member got through one title: the
-/// position and whether they finished it, which are one report.
-pub const TAKES_PROGRESS: &[&str] = &["watched"];
-
-/// The actions whose command carries one thing by its id: a title, or a wake a phone confirms.
-pub const TAKES_TITLE: &[&str] = &["watched", "ask", "push-woken"];
 
 /// The action whose command carries each way to be told a member chooses.
 pub const TAKES_BACKENDS: &[&str] = &["notify-choose"];

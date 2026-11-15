@@ -7,6 +7,7 @@ mod healing;
 mod installed;
 mod keys;
 mod notifying;
+mod watching;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
@@ -25,6 +26,7 @@ use built::{
 };
 use installed::what_is_installed;
 use keys::{a_device_key, a_key_claim, a_minted_key, every_device_key, every_key};
+use watching::{a_play, a_tune, the_channels};
 
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
@@ -240,6 +242,9 @@ fn serving() -> Vec<Outcome> {
         Outcome::PartWay(lemonfiber_core::model::PartWayReport::default()),
         Outcome::Granted(lemonfiber_core::model::GrantReport::default()),
         Outcome::Watched(lemonfiber_core::model::WatchedReport::default()),
+        Outcome::Channels(the_channels()),
+        Outcome::Tuned(a_tune()),
+        Outcome::Play(a_play()),
         Outcome::Askable(a_search()),
         Outcome::AskableKinds(the_kinds()),
         Outcome::Asked(an_ask()),

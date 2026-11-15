@@ -135,4 +135,6 @@ fn a_member_nothing_holds_back_is_offered_everything_and_nothing_is_looked_up() 
     assert!(!open.restricted());
     assert_eq!(open.region(), "");
     assert!(open.admits(None));
+    assert!(open.admits(Some("18")));
+    assert!(open.admits(Some("a certificate no table names")));
 }

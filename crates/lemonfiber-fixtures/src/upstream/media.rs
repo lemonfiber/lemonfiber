@@ -5,18 +5,21 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::instant::Instant;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    Addressee, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared, Declaring,
-    Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Heard, Hearing,
-    Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath, Locations,
-    Medium, Naming, OutsideAccount, OutsideServer, Picture, Playback, Ports, Presentation,
-    Programme, Question, Recounting, Screening, SeasonDetail, SeriesHeld, Statuses, Token, Tuned,
-    Tuning, Upkeep,
+    Addressee, Allowing, Answers, AppKeys, Applied, Astray, BytePath, Channel, Dated, Declared,
+    Declaring, Encrypting, EpisodeDetail, Failure, FiledAt, Fronted, Furnished, Furnishing, Heard,
+    Hearing, Held, Holds, HowFar, Image, Item, ItemDetail, ItemProgress, Library, LivePath,
+    Locations, Medium, Naming, OutsideAccount, OutsideServer, Picture, Playback, Ports,
+    Presentation, Programme, Question, Recounting, Screening, SeasonDetail, SeriesHeld, Statuses,
+    Token, Tuned, Tuning, Upkeep,
 };
 
 use super::Upstream;
 
 /// Where the upstream reads a certificate only once it restarts.
 pub const READ_AT_START: &str = "/config/lemonfiber/internal.p12";
+
+/// The live stream the upstream will not close.
+pub const STUCK: &str = "stuck";
 
 /// One item the server holds, with a poster and something that plays.
 fn item(id: &str) -> Item {
@@ -152,6 +155,14 @@ impl Fronted for Upstream {
     }
     async fn restart(&self) -> Result<(), Failure> {
         self.tell("restart".to_owned());
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Allowing for Upstream {
+    async fn allow_origins(&self, origins: &[String]) -> Result<(), Failure> {
+        self.tell(format!("allow {}", origins.join(" ")));
         Ok(())
     }
 }
@@ -303,7 +314,7 @@ impl Tuning for Upstream {
             now: Some(Programme {
                 title: "The evening news".to_owned(),
                 certificate: Some("PG".to_owned()),
-                ends: Some("2026-11-13T19:00:00Z".to_owned()),
+                ends: Some(lemonfiber_ports::Instant::from_seconds(1_794_596_400)),
             }),
         }])
     }
@@ -318,8 +329,7 @@ impl Tuning for Upstream {
     }
 
     async fn untune(&self, closes_by: &str) -> Result<(), Failure> {
-        self.tell(format!("untune {closes_by}"));
-        Ok(())
+        untuned(self, closes_by)
     }
 }
 
@@ -359,4 +369,16 @@ impl Furnishing for Upstream {
             })
             .collect())
     }
+}
+
+/// How the upstream answers being told to close the live stream `closes_by`: it closes every
+/// one but [`STUCK`].
+fn untuned(upstream: &Upstream, closes_by: &str) -> Result<(), Failure> {
+    upstream.tell(format!("untune {closes_by}"));
+    if closes_by == STUCK {
+        return Err(Failure::Unavailable {
+            service: "media".to_owned(),
+        });
+    }
+    Ok(())
 }

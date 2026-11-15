@@ -96,6 +96,9 @@
     "/lemonfiber/media.serve/v1/allow_only": {
       "$ref": "operations/allow_only.json"
     },
+    "/lemonfiber/media.serve/v1/allow_origins": {
+      "$ref": "operations/allow_origins.json"
+    },
     "/lemonfiber/media.serve/v1/allowed_origins": {
       "$ref": "operations/allowed_origins.json"
     },

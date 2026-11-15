@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "media.serve/v1/openapi.json",
-      "sha256": "11a3883267ded53f6a7d84669a80e9cbf74bbfbd1d57e1dc1b2a889a6949bfce"
+      "sha256": "b627b28fde299d8893f0a4c89a05d8286dc9e8328b8346d47f74e1b410b3a24b"
     },
     {
       "path": "media.serve/v1/operations/signed_in.json",
@@ -106,6 +106,10 @@
       "sha256": "061d18c6593e7d3297934c1d05b78a16ddd167276148bd1426b86bc08b94edfa"
     },
     {
+      "path": "media.serve/v1/operations/allow_origins.json",
+      "sha256": "76725bf3ab2ec4b1a96ca0b3e086c3af9abda41c1981b5d60878ebf5a464ef8a"
+    },
+    {
       "path": "media.serve/v1/operations/declared.json",
       "sha256": "aa3b8ffc13c513628efe881b3ca885440c79ff13978e932e4e2422c2efed270e"
     },
@@ -123,7 +127,7 @@
     },
     {
       "path": "media.serve/v1/operations/channels.json",
-      "sha256": "23b74500b2058defcf6927ba2b3845021feab9c5d16a276beef2d7dac91b8008"
+      "sha256": "1700e69dd8ee0c83355e999603b8d34ab1954787b0f5e136b80672a3ecca7e98"
     },
     {
       "path": "media.serve/v1/operations/tune.json",
@@ -139,7 +143,7 @@
     },
     {
       "path": "media.serve/v1/conformance.json",
-      "sha256": "081df4198b1a42998f54c54289527aa1d410cb10f8561d5c066e285f57d4be93"
+      "sha256": "5160757d784555c8f8de8a0fd747aa6693ac5d28f4c281c764b5172b8be000bb"
     }
   ],
   "major": 1

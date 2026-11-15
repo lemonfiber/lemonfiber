@@ -89,6 +89,8 @@ pub const OFFERED: &[&str] = &[
     "household-handoff",
     "grant",
     "watched",
+    "tune",
+    "play",
     "ask",
     "notify-choose",
     "push-woken",
@@ -518,6 +520,9 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
         });
     }
     if let Some(refused) = unwanted(action, given, OFFERED) {
+        return Some(refused);
+    }
+    if let Some(refused) = viewing::alongside(action, given) {
         return Some(refused);
     }
     // Two arguments, two requests. A teardown that waits and a stop of named services are

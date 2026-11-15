@@ -4,8 +4,9 @@ use super::a_plugin_source;
 use lemonfiber_core::app::Restarting;
 use lemonfiber_core::app::{
     plugins, AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision, Diagnosing,
-    Filling, Gathering, Inviting, Keeping, LettingGo, Linking, MigrateAction, QualityAction,
-    Queueing, Removing, Restoring, Setting, Settling, SetupAction, Teardown, Tracing, Waiting,
+    Filling, Gathering, Inviting, Keeping, LettingGo, Linking, Live, MigrateAction, PlayFrom,
+    QualityAction, Queueing, Removing, Restoring, Setting, Settling, SetupAction, Teardown,
+    Tracing, Viewing, Waiting,
 };
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::doctor::Narrowing;
@@ -38,9 +39,39 @@ pub(super) const NOT_DISPATCHED: [&str; 4] = ["logs", "ui", "pass", "help"];
 pub(super) fn samples() -> Vec<(&'static str, Command)> {
     let mut all = over_the_stack();
     all.extend(over_the_household());
+    all.extend(over_what_a_member_watches());
     all.extend(over_what_this_machine_keeps());
     all.extend(over_where_alerts_go());
     all
+}
+
+/// What a member watches: the live TV channels, a channel tuned, and a title played.
+fn over_what_a_member_watches() -> Vec<(&'static str, Command)> {
+    vec![
+        (
+            "channels",
+            Command::Viewing(Viewing::Channels {
+                member: "anybody".to_owned(),
+            }),
+        ),
+        (
+            "tune",
+            Command::Viewing(Viewing::Tune {
+                member: "anybody".to_owned(),
+                live: Live::Open("a-channel".to_owned()),
+                asker: lemonfiber_core::app::Asker::Operator,
+            }),
+        ),
+        (
+            "play",
+            Command::Viewing(Viewing::Play {
+                member: "anybody".to_owned(),
+                id: "0123456789abcdef0123456789abcdef".to_owned(),
+                from: PlayFrom::Device("a-phone-0123".to_owned()),
+                asker: lemonfiber_core::app::Asker::Operator,
+            }),
+        ),
+    ]
 }
 
 /// The phones that asked to be woken and the back-ends alerts are delivered to.
@@ -158,10 +189,11 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("household", Command::Household { member: None }),
         (
             "held",
-            Command::Held {
+            Command::Held(lemonfiber_core::app::Shelf {
                 member: lemonfiber_core::app::Whom::Named("anybody".to_owned()),
                 most: 25,
-            },
+                asker: lemonfiber_core::app::Asker::Operator,
+            }),
         ),
         ("playing", Command::Playing { member: None }),
         ("walkthrough", Command::Walkthrough { item: None }),

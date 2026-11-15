@@ -2,7 +2,7 @@ use lemonfiber_core::app::Command;
 use lemonfiber_core::instant::Instant;
 
 use super::{carried, KEY_CALLABLE, OFFERED};
-use crate::actions::{Arguments, TAKES_AGREEMENT};
+use crate::actions::{Arguments, Handed, TAKES_AGREEMENT};
 use crate::entitled::callable_by_a_key;
 
 /// A carrier holding something for every argument any action reads, agreed to or not.
@@ -21,6 +21,9 @@ fn everything(confirm: bool) -> Arguments {
         id: Some("0123456789abcdef0123456789abcdef".to_owned()),
         position: Some(1),
         ended: Some(true),
+        stream: Some("0123456789abcdef0123456789abcdef".to_owned()),
+        stop: Some(true),
+        pass: Some(Handed("a-pass".to_owned())),
         kind: Some("movies".to_owned()),
         unit: None,
         seasons: Vec::new(),
@@ -414,5 +417,116 @@ fn a_wake_confirmed_without_its_endpoint_or_its_id_is_refused_by_what_it_lacks()
     assert_eq!(
         super::notifying::asked_for("push-woken", named).err(),
         Some(missing("id"))
+    );
+}
+
+/// A channel beside a stream or a stop, and a device beside a pass, each name two requests,
+/// so the pair is refused before either command is looked for.
+#[test]
+fn a_live_or_browser_request_naming_two_at_once_is_refused() {
+    let id = || Some("0123456789abcdef0123456789abcdef".to_owned());
+    for (action, given, argument, alongside) in [
+        (
+            "tune",
+            Arguments {
+                id: id(),
+                stream: id(),
+                ..Arguments::default()
+            },
+            "id",
+            "stream",
+        ),
+        (
+            "tune",
+            Arguments {
+                id: id(),
+                stop: Some(true),
+                ..Arguments::default()
+            },
+            "id",
+            "stop",
+        ),
+        (
+            "play",
+            Arguments {
+                id: id(),
+                device: Some("a-phone-0123".to_owned()),
+                pass: Some(Handed("a-pass".to_owned())),
+                ..Arguments::default()
+            },
+            "device",
+            "pass",
+        ),
+    ] {
+        assert_eq!(
+            crate::actions::named(action, given).err(),
+            Some(crate::actions::Refused::Together {
+                action: action.to_owned(),
+                argument: argument.to_owned(),
+                alongside: alongside.to_owned(),
+            })
+        );
+    }
+}
+
+/// A stream names one to renew, a stream with a stop one to close, and neither with no
+/// channel is refused by the id it lacks; a pass alone plays from that pass, and neither a
+/// device nor a pass is refused by the device it lacks.
+#[test]
+fn a_live_or_browser_request_comes_to_the_one_thing_it_names() {
+    use lemonfiber_core::app::{Live, PlayFrom, Viewing};
+    let stream = || Some("0123456789abcdef0123456789abcdef".to_owned());
+    let live = |given: Arguments| match super::viewing::asked_for("tune", given) {
+        Ok(Command::Viewing(Viewing::Tune { live, .. })) => Ok(live),
+        other => Err(other.err()),
+    };
+    assert_eq!(
+        live(Arguments {
+            stream: stream(),
+            ..Arguments::default()
+        }),
+        Ok(Live::Renew("0123456789abcdef0123456789abcdef".to_owned()))
+    );
+    assert_eq!(
+        live(Arguments {
+            stream: stream(),
+            stop: Some(true),
+            ..Arguments::default()
+        }),
+        Ok(Live::Stop("0123456789abcdef0123456789abcdef".to_owned()))
+    );
+    let missing = |action: &str, argument: &str| crate::actions::Refused::Missing {
+        action: action.to_owned(),
+        argument: argument.to_owned(),
+    };
+    assert_eq!(live(Arguments::default()), Err(Some(missing("tune", "id"))));
+
+    let from = |given: Arguments| match super::viewing::asked_for("play", given) {
+        Ok(Command::Viewing(Viewing::Play { from, .. })) => Ok(from),
+        other => Err(other.err()),
+    };
+    assert_eq!(
+        from(Arguments {
+            id: stream(),
+            pass: Some(Handed("a-pass".to_owned())),
+            ..Arguments::default()
+        }),
+        Ok(PlayFrom::Pass("a-pass".to_owned()))
+    );
+    assert_eq!(
+        from(Arguments {
+            id: stream(),
+            ..Arguments::default()
+        }),
+        Err(Some(missing("play", "device")))
+    );
+}
+
+/// A pass handed in is never shown where the arguments are debugged.
+#[test]
+fn a_handed_pass_is_withheld_where_it_is_debugged() {
+    assert_eq!(
+        format!("{:?}", Handed("a-sealed-pass".to_owned())),
+        lemonfiber_core::model::WITHHELD
     );
 }

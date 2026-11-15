@@ -2434,6 +2434,74 @@
           }
         ]
       },
+      "Channel": {
+        "additionalProperties": false,
+        "description": "One live TV channel, as one member's account may watch it.",
+        "properties": {
+          "id": {
+            "description": "The identifier the server tells it apart by.",
+            "type": "string"
+          },
+          "name": {
+            "description": "What it is called.",
+            "type": "string"
+          },
+          "now": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Programme"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The programme on it now, where the server knows one."
+          },
+          "number": {
+            "description": "Its number, where it has one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ChannelsReport": {
+        "description": "The live TV channels one member may watch, each with the programme on it now.",
+        "properties": {
+          "channels": {
+            "description": "Each channel their own account may watch whose programme now is within their\nlimits. Empty where their account may not watch live TV.",
+            "items": {
+              "$ref": "#/components/schemas/Channel"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "The identifier the media server files them under.",
+            "type": "string"
+          },
+          "member": {
+            "description": "The member this was asked for, by the name they are known by.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "member",
+          "id",
+          "channels",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
       "Choice": {
         "description": "What to do about an interrupted apply, once one is found.\n\nThe three exits the setup wizard promises for its one dangerous state: keep\ngoing, walk it back, or drop it entirely. A surface offers these; [`Recovery`]\nturns the chosen one into the work it means.\n\nRead back as well as built, because the surface offering them may not be in this\nprocess: a browser sends the one the operator picked by the name it is written\nunder here.",
         "oneOf": [
@@ -10782,6 +10850,52 @@
         ],
         "type": "object"
       },
+      "PlayReport": {
+        "description": "Where one title plays from in a member's browser, at the stack's front door, on a\npass sealing a session on their own account.",
+        "properties": {
+          "id": {
+            "description": "The title or episode, by the identifier the shelf lists it under.",
+            "type": "string"
+          },
+          "lapses": {
+            "description": "When the pass lapses, in whole seconds since the Unix epoch. A browser hands it\nback for a new one before then.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "member": {
+            "description": "The member it plays as, by the name they are known by.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+            "type": "boolean"
+          },
+          "stream_from": {
+            "description": "The playlist it plays from at the front door, carrying its pass.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unlocated": {
+            "description": "Why nothing is located, where nothing is.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "member",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
       "Playback": {
         "description": "Somebody watching something now, as the media server lists the session.\n\nWho and what, and where: what a household recognises about somebody watching. No\nstream, no bitrate and no transcode reason, because a member is not choosing one and\na surface handed those would have to decide not to draw them.",
         "properties": {
@@ -13471,6 +13585,37 @@
           "step",
           "came",
           "landed"
+        ],
+        "type": "object"
+      },
+      "Programme": {
+        "additionalProperties": false,
+        "description": "A programme on a channel.",
+        "properties": {
+          "certificate": {
+            "description": "Its certificate, as the server holds it, where it has one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends": {
+            "default": null,
+            "description": "When it ends, where the server knows.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "What it is called.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
         ],
         "type": "object"
       },
@@ -19749,6 +19894,73 @@
         ],
         "type": "object"
       },
+      "TunedReport": {
+        "description": "A channel's live stream opened for a member, where its bytes are served at the\nguarded front door, each on a pass for that live stream and that member.",
+        "properties": {
+          "channel": {
+            "description": "The channel, by the identifier the channels list gives it.",
+            "type": "string"
+          },
+          "direct": {
+            "description": "Where the tuner's own stream is served, carrying its pass.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fingerprint": {
+            "description": "SHA-256 over the certificate the door presents, lower-case hex, which a client\npins.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lapses": {
+            "description": "When the passes lapse, in whole seconds since the Unix epoch. A client asks for\nnew ones before then.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "member": {
+            "description": "The member it is opened for, by the name they are known by.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+            "type": "boolean"
+          },
+          "stream": {
+            "description": "The live stream a renewal or a stop names.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transcoded": {
+            "description": "Where a transcoded playlist of it is served, carrying its pass.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unlocated": {
+            "description": "Why nothing is located, where nothing is.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "channel",
+          "member",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
       "Unconfigured": {
         "description": "What a monitor was asked to watch, what it watches instead, and why.",
         "properties": {
@@ -22679,6 +22891,9 @@
             "$ref": "#/components/schemas/kind-certificate"
           },
           {
+            "$ref": "#/components/schemas/kind-channels"
+          },
+          {
             "$ref": "#/components/schemas/kind-clients"
           },
           {
@@ -22790,6 +23005,9 @@
             "$ref": "#/components/schemas/kind-pausing"
           },
           {
+            "$ref": "#/components/schemas/kind-play"
+          },
+          {
             "$ref": "#/components/schemas/kind-playing"
           },
           {
@@ -22890,6 +23108,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-trace"
+          },
+          {
+            "$ref": "#/components/schemas/kind-tuned"
           },
           {
             "$ref": "#/components/schemas/kind-undo"
@@ -23540,6 +23761,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/CertificateReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-channels": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChannelsReport",
             "description": "The payload."
           },
           "host": {
@@ -25049,6 +25310,46 @@
         "title": "Envelope",
         "type": "object"
       },
+      "kind-play": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlayReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
       "kind-playing": {
         "description": "The wrapper every machine-readable payload arrives in.",
         "properties": {
@@ -26380,6 +26681,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/TraceReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-tuned": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TunedReport",
             "description": "The payload."
           },
           "host": {
@@ -28582,6 +28923,77 @@
         }
       }
     },
+    "/api/actions/play": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "device": {
+                    "default": null,
+                    "description": "The id a player keeps for the device it plays on, which a grant opens a session\nfor.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "id": {
+                    "default": null,
+                    "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pass": {
+                    "default": null,
+                    "description": "The pass a browser holds, handed back for a new one around the same session.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelope"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-job"
+                }
+              }
+            },
+            "description": "Accepted, and named so that what became of it can be asked."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/actions/plugin-install": {
       "post": {
         "requestBody": {
@@ -30144,6 +30556,77 @@
         }
       }
     },
+    "/api/actions/tune": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "default": null,
+                    "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "stop": {
+                    "default": null,
+                    "description": "Whether to close the live stream named rather than renew its passes.",
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "stream": {
+                    "default": null,
+                    "description": "The live stream a renewal or a stop names, as a channel opened for the member\nanswered it.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelope"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-job"
+                }
+              }
+            },
+            "description": "Accepted, and named so that what became of it can be asked."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/actions/undo": {
       "post": {
         "requestBody": {
@@ -30998,6 +31481,41 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/kind-catalogue"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/channels": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-channels"
                 }
               }
             },

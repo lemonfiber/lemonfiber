@@ -171,6 +171,13 @@ const MINTING: &[(&str, &str)] = &[
          outlives nothing that could identify this installation",
     ),
     (
+        "crates/lemonfiber-core/src/screening/door.rs",
+        "the id of one play of an item, drawn fresh for each play and named in the stream or \
+         playlist location the member plays from, which the media server in this stack \
+         answers. The next play draws another, so it outlives nothing that could identify this \
+         installation",
+    ),
+    (
         "crates/lemonfiber-core/src/secret.rs",
         "the two passwords lemonfiber has to mint rather than read: the torrent client's web UI \
          and the media server's administrator. Recorded in the settings file because the \

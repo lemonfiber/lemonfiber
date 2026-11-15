@@ -7,9 +7,13 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::app::Ctx;
+use lemonfiber_contract::capabilities::proxy::front;
+use lemonfiber_contract::capabilities::stream::guard;
+
+use crate::app::{Asker, Ctx};
 use crate::certificate::{self, Kept, Unkept};
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
+use crate::ports::random::Random;
 use crate::ports::service::{Declaring, Item, ItemDetail, ItemProgress, Locations, Medium};
 
 /// The port the guarded front door serves encrypted on.
@@ -63,6 +67,8 @@ pub(crate) enum Door {
         fingerprint: String,
         /// Where the media server behind the door serves each item, as it declared it.
         locations: Locations,
+        /// Who asked, which decides the words an item not located says why in.
+        asker: Asker,
     },
     /// Why nothing can be located at the door.
     Unknown(String),
@@ -105,8 +111,17 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     }
 }
 
+/// The door as this machine stands now, in front of `server`, saying why nothing can
+/// be located there in the words `asker` is told.
+pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
+    match seen(ctx, server, asker).await {
+        Door::Unknown(why) => Door::Unknown(told(asker, why)),
+        door @ Door::At { .. } => door,
+    }
+}
+
 /// The door as this machine stands now, in front of `server`.
-pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
+async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
@@ -125,6 +140,7 @@ pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
             base,
             fingerprint,
             locations,
+            asker,
         },
         Err(why) => Door::Unknown(why),
     }
@@ -147,12 +163,99 @@ fn at_the_door(
 
 /// Where `server` serves each item, from its declaration once that is checked.
 async fn served_at(server: &dyn Declaring) -> Result<Locations, String> {
+    declared(server).await.map(|declared| declared.locations)
+}
+
+/// What `server` declared, once that is checked, or why it is not held to it.
+pub(crate) async fn declared(
+    server: &dyn Declaring,
+) -> Result<crate::ports::service::Declared, String> {
     let declared = server.declared().await.map_err(|_| UNDECLARED.to_owned())?;
     declared
         .checked()
-        .map(|declared| declared.locations)
         .map_err(|why| format!("{REFUSED_DECLARATION} {why}"))
 }
+
+/// `why` nothing is located, in the words `asker` is told: what to fix for the operator,
+/// and for a member only that it does not play here yet, which nothing they can do
+/// changes.
+#[must_use]
+pub(crate) fn told(asker: Asker, why: String) -> String {
+    match asker {
+        Asker::Operator => why,
+        Asker::Member => UNPLAYABLE.to_owned(),
+    }
+}
+
+/// A fresh id for one play of an item, which a stream or playlist location names where
+/// its template holds `{play}`: thirty-two lower-case hex digits, or nothing where no
+/// randomness could be drawn.
+#[must_use]
+pub(crate) fn drawn_play(random: &dyn Random) -> Option<String> {
+    random
+        .bytes(PLAY_BYTES)
+        .map(|bytes| crate::secret::render(&bytes))
+}
+
+/// How many bytes a play's id is drawn from.
+pub(crate) const PLAY_BYTES: usize = 16;
+
+/// `at`, a path or a whole address, carrying `pass` in the one parameter a pass travels
+/// in. A pass is written in characters a query carries as they are.
+#[must_use]
+pub(crate) fn passed(at: &str, pass: &str) -> String {
+    let joiner = if at.contains('?') { '&' } else { '?' };
+    format!("{at}{joiner}{}={pass}", lemonfiber_sidecar::pass::PARAMETER)
+}
+
+/// What a member is told where nothing can be located for them.
+const UNPLAYABLE: &str = "This cannot be played here yet. Whoever looks after the household \
+                          can set it up.";
+
+/// The address the stack's front door serves the guard at for a browser, with a
+/// certificate a browser trusts: the label the guard's route is published under, in front
+/// of the domain the household's proxy serves; or why there is none.
+pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
+    let register = crate::app::plugins::read(ctx).map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
+    let fillers = crate::app::targets::fillers_here(ctx, &manifest);
+    if fillers.filling(front::CAPABILITY).is_none() {
+        return Err(NO_PROXY.to_owned());
+    }
+    let label = fillers
+        .filling(guard::CAPABILITY)
+        .and_then(|(guarding, _)| {
+            register
+                .installed()
+                .iter()
+                .flat_map(|plugin| &plugin.services)
+                .find(|placed| placed.service == guarding.id)
+        })
+        .and_then(|placed| placed.reached.as_ref()?.hostname().map(str::to_owned))
+        .ok_or_else(|| NO_BROWSER_ROUTE.to_owned())?;
+    crate::door::proxied(&label, ctx.settings.household_domain.as_deref())
+        .map(|address| address.url)
+        .ok_or_else(|| NO_DOMAIN.to_owned())
+}
+
+/// Said where no proxy fronts the household's services, so no browser reaches the door.
+const NO_PROXY: &str = "No proxy fronts the household's services, so a browser has no address \
+                        with a certificate it trusts to play from. Install the household's \
+                        proxy, and every title plays in a browser.";
+
+/// Said where the guard publishes no route through the household's proxy.
+const NO_BROWSER_ROUTE: &str = "The guard in front of the media server publishes no route \
+                                through the household's proxy, so a browser has nowhere to \
+                                play from. Install the door plugin, which publishes one.";
+
+/// Said where no domain is configured for the household's proxy to serve under.
+const NO_DOMAIN: &str = "No domain is configured for the household's proxy, so the route a \
+                         browser plays from has no address a certificate is issued for. Set \
+                         DOMAIN to a domain whose addresses point at this machine, and every \
+                         title plays in a browser.";
 
 /// Said where the media server would not say where it serves each item.
 const UNDECLARED: &str = "The media server would not say where it serves each title, so \
@@ -186,22 +289,29 @@ const NOT_AN_ITEM: &str = "the media server named this item by something that is
 /// The same item, located at the door: its pictures where it has them, and where it
 /// streams from where it plays.
 #[must_use]
-pub(crate) fn located(item: Item, door: &Door) -> Held {
+pub(crate) fn located(item: Item, door: &Door, random: &dyn Random) -> Held {
     let at = match door {
-        _ if !super::an_item(&item.id) => Located {
-            unlocated: Some(NOT_AN_ITEM.to_owned()),
-            ..Located::default()
-        },
         Door::Unknown(why) => Located {
             unlocated: Some(why.clone()),
+            ..Located::default()
+        },
+        Door::At { asker, .. } if !super::an_item(&item.id) => Located {
+            unlocated: Some(told(*asker, NOT_AN_ITEM.to_owned())),
             ..Located::default()
         },
         Door::At {
             base,
             fingerprint,
             locations: templates,
+            ..
         } => {
             let at = |template: &str| Locations::located(template, base, &item.id);
+            let stream_from = streams(&item)
+                .then(|| {
+                    let play = drawn_play(random)?;
+                    Locations::played(&templates.stream, base, &item.id, &play)
+                })
+                .flatten();
             Located {
                 poster: item.holds.poster.then(|| at(&templates.poster)).flatten(),
                 backdrop: item
@@ -209,7 +319,7 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
                     .backdrop
                     .then(|| at(&templates.backdrop))
                     .flatten(),
-                stream_from: streams(&item).then(|| at(&templates.stream)).flatten(),
+                stream_from,
                 door: Some(Pinned {
                     fingerprint: fingerprint.clone(),
                 }),
@@ -227,9 +337,9 @@ pub(crate) fn located(item: Item, door: &Door) -> Held {
 }
 
 /// A title and every episode in it, located at the door.
-pub(crate) fn placed(detail: ItemDetail, door: &Door) -> Title {
+pub(crate) fn placed(detail: ItemDetail, door: &Door, random: &dyn Random) -> Title {
     Title {
-        held: located(detail.item, door),
+        held: located(detail.item, door, random),
         overview: detail.overview,
         minutes: detail.minutes,
         genres: detail.genres,
@@ -246,7 +356,7 @@ pub(crate) fn placed(detail: ItemDetail, door: &Door) -> Title {
                     .episodes
                     .into_iter()
                     .map(|episode| Episode {
-                        held: located(episode.item, door),
+                        held: located(episode.item, door, random),
                         number: episode.number,
                         overview: episode.overview,
                         minutes: episode.minutes,
@@ -258,9 +368,9 @@ pub(crate) fn placed(detail: ItemDetail, door: &Door) -> Title {
 }
 
 /// How far a member got through one item, located at the door.
-pub(crate) fn progressed(progress: ItemProgress, door: &Door) -> PartWay {
+pub(crate) fn progressed(progress: ItemProgress, door: &Door, random: &dyn Random) -> PartWay {
     PartWay {
-        held: located(progress.item, door),
+        held: located(progress.item, door, random),
         position: progress.position,
         length: progress.length,
     }

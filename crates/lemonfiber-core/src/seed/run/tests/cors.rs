@@ -51,10 +51,15 @@ fn unmoved_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     }
 }
 
-/// A media server whose allow-list reads as `held`, taking a write where `takes`.
+/// A media server whose allow-list reads as `held`, taking no list and one origin where
+/// `takes`.
 fn serving(held: &[&str], takes: bool) -> Arc<Fake> {
     Fake::by_path(vec![
         (media::serve("allowed_origins"), media::answered(&held)),
+        (
+            media::serve("allow_origins"),
+            media::refused(lemonfiber_contract::wire::Kind::Unsupported),
+        ),
         (
             media::serve("allow_only"),
             if takes {
@@ -310,4 +315,101 @@ async fn a_strangers_door_never_puts_its_origin_on_the_allow_list() {
         "a stranger's origin was offered for the allow-list"
     );
     assert_eq!(written, vec![DOOR.to_owned()]);
+}
+
+/// A media server taking a list is handed every origin the household reaches it from, and
+/// is asked for no single origin.
+#[tokio::test]
+async fn a_server_taking_a_list_is_handed_the_list() {
+    let http = Fake::by_path(vec![
+        (
+            media::serve("allowed_origins"),
+            media::answered(&["http://192.168.1.9:5055"]),
+        ),
+        (media::serve("allow_origins"), media::taken()),
+    ]);
+    let ctx = cors_ctx("cors-listed", true, http.clone());
+
+    let (state, written) = seeded_cors(&ctx, &http).await;
+    let listed: Vec<serde_json::Value> = media::served(&http.requests(), "allow_origins");
+
+    assert_eq!(state, Some(State::Wired));
+    assert!(written.is_empty(), "{written:?}");
+    assert!(
+        listed.iter().any(|asked| asked.to_string().contains(DOOR)),
+        "{listed:?}"
+    );
+}
+
+/// The web surface's own origin joins the front door's on the list: its household
+/// address where it was offered to the network, this machine's loopback address where it
+/// was not, each encrypted where it presented a certificate.
+#[tokio::test]
+async fn the_web_surface_is_listed_where_the_last_run_served_it() {
+    for (served, origin) in [
+        (
+            crate::companion::served::Served {
+                port: 8443,
+                encrypted: true,
+                network: true,
+            },
+            "https://192.168.1.20:8443",
+        ),
+        (
+            crate::companion::served::Served {
+                port: 8080,
+                encrypted: false,
+                network: false,
+            },
+            "http://127.0.0.1:8080",
+        ),
+    ] {
+        let http = Fake::by_path(vec![
+            (
+                media::serve("allowed_origins"),
+                media::answered(&["http://192.168.1.9:5055"]),
+            ),
+            (media::serve("allow_origins"), media::taken()),
+        ]);
+        let mut ctx = cors_ctx(&format!("cors-console-{}", served.port), true, http.clone());
+        let companion = lemonfiber_fixtures::scratch::Scratch::named(&format!(
+            "cors-console-companion-{}",
+            served.port
+        ))
+        .kept();
+        let _ = std::fs::create_dir_all(&companion);
+        assert!(crate::companion::served::record(&companion, served).is_ok());
+        ctx.settings.companion = Some(companion);
+
+        let (state, _) = seeded_cors(&ctx, &http).await;
+        let listed = media::served(&http.requests(), "allow_origins");
+
+        assert_eq!(state, Some(State::Wired), "{origin}");
+        assert!(
+            listed
+                .iter()
+                .any(|asked| asked.to_string().contains(origin)),
+            "{origin}: {listed:?}"
+        );
+    }
+}
+
+/// A list the media server refuses for any reason but taking none is reported, and no
+/// single origin is asked for in its place.
+#[tokio::test]
+async fn a_list_the_media_server_refuses_is_reported_and_no_single_origin_asked_for() {
+    let http = Fake::by_path(vec![
+        (media::serve("allowed_origins"), media::answered(&OPEN)),
+        (media::serve("allow_origins"), media::refusing()),
+        (media::serve("allow_only"), media::taken()),
+    ]);
+    let ctx = cors_ctx("cors-list-refused", true, http.clone());
+
+    let (state, _) = seeded_cors(&ctx, &http).await;
+
+    assert!(
+        matches!(state, Some(State::Failed { .. } | State::Skipped { .. })),
+        "{state:?}"
+    );
+    assert!(media::served(&http.requests(), "allow_only").is_empty());
 }

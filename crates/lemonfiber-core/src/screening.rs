@@ -10,15 +10,19 @@
 //! with the fingerprint the door presents, so a client is handed a whole address it can
 //! pin and never builds one.
 
+mod browser;
 pub mod door;
 pub mod grants;
 pub mod guarded;
+mod tuned;
+mod tuning;
 
 use crate::app::targets::{media, Media};
-use crate::app::{Ctx, Outcome, Viewing, Whom};
+use crate::app::{Asker, Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play::{
     NOBODY_NAMED, NOTHING_TO_PLAY_FROM, NOT_AN_ITEM, NOT_A_DEVICE, NOT_IN_THE_HOUSEHOLD,
-    NOT_ON_THEIR_SHELF, NO_SUCH_PICTURE, SERVER_SILENT, SIGNS_NO_DEVICE_IN,
+    NOT_ON_THEIR_SHELF, NOT_THEIR_PASS, NOT_THEIR_STREAM, NO_LIVE_TV, NO_SUCH_PICTURE,
+    SERVER_SILENT, SIGNS_NO_DEVICE_IN,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
 use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
@@ -27,7 +31,7 @@ use crate::ports::service::{Household, HowFar, Image, Member, Picture, PICTURE_M
 use door::{placed, progressed};
 
 /// Every refusal a member's viewing answers with, which a client names by its code.
-pub const REFUSALS: [Code; 9] = [
+pub const REFUSALS: [Code; 12] = [
     NOT_AN_ITEM,
     NOT_ON_THEIR_SHELF,
     NOT_A_DEVICE,
@@ -37,6 +41,9 @@ pub const REFUSALS: [Code; 9] = [
     NOT_IN_THE_HOUSEHOLD,
     SIGNS_NO_DEVICE_IN,
     NO_SUCH_PICTURE,
+    NO_LIVE_TV,
+    NOT_THEIR_STREAM,
+    NOT_THEIR_PASS,
 ];
 
 /// How many titles a member's part-way list answers with.
@@ -111,10 +118,16 @@ pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
 /// The [`Problem`] the request is refused with.
 pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<Problem>> {
     match viewing {
-        Viewing::Title { member, id } => title(ctx, &member, &id).await.map(Outcome::Title),
-        Viewing::PartWay { member, most } => {
-            part_way(ctx, &member, most).await.map(Outcome::PartWay)
+        Viewing::Title { member, id, asker } => {
+            title(ctx, &member, &id, asker).await.map(Outcome::Title)
         }
+        Viewing::PartWay {
+            member,
+            most,
+            asker,
+        } => part_way(ctx, &member, most, asker)
+            .await
+            .map(Outcome::PartWay),
         Viewing::Grant { member, device } => {
             granted(ctx, &member, &device).await.map(Outcome::Granted)
         }
@@ -125,6 +138,22 @@ pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<P
         } => watched(ctx, &member, &id, how_far)
             .await
             .map(Outcome::Watched),
+        Viewing::Channels { member } => tuning::channels(ctx, &member).await.map(Outcome::Channels),
+        Viewing::Tune {
+            member,
+            live,
+            asker,
+        } => tuning::tuned(ctx, &member, live, asker)
+            .await
+            .map(Outcome::Tuned),
+        Viewing::Play {
+            member,
+            id,
+            from,
+            asker,
+        } => browser::played(ctx, &member, &id, from, asker)
+            .await
+            .map(Outcome::Play),
     }
 }
 
@@ -134,12 +163,14 @@ pub(crate) async fn viewed(ctx: &Ctx, viewing: Viewing) -> Result<Outcome, Box<P
 ///
 /// A [`Problem`] where the id names nothing the server could hold, where the title is
 /// not on the member's shelf, and where there is no server or it does not answer.
-async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Problem>> {
+async fn title(
+    ctx: &Ctx,
+    whose: &Whom,
+    id: &str,
+    asker: Asker,
+) -> Result<TitleReport, Box<Problem>> {
     if !an_item(id) {
-        return Err(refused(
-            NOT_AN_ITEM,
-            "That is not a title the household could hold",
-        ));
+        return Err(not_an_item());
     }
     let server = server(ctx).await?;
     let member = match whose {
@@ -152,12 +183,12 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
         .await
         .map_err(|_| unanswered())?
         .ok_or_else(|| refused(NOT_ON_THEIR_SHELF, "That title is not on this shelf"))?;
-    let door = door::standing(ctx, server.serve.as_ref()).await;
+    let door = door::standing(ctx, server.serve.as_ref(), asker).await;
     let (member, id) = member.map_or_else(Default::default, |member| (member.name, member.id));
     Ok(TitleReport {
         member,
         id,
-        title: Some(placed(title, &door)),
+        title: Some(placed(title, &door, ctx.seams.random.as_ref())),
         rehearsed: false,
     })
 }
@@ -177,10 +208,7 @@ pub async fn picture(
     which: Picture,
 ) -> Result<Pictured, Box<Problem>> {
     if !an_item(id) {
-        return Err(refused(
-            NOT_AN_ITEM,
-            "That is not a title the household could hold",
-        ));
+        return Err(not_an_item());
     }
     let server = server(ctx).await?;
     let member = match whose {
@@ -202,7 +230,12 @@ pub async fn picture(
 ///
 /// A [`Problem`] where nobody is named, where there is no server, and where the member
 /// is not in the household. A server that will not say is answered as unread.
-async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, Box<Problem>> {
+async fn part_way(
+    ctx: &Ctx,
+    whose: &Whom,
+    most: u32,
+    asker: Asker,
+) -> Result<PartWayReport, Box<Problem>> {
     let Whom::Named(named) = whose else {
         return Err(nobody());
     };
@@ -216,13 +249,13 @@ async fn part_way(ctx: &Ctx, whose: &Whom, most: u32) -> Result<PartWayReport, B
             ..PartWayReport::default()
         });
     };
-    let door = door::standing(ctx, server.serve.as_ref()).await;
+    let door = door::standing(ctx, server.serve.as_ref(), asker).await;
     Ok(PartWayReport {
         member: member.name,
         id: member.id,
         part_way: part_way
             .into_iter()
-            .map(|one| progressed(one, &door))
+            .map(|one| progressed(one, &door, ctx.seams.random.as_ref()))
             .collect(),
         available: true,
         findings: Vec::new(),
@@ -292,10 +325,7 @@ async fn watched(
     how_far: HowFar,
 ) -> Result<WatchedReport, Box<Problem>> {
     if !an_item(id) {
-        return Err(refused(
-            NOT_AN_ITEM,
-            "That is not a title the household could hold",
-        ));
+        return Err(not_an_item());
     }
     let server = server(ctx).await?;
     let member = member(server.identity.as_ref(), named).await?;
@@ -335,6 +365,37 @@ pub(crate) async fn lapsed(ctx: &Ctx) {
     if let Some(server) = media(ctx, &manifest).await {
         grants::ended(ctx, &server).await;
     }
+}
+
+/// Close every live stream opened for `member`, sign out every device a grant or a
+/// browser's pass opened a session on their account for, and forget every pass of theirs
+/// that was renewed, as they leave the household.
+///
+/// Asked before their account goes, while the media server can still say which sessions
+/// are theirs. Quietly nothing where there is no server to ask.
+pub(crate) async fn leaving(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest, member: &str) {
+    if let Some(server) = media(ctx, manifest).await {
+        tuned::closed(ctx, server.serve.as_ref(), |one| one.member == member).await;
+        grants::signed_out(&server, member).await;
+    }
+    crate::app::project::passing::unrenewed(ctx, member);
+}
+
+/// The origin of the stack's front door a browser plays a title from, as a content
+/// security policy names it, where the core knows one.
+#[must_use]
+pub fn browser_origin(ctx: &Ctx) -> Option<String> {
+    let base = door::for_a_browser(ctx).ok()?;
+    let origin = url::Url::parse(&base).ok()?.origin();
+    origin.is_tuple().then(|| origin.ascii_serialization())
+}
+
+/// How often a serving process closes the live streams whose passes lapsed unrenewed.
+pub const UNTUNED_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Close every live stream whose pass lapsed unrenewed.
+pub async fn untuned(ctx: &Ctx) {
+    tuned::lapsed(ctx).await;
 }
 
 /// Whether `id` is shaped like an item the media server files: thirty-two hex digits,
@@ -417,6 +478,11 @@ fn refused(code: crate::error::Code, summary: &str) -> Box<Problem> {
         )
         .in_state(State::Guided),
     )
+}
+
+/// The refusal for an id that names nothing the server could hold.
+fn not_an_item() -> Box<Problem> {
+    refused(NOT_AN_ITEM, "That is not a title the household could hold")
 }
 
 /// The refusal for nobody named.

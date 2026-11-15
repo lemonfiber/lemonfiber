@@ -18,7 +18,7 @@ use super::{
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
     RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPushEndpoint,
     RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
-    RawUi, RawUp, RawWhom, UpdateCommand,
+    RawUi, RawUp, RawWhom, UpdateCommand, Watching,
 };
 
 /// What the operator asked for.
@@ -197,14 +197,9 @@ pub enum Request {
         #[command(flatten)]
         shelf: RawShelf,
     },
-    /// Show what the media server is playing now: who is watching what, and where.
-    ///
-    /// Every session in the house, or one member's with `--member`.
-    Playing {
-        /// Whose sessions, by the name they are known by.
-        #[arg(long)]
-        member: Option<String>,
-    },
+    /// What is playing, live TV and a title in a browser.
+    #[command(flatten)]
+    Watching(Watching),
     /// Add one thing, end to end, and watch every step of it happen.
     ///
     /// The walk a first run is offered: search the indexers, grab a release, download

@@ -1,0 +1,59 @@
+{
+  "fields": {
+    "channel": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "direct": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "fingerprint": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "lapses": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stream": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "transcoded": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "unlocated": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

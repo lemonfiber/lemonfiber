@@ -4,8 +4,8 @@
 use lemonfiber_fixtures::upstream::media::READ_AT_START;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{
-    AppKeys, Declaring, Encrypting, FiledAt, Fronted, Furnishing, HowFar, Library, Picture,
-    Screening, Tuning, Upkeep,
+    Allowing, AppKeys, Declaring, Encrypting, FiledAt, Fronted, Furnishing, HowFar, Library,
+    Picture, Screening, Tuning, Upkeep,
 };
 
 use super::{crosses_alike, serve};
@@ -15,7 +15,16 @@ const PIN: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f2001
 
 /// Every operation of the capability, once, each answer written down.
 async fn script<
-    M: Screening + Library + Upkeep + Fronted + AppKeys + Declaring + Encrypting + Furnishing + Tuning,
+    M: Screening
+        + Library
+        + Upkeep
+        + Fronted
+        + Allowing
+        + AppKeys
+        + Declaring
+        + Encrypting
+        + Furnishing
+        + Tuning,
 >(
     server: &M,
 ) -> Vec<String> {
@@ -48,6 +57,15 @@ async fn script<
         format!("{:?}", server.trust_only("10.0.0.2").await),
         format!("{:?}", server.allowed_origins().await),
         format!("{:?}", server.allow_only("https://house.example").await),
+        format!(
+            "{:?}",
+            server
+                .allow_origins(&[
+                    "https://console.example".to_owned(),
+                    "https://watch.house.example".to_owned(),
+                ])
+                .await
+        ),
         format!("{:?}", server.restart().await),
         format!("{:?}", server.filed_as("gate").await),
         format!("{:?}", server.dated("gate").await),
@@ -90,6 +108,7 @@ async fn a_media_server_answers_and_is_told_through_its_contract_as_it_is_in_pro
             "rescan",
             "refresh",
             "trust",
+            "allow",
             "allow",
             "restart",
             "answers",

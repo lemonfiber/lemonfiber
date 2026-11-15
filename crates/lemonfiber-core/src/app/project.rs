@@ -9,7 +9,7 @@ mod host;
 mod linking;
 mod mounting;
 mod moving;
-mod passing;
+pub(crate) mod passing;
 mod profiled;
 mod rendering;
 mod retiring;

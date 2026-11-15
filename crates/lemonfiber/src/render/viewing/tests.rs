@@ -168,3 +168,132 @@ fn what_could_not_be_read_part_way_is_said() {
     assert!(text.contains("  ! unread"), "{text}");
     assert!(!text.contains("Nothing part-way through"), "{text}");
 }
+
+/// A channel is a line with its number, its name, what is on and its certificate where
+/// each is known, and its id; no channel at all is said as the answer.
+#[test]
+fn channels_are_listed_with_what_is_on_and_none_is_said_as_the_answer() {
+    use lemonfiber_core::model::ChannelsReport;
+    use lemonfiber_core::ports::service::{Channel, Programme};
+    let mut report = ChannelsReport {
+        member: "Ada".to_owned(),
+        id: "a7f3".to_owned(),
+        channels: vec![
+            Channel {
+                id: "c1".to_owned(),
+                name: "Kids".to_owned(),
+                number: Some("7".to_owned()),
+                now: Some(Programme {
+                    title: "Cartoons".to_owned(),
+                    certificate: Some("U".to_owned()),
+                    ends: None,
+                }),
+            },
+            Channel {
+                id: "c2".to_owned(),
+                name: "News".to_owned(),
+                number: None,
+                now: Some(Programme {
+                    title: "Headlines".to_owned(),
+                    certificate: None,
+                    ends: None,
+                }),
+            },
+            Channel {
+                id: "c3".to_owned(),
+                name: "Quiet".to_owned(),
+                number: None,
+                now: None,
+            },
+        ],
+        rehearsed: false,
+    };
+    let text = super::channels(&report).text();
+    assert!(text.contains("Ada — live TV"), "{text}");
+    assert!(text.contains("  7 Kids — Cartoons (U)  [c1]"), "{text}");
+    assert!(text.contains("  News — Headlines  [c2]"), "{text}");
+    assert!(text.contains("  Quiet  [c3]"), "{text}");
+    report.channels.clear();
+    assert!(super::channels(&report)
+        .text()
+        .contains("No channel this member may watch now"));
+}
+
+/// A live stream opened says where each path is served, the door it presents and a code
+/// for each; one closed, rehearsed or unlocated says that instead.
+#[test]
+fn a_live_stream_says_where_it_is_served_or_why_it_is_not() {
+    use lemonfiber_core::model::TunedReport;
+    let opened = TunedReport {
+        channel: "c1".to_owned(),
+        member: "Ada".to_owned(),
+        stream: Some("ls1".to_owned()),
+        direct: Some("https://h:8920/live/ls1/stream.ts?pass=p".to_owned()),
+        transcoded: Some("https://h:8920/videos/c1/live.m3u8?pass=p".to_owned()),
+        fingerprint: Some("ab12".to_owned()),
+        lapses: Some(1_800_000_000),
+        unlocated: None,
+        rehearsed: false,
+    };
+    let text = super::tuned(&opened).text();
+    assert!(text.contains("Channel c1 is open for Ada as ls1"), "{text}");
+    assert!(text.contains("the door presents ab12"), "{text}");
+    assert!(text.contains("As the tuner sends it:"), "{text}");
+    assert!(
+        text.contains("  https://h:8920/videos/c1/live.m3u8?pass=p"),
+        "{text}"
+    );
+    assert_eq!(text.matches("The same, for a camera:").count(), 2, "{text}");
+
+    let closed = TunedReport {
+        channel: "c1".to_owned(),
+        member: "Ada".to_owned(),
+        ..TunedReport::default()
+    };
+    assert!(super::tuned(&closed)
+        .text()
+        .contains("Channel c1 is closed for Ada."));
+    let rehearsed = TunedReport {
+        rehearsed: true,
+        ..closed.clone()
+    };
+    assert!(super::tuned(&rehearsed)
+        .text()
+        .contains("rehearsed, so nothing was opened"));
+    let unlocated = TunedReport {
+        unlocated: Some("no door".to_owned()),
+        ..closed
+    };
+    assert_eq!(super::tuned(&unlocated).text().trim(), "! no door");
+}
+
+/// A title playing in a browser says where, on what pass, with a code; a rehearsal says
+/// it would play, and an unlocated one why it does not.
+#[test]
+fn a_browser_play_says_where_it_plays_or_why_it_does_not() {
+    use lemonfiber_core::model::PlayReport;
+    let rehearsed = PlayReport {
+        id: "f1".to_owned(),
+        member: "Ada".to_owned(),
+        ..PlayReport::default()
+    };
+    assert!(super::play(&rehearsed)
+        .text()
+        .contains("f1 would play in a browser as Ada."));
+    let playing = PlayReport {
+        stream_from: Some("https://door.example/videos/f1/master.m3u8?pass=p".to_owned()),
+        lapses: Some(1_800_000_000),
+        ..rehearsed.clone()
+    };
+    let text = super::play(&playing).text();
+    assert!(
+        text.contains("f1 plays in a browser as Ada, on a pass lapsing at"),
+        "{text}"
+    );
+    assert!(text.contains("The same, for a camera:"), "{text}");
+    let unlocated = PlayReport {
+        unlocated: Some("no route".to_owned()),
+        ..rehearsed
+    };
+    assert_eq!(super::play(&unlocated).text().trim(), "! no route");
+}

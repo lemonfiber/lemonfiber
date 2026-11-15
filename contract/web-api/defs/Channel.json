@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One live TV channel, as one member's account may watch it.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The identifier the server tells it apart by.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called.",
+      "type": "string"
+    },
+    "now": {
+      "description": "The programme on it now, where the server knows one.",
+      "anyOf": [
+        {
+          "$ref": "Programme.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "number": {
+      "description": "Its number, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name"
+  ]
+}

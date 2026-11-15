@@ -15,7 +15,9 @@ use std::path::Path;
 
 use axum::body::to_bytes;
 use axum::http::{header, StatusCode};
-use lemonfiber_api::frontend::{absent, content_type, missing, page, routes, served, unanswered};
+use lemonfiber_api::frontend::{
+    absent, content_type, missing, page, page_playing, playing_from, routes, served, unanswered,
+};
 use lemonfiber_core::frontend::{Asset, Source};
 
 /// The app a build would embed, read from disk instead.
@@ -205,6 +207,24 @@ fn the_page_says_what_it_may_load_and_refuses_to_be_framed() {
     assert!(policy.contains("base-uri 'none'"), "{policy}");
 }
 
+#[test]
+fn a_page_that_plays_from_the_front_door_may_load_from_it() {
+    let door = "https://watch.home.lan";
+    let policy = said(
+        &page_playing(Some(app()), "/", Some(door)),
+        header::CONTENT_SECURITY_POLICY,
+    );
+    assert_eq!(policy, playing_from(door));
+    let alone = said(
+        &page_playing(Some(app()), "/", None),
+        header::CONTENT_SECURITY_POLICY,
+    );
+    assert_eq!(
+        alone,
+        said(&page(Some(app()), "/"), header::CONTENT_SECURITY_POLICY)
+    );
+}
+
 #[tokio::test]
 async fn one_file_served_on_its_own_carries_the_same_guarantees() {
     let Some(asset) = app().asset("/assets/app.css") else {
@@ -255,7 +275,12 @@ async fn asked_for(app: Option<Source>, path: &str) -> (u16, String) {
     let Ok(request) = request else {
         unreachable!("a request built from a path that is already one cannot fail");
     };
-    let served = tower::ServiceExt::oneshot(routes(app), request).await.ok();
+    let served = tower::ServiceExt::oneshot(
+        routes(app, std::sync::Arc::new(crate::idle::ctx())),
+        request,
+    )
+    .await
+    .ok();
     let Some(response) = served else {
         unreachable!("the router is infallible; its handlers answer rather than fail");
     };
