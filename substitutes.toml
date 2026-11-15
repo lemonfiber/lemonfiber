@@ -109,7 +109,7 @@ media_type = "movies"
 arm        = "curator-lidarr"
 plugin     = "lidarr"
 origin     = "https://github.com/lemonfiber/plugin-lidarr"
-revision   = "d2a0e07d99d4c7bd62155469e1b845bb1db74001"
+revision   = "fdd241d938957db10518a61291e8f9c6f8583e44"
 media_type = "music"
 
 [[curator]]
