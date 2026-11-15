@@ -3,7 +3,9 @@
 //! The read-only half of the seeding step that claims them. Seeding claims each part
 //! nobody holds; this asks each who holds it, changing nothing, so an operator running a
 //! diagnosis is told of a part anybody can take, one somebody else holds, and one that
-//! will not say, which is never taken as held.
+//! will not say, which is never taken as held. A part not answering yet, while it starts
+//! or starts again to take a claim, could not be asked, which is not the same as anybody
+//! holding it.
 
 use std::sync::Arc;
 
@@ -12,7 +14,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::config::PART_UNCLAIMED;
 use crate::error::{Problem, Remedy};
-use crate::ports::service::{Owner, Ownership};
+use crate::ports::service::{Failure, Owner, Ownership};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "config.claimed";
@@ -118,6 +120,10 @@ async fn asked(part: &Part, owner: Option<&dyn Ownership>) -> Verdict {
                 "If that was not you, reset {name}'s configuration and run lemonfiber seed"
             )),
         )),
+        Err(failure @ Failure::Unavailable { .. }) => Verdict::Unverified {
+            reason: format!("{name} could not be asked who holds it: {failure}"),
+            remedy: starting(),
+        },
         Err(failure) => Verdict::Warn(unknown(name, &failure.to_string())),
     }
 }
@@ -128,11 +134,14 @@ fn unknown(name: &str, why: &str) -> Problem {
         PART_UNCLAIMED,
         format!("Anybody may hold {name}"),
         format!("{name} could not be asked who holds it: {why}"),
-        Remedy::new(
-            "Check the service is up and has finished starting, then run the diagnosis again",
-        )
-        .with_detail("lemonfiber status"),
+        starting(),
     )
+}
+
+/// What gets an answer from a part that is not answering yet.
+fn starting() -> Remedy {
+    Remedy::new("Check the service is up and has finished starting, then run the diagnosis again")
+        .with_detail("lemonfiber status")
 }
 
 #[cfg(test)]

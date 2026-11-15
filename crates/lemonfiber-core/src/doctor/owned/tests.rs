@@ -15,6 +15,8 @@ enum Asked {
     Silent,
     /// It cannot be asked over its contract.
     Unaskable,
+    /// Refusing the credential lemonfiber holds for it.
+    Refusing,
 }
 
 /// The verdicts the check comes to over `parts`, each a part answering as given.
@@ -34,6 +36,7 @@ async fn verdicts(parts: Vec<Asked>) -> Vec<Verdict> {
                         Asked::Holding(owner) => Some(owning::Part::answering(Some(owner))),
                         Asked::Silent => Some(owning::Part::answering(None)),
                         Asked::Unaskable => None,
+                        Asked::Refusing => Some(owning::Part::refusing()),
                     }
                     .map(|part| Arc::new(part) as Arc<dyn Ownership>),
                 )
@@ -90,8 +93,8 @@ async fn a_part_nobody_holds_or_somebody_else_holds_is_a_warning_naming_what_to_
 }
 
 #[tokio::test]
-async fn a_part_that_will_not_say_is_a_warning_never_a_pass() {
-    let verdicts = verdicts(vec![Asked::Silent, Asked::Unaskable]).await;
+async fn a_part_that_cannot_be_asked_over_its_contract_is_a_warning_never_a_pass() {
+    let verdicts = verdicts(vec![Asked::Unaskable]).await;
     assert!(
         verdicts
             .iter()
@@ -101,10 +104,31 @@ async fn a_part_that_will_not_say_is_a_warning_never_a_pass() {
 }
 
 #[tokio::test]
+async fn a_part_not_answering_yet_could_not_be_asked_and_is_never_a_pass_or_anybodys() {
+    let verdicts = verdicts(vec![Asked::Silent]).await;
+    assert!(
+        matches!(verdicts.as_slice(), [Verdict::Unverified { reason, .. }]
+            if reason == "Part 0 could not be asked who holds it: part is not answering"),
+        "{verdicts:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_machine_with_no_part_claimed_first_skips_the_check() {
     let verdicts = verdicts(Vec::new()).await;
     assert!(
         matches!(verdicts.as_slice(), [Verdict::Skipped { .. }]),
+        "{verdicts:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_part_answering_but_refusing_to_say_is_a_warning_naming_why() {
+    let verdicts = verdicts(vec![Asked::Refusing]).await;
+
+    assert!(
+        matches!(verdicts.as_slice(), [verdict]
+            if warned_with(verdict, "could not be asked who holds it: part rejected the credential")),
         "{verdicts:?}"
     );
 }
