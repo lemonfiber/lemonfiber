@@ -118,7 +118,7 @@ fn nothing_handed_over_is_in_anything_but_the_households_own_words() {
     );
     for line in &said {
         assert_eq!(
-            crate::error::household::unhoused(line),
+            lemonfiber_fixtures::unhoused::unhoused(line),
             None,
             "a member was handed something not in the household's words: {line}"
         );
@@ -399,7 +399,7 @@ fn every_policy_has_words_to_be_told_in() {
 fn every_policy_a_member_is_told_is_in_the_households_words() {
     for policy in Policy::ALL {
         assert_eq!(
-            crate::error::household::unhoused(policy.household()),
+            lemonfiber_fixtures::unhoused::unhoused(policy.household()),
             None,
             "{policy:?}"
         );
@@ -411,6 +411,10 @@ fn every_policy_a_member_is_told_is_in_the_households_words() {
 fn every_limit_a_member_is_told_is_in_the_households_words() {
     for (requests, days) in [(1, 1), (5, 7), (12, 30), (3, 14)] {
         let said = crate::asking::limit(crate::ports::service::Quota { requests, days });
-        assert_eq!(crate::error::household::unhoused(&said), None, "{said}");
+        assert_eq!(
+            lemonfiber_fixtures::unhoused::unhoused(&said),
+            None,
+            "{said}"
+        );
     }
 }

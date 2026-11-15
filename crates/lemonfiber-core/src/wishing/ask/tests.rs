@@ -688,7 +688,7 @@ fn every_sentence_an_ask_comes_to_is_in_the_households_words() {
                 for left in &leaves {
                     let sentence = said(outcome, released, left, rehearsed);
                     assert_eq!(
-                        crate::error::household::unhoused(&sentence),
+                        lemonfiber_fixtures::unhoused::unhoused(&sentence),
                         None,
                         "{sentence}"
                     );
@@ -696,5 +696,8 @@ fn every_sentence_an_ask_comes_to_is_in_the_households_words() {
             }
         }
     }
-    assert_eq!(crate::error::household::unhoused(super::ON_ITS_WAY), None);
+    assert_eq!(
+        lemonfiber_fixtures::unhoused::unhoused(super::ON_ITS_WAY),
+        None
+    );
 }

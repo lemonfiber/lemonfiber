@@ -1,31 +1,6 @@
-use super::{spoken, unhoused, Obstacle, Words, FAULT, FAULT_REMEDY};
-use crate::codes::{every_declared, play, serve, wish, Household};
+use super::{spoken, Obstacle, Words, FAULT, FAULT_REMEDY};
+use crate::codes::{play, serve, wish, Household};
 use crate::{Code, Problem, Remedy, State, Stepped};
-
-/// Every code there is has words a member may be told, naming no service, size, address,
-/// version or state of the stack, and so does what a fault of the stack is said as.
-///
-/// Every code rather than only those some route is known to answer today: each is
-/// declared with a household entry, so none can reach a member's session without one.
-#[test]
-fn every_code_a_member_could_be_answered_with_is_in_the_households_words() {
-    for declared in every_declared() {
-        let words = Words::of(declared.code());
-        for said in [words.said, words.remedy] {
-            assert_eq!(
-                unhoused(said),
-                None,
-                "{} tells a member something not in the household's words: {said}",
-                declared.code()
-            );
-            assert!(
-                !said.trim().is_empty(),
-                "{} tells a member nothing",
-                declared.code()
-            );
-        }
-    }
-}
 
 /// A fault of the stack reads as not working right now, with whoever runs the house told.
 #[test]
@@ -119,39 +94,4 @@ fn an_obstacle_is_worded_by_its_code_for_whoever_reads_it() {
             remedy: words.remedy.to_owned(),
         }
     );
-}
-
-/// What a member may not be shown is found, whichever kind of thing it is.
-#[test]
-fn what_a_member_may_not_be_shown_is_found() {
-    for (text, found) in [
-        ("Jellyfin did not answer", "jellyfin"),
-        ("The media server did not answer", "media server"),
-        ("It needs 4 GB more", "4"),
-        ("It needs 12GB more", "12gb"),
-        ("Fetching at 3 MB/s", "3"),
-        ("Open http://house.lan", "http"),
-        ("Reached at 192.168.1.20", "192.168.1.20"),
-        ("Now on v1.4.2", "v1.4.2"),
-        ("The stack is stopped", "stack"),
-        ("It is still downloading", "downloading"),
-        ("No indexer answered", "indexer"),
-    ] {
-        assert_eq!(unhoused(text).as_deref(), Some(found), "{text}");
-    }
-}
-
-/// The household's own words pass, the house included, and a word is matched whole.
-#[test]
-fn the_households_own_words_pass() {
-    for text in [
-        "This isn't working right now, and whoever runs the house has been told.",
-        "It is already in the house. Play it from your shelf.",
-        "Ask again once your allowance frees up.",
-        "Your library isn't answering right now.",
-        "The idea is sound, and serving dinner can wait.",
-        "Episode 3 of season 2.",
-    ] {
-        assert_eq!(unhoused(text), None, "{text}");
-    }
 }

@@ -13,6 +13,9 @@
 
 use std::fs;
 
+use lemonfiber_core::error::codes::admit::NOT_YOURS;
+use lemonfiber_core::error::household::Words;
+
 use crate::door;
 use door::*;
 
@@ -81,9 +84,11 @@ async fn a_member_is_refused_a_read_that_is_not_theirs() {
     let answer = asked(router, "GET", "/api/version", &carried, "").await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN);
+    let words = Words::of(NOT_YOURS);
     assert!(
-        answer.body.contains("may ask for"),
-        "a member was turned away without being told it was theirs to be told: {}",
+        answer.body.contains(NOT_YOURS.as_str()) && answer.body.contains(words.said),
+        "a member was turned away without being told, in the household's words, that it \
+         was not theirs: {}",
         answer.body
     );
     let _ = fs::remove_dir_all(a_directory("member-refused-read"));

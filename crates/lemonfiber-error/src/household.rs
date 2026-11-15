@@ -116,10 +116,5 @@ impl std::fmt::Display for Obstacle {
     }
 }
 
-#[cfg(any(test, feature = "testing"))]
-mod unhoused;
-#[cfg(any(test, feature = "testing"))]
-pub use unhoused::unhoused;
-
 #[cfg(test)]
 mod tests;

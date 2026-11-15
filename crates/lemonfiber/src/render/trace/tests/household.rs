@@ -74,7 +74,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             lemonfiber_core::error::codes::play::SERVER_SILENT,
             "a library could not be read",
         )],
-        noted: Vec::new(),
+        noted: vec!["the media server holds no account under sam".to_owned()],
         filtering: None,
         policy: None,
         allows: None,
@@ -92,6 +92,10 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
     assert!(text.contains("something   the request service reports a state"));
     assert!(text.contains("1 member(s), 3 request(s)."), "{text}");
     assert!(text.contains("! a library could not be read"));
+    assert!(
+        text.contains("! the media server holds no account under sam"),
+        "{text}"
+    );
 }
 
 /// What a household may ask for reads under the list, with its limit beside it.

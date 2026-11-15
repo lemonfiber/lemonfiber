@@ -387,6 +387,10 @@ async fn a_member_is_sent_the_house_and_the_operator_the_product() {
         }
     }
     for said in [HOUSEHOLD_TITLE, crate::notify::fanning::READY] {
-        assert_eq!(crate::error::household::unhoused(said), None, "{said}");
+        assert_eq!(
+            lemonfiber_fixtures::unhoused::unhoused(said),
+            None,
+            "{said}"
+        );
     }
 }

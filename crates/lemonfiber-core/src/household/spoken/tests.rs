@@ -1,13 +1,15 @@
 use crate::app::Outcome;
 use crate::asking::{Estimate, Passed, Refused};
+use crate::error::codes::every_declared;
 use crate::error::codes::play::{MISNAMED, SERVER_SILENT};
 use crate::error::codes::quota::UNREACHABLE;
-use crate::error::household::{unhoused, Obstacle, Words};
+use crate::error::household::{Obstacle, Words};
 use crate::model::{
-    Held, HeldReport, HouseholdMember, HouseholdReport, Located, MemberRequest, PartWay,
-    PartWayReport, PlayReport, PlayingReport, Title, TitleReport, TunedReport,
+    Episode, Held, HeldReport, HouseholdMember, HouseholdReport, Located, MemberRequest, PartWay,
+    PartWayReport, PlayReport, PlayingReport, Season, Title, TitleReport, TunedReport,
 };
 use crate::ports::service::Medium;
+use lemonfiber_fixtures::unhoused::unhoused;
 
 /// What the operator is told is in the way, worded for them.
 fn operator(code: crate::error::Code) -> Obstacle {
@@ -101,15 +103,33 @@ fn every_member_read_is_worded_for_the_household() {
             genres: Vec::new(),
             certificate: None,
             released: None,
-            seasons: Vec::new(),
+            seasons: vec![Season {
+                id: "1".to_owned(),
+                name: "Season 1".to_owned(),
+                number: Some(1),
+                episodes: vec![Episode {
+                    held: unlocated(),
+                    number: Some(1),
+                    overview: None,
+                    minutes: None,
+                }],
+            }],
         }),
         ..TitleReport::default()
     })
     .for_household() else {
         unreachable!("a title stopped being a title");
     };
+    let title = titled
+        .title
+        .unwrap_or_else(|| unreachable!("the title went missing"));
+    assert_eq!(title.held.at.unlocated, Some(household(MISNAMED)));
     assert_eq!(
-        titled.title.and_then(|title| title.held.at.unlocated),
+        title
+            .seasons
+            .first()
+            .and_then(|season| season.episodes.first())
+            .and_then(|episode| episode.held.at.unlocated.clone()),
         Some(household(MISNAMED))
     );
 }
@@ -231,4 +251,29 @@ fn why_a_member_has_nowhere_to_watch_is_in_the_households_words() {
 fn an_outcome_with_nothing_to_word_again_is_left_as_it_is() {
     let outcome = Outcome::Watched(crate::model::WatchedReport::default());
     assert_eq!(outcome.clone().for_household(), outcome);
+}
+
+/// Every code there is has words a member may be told, naming no service, size, address,
+/// version or state of the stack, and so does what a fault of the stack is said as.
+///
+/// Every code rather than only those some route is known to answer today: each is
+/// declared with a household entry, so none can reach a member's session without one.
+#[test]
+fn every_code_a_member_could_be_answered_with_is_in_the_households_words() {
+    for declared in every_declared() {
+        let words = Words::of(declared.code());
+        for said in [words.said, words.remedy] {
+            assert_eq!(
+                unhoused(said),
+                None,
+                "{} tells a member something not in the household's words: {said}",
+                declared.code()
+            );
+            assert!(
+                !said.trim().is_empty(),
+                "{} tells a member nothing",
+                declared.code()
+            );
+        }
+    }
 }

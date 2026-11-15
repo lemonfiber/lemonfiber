@@ -17,6 +17,8 @@
 
 use std::collections::BTreeMap;
 
+use lemonfiber_fixtures::parts::{owned, OWNED};
+
 use crate::source_tree::{crates_that_ship, in_a_crate_that_ships, shipped};
 
 /// The crates that are the bundle, where every part is named by design.
@@ -27,19 +29,6 @@ const NATIVE_APIS: &str = "crates/lemonfiber-manifest/src/schema/api.rs";
 
 /// The type naming a native API, through whose paths an application's name is the API's.
 const NATIVE_API: &str = "ApiKind";
-
-/// The part ids that are also the core's own words, each with what the core means by it.
-const OWNED: [(&str, &str); 3] = [
-    (
-        "door",
-        "the front door a household is handed, which the core decides",
-    ),
-    ("decline", "invite.decline, a capability of the vocabulary"),
-    (
-        "request-gate",
-        "request.gate, a capability of the vocabulary",
-    ),
-];
 
 /// What takes a name off [`NAMED`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -254,7 +243,7 @@ fn parts() -> Vec<String> {
         .iter()
         .filter(|pinned| pinned.stage != Some(lemonfiber_bundled::Stage::Offered))
         .map(|pinned| pinned.first_party.plugin.to_owned())
-        .filter(|id| !OWNED.iter().any(|(owned, _)| owned == id))
+        .filter(|id| !owned(id))
         .collect()
 }
 
@@ -445,8 +434,8 @@ fn a_planted_name_is_found_and_nothing_this_reads_past() {
 #[test]
 fn the_cores_own_words_are_not_read_as_parts() {
     let parts = parts();
-    for (owned, _) in OWNED {
-        assert!(!parts.iter().any(|part| part == owned), "{owned}");
+    for (word, _) in OWNED {
+        assert!(!parts.iter().any(|part| part == word), "{word}");
     }
     assert!(parts.len() > 10, "the bundle's parts were read: {parts:?}");
 }

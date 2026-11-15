@@ -1,50 +1,30 @@
 //! Whether a piece of text is in the household's words.
 //!
-//! What a member's surface may not show (`G2-R16`): a service's name, a domain term, a
-//! size, a rate, an address, a version, a stage of the pipeline, or how the stack stands.
-//! Shared by every test that holds text a member reads to it, so there is one list.
+//! What a member's surface may not show: a service's name, a domain term, a size, a rate,
+//! an address, a version, a stage of the pipeline, or how the stack stands. Shared by every
+//! test that holds text a member reads to it, so there is one list.
 
-/// The names of services the stack runs or could run, and the engine they run on.
-const SERVICES: &[&str] = &[
+/// The names of services the stack could run that the bundle pins no plugin for, and of
+/// the engines and the tunnel it runs on.
+const UNPINNED: &[&str] = &[
     "apprise",
-    "audiobookshelf",
-    "bazarr",
-    "bindery",
     "byparr",
-    "caddy",
     "calibre",
     "docker",
-    "emby",
-    "flaresolverr",
-    "gluetun",
     "gotify",
-    "jellyfin",
     "jellyseerr",
     "komga",
     "lemonfiber",
-    "lidarr",
-    "medusa",
-    "navidrome",
-    "ntfy",
     "nzbget",
     "nzbhydra",
-    "nzbhydra2",
     "overseerr",
     "plex",
     "podman",
-    "prowlarr",
-    "qbittorrent",
-    "radarr",
     "readarr",
-    "recyclarr",
-    "sabnzbd",
-    "seerr",
     "sickchill",
     "sickgear",
-    "sonarr",
     "tdarr",
     "transmission",
-    "unpackerr",
     "whisparr",
     "wireguard",
 ];
@@ -158,8 +138,11 @@ pub fn unhoused(text: &str) -> Option<String> {
         .split(|letter: char| !(letter.is_alphanumeric() || letter == '\''))
         .filter(|word| !word.is_empty())
         .collect();
-    if let Some(term) = SERVICES.iter().chain(TERMS).find(|term| said(&words, term)) {
-        return Some((*term).to_owned());
+    let mut named = crate::parts::pinned()
+        .map(|id| id.replace('-', " "))
+        .chain(UNPINNED.iter().chain(TERMS).map(|term| (*term).to_owned()));
+    if let Some(term) = named.find(|term| said(&words, term)) {
+        return Some(term);
     }
     let tokens: Vec<&str> = lower.split_whitespace().collect();
     for (at, token) in tokens.iter().enumerate() {
@@ -205,3 +188,6 @@ fn versioned(token: &str) -> bool {
             .iter()
             .all(|part| !part.is_empty() && part.chars().all(|letter| letter.is_ascii_digit()))
 }
+
+#[cfg(test)]
+mod tests;

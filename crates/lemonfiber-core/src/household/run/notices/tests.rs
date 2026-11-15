@@ -100,7 +100,7 @@ fn what_each_notice_is_for_survives_a_telephone() {
 fn nothing_the_house_is_shown_is_in_anything_but_its_own_words() {
     for notice in every_notice() {
         assert_eq!(
-            crate::error::household::unhoused(&notice),
+            lemonfiber_fixtures::unhoused::unhoused(&notice),
             None,
             "the household was shown something not in its words: {notice}"
         );

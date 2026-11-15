@@ -2,8 +2,9 @@ use axum::body::to_bytes;
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
 use lemonfiber_core::error::codes::play::SERVER_SILENT;
-use lemonfiber_core::error::household::{unhoused, Words};
+use lemonfiber_core::error::household::Words;
 use lemonfiber_core::error::{Problem, Remedy};
+use lemonfiber_fixtures::unhoused::unhoused;
 
 use super::{for_audience, refused, Audience, Refused};
 use crate::admission::Caller;
