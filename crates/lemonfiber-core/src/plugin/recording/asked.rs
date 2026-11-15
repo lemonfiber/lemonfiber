@@ -12,7 +12,7 @@ use tokio::time::Instant;
 use super::fronted::{self, Fronting};
 use super::served::{answers, POLL};
 use super::stood_in;
-use super::written::{answered_before, landing, written};
+use super::written::{answered_before, landing, written, Varying};
 use super::{Failed, Recorder, Taken, Took};
 use crate::plugin::container::LOOPBACK;
 use crate::plugin::installed::{Installed, Placed};
@@ -288,7 +288,7 @@ async fn recorded(
                 },
                 recorder.taking,
                 &stood_in,
-                &item.request.varies,
+                Varying::declared(&item.request.varies),
             )
         })
         .collect();
@@ -326,7 +326,7 @@ fn case_written(
             },
             taking,
             stood_in,
-            &BTreeMap::new(),
+            Varying::answered(&case.answered),
         ),
     };
     Taken {

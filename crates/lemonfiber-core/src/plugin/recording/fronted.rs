@@ -63,6 +63,8 @@ pub(super) struct Case {
     pub(super) asked: Asked,
     /// What the adapter answered, scrubbed.
     pub(super) answer: Answer,
+    /// The schema of what the case's operation answers.
+    pub(super) answered: Value,
     /// The host outside the stack it reaches, where it is left as recorded.
     pub(super) left: Option<String>,
 }
@@ -381,6 +383,7 @@ impl Asking<'_> {
                 accept: Some(JSON.to_owned()),
             },
             answer: kept(&response),
+            answered: case.operation.answered.as_value().clone(),
             left: None,
         })
     }

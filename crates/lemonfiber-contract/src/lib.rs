@@ -19,6 +19,7 @@ pub mod client;
 pub mod conformance;
 mod declare;
 pub mod documents;
+pub mod instants;
 pub mod released;
 
 use std::future::Future;

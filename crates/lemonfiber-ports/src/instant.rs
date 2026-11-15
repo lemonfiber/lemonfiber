@@ -159,16 +159,17 @@ impl std::str::FromStr for Instant {
 }
 
 impl schemars::JsonSchema for Instant {
-    fn inline_schema() -> bool {
-        true
-    }
-
     fn schema_name() -> Cow<'static, str> {
         "Instant".into()
     }
 
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        u64::json_schema(generator)
+        let mut schema = u64::json_schema(generator);
+        schema.insert(
+            "description".to_owned(),
+            "A moment, as a whole number of seconds since the Unix epoch.".into(),
+        );
+        schema
     }
 }
 

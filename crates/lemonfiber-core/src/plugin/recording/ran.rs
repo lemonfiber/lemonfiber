@@ -4,7 +4,7 @@ use std::path::Path;
 
 use lemonfiber_plugin::{Manifest, Run};
 
-use super::written::{before, written};
+use super::written::{before, written, Varying};
 use super::{placed, Recorder, Retaking, Taken, Took};
 use crate::plugin::program::{performed_from, pinned, recorded, Asking, Came, Operator, Starting};
 use crate::plugin::recorded::{Of, Recording, RunAsked, RunResult};
@@ -144,7 +144,7 @@ fn kept(
         },
         taking,
         &[],
-        &std::collections::BTreeMap::new(),
+        Varying::NOWHERE,
     )
 }
 

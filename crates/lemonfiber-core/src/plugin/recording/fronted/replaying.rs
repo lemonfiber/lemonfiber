@@ -115,6 +115,7 @@ impl Asking<'_> {
                 accept: Some(JSON.to_owned()),
             },
             answer: Answer::clone(&answer),
+            answered: case.operation.answered.as_value().clone(),
             left: Some(host),
         }
     }

@@ -90,12 +90,21 @@ fn an_instant_on_the_wire_reads_only_from_an_integer() {
 }
 
 #[test]
-fn the_schema_is_an_inline_unsigned_integer() {
+fn the_schema_is_an_unsigned_integer_defined_once_as_instant() {
     let mut generator = schemars::SchemaGenerator::default();
     let schema = generator.subschema_for::<Instant>();
     assert_eq!(
         schema.as_value(),
-        &serde_json::json!({"type": "integer", "format": "uint64", "minimum": 0})
+        &serde_json::json!({"$ref": "#/$defs/Instant"})
+    );
+    assert_eq!(
+        generator.definitions().get("Instant"),
+        Some(&serde_json::json!({
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "A moment, as a whole number of seconds since the Unix epoch.",
+        }))
     );
 }
 
