@@ -53,7 +53,10 @@ fn a_located_title_says_where_it_plays_and_what_the_door_presents() {
 #[test]
 fn an_unlocated_title_says_why() {
     let text = title(&a_title(Located {
-        unlocated: Some("no address".to_owned()),
+        unlocated: Some(lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "no address",
+        )),
         ..Located::default()
     }))
     .text();
@@ -161,7 +164,10 @@ fn a_series_lists_its_seasons_and_numbered_episodes() {
 fn what_could_not_be_read_part_way_is_said() {
     let report = PartWayReport {
         member: "ana".to_owned(),
-        findings: vec!["unread".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "unread",
+        )],
         ..PartWayReport::default()
     };
     let text = part_way(&report).text();
@@ -261,10 +267,16 @@ fn a_live_stream_says_where_it_is_served_or_why_it_is_not() {
         .text()
         .contains("rehearsed, so nothing was opened"));
     let unlocated = TunedReport {
-        unlocated: Some("no door".to_owned()),
+        unlocated: Some(lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::PASSLESS,
+            "no door",
+        )),
         ..closed
     };
-    assert_eq!(super::tuned(&unlocated).text().trim(), "! no door");
+    assert_eq!(
+        super::tuned(&unlocated).text().trim(),
+        "! no door (PLAY-17)"
+    );
 }
 
 /// A title playing in a browser says where, on what pass, with a code; a rehearsal says
@@ -292,8 +304,14 @@ fn a_browser_play_says_where_it_plays_or_why_it_does_not() {
     );
     assert!(text.contains("The same, for a camera:"), "{text}");
     let unlocated = PlayReport {
-        unlocated: Some("no route".to_owned()),
+        unlocated: Some(lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::NO_BROWSER_ROUTE,
+            "no route",
+        )),
         ..rehearsed
     };
-    assert_eq!(super::play(&unlocated).text().trim(), "! no route");
+    assert_eq!(
+        super::play(&unlocated).text().trim(),
+        "! no route (PLAY-19)"
+    );
 }

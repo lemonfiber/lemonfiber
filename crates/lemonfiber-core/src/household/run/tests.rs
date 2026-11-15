@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::naming::Titled;
-use super::{allowance, assemble, household, reaching, titled, Ctx, Naming};
+use super::naming::{titled, Titled};
+use super::{allowance, assemble, household, reaching, Ctx, Naming};
 use crate::household::State;
 use crate::model::{HouseholdReport, Restriction};
 use crate::ports::media::Kind;

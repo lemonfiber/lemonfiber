@@ -21,8 +21,26 @@ pub const WAITED_FOR: Duration = Duration::from_secs(10);
 /// The most of a back-end's refusal that is kept.
 const REASON_MOST: usize = 200;
 
-/// What every message is titled with.
+/// What every message to the operator is titled with.
 const TITLE: &str = "lemonfiber";
+
+/// What every message to a household member is titled with: the stack, as the household
+/// calls it.
+pub const HOUSEHOLD_TITLE: &str = "The house";
+
+/// What a message of `kind` is titled with: the house's own name for itself where it goes
+/// to a member, and the product's where it goes to the operator.
+const fn titled(kind: Notification) -> &'static str {
+    match kind {
+        Notification::Ready => HOUSEHOLD_TITLE,
+        Notification::Problem
+        | Notification::Completion
+        | Notification::Update
+        | Notification::Backup
+        | Notification::Request
+        | Notification::Member => TITLE,
+    }
+}
 
 /// How many of a gotify server's newest messages are looked through for one sent.
 const GOTIFY_NEWEST: &str = "50";
@@ -130,7 +148,7 @@ fn request(backend: &Backend, held: &Held, message: &Message) -> Option<Request>
     let mut headers = Vec::new();
     let (url, body) = match backend.kind {
         BackendKind::Ntfy => {
-            headers.push(("Title".to_owned(), TITLE.to_owned()));
+            headers.push(("Title".to_owned(), titled(message.kind).to_owned()));
             headers.push(("Tags".to_owned(), tag(message.kind).to_owned()));
             if message.urgent {
                 headers.push(("Priority".to_owned(), "high".to_owned()));
@@ -145,7 +163,7 @@ fn request(backend: &Backend, held: &Held, message: &Message) -> Option<Request>
             headers.push(("X-Gotify-Key".to_owned(), held.token.clone()?));
             headers.push(("Content-Type".to_owned(), JSON.to_owned()));
             let body = json!({
-                "title": TITLE,
+                "title": titled(message.kind),
                 "message": message.summary,
                 "priority": if message.urgent { 8 } else { 5 },
             });
@@ -164,7 +182,7 @@ fn request(backend: &Backend, held: &Held, message: &Message) -> Option<Request>
         BackendKind::Apprise => {
             headers.push(("Content-Type".to_owned(), JSON.to_owned()));
             let body = json!({
-                "title": TITLE,
+                "title": titled(message.kind),
                 "body": message.summary,
                 "type": if message.urgent { "failure" } else { "info" },
             });

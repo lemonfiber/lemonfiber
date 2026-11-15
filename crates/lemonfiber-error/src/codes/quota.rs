@@ -7,6 +7,7 @@ codes! {
         meaning: "The request service would not answer, so nothing was changed. What was in \
             force before is still in force.",
         remedy: "Check the request service is running, then run this again.",
+        household: fault,
     }
     /// Raised where a policy that lives inside a limit was chosen without one.
     NO_LIMIT = "QUOTA-2" {
@@ -16,6 +17,7 @@ codes! {
         meaning: "A policy that lives inside a limit was chosen without one. Living within a \
             limit needs a limit.",
         remedy: "Say how many requests a period allows, and how long the period is.",
+        household: fault,
     }
     /// Raised where the request named is not one that is waiting on anybody.
     NOT_WAITING = "QUOTA-4" {
@@ -25,6 +27,7 @@ codes! {
         meaning: "The request named is not one that is waiting on anybody, so there is nothing \
             to rule on.",
         remedy: "Ask what the household has asked for, to see what is still waiting.",
+        household: fault,
     }
     /// Raised where a request was turned down and the reason said nothing.
     NO_REASON = "QUOTA-5" {
@@ -34,6 +37,7 @@ codes! {
         meaning: "A request was turned down and the reason given was blank. The reason is passed \
             on to whoever asked, so a blank one tells them nothing.",
         remedy: "Say why in a few words, and pass them on to whoever asked.",
+        household: fault,
     }
     /// Raised where nobody in the household goes by the name that was given.
     NOBODY = "QUOTA-6" {
@@ -43,6 +47,7 @@ codes! {
         meaning: "Nobody in this household goes by the name that was given, so nothing was \
             changed.",
         remedy: "Name somebody who is here. The message lists the household.",
+        household: fault,
     }
     /// Raised where the request service holds no account for somebody who has one here.
     NEVER_HERE = "QUOTA-7" {
@@ -54,6 +59,7 @@ codes! {
             theirs for a limit to sit on — what the household is held to applies to them \
             meanwhile.",
         remedy: "Ask them to open the request service once, then set this again.",
+        household: fault,
     }
     /// Raised where a run was asked to close what has waited too long and the household has
     /// never said how long that is.
@@ -66,6 +72,7 @@ codes! {
             nobody agreed to close.",
         remedy: "Say how many days a request may wait, as in lemonfiber household expiring \
             --after 30.",
+        household: fault,
     }
     /// Raised where the period named would close a request nobody was ever reminded about.
     TOO_SOON = "QUOTA-9" {
@@ -76,5 +83,18 @@ codes! {
             reminder and the closing are one arrangement, and a request that goes before the \
             reminder is one nobody saw waiting.",
         remedy: "Name a period of a week or more, so the reminder is reached first.",
+        household: fault,
+    }
+    /// Said where what the disk is holding back could not be written down beside the
+    /// settings.
+    UNRECORDED = "QUOTA-10" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "What the disk is holding back could not be written down beside the settings, \
+            so the next reading works from an older answer.",
+        remedy: "Check in the request service that everybody who should be able to ask still \
+            can.",
+        household: fault,
     }
 }

@@ -18,7 +18,6 @@ fn title(member: Whom) -> Command {
     Command::Viewing(Viewing::Title {
         member,
         id: FILM.to_owned(),
-        asker: lemonfiber_core::app::Asker::Operator,
     })
 }
 

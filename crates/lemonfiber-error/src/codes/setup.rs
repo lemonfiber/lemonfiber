@@ -7,6 +7,7 @@ codes! {
         meaning: "Setup was asked to apply before its answers were reviewed. Nothing has been \
             written.",
         remedy: "Answer every question, then confirm the review before applying.",
+        household: fault,
     }
     /// Raised when the operator's chosen data directory cannot be created.
     DIR_NOT_MADE = "SETUP-2" {
@@ -16,6 +17,7 @@ codes! {
         meaning: "The data directory you chose could not be created. Setup stopped; the next run \
             recovers it.",
         remedy: "Check the location is on a writable disk, then try again.",
+        household: fault,
     }
     /// Raised when a directory from an interrupted apply could not be removed.
     NOT_REMOVED = "SETUP-3" {
@@ -25,6 +27,7 @@ codes! {
         meaning: "A directory left by an interrupted setup could not be removed. The rest was \
             reversed; this one directory holds nothing.",
         remedy: "Remove it by hand, or leave it where it is.",
+        household: fault,
     }
     /// Raised when reversing needs the service that made a change.
     NEEDS_SERVICE = "SETUP-4" {
@@ -34,6 +37,7 @@ codes! {
         meaning: "Reversing a change needs the service that made it. Settings and directories \
             were reversed; a resource a service created was not.",
         remedy: "Reverse it from the service itself, once that service is reachable.",
+        household: fault,
     }
     /// Raised when an answer is not meaningful on the platform setup is running on.
     DOES_NOT_APPLY = "SETUP-5" {
@@ -43,6 +47,7 @@ codes! {
         meaning: "An answer is not meaningful on the platform setup is running on. Nothing has \
             been applied.",
         remedy: "Answer with a choice this platform offers.",
+        household: fault,
     }
     /// Raised when setup is asked to gather answers for a wizard already past it.
     ALREADY_UNDERWAY = "SETUP-6" {
@@ -52,6 +57,7 @@ codes! {
         meaning: "Setup is past the point of gathering answers — it has been reviewed, is \
             applying, or is finished. Nothing has been changed.",
         remedy: "Resume or recover the setup in progress, or reconfigure a finished one.",
+        household: fault,
     }
     /// Raised when setup is answered on a machine that is already set up.
     ALREADY_SET_UP = "SETUP-7" {
@@ -63,6 +69,7 @@ codes! {
             has been changed.",
         remedy: "Change the setting you came to change, with lemonfiber config set <key> \
             <value>.",
+        household: fault,
     }
     /// Raised when a recovery is asked for and no apply stopped part-way.
     NOTHING_TO_RECOVER = "SETUP-8" {
@@ -74,6 +81,7 @@ codes! {
             choose about. Nothing has been changed.",
         remedy: "Ask where setup stands, with lemonfiber setup --status, before choosing a way \
             out of it.",
+        household: fault,
     }
     /// Raised when a reversal would write over a setting the operator has since chosen.
     NOT_PUT_BACK = "SETUP-9" {
@@ -85,6 +93,7 @@ codes! {
             would take away a decision you made. Everything else was put back, and the message \
             names the ones it left alone.",
         remedy: "Set them back by hand if the earlier value is the one you want.",
+        household: fault,
     }
     /// Raised when a reversal meets a setting whose sealed record will not open.
     NOT_OPENED = "SETUP-10" {
@@ -97,6 +106,7 @@ codes! {
             is not something to put back, so they were left exactly as they are and the \
             message names them. Everything else was put back.",
         remedy: "Set them yourself, to the value you want.",
+        household: fault,
     }
     /// Raised when a directory a reversal would remove still holds something else's files.
     STILL_HOLDING = "SETUP-11" {
@@ -108,6 +118,7 @@ codes! {
             because taking one that holds files would take those files with it. Everything else \
             was put back, and the message names the directories.",
         remedy: "Look at what is inside, then remove them by hand if nothing there is wanted.",
+        household: fault,
     }
     /// Raised when a region a reversal would take out of a stack file cannot be.
     NOT_WITHDRAWN = "SETUP-12" {
@@ -118,6 +129,7 @@ codes! {
             out. Everything before it was put back; the region is still in the file, between the \
             markers that name whose it is.",
         remedy: "Delete the region by hand, markers included, or run the reversal again.",
+        household: fault,
     }
     /// Raised when a file a reversal would write back to what it held cannot be.
     NOT_REWOUND = "SETUP-13" {
@@ -128,6 +140,7 @@ codes! {
             Everything before it was put back; this file still holds what lemonfiber wrote, and \
             the message names it.",
         remedy: "Run the reversal again once the file can be written.",
+        household: fault,
     }
     /// Raised when a reversal meets a secret it cannot put back, which must be replaced at
     /// the terminal.
@@ -141,6 +154,7 @@ codes! {
             value is not kept. They were left exactly as they are, and the message names them. \
             Everything else was put back.",
         remedy: "Replace each secret the message names at the terminal.",
+        household: fault,
     }
     /// Raised when a service's state lemonfiber moved could not be moved back.
     NOT_MOVED_BACK = "SETUP-15" {
@@ -151,6 +165,7 @@ codes! {
             Everything before it was put back; this one is still where lemonfiber moved it, \
             and the message names both places.",
         remedy: "Run the reversal again once both places can be written.",
+        household: fault,
     }
     /// Raised when a VPN answer leaves the egress guard without what it needs to start.
     GUARD_UNANSWERED = "SETUP-16" {
@@ -161,5 +176,6 @@ codes! {
             start, or gives one it does not ask for under the answers given. Nothing was \
             recorded, and the VPN step is asked again.",
         remedy: "Answer the VPN step again with every setting and secret it names.",
+        household: fault,
     }
 }

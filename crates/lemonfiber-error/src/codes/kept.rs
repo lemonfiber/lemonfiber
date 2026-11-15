@@ -10,5 +10,6 @@ codes! {
             at the usual place would risk naming a directory that is somebody else's.",
         remedy: "Run this as the account that installed lemonfiber, on a machine with a home \
             directory it can read.",
+        household: fault,
     }
 }

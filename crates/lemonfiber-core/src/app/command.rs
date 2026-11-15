@@ -45,7 +45,7 @@ pub use doorway::Doorway;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
-pub use household::{Answer, Arranged, Asker, Chosen, Decision, Shelf, Whom};
+pub use household::{Answer, Arranged, Chosen, Decision, Shelf, Whom};
 pub use inviting::Inviting;
 pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;

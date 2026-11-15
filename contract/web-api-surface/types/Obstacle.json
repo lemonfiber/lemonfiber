@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "code": {
+      "type": [
+        "ref:Code"
+      ],
+      "required": true
+    },
+    "remedy": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "said": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

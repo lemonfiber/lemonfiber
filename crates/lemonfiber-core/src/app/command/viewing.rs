@@ -1,6 +1,6 @@
 //! What a member asks for when they sit down to watch.
 
-use super::{Asker, Whom};
+use super::Whom;
 use crate::model::WITHHELD;
 use crate::ports::service::HowFar;
 
@@ -15,8 +15,6 @@ pub enum Viewing {
         member: Whom,
         /// The title, by the identifier the shelf lists it under.
         id: String,
-        /// Who asked.
-        asker: Asker,
     },
     /// What a member was part-way through, most recent first.
     PartWay {
@@ -24,8 +22,6 @@ pub enum Viewing {
         member: Whom,
         /// How many to answer with.
         most: u32,
-        /// Who asked.
-        asker: Asker,
     },
     /// Open a session on a member's own account for one of their devices.
     Grant {
@@ -54,8 +50,6 @@ pub enum Viewing {
         member: String,
         /// What is asked of the live stream.
         live: Live,
-        /// Who asked.
-        asker: Asker,
     },
     /// Where one title plays from in a member's browser, on a pass holding a session on
     /// their own account.
@@ -66,8 +60,6 @@ pub enum Viewing {
         id: String,
         /// What the pass is made from.
         from: PlayFrom,
-        /// Who asked.
-        asker: Asker,
     },
 }
 

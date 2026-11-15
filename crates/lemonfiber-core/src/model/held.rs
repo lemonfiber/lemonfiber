@@ -56,9 +56,9 @@ pub struct Located {
     /// The certificate the door presents, which a client pins, beside any location.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub door: Option<Pinned>,
-    /// Why no location is stated, where none is.
+    /// Why no location is stated, where none is, by the code that names it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
+    pub unlocated: Option<crate::error::household::Obstacle>,
 }
 
 /// The certificate a guarded door presents, as a client pins it.
@@ -83,12 +83,12 @@ pub struct HeldReport {
     /// would tell a household they own nothing on the day the media server rebooted.
     /// Anything that could not be read is said in `findings` and this goes false.
     pub available: bool,
-    /// What is worth saying about this shelf, in the words its reader would use.
+    /// What stood in the way of reading this shelf, each by the code that names it.
     ///
     /// Always written, empty or not. A field the schema requires and the document
     /// sometimes omits is one a reader has to guess about, and an empty list already
-    /// says the thing it would say: there is nothing to report about this shelf.
-    pub findings: Vec<String>,
+    /// says the thing it would say: nothing stood in the way.
+    pub findings: Vec<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     ///
     /// Said in a field of its own so that a rehearsal is never told from the real run by

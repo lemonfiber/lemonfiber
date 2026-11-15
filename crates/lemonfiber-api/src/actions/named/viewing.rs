@@ -6,7 +6,7 @@
 //! names; the operator names the member, and naming nobody is refused by the core,
 //! which knows who is in the household.
 
-use lemonfiber_core::app::{Asker, Command, Live, PlayFrom, Viewing};
+use lemonfiber_core::app::{Command, Live, PlayFrom, Viewing};
 use lemonfiber_core::ports::service::HowFar;
 
 use crate::actions::{Arguments, Handed, Refused};
@@ -67,7 +67,6 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
                 (None, Some(stream), true) => Live::Stop(stream),
                 (None, None, _) => return Err(missing("id")),
             },
-            asker: Asker::Operator,
         },
         "play" => Viewing::Play {
             member,
@@ -77,7 +76,6 @@ pub(super) fn asked_for(action: &str, given: Arguments) -> Result<Command, Refus
                 (None, Some(Handed(pass))) => PlayFrom::Pass(pass),
                 (None, None) => return Err(missing("device")),
             },
-            asker: Asker::Operator,
         },
         _ => Viewing::Watched {
             member,

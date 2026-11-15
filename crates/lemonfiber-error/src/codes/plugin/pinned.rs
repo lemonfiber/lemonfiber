@@ -12,6 +12,7 @@ codes! {
             written.",
         remedy: "Install the plugin without that service's replaces, or use the first-party \
             plugin this build names for that part.",
+        household: fault,
     }
     /// Raised when a plugin carrying the id of a part this build pins comes from anywhere
     /// but that pin.
@@ -24,5 +25,6 @@ codes! {
             name. Nothing was written.",
         remedy: "Install it by its id alone, from the tree this build carries, or give a plugin \
             of your own an id of its own.",
+        household: fault,
     }
 }

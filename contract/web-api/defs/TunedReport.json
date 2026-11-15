@@ -54,9 +54,13 @@
     },
     "unlocated": {
       "description": "Why nothing is located, where nothing is.",
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "$ref": "Obstacle.json"
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   },

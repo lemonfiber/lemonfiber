@@ -10,6 +10,7 @@ codes! {
             reach outside your machine.",
         remedy: "Stop torrent transfers now, then confirm the client shares the VPN's network — \
             network_mode: service:<gateway> in the stack.",
+        household: fault,
     }
     /// Raised when the VPN container that should carry traffic is not running.
     VPN_CONTAINER_DOWN = "VPN-2" {
@@ -21,6 +22,7 @@ codes! {
             leaking while it is down.",
         remedy: "Start the form that includes it, then read its logs: lemonfiber logs \
             <gateway>.",
+        household: fault,
     }
     /// Raised when the client cannot reach the internet through the tunnel.
     CLIENT_ISOLATED = "VPN-3" {
@@ -30,6 +32,7 @@ codes! {
         meaning: "The tunnel is up and the client could not reach the internet through it. \
             Nothing is leaking, and torrents will not transfer until it can.",
         remedy: "Confirm the client uses the VPN container's network.",
+        household: fault,
     }
     /// Raised when port forwarding was asked for but the provider granted no port.
     NO_FORWARDED_PORT = "VPN-4" {
@@ -42,6 +45,7 @@ codes! {
         remedy: "Regenerate the VPN credentials with port forwarding enabled. On ProtonVPN that \
             means enabling NAT-PMP and picking a P2P server when the WireGuard configuration is \
             generated.",
+        household: fault,
     }
     /// The code a stack whose traffic survives its tunnel earns.
     KILLSWITCH_LEAKS = "VPN-5" {
@@ -53,6 +57,7 @@ codes! {
             VPN that never fails is not a thing.",
         remedy: "Enable the egress guard's own killswitch, so it stops every packet while \
             its tunnel is down.",
+        household: fault,
     }
     /// The code a stack whose tunnel could not be put back earns.
     TUNNEL_NOT_RESTORED = "VPN-6" {
@@ -63,6 +68,7 @@ codes! {
             The stack is left without one, and whether traffic is flowing outside it is exactly \
             what is now unknown.",
         remedy: "Restart the tunnel container now.",
+        household: fault,
     }
     /// Raised when the client is listening somewhere other than the forwarded port.
     PORT_MISMATCH = "VPN-7" {
@@ -73,6 +79,7 @@ codes! {
             another. Downloads still arrive, so nothing looks wrong — but no peer can reach the \
             client, so it cannot seed and connects to fewer sources.",
         remedy: "Run lemonfiber up to move the client onto the forwarded port.",
+        household: fault,
     }
     /// Raised when torrents are configured with nothing containing them.
     NO_TUNNEL = "VPN-8" {
@@ -84,5 +91,6 @@ codes! {
             is on, and to every peer in the swarm.",
         remedy: "Put the torrent client behind a VPN container in the stack. Where this is \
             deliberate, answer it once with lemonfiber doctor --accept vpn.unprotected.",
+        household: fault,
     }
 }

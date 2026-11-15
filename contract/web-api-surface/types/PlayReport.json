@@ -32,7 +32,7 @@
     },
     "unlocated": {
       "type": [
-        "null|string"
+        "anyOf(null,ref:Obstacle)"
       ],
       "required": false
     }

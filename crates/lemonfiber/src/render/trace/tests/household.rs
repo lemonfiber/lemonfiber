@@ -70,7 +70,11 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             asking: None,
         }],
         available: true,
-        findings: vec!["a library could not be read".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "a library could not be read",
+        )],
+        noted: vec!["the media server holds no account under sam".to_owned()],
         filtering: None,
         policy: None,
         allows: None,
@@ -88,6 +92,10 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
     assert!(text.contains("something   the request service reports a state"));
     assert!(text.contains("1 member(s), 3 request(s)."), "{text}");
     assert!(text.contains("! a library could not be read"));
+    assert!(
+        text.contains("! the media server holds no account under sam"),
+        "{text}"
+    );
 }
 
 /// What a household may ask for reads under the list, with its limit beside it.
@@ -210,6 +218,7 @@ fn a_household(
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy,
         allows: allows.map(str::to_owned),
@@ -268,6 +277,7 @@ fn the_answer_for_whoever_asked_is_drawn_under_their_own_list() {
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -306,6 +316,7 @@ fn a_whole_household_is_handed_nothing_to_pass_on() {
         members,
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -343,6 +354,7 @@ fn an_invitation_nobody_took_up_says_so_rather_than_never_signed_in() {
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -396,6 +408,7 @@ fn a_limit_reads_in_the_words_it_was_chosen_in() {
             }],
             available: true,
             findings: Vec::new(),
+            noted: Vec::new(),
             filtering: None,
             policy: None,
             allows: None,
@@ -430,6 +443,7 @@ fn a_limit_that_is_no_step_offered_still_says_what_it_is() {
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -463,6 +477,7 @@ fn the_account_that_runs_the_server_says_so() {
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -500,6 +515,7 @@ fn an_account_switched_off_says_so_and_does_not_invent_a_last_visit() {
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -526,6 +542,7 @@ fn an_empty_household_says_whether_it_was_read() {
         members: Vec::new(),
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -540,7 +557,11 @@ fn an_empty_household_says_whether_it_was_read() {
         rehearsed: false,
         members: Vec::new(),
         available: false,
-        findings: vec!["could not be read".to_owned()],
+        findings: vec![lemonfiber_core::error::household::Obstacle::new(
+            lemonfiber_core::error::codes::play::SERVER_SILENT,
+            "could not be read",
+        )],
+        noted: Vec::new(),
         filtering: None,
         policy: None,
         allows: None,
@@ -598,6 +619,7 @@ fn held(
         }],
         available: true,
         findings: Vec::new(),
+        noted: Vec::new(),
         filtering: Some("a content filter, not a security boundary".to_owned()),
         policy: None,
         allows: None,

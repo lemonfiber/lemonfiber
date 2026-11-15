@@ -1,4 +1,3 @@
-use super::super::notices::tests::NOT_FOR_THE_HOUSEHOLD;
 use super::to_hand_over;
 use crate::asking::{Estimate, Policy, Refused, Standing};
 use crate::household::State;
@@ -118,9 +117,11 @@ fn nothing_handed_over_is_in_anything_but_the_households_own_words() {
         "there was too little said to hold to anything: {said:?}"
     );
     for line in &said {
-        for word in NOT_FOR_THE_HOUSEHOLD {
-            assert!(!line.contains(word), "a member was handed {word:?}: {line}");
-        }
+        assert_eq!(
+            lemonfiber_fixtures::unhoused::unhoused(line),
+            None,
+            "a member was handed something not in the household's words: {line}"
+        );
     }
 }
 
@@ -389,6 +390,31 @@ fn every_policy_has_words_to_be_told_in() {
             said.first()
                 .is_some_and(|line| line.contains(policy.household())),
             "a member was told the policy in the operator's words: {said:?}"
+        );
+    }
+}
+
+/// Every policy a member is told is in the household's words.
+#[test]
+fn every_policy_a_member_is_told_is_in_the_households_words() {
+    for policy in Policy::ALL {
+        assert_eq!(
+            lemonfiber_fixtures::unhoused::unhoused(policy.household()),
+            None,
+            "{policy:?}"
+        );
+    }
+}
+
+/// Every limit a member is told reads in the household's words, whatever its length.
+#[test]
+fn every_limit_a_member_is_told_is_in_the_households_words() {
+    for (requests, days) in [(1, 1), (5, 7), (12, 30), (3, 14)] {
+        let said = crate::asking::limit(crate::ports::service::Quota { requests, days });
+        assert_eq!(
+            lemonfiber_fixtures::unhoused::unhoused(&said),
+            None,
+            "{said}"
         );
     }
 }

@@ -13,6 +13,7 @@
 mod allowance;
 pub(crate) mod as_owner;
 mod defaults;
+mod grouping;
 mod handing_over;
 mod holding;
 mod kept;
@@ -24,15 +25,17 @@ use std::collections::BTreeMap;
 
 use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
-use crate::collected::Reference;
 pub(crate) use allowance::{allowance_of, OwnAllowance};
-use naming::{library_titles, named_access, named_by_the_server, titled, unheld_titles, Naming};
+use grouping::{grouped, names};
+use naming::{library_titles, named_access, named_by_the_server, unheld_titles, Naming};
 
 use crate::asking::Policy;
+use crate::error::codes::play::{NOTHING_TO_PLAY_FROM, SERVER_SILENT};
+use crate::error::codes::quota::UNREACHABLE;
+use crate::error::codes::wish::NOT_SET_UP;
+use crate::error::household::Obstacle;
 use crate::error::{Diagnose, Problem};
-use crate::household::State;
-use crate::model::{HouseholdMember, HouseholdReport, MemberRequest, Restriction};
-use crate::ports::media::{Kind, TitleKind};
+use crate::model::{HouseholdMember, HouseholdReport, Restriction};
 use crate::ports::service::{HouseholdRequest, Member};
 
 /// Read the household's requests, grouped by the member who made each one.
@@ -79,20 +82,23 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     // members: somebody with an account who has never asked for anything does not
     // appear at all, and neither does an invitation nobody has taken up.
     let Some(server) = identity(ctx, &manifest).await else {
-        return Ok(unavailable(
+        return Ok(unavailable(Obstacle::new(
+            NOTHING_TO_PLAY_FROM,
             "there is no media server to ask who is in the household, or it cannot be \
              asked over its contracts — so who is here cannot be read",
-        ));
+        )));
     };
 
     let Ok(accounts) = server.household().await else {
-        return Ok(unavailable(
+        return Ok(unavailable(Obstacle::new(
+            SERVER_SILENT,
             "the media server would not say who holds an account, so who is in the \
              household could not be read — reported as unavailable, not as nobody",
-        ));
+        )));
     };
 
     let mut findings = Vec::new();
+    let mut noted = Vec::new();
     let (libraries, certificates) = named_by_the_server(server.as_ref(), &mut findings).await;
 
     // What is said about invitations names other people's accounts, so it is said only
@@ -104,7 +110,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
         removed,
     } = standing::invitations(ctx, server.as_ref(), &accounts, &mut about_invitations).await;
     if member.is_none() {
-        findings.append(&mut about_invitations);
+        noted.append(&mut about_invitations);
     }
 
     // A request service that will not answer costs the requests, not the household.
@@ -128,11 +134,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     let kept = as_owner::kept(ctx);
     let (requests, asked) = asked_of(reached.as_ref(), &accounts, &kept, &mut findings).await;
     if asked.household.is_none() {
-        findings.push(
-            "what the household may ask for could not be read, so no policy and no \
-             limit are shown — reported as unread rather than as unlimited"
-                .to_owned(),
-        );
+        findings.push(Obstacle::new(UNREACHABLE, UNREAD_POLICY));
     }
 
     // One library read per service names every request that has been handed over, rather
@@ -140,11 +142,11 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     let (titles, named) = library_titles(ctx, &manifest).await;
     let unheld = unheld_titles(reached.as_ref(), server.as_ref(), &requests, &titles).await;
     if !named {
-        findings.push(
+        findings.push(Obstacle::new(
+            SERVER_SILENT,
             "a library could not be read, so some requests are named by what they are \
-             rather than by their title"
-                .to_owned(),
-        );
+             rather than by their title",
+        ));
     }
 
     // The disk is asked once for the whole household, and asked at all because a member
@@ -191,6 +193,7 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
     );
     kept::listed(ctx, &mut report, &members_by_id, &reasons).await;
     report.findings.append(&mut findings);
+    report.noted.append(&mut noted);
     Ok(report)
 }
 
@@ -200,7 +203,7 @@ async fn asked_of(
     reached: Option<&crate::app::targets::HouseholdAccess>,
     accounts: &[Member],
     kept: &as_owner::Kept,
-    findings: &mut Vec<String>,
+    findings: &mut Vec<Obstacle>,
 ) -> (Vec<HouseholdRequest>, allowance::Asked) {
     let Some(access) = reached else {
         return (
@@ -214,11 +217,11 @@ async fn asked_of(
     let requests = if let Ok(requests) = access.requests.requests().await {
         kept.attributed(requests)
     } else {
-        findings.push(
+        findings.push(Obstacle::new(
+            UNREACHABLE,
             "the request service's own record could not be read, so what the household \
-             has asked for is not shown"
-                .to_owned(),
-        );
+             has asked for is not shown",
+        ));
         Vec::new()
     };
     (
@@ -245,7 +248,7 @@ async fn shown_to_the_household(
     access: &crate::app::targets::HouseholdAccess,
     asked: &allowance::Asked,
     no_room: bool,
-) -> Vec<String> {
+) -> Vec<Obstacle> {
     let mut findings = Vec::new();
     if let Some(finding) = notices::put_where_they_ask(
         access.requests.as_ref(),
@@ -277,118 +280,24 @@ async fn shown_to_the_household(
 pub(crate) async fn reaching(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
-) -> Result<crate::app::targets::HouseholdAccess, String> {
+) -> Result<crate::app::targets::HouseholdAccess, Obstacle> {
     let Some(access) = household_requests(ctx, manifest).await else {
-        return Err(
+        return Err(Obstacle::new(
+            NOT_SET_UP,
             "there is no request service to ask, or it cannot be asked yet, so what the \
-             household has asked for is not shown"
-                .to_owned(),
-        );
+             household has asked for is not shown",
+        ));
     };
 
     if access.requests.answers().await.is_err() {
-        return Err(
+        return Err(Obstacle::new(
+            UNREACHABLE,
             "the request service would not accept lemonfiber's key, so what it has been \
-             asked for is not shown"
-                .to_owned(),
-        );
+             asked for is not shown",
+        ));
     }
 
     Ok(access)
-}
-
-/// Whether this account is the one the caller named.
-///
-/// Two ways of naming one person, because two callers name them differently. A person
-/// types a name and means whoever they were thinking of, so it is looked for inside one
-/// — the same courtesy the trace extends to a title. A session carries the id the media
-/// server assigned and means that account and no other, so it is compared whole.
-///
-/// **An id names one account and nothing else.** Where `named` is an account's id it is
-/// compared whole against every account and never looked for inside a name: this
-/// narrowing decides whose requests somebody is shown, and the one reading it must never
-/// produce is a member handed another member's row because that row's name happened to
-/// contain their id.
-///
-/// `named` arrives lower-cased, because the caller lower-cases it once rather than this
-/// doing it per account.
-fn names(account: &Member, named: &str, by_id: bool) -> bool {
-    if by_id {
-        return account.id.to_lowercase() == named;
-    }
-    account.name.to_lowercase().contains(named)
-}
-
-/// The id of the account a request is filed under, lower-cased, or the name it was
-/// asked under where no account answers to it.
-///
-/// By the media server's id wherever the record carries one, because that is the one
-/// thing about the requester they cannot change: the name the request service shows is
-/// theirs to set, and joined on it a member could rename themselves after somebody else
-/// and have their requests, and their count, filed under that person. Only a record
-/// carrying no id at all is filed by name, which is all it has.
-///
-/// `ids` is every account's lower-cased name against its lower-cased id.
-fn whose(request: &HouseholdRequest, ids: &BTreeMap<String, String>) -> String {
-    if let Some(id) = &request.member_id {
-        return id.to_lowercase();
-    }
-    let named = request.member.to_lowercase();
-    ids.get(&named).cloned().unwrap_or(named)
-}
-
-/// The requests, gathered under whoever made each one.
-///
-/// Keyed by the lower-cased id of the account a request is filed under, or by the name it
-/// was asked under where no account answers to it — see [`whose`].
-fn grouped(
-    requests: Vec<HouseholdRequest>,
-    accounts: &[Member],
-    naming: &Naming<'_>,
-) -> BTreeMap<String, Theirs> {
-    // Lower-cased either way: the media server treats two names differing only in case
-    // as the same person, so a join on the exact string would file a member's own
-    // requests under nobody.
-    let ids: BTreeMap<String, String> = accounts
-        .iter()
-        .map(|account| (account.name.to_lowercase(), account.id.to_lowercase()))
-        .collect();
-    let mut by_whom: BTreeMap<String, Theirs> = BTreeMap::new();
-    for request in requests {
-        let state = State::of(request.request_status, request.media_status);
-        let made = request.made;
-        let theirs = by_whom.entry(whose(&request, &ids)).or_default();
-        if theirs.shown_as.is_empty() {
-            theirs.shown_as = request.member.to_lowercase();
-        }
-        // Kept beside the requests rather than read back off them: what a period counts
-        // is when something was asked for, and a request already fetched is still inside
-        // the window that counted it.
-        //
-        // A request that was turned down is not, which is the service's own arithmetic
-        // and not a choice made here: it excludes a declined one from the count, so
-        // counting its date would name a day the window is not waiting on.
-        if let Some(made) = made.filter(|_| state != Some(State::Declined)) {
-            theirs.made.push(made);
-        }
-        let named = titled(&request, naming.titles).or_else(|| naming.unheld.get(&request.id));
-        theirs.requests.push(MemberRequest {
-            id: request.id.to_string(),
-            asked: request.made,
-            title: named.map(|named| named.title.clone()),
-            year: named.and_then(|named| named.year),
-            arrived: request.arrived,
-            shelf_id: request.shelf_id.clone(),
-            media: request.kind.map(Kind::noun).map(str::to_owned),
-            kind: request.kind.map(TitleKind::from),
-            unit: None,
-            state,
-            waiting_days: allowance::waiting(state, made, naming.now),
-            estimate: allowance::estimated(request.kind, naming.quality),
-            refused: naming.reasons.of(Reference::Filed(request.id)).cloned(),
-        });
-    }
-    by_whom
 }
 
 /// The household, member by member, with what each asked for joined onto them.
@@ -456,9 +365,9 @@ fn assemble(
     let mut unclaimed: Vec<String> = by_whom.into_values().map(|left| left.shown_as).collect();
     unclaimed.sort();
     unclaimed.dedup();
-    let mut findings = Vec::new();
+    let mut noted = Vec::new();
     if member.is_none() && !unclaimed.is_empty() {
-        findings.push(format!(
+        noted.push(format!(
             "the media server holds no account under {}, so what they asked for is not \
              listed under anybody",
             unclaimed.join(", ")
@@ -470,7 +379,7 @@ fn assemble(
     // has been given half a limit, and half a limit looks like a whole one.
     for held in &members {
         if held.access.restriction.disagrees() {
-            findings.push(format!(
+            noted.push(format!(
                 "{} is held to what they may watch and not to what they may ask for, so \
                  what they cannot watch they can still fetch",
                 held.name
@@ -486,7 +395,7 @@ fn assemble(
         .any(|held| held.access.restriction != Restriction::Unrestricted)
         .then(|| crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned());
 
-    findings.extend(allowance::worth_saying(
+    noted.extend(allowance::worth_saying(
         &members,
         naming.expiring,
         naming.hosted,
@@ -502,36 +411,21 @@ fn assemble(
             .and_then(|held| held.quota)
             .map(crate::asking::limit),
         members,
-        findings,
+        findings: Vec::new(),
+        noted,
         available: true,
         filtering,
     }
 }
 
-/// One member's requests, and when each was asked for.
-///
-/// The dates are gathered beside the requests rather than carried on them, because they
-/// answer a different question: a report says how long something has been *waiting*,
-/// and a period counts when it was *asked for* — which includes everything already
-/// fetched.
-#[derive(Default)]
-struct Theirs {
-    /// What they asked for, as the report carries it.
-    requests: Vec<MemberRequest>,
-    /// When each was asked for, as the request service says.
-    made: Vec<crate::instant::Instant>,
-    /// The name the request service showed them by, lower-cased, for saying who asked
-    /// where nobody in the household did.
-    shown_as: String,
-}
-
 /// The household view where the requests could not be read at all — said plainly, so an
 /// empty list is never mistaken for a household that has asked for nothing.
-fn unavailable(reason: &str) -> HouseholdReport {
+fn unavailable(reason: Obstacle) -> HouseholdReport {
     HouseholdReport {
         rehearsed: false,
         members: Vec::new(),
-        findings: vec![reason.to_owned()],
+        findings: vec![reason],
+        noted: Vec::new(),
         available: false,
         // Nothing was read, so there is no policy to report and no limit to state. A
         // household shown as trusting everybody because nobody could be asked is the
@@ -544,6 +438,11 @@ fn unavailable(reason: &str) -> HouseholdReport {
         filtering: None,
     }
 }
+
+/// Said where what the household may ask for could not be read.
+pub(super) const UNREAD_POLICY: &str = "what the household may ask for could not be read, so no \
+                                        policy and no limit are shown — reported as unread \
+                                        rather than as unlimited";
 
 #[cfg(test)]
 mod tests;

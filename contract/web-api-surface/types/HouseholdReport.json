@@ -20,13 +20,19 @@
     },
     "findings": {
       "type": [
-        "array[string]"
+        "array[ref:Obstacle]"
       ],
       "required": true
     },
     "members": {
       "type": [
         "array[ref:HouseholdMember]"
+      ],
+      "required": true
+    },
+    "noted": {
+      "type": [
+        "array[string]"
       ],
       "required": true
     },

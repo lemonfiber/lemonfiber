@@ -8,6 +8,7 @@ codes! {
             certificate a phone pins and the name it knows this stack by are kept beside the \
             configuration, and this machine would not say where its configuration directory is.",
         remedy: "Run it as a user with a home directory, so there is a configuration directory.",
+        household: fault,
     }
     /// Raised when the web surface has not been served encrypted on the network.
     NOT_SERVED = "PAIR-2" {
@@ -20,6 +21,7 @@ codes! {
             port the surface was last served on that way, and it has not been.",
         remedy: "Serve the web interface encrypted and on your network, on a port that stays the \
             same: lemonfiber ui --lan --tls --port <port>.",
+        household: fault,
     }
     /// Raised when the certificate the surface presents cannot be read or made.
     NO_CERTIFICATE = "PAIR-3" {
@@ -31,6 +33,7 @@ codes! {
             made again on its own — a new one is one every paired phone refuses.",
         remedy: "Replace it with lemonfiber companion certificate --confirm, knowing every \
             paired phone will need pairing again.",
+        household: fault,
     }
     /// Raised when this machine has no address a phone could reach it at.
     NO_ADDRESS = "PAIR-4" {
@@ -42,6 +45,7 @@ codes! {
             has none written down.",
         remedy: "Record the address your household reaches this machine at, with lemonfiber \
             config set HOUSEHOLD_HOST <address>.",
+        household: fault,
     }
     /// Raised when the stack's identifier cannot be read or made.
     UNNAMED = "PAIR-5" {
@@ -52,5 +56,6 @@ codes! {
             stack by an identifier it keeps whatever else changes; the message says what went \
             wrong.",
         remedy: "Check that the configuration directory can be written, and try again.",
+        household: fault,
     }
 }

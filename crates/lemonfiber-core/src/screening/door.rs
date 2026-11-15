@@ -10,8 +10,12 @@ use std::path::{Path, PathBuf};
 use lemonfiber_contract::capabilities::proxy::front;
 use lemonfiber_contract::capabilities::stream::guard;
 
-use crate::app::{Asker, Ctx};
+use crate::app::Ctx;
 use crate::certificate::{self, Kept, Unkept};
+use crate::error::codes::play::{
+    DOOR_UNREADY, MISNAMED, NO_BROWSER_ROUTE, NO_HOUSEHOLD_ADDRESS, UNDECLARED,
+};
+use crate::error::household::Obstacle;
 use crate::model::{Episode, Held, Located, PartWay, Pinned, Season, Title};
 use crate::ports::random::Random;
 use crate::ports::service::{Declaring, Item, ItemDetail, ItemProgress, Locations, Medium};
@@ -67,11 +71,9 @@ pub(crate) enum Door {
         fingerprint: String,
         /// Where the media server behind the door serves each item, as it declared it.
         locations: Locations,
-        /// Who asked, which decides the words an item not located says why in.
-        asker: Asker,
     },
     /// Why nothing can be located at the door.
-    Unknown(String),
+    Unknown(Obstacle),
 }
 
 /// The directory the door's certificate is kept in, beneath `project`.
@@ -111,21 +113,12 @@ pub(crate) fn made_before_start(ctx: &Ctx, manifest: &lemonfiber_manifest::Manif
     }
 }
 
-/// The door as this machine stands now, in front of `server`, saying why nothing can
-/// be located there in the words `asker` is told.
-pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
-    match seen(ctx, server, asker).await {
-        Door::Unknown(why) => Door::Unknown(told(asker, why)),
-        door @ Door::At { .. } => door,
-    }
-}
-
 /// The door as this machine stands now, in front of `server`.
-async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
+pub(crate) async fn standing(ctx: &Ctx, server: &dyn Declaring) -> Door {
     let project =
         crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
     let Some(project) = project else {
-        return Door::Unknown(NO_STACK.to_owned());
+        return Door::Unknown(Obstacle::new(DOOR_UNREADY, NO_STACK));
     };
     let at = crate::app::invite::household_address(ctx, GUARDED).await;
     let (base, fingerprint) = match at_the_door(
@@ -140,7 +133,6 @@ async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
             base,
             fingerprint,
             locations,
-            asker,
         },
         Err(why) => Door::Unknown(why),
     }
@@ -151,40 +143,33 @@ async fn seen(ctx: &Ctx, server: &dyn Declaring, asker: Asker) -> Door {
 fn at_the_door(
     url: Option<String>,
     kept: Result<Option<Kept>, Unkept>,
-) -> Result<(String, String), String> {
+) -> Result<(String, String), Obstacle> {
     let fingerprint = match kept {
         Ok(Some(kept)) => kept.fingerprint,
-        Ok(None) => return Err(NOT_MADE.to_owned()),
-        Err(why) => return Err(format!("{UNREADABLE} {why}")),
+        Ok(None) => return Err(Obstacle::new(DOOR_UNREADY, NOT_MADE)),
+        Err(why) => return Err(Obstacle::new(DOOR_UNREADY, format!("{UNREADABLE} {why}"))),
     };
     url.map(|url| (url.replacen("http://", "https://", 1), fingerprint))
-        .ok_or_else(|| NO_ADDRESS.to_owned())
+        .ok_or((NO_HOUSEHOLD_ADDRESS, NO_ADDRESS))
+        .map_err(Obstacle::from)
 }
 
 /// Where `server` serves each item, from its declaration once that is checked.
-async fn served_at(server: &dyn Declaring) -> Result<Locations, String> {
+async fn served_at(server: &dyn Declaring) -> Result<Locations, Obstacle> {
     declared(server).await.map(|declared| declared.locations)
 }
 
 /// What `server` declared, once that is checked, or why it is not held to it.
 pub(crate) async fn declared(
     server: &dyn Declaring,
-) -> Result<crate::ports::service::Declared, String> {
-    let declared = server.declared().await.map_err(|_| UNDECLARED.to_owned())?;
+) -> Result<crate::ports::service::Declared, Obstacle> {
+    let declared = server
+        .declared()
+        .await
+        .map_err(|_| Obstacle::new(UNDECLARED, NOT_DECLARED))?;
     declared
         .checked()
-        .map_err(|why| format!("{REFUSED_DECLARATION} {why}"))
-}
-
-/// `why` nothing is located, in the words `asker` is told: what to fix for the operator,
-/// and for a member only that it does not play here yet, which nothing they can do
-/// changes.
-#[must_use]
-pub(crate) fn told(asker: Asker, why: String) -> String {
-    match asker {
-        Asker::Operator => why,
-        Asker::Member => UNPLAYABLE.to_owned(),
-    }
+        .map_err(|why| Obstacle::new(UNDECLARED, format!("{REFUSED_DECLARATION} {why}")))
 }
 
 /// A fresh id for one play of an item, which a stream or playlist location names where
@@ -208,22 +193,19 @@ pub(crate) fn passed(at: &str, pass: &str) -> String {
     format!("{at}{joiner}{}={pass}", lemonfiber_sidecar::pass::PARAMETER)
 }
 
-/// What a member is told where nothing can be located for them.
-const UNPLAYABLE: &str = "This cannot be played here yet. Whoever looks after the household \
-                          can set it up.";
-
 /// The address the stack's front door serves the guard at for a browser, with a
 /// certificate a browser trusts: the label the guard's route is published under, in front
 /// of the domain the household's proxy serves; or why there is none.
-pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
+pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, Obstacle> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
-        .map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
-    let register = crate::app::plugins::read(ctx).map_err(|_| NO_BROWSER_ROUTE.to_owned())?;
+        .map_err(|_| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
+    let register =
+        crate::app::plugins::read(ctx).map_err(|_| Obstacle::new(NO_BROWSER_ROUTE, UNROUTED))?;
     let fillers = crate::app::targets::fillers_here(ctx, &manifest);
     if fillers.filling(front::CAPABILITY).is_none() {
-        return Err(NO_PROXY.to_owned());
+        return Err(Obstacle::new(NO_BROWSER_ROUTE, NO_PROXY));
     }
     let label = fillers
         .filling(guard::CAPABILITY)
@@ -235,10 +217,11 @@ pub(crate) fn for_a_browser(ctx: &Ctx) -> Result<String, String> {
                 .find(|placed| placed.service == guarding.id)
         })
         .and_then(|placed| placed.reached.as_ref()?.hostname().map(str::to_owned))
-        .ok_or_else(|| NO_BROWSER_ROUTE.to_owned())?;
+        .ok_or((NO_BROWSER_ROUTE, UNROUTED))?;
     crate::door::proxied(&label, ctx.settings.household_domain.as_deref())
         .map(|address| address.url)
-        .ok_or_else(|| NO_DOMAIN.to_owned())
+        .ok_or((NO_BROWSER_ROUTE, NO_DOMAIN))
+        .map_err(Obstacle::from)
 }
 
 /// Said where no proxy fronts the household's services, so no browser reaches the door.
@@ -247,7 +230,7 @@ const NO_PROXY: &str = "No proxy fronts the household's services, so a browser h
                         proxy, and every title plays in a browser.";
 
 /// Said where the guard publishes no route through the household's proxy.
-const NO_BROWSER_ROUTE: &str = "The guard in front of the media server publishes no route \
+const UNROUTED: &str = "The guard in front of the media server publishes no route \
                                 through the household's proxy, so a browser has nowhere to \
                                 play from. Install the door plugin, which publishes one.";
 
@@ -258,7 +241,7 @@ const NO_DOMAIN: &str = "No domain is configured for the household's proxy, so t
                          title plays in a browser.";
 
 /// Said where the media server would not say where it serves each item.
-const UNDECLARED: &str = "The media server would not say where it serves each title, so \
+const NOT_DECLARED: &str = "The media server would not say where it serves each title, so \
                           nothing can be located at the front door.";
 
 /// Said before the reason the media server's declaration was refused.
@@ -284,7 +267,7 @@ const NO_ADDRESS: &str = "This machine's household address is not known, so noth
                           it at, and every title says where it is served.";
 
 /// Why an item the media server named by something other than an item id is not located.
-const NOT_AN_ITEM: &str = "the media server named this item by something that is not an item id";
+const NOT_AN_ITEM: &str = "The media server named this item by something that is not an item id.";
 
 /// The same item, located at the door: its pictures where it has them, and where it
 /// streams from where it plays.
@@ -295,8 +278,8 @@ pub(crate) fn located(item: Item, door: &Door, random: &dyn Random) -> Held {
             unlocated: Some(why.clone()),
             ..Located::default()
         },
-        Door::At { asker, .. } if !super::an_item(&item.id) => Located {
-            unlocated: Some(told(*asker, NOT_AN_ITEM.to_owned())),
+        Door::At { .. } if !super::an_item(&item.id) => Located {
+            unlocated: Some(Obstacle::new(MISNAMED, NOT_AN_ITEM)),
             ..Located::default()
         },
         Door::At {

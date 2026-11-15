@@ -2,7 +2,7 @@
 //! does not hold.
 
 use super::{code, ctx_over, server, FILM, PHONE};
-use crate::app::{Asker, Live, PlayFrom, Viewing};
+use crate::app::{Live, PlayFrom, Viewing};
 use crate::screening::viewed;
 
 #[tokio::test]
@@ -14,13 +14,11 @@ async fn a_stranger_asking_for_live_tv_or_a_browser_play_is_refused_by_name() {
         Viewing::Tune {
             member: member(),
             live: Live::Open("kids".to_owned()),
-            asker: Asker::Member,
         },
         Viewing::Play {
             member: member(),
             id: FILM.to_owned(),
             from: PlayFrom::Device(PHONE.to_owned()),
-            asker: Asker::Member,
         },
     ] {
         let refused = viewed(&ctx, asked).await;

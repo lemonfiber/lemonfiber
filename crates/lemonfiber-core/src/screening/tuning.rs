@@ -13,15 +13,18 @@
 //! no location and no pass.
 
 use crate::app::targets::Media;
-use crate::app::{Asker, Ctx, Live};
-use crate::error::codes::play::{NOT_ON_THEIR_SHELF, NOT_THEIR_STREAM, NO_LIVE_TV};
+use crate::app::{Ctx, Live};
+use crate::error::codes::play::{
+    NOT_ON_THEIR_SHELF, NOT_THEIR_STREAM, NO_LIVE_TV, PASSLESS, UNDECLARED, UNPLACED,
+};
+use crate::error::household::Obstacle;
 use crate::error::Problem;
 use crate::model::{ChannelsReport, TunedReport};
 use crate::pass::{Key, Watching, LIFETIME};
 use crate::ports::service::{joined, Channel, Failure, Member};
 use crate::rating::Limits;
 
-use super::door::{self, told, Door};
+use super::door::{self, Door};
 use super::tuned::{self, Open};
 use super::{member, refused, server, unanswered};
 
@@ -51,19 +54,14 @@ pub(super) async fn channels(ctx: &Ctx, named: &str) -> Result<ChannelsReport, B
 /// A [`Problem`] where there is no server, the member is not in the household, the
 /// channel is not one they may watch now, the live stream named is not one opened for
 /// them, or the server does not answer.
-pub(super) async fn tuned(
-    ctx: &Ctx,
-    named: &str,
-    live: Live,
-    asker: Asker,
-) -> Result<TunedReport, Box<Problem>> {
+pub(super) async fn tuned(ctx: &Ctx, named: &str, live: Live) -> Result<TunedReport, Box<Problem>> {
     let server = server(ctx).await?;
     let member = member(server.identity.as_ref(), named).await?;
     match live {
-        Live::Open(channel) => opened(ctx, &server, &member, &channel, asker).await,
+        Live::Open(channel) => opened(ctx, &server, &member, &channel).await,
         Live::Renew(stream) => {
             let open = theirs(ctx, &member, &stream)?;
-            renewed(ctx, &server, &member, open, asker).await
+            renewed(ctx, &server, &member, open).await
         }
         Live::Stop(stream) => {
             let open = theirs(ctx, &member, &stream)?;
@@ -155,11 +153,10 @@ async fn opened(
     server: &Media,
     member: &Member,
     channel: &str,
-    asker: Asker,
 ) -> Result<TunedReport, Box<Problem>> {
     allowed(server, member, channel).await?;
     let unlocated = |why| unlocated(channel, member, why);
-    let ready = match ready(ctx, server, asker).await {
+    let ready = match ready(ctx, server).await {
         Ok(ready) => ready,
         Err(why) => return Ok(unlocated(why)),
     };
@@ -189,7 +186,7 @@ async fn opened(
         .collect();
     if streams.is_empty() {
         let _ = server.serve.untune(&open.closes_by).await;
-        return Ok(unlocated(told(asker, UNCOVERED.to_owned())));
+        return Ok(unlocated(Obstacle::new(UNPLACED, UNCOVERED)));
     }
     let open = Open { streams, ..open };
     let report = located(&ready, member, &open, issued);
@@ -204,10 +201,9 @@ async fn renewed(
     server: &Media,
     member: &Member,
     open: Open,
-    asker: Asker,
 ) -> Result<TunedReport, Box<Problem>> {
     allowed(server, member, &open.channel).await?;
-    let ready = match ready(ctx, server, asker).await {
+    let ready = match ready(ctx, server).await {
         Ok(ready) => ready,
         Err(why) => return Ok(unlocated(&open.channel, member, why)),
     };
@@ -224,7 +220,7 @@ async fn renewed(
         return Ok(unlocated(
             &open.channel,
             member,
-            told(asker, UNRENEWED.to_owned()),
+            Obstacle::new(PASSLESS, UNRENEWED),
         ));
     }
     tuned::renewed(ctx, &open.closes_by, lapses);
@@ -243,23 +239,19 @@ struct Ready {
     watching: Watching,
 }
 
-/// Everything a live stream's location is built from, or why nothing can be located, in
-/// the words `asker` is told.
-async fn ready(ctx: &Ctx, server: &Media, asker: Asker) -> Result<Ready, String> {
-    let (base, fingerprint) = match door::standing(ctx, server.serve.as_ref(), asker).await {
+/// Everything a live stream's location is built from, or why nothing can be located.
+async fn ready(ctx: &Ctx, server: &Media) -> Result<Ready, Obstacle> {
+    let (base, fingerprint) = match door::standing(ctx, server.serve.as_ref()).await {
         Door::At {
             base, fingerprint, ..
         } => (base, fingerprint),
         Door::Unknown(why) => return Err(why),
     };
-    let key =
-        crate::app::project::passing::key(ctx).ok_or_else(|| told(asker, KEYLESS.to_owned()))?;
-    let declared = door::declared(server.serve.as_ref())
-        .await
-        .map_err(|why| told(asker, why))?;
+    let key = crate::app::project::passing::key(ctx).ok_or((PASSLESS, KEYLESS))?;
+    let declared = door::declared(server.serve.as_ref()).await?;
     let watching = Watching::of(&crate::pass::told(&declared))
         .ok()
-        .ok_or(told(asker, UNDECLARED.to_owned()))?;
+        .ok_or((UNDECLARED, UNCOMPILED))?;
     Ok(Ready {
         base,
         fingerprint,
@@ -323,7 +315,7 @@ fn rehearsed(channel: &str, member: &Member, ready: Ready) -> TunedReport {
 }
 
 /// Nothing located for `channel`, and `why`.
-fn unlocated(channel: &str, member: &Member, why: String) -> TunedReport {
+fn unlocated(channel: &str, member: &Member, why: Obstacle) -> TunedReport {
     TunedReport {
         channel: channel.to_owned(),
         member: member.name.clone(),
@@ -343,7 +335,7 @@ const KEYLESS: &str = "The pass service has no key yet, so no pass can be issued
                        media server.";
 
 /// Said where the media server's live-stream paths do not compile.
-const UNDECLARED: &str = "The media server declared live-stream paths the core cannot hold a \
+const UNCOMPILED: &str = "The media server declared live-stream paths the core cannot hold a \
                           request to, so no pass is issued for a live stream.";
 
 /// Said where no live-stream path covers a path the media server answered.

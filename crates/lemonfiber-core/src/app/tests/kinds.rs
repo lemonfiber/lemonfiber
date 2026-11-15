@@ -359,7 +359,6 @@ async fn a_shelf_with_no_media_server_behind_it_is_unread_not_empty() {
         Command::Held(crate::app::Shelf {
             member: crate::app::Whom::Named("ada".to_owned()),
             most: 25,
-            asker: crate::app::Asker::Operator,
         }),
         &ctx(Ok(spoke(""))),
     )

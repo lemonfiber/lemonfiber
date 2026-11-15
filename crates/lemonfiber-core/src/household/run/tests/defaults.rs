@@ -110,14 +110,13 @@ async fn a_request_service_that_will_not_answer_leaves_the_defaults_unread() {
         report
             .findings
             .iter()
-            .any(|said| said.contains("would not accept lemonfiber's key")),
+            .any(|said| said.said.contains("would not accept lemonfiber's key")),
         "{report:?}"
     );
     assert!(
-        report
-            .findings
-            .iter()
-            .any(|said| said.contains("reported as unread rather than as unlimited")),
+        report.findings.iter().any(|said| said
+            .said
+            .contains("reported as unread rather than as unlimited")),
         "{report:?}"
     );
     assert!(

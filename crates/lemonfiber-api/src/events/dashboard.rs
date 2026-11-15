@@ -169,7 +169,7 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
     heard.0 = Some(now);
     let outcome = dispatch(Command::Playing { member: None }, &dashboard.ctx)
         .await
-        .unwrap_or_else(|_| playing_unread());
+        .unwrap_or_else(|problem| playing_unread(&problem));
     let rendered = Rendered::of(EventKind::Playing, &outcome)
         .filter(|_| outcome.kind() == EventKind::Playing.kind())?;
     let previous = heard.1.replace(rendered.said().to_owned());

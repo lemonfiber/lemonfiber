@@ -39,11 +39,10 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
         }
     };
     if asking.is_none() {
-        findings.push(
-            "what the household may ask for could not be read, so no policy and no \
-             limit are shown — reported as unread rather than as unlimited"
-                .to_owned(),
-        );
+        findings.push(crate::error::household::Obstacle::new(
+            crate::error::codes::quota::UNREACHABLE,
+            super::UNREAD_POLICY,
+        ));
     }
 
     let no_room = crate::space::run::admits(ctx).await.is_err();
@@ -67,6 +66,7 @@ pub(crate) async fn as_the_defaults(ctx: &Ctx) -> Result<HouseholdReport, Box<Pr
         members: vec![member],
         available: true,
         findings,
+        noted: Vec::new(),
         filtering: None,
     })
 }

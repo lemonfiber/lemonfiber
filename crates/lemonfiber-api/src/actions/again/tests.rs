@@ -344,11 +344,11 @@ async fn work_stopped_before_it_answered_is_answered_as_that_and_its_attempt_for
     let work = tokio::spawn(std::future::pending::<Answer>());
     work.abort();
     register.settle(&sent, work).await;
-    let Some(Answer::Now(status, Some(body))) = waiting.await.ok() else {
+    let Some(Answer::Refused(status, problem)) = waiting.await.ok() else {
         unreachable!("the second send is answered with the refusal");
     };
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-    assert!(body.contains(Refusal::Unanswered.code().as_str()), "{body}");
+    assert_eq!(problem.code, Refusal::Unanswered.code());
     assert!(first(&register, &Caller::Machine, "a", moment()).await);
     assert!(!first(&register, &Caller::Machine, "other", moment()).await);
 }

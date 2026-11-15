@@ -33,7 +33,7 @@ mod window;
 
 pub use estimate::{Estimate, FILM_HOURS, SEASON_HOURS};
 pub use expiry::Expiry;
-pub use reasons::{Reasons, Refused};
+pub use reasons::{Passed, Reasons, Refused};
 pub(crate) use refusal::{
     never_asked_here, no_limit_named, no_reason_given, nobody_called, nothing_agreed,
     nothing_to_decide, sooner_than_the_reminder, unreachable,

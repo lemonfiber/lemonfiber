@@ -100,11 +100,10 @@ pub mod watch;
 pub(crate) mod watcher;
 
 pub use command::{
-    AlertAction, Allowance, Answer, Arranged, Asker, Asking, BandwidthAsked, Chosen, Command,
-    Decision, Diagnosing, Doorway, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo,
-    Linking, Live, MigrateAction, PlayFrom, QualityAction, Queueing, Reclaiming, Removing,
-    Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom, Wishing,
-    HOSTABLE,
+    AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
+    Diagnosing, Doorway, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, Live,
+    MigrateAction, PlayFrom, QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring,
+    Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;

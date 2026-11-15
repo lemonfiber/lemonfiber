@@ -59,7 +59,6 @@ fn over_what_a_member_watches() -> Vec<(&'static str, Command)> {
             Command::Viewing(Viewing::Tune {
                 member: "anybody".to_owned(),
                 live: Live::Open("a-channel".to_owned()),
-                asker: lemonfiber_core::app::Asker::Operator,
             }),
         ),
         (
@@ -68,7 +67,6 @@ fn over_what_a_member_watches() -> Vec<(&'static str, Command)> {
                 member: "anybody".to_owned(),
                 id: "0123456789abcdef0123456789abcdef".to_owned(),
                 from: PlayFrom::Device("a-phone-0123".to_owned()),
-                asker: lemonfiber_core::app::Asker::Operator,
             }),
         ),
     ]
@@ -192,7 +190,6 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
             Command::Held(lemonfiber_core::app::Shelf {
                 member: lemonfiber_core::app::Whom::Named("anybody".to_owned()),
                 most: 25,
-                asker: lemonfiber_core::app::Asker::Operator,
             }),
         ),
         ("playing", Command::Playing { member: None }),

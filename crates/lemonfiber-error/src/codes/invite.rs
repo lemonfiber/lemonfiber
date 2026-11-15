@@ -7,6 +7,7 @@ codes! {
         meaning: "This stack has no media server, so there is no account to offer. An invitation \
             is an account somebody signs in to; without one there is nothing to invite them to.",
         remedy: "Add a media server to the stack and run setup.",
+        household: fault,
     }
     /// Said where the admin credential was never recorded: nothing can be asked of the server.
     NO_CREDENTIAL = "INVITE-2" {
@@ -16,6 +17,7 @@ codes! {
         meaning: "The media server's own account has not been set up yet. Making somebody else \
             an account is done as the administrator, and this machine has not recorded one.",
         remedy: "Run lemonfiber setup, so the media server's account is made and recorded.",
+        household: fault,
     }
     /// Said where this machine has no address the household could arrive at.
     ///
@@ -31,6 +33,7 @@ codes! {
             has none written down.",
         remedy: "Record the address the household should use, with lemonfiber config set \
             HOUSEHOLD_HOST <address>.",
+        household: fault,
     }
     /// Said where the invitation is for nobody: the name is blank, or only spaces.
     ///
@@ -44,6 +47,7 @@ codes! {
         meaning: "The invitation is for nobody — the name was blank. The name is what they will \
             sign in as, so a blank one is an account nobody could use.",
         remedy: "Give the name they will sign in as, as in lemonfiber invite ana.",
+        household: fault,
     }
     /// Said where an invitation offered again could not be dated again, so its window is not
     /// real.
@@ -60,6 +64,7 @@ codes! {
             real. Their account is still there as it was; what could not be written down is when \
             it was offered, which is what the window is counted from.",
         remedy: "Check the configuration directory can be written, then run this again.",
+        household: fault,
     }
     /// Said where the media server would not say what libraries it holds.
     ///
@@ -74,6 +79,7 @@ codes! {
             Choosing what somebody may open starts by finding the libraries, and that read did \
             not answer.",
         remedy: "Check the media server is running, then run this again.",
+        household: fault,
     }
     /// Said where no library goes by a name that was given.
     ///
@@ -86,6 +92,7 @@ codes! {
             named the way the media server's own screens name them, though not necessarily in \
             the same capitalisation.",
         remedy: "Name a library the media server holds. The message lists the ones there are.",
+        household: fault,
     }
     /// Said where what the account may watch could not be written on it.
     ///
@@ -102,6 +109,7 @@ codes! {
             send; an existing one is still there, allowed what it was allowed before.",
         remedy: "Run this again with the same choices, or set them in the media server's own \
             settings.",
+        household: fault,
     }
     /// Said where the offer could not be written down.
     ///
@@ -116,6 +124,7 @@ codes! {
             offered. An invitation runs out a set time after it is offered, and one this machine \
             has no date for is taken back the next time anybody is invited.",
         remedy: "Check the configuration directory can be written, then run this again.",
+        household: fault,
     }
     /// Said where the account could not be made one its person can claim: switched on,
     /// and bounded against guessing at its password.
@@ -127,6 +136,7 @@ codes! {
             offered switched on, with a limit on wrong passwords, and the media server would not \
             write either.",
         remedy: "Check the media server is running, then run this again.",
+        household: fault,
     }
     /// Said where the name given is the account that administers the media server.
     ///
@@ -140,5 +150,6 @@ codes! {
             one to offer. This is the account lemonfiber signs in as, and an invitation would \
             put a household member's limits on it.",
         remedy: "Invite the person under a name of their own.",
+        household: fault,
     }
 }

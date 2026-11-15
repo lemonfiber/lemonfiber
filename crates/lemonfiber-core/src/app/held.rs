@@ -17,8 +17,10 @@
 //! the member's side without reading any member's.
 
 use super::targets::media;
-use super::{Asker, Ctx, Outcome, Shelf, Whom};
+use super::{Ctx, Outcome, Shelf, Whom};
 
+use crate::error::codes::play::{NOTHING_TO_PLAY_FROM, NOT_IN_THE_HOUSEHOLD, SERVER_SILENT};
+use crate::error::household::Obstacle;
 use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
 use crate::ports::service::{Failure, Item, Member};
@@ -32,20 +34,11 @@ use crate::screening::door::{located, Door};
 /// One resolution for both rather than two paths that could come to disagree about who
 /// was meant.
 pub(crate) async fn asked(ctx: &Ctx, shelf: Shelf) -> Result<Outcome, Box<Problem>> {
-    let Shelf {
-        member,
-        most,
-        asker,
-    } = shelf;
-    held(ctx, &member, most, asker).await.map(Outcome::Held)
+    let Shelf { member, most } = shelf;
+    held(ctx, &member, most).await.map(Outcome::Held)
 }
 
-async fn held(
-    ctx: &Ctx,
-    whose: &Whom,
-    most: u32,
-    asker: Asker,
-) -> Result<HeldReport, Box<Problem>> {
+async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldReport, Box<Problem>> {
     let manifest = ctx
         .stack
         .checked_manifest(ctx.today())
@@ -54,12 +47,13 @@ async fn held(
     let Some(server) = media(ctx, &manifest).await else {
         return Ok(unread(
             whose,
+            NOTHING_TO_PLAY_FROM,
             "there is no media server to ask what the household holds, or it cannot be \
              asked over its contracts",
         ));
     };
 
-    let door = crate::screening::door::standing(ctx, server.serve.as_ref(), asker).await;
+    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
     let Whom::Named(member) = whose else {
         return Ok(shelved(
             server.serve.holdings(None, most).await,
@@ -72,6 +66,7 @@ async fn held(
     let Ok(accounts) = server.identity.household().await else {
         return Ok(unread(
             whose,
+            SERVER_SILENT,
             "the media server would not say who holds an account, so who this shelf \
              belongs to could not be established",
         ));
@@ -80,6 +75,7 @@ async fn held(
     let Some(account) = account(&accounts, member) else {
         return Ok(unread(
             whose,
+            NOT_IN_THE_HOUSEHOLD,
             "nobody in this household is known by that, so there is no shelf to read — \
              which is not the same as a shelf with nothing on it",
         ));
@@ -106,11 +102,11 @@ fn shelved(
         return HeldReport {
             member,
             id,
-            findings: vec![
+            findings: vec![Obstacle::new(
+                SERVER_SILENT,
                 "the media server would not say what this shelf holds, so it is reported \
-                 as unread rather than as empty"
-                    .to_owned(),
-            ],
+                 as unread rather than as empty",
+            )],
             ..HeldReport::default()
         };
     };
@@ -140,14 +136,14 @@ pub(crate) fn account<'a>(accounts: &'a [Member], named: &str) -> Option<&'a Mem
 ///
 /// It names the member as they were asked for, since who they are was never
 /// established, and names nobody for the household's defaults.
-fn unread(whose: &Whom, why: &str) -> HeldReport {
+fn unread(whose: &Whom, code: crate::error::Code, why: &str) -> HeldReport {
     let member = match whose {
         Whom::Named(member) => member.clone(),
         Whom::Defaults => String::new(),
     };
     HeldReport {
         member,
-        findings: vec![why.to_owned()],
+        findings: vec![Obstacle::new(code, why)],
         ..HeldReport::default()
     }
 }

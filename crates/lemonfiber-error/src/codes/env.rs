@@ -7,6 +7,7 @@ codes! {
         meaning: "Docker is not installed. lemonfiber runs your stack in containers, so nothing \
             can start without an engine.",
         remedy: "Install Docker Desktop, or Docker Engine on Linux.",
+        household: fault,
     }
     /// Raised when the Docker client is present but its daemon is not answering.
     DAEMON_DOWN = "ENV-2" {
@@ -18,6 +19,7 @@ codes! {
             problem, rather than a missing install.",
         remedy: "Start Docker Desktop, or the docker service on Linux. If it is running, check \
             that your account may run docker.",
+        household: fault,
     }
     /// Raised when the Compose plugin is missing or too old to drive.
     COMPOSE_UNUSABLE = "ENV-3" {
@@ -28,6 +30,7 @@ codes! {
             stack through Compose v2.",
         remedy: "Install or update the Docker Compose plugin. The message names the minimum \
             version.",
+        household: fault,
     }
     /// Raised when the container engine is confirmed not to start with this machine.
     ///
@@ -46,6 +49,7 @@ codes! {
             there, with no error and nothing in any log you would think to look at.",
         remedy: "Turn the engine's own start-at-boot on: Docker Desktop's open-at-login setting \
             on a Mac and on Windows, the daemon's unit on Linux. The message names which.",
+        household: fault,
     }
     /// Raised when this machine and the daemon speak different Docker API generations.
     API_MISMATCH = "ENV-5" {
@@ -57,6 +61,7 @@ codes! {
             generation is not available.",
         remedy: "Bring both to the same Docker release, or carry on with the older set. It is \
             ordinary where the two machines were updated at different times.",
+        household: fault,
     }
     /// Raised when the stack's engine is `OrbStack` with its network bridge on.
     NETWORKS_MIRRORED = "ENV-6" {
@@ -70,5 +75,6 @@ codes! {
             container's address, so nothing of the stack needs the bridge.",
         remedy: "Turn the network bridge off with orb config set network_bridge false, then \
             restart OrbStack.",
+        household: fault,
     }
 }

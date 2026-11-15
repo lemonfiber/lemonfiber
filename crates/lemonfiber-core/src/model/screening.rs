@@ -106,8 +106,8 @@ pub struct PartWayReport {
     /// Whether it could be read at all. An empty list and an unread one are different
     /// answers, and what could not be read is said in `findings`.
     pub available: bool,
-    /// What is worth saying about this read, in the words its reader would use.
-    pub findings: Vec<String>,
+    /// What stood in the way of this read, each by the code that names it.
+    pub findings: Vec<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
@@ -199,7 +199,7 @@ pub struct TunedReport {
     pub lapses: Option<u64>,
     /// Why nothing is located, where nothing is.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
+    pub unlocated: Option<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }
@@ -238,7 +238,7 @@ pub struct PlayReport {
     pub lapses: Option<u64>,
     /// Why nothing is located, where nothing is.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unlocated: Option<String>,
+    pub unlocated: Option<crate::error::household::Obstacle>,
     /// Whether this was a rehearsal: what would have happened, with none of it done.
     pub rehearsed: bool,
 }

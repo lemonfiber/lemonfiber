@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Something in the way of one part of an answer, said by its code.\n\nWhat a read carries beside the part it could not give, rather than a sentence of its\nown: a sentence carries no code, so nothing could word it again for whoever reads it.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "description": "The code that names what is in the way.",
+      "$ref": "Code.json"
+    },
+    "remedy": {
+      "description": "What to do about it.",
+      "type": "string"
+    },
+    "said": {
+      "description": "What is in the way, in one sentence.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "said",
+    "remedy"
+  ]
+}

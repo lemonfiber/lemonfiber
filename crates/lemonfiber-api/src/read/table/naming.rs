@@ -11,7 +11,7 @@
 //! rather than an omission: there is nothing for them to mean.
 
 use lemonfiber_core::app::{
-    Asker, Command, Diagnosing, Removing, Shelf, Tracing, Viewing, Waiting, Whom, Wishing,
+    Command, Diagnosing, Removing, Shelf, Tracing, Viewing, Waiting, Whom, Wishing,
 };
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
@@ -189,11 +189,7 @@ pub(super) fn shelf(
 ) -> Result<Command, Refusal> {
     let member = whose_shelf(member, defaults)?;
     let most = counted(most, A_SHELF)?;
-    Ok(Command::Held(Shelf {
-        member,
-        most,
-        asker: Asker::Operator,
-    }))
+    Ok(Command::Held(Shelf { member, most }))
 }
 
 /// Whose shelf a read is about: a member, or the household's defaults.
@@ -231,11 +227,7 @@ pub(super) fn titled(
 ) -> Result<Command, Refusal> {
     let member = whose_shelf(member, defaults)?;
     let id = title.ok_or(Refusal::NoSuchRead)?;
-    Ok(Command::Viewing(Viewing::Title {
-        member,
-        id,
-        asker: Asker::Operator,
-    }))
+    Ok(Command::Viewing(Viewing::Title { member, id }))
 }
 
 /// What a member was part-way through, `most` of it, or why it cannot be answered.
@@ -250,7 +242,6 @@ pub(super) fn part_way(member: Option<String>, most: Option<String>) -> Result<C
     Ok(Command::Viewing(Viewing::PartWay {
         member: Whom::Named(member),
         most,
-        asker: Asker::Operator,
     }))
 }
 
