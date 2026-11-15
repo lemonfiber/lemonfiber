@@ -20,7 +20,7 @@
     },
     "last_seen": {
       "type": [
-        "integer|null/uint64"
+        "anyOf(null,ref:Instant)"
       ],
       "required": false
     },

@@ -13,12 +13,14 @@
     },
     "last_seen": {
       "description": "When the media server last heard from it, where it says.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

@@ -30,6 +30,12 @@
           "application/json": {
             "schema": {
               "$defs": {
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "Session": {
                   "additionalProperties": false,
                   "description": "One device signed in to an account, as the media server lists it.",
@@ -47,14 +53,16 @@
                       "type": "string"
                     },
                     "last_seen": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When the server last heard from it, where it says.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When the server last heard from it, where it says."
                     }
                   },
                   "required": [

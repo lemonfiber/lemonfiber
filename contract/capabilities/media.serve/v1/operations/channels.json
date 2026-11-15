@@ -67,6 +67,12 @@
                   ],
                   "type": "object"
                 },
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "Programme": {
                   "additionalProperties": false,
                   "description": "A programme on a channel.",
@@ -79,14 +85,16 @@
                       ]
                     },
                     "ends": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When it ends, where the server knows.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When it ends, where the server knows."
                     },
                     "title": {
                       "description": "What it is called.",

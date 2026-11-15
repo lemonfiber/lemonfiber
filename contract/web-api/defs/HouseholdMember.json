@@ -24,12 +24,14 @@
     },
     "last_seen": {
       "description": "When the media server last saw them. Absent where nobody has ever signed in,\nwhich is exactly the unclaimed invitations.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "name": {
       "description": "The member, by the name their account is held under.",

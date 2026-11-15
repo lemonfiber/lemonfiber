@@ -21,9 +21,7 @@
     },
     "registered": {
       "description": "When it was registered.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     }
   },
   "required": [

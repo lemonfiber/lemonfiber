@@ -13,9 +13,7 @@
     },
     "registered": {
       "description": "When it was registered.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "rehearsed": {
       "description": "Whether this was a rehearsal: what registering would come to, with nothing kept.",

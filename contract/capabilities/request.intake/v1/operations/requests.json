@@ -26,14 +26,16 @@
                   "description": "One thing a household member asked for, as the request service records it.\n\nWhat became of the request and what became of the media it asked for are two\nstatuses; the household model turns the pair into the one word a member reads.",
                   "properties": {
                     "arrived": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When the media it asked for arrived on the media server, or nothing until it is\nthere.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When the media it asked for arrived on the media server, or nothing until it is\nthere."
                     },
                     "id": {
                       "description": "The number the request service files this request under, which is how one is\nnamed to it again when somebody rules on it.",
@@ -60,14 +62,16 @@
                       "description": "Which service files the media — television or film — or `None` where the\nrequest service names a media type this build does not know."
                     },
                     "made": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
                       "default": null,
-                      "description": "When it was asked for, where the service says — what a request waiting\non somebody is measured against, and what a counting period runs from.",
-                      "format": "uint64",
-                      "minimum": 0,
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
+                      "description": "When it was asked for, where the service says — what a request waiting\non somebody is measured against, and what a counting period runs from."
                     },
                     "media_status": {
                       "anyOf": [
@@ -123,6 +127,12 @@
                     "member"
                   ],
                   "type": "object"
+                },
+                "Instant": {
+                  "description": "A moment, as a whole number of seconds since the Unix epoch.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
                 },
                 "Kind": {
                   "description": "The two kinds of video a household files by resolution.",

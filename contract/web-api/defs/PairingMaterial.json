@@ -9,9 +9,7 @@
     },
     "expires": {
       "description": "When the material stops being good.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "fingerprint": {
       "description": "The certificate that address presents: SHA-256 over its DER encoding, in\nlower-case hex. Not the digest of its public key.",

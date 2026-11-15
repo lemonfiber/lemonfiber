@@ -5,9 +5,7 @@
   "properties": {
     "created_at": {
       "description": "When it was taken.",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "$ref": "Instant.json"
     },
     "data_root": {
       "description": "The data root it was taken against, to notice a restore to a different one.",

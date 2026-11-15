@@ -19,7 +19,7 @@
     },
     {
       "path": "identity.source/v1/operations/household.json",
-      "sha256": "ddfde469c99174dacb4e017aa29634c375d233572c50df8474c428e49be6a886"
+      "sha256": "1292b59a95361ccd06d527eac633889cf6037cf9228d7095cb5acc5f6c1e979b"
     },
     {
       "path": "identity.source/v1/operations/whoever.json",
@@ -31,7 +31,7 @@
     },
     {
       "path": "identity.source/v1/operations/invite.json",
-      "sha256": "61b91b5c4aca3e3e894330bb530cfe99004f06c855cf0cec1b7d8852b48937a8"
+      "sha256": "54d0ae5b3e1f0dc8d508e78b3b2aba7d7848240b204e91bc5e78d2d426543d2f"
     },
     {
       "path": "identity.source/v1/operations/claim.json",
@@ -43,7 +43,7 @@
     },
     {
       "path": "identity.source/v1/operations/when_invited.json",
-      "sha256": "de79ecd5a426f2d025cda22f283050b61dcea55484e2d71eb46e285f7ee06414"
+      "sha256": "114546b364d69f7df90c403033920d8b77363d6f70f976a7e878ebc3a29d62e6"
     },
     {
       "path": "identity.source/v1/operations/libraries.json",
@@ -71,7 +71,7 @@
     },
     {
       "path": "identity.source/v1/operations/sessions.json",
-      "sha256": "f077265dc8de2d3feee16b49422a294cf1cf15b6abf3f8dd213c08cf6dd64661"
+      "sha256": "45fe5d488d71b0dba14cc3f59cc8885bfd1bb38ddfc22444623fa1fcc5c3d34f"
     },
     {
       "path": "identity.source/v1/operations/signs_devices_in.json",
@@ -83,7 +83,7 @@
     },
     {
       "path": "identity.source/v1/operations/sign_in_by_code.json",
-      "sha256": "46b7892e66e4189a1336a65cfc2e2c87e686898ec7db22a43342b7ac5d90eed5"
+      "sha256": "f7861f31984a3a8543354ce4ec717400f0b9c62725f7c4e116f3b0027e877d43"
     },
     {
       "path": "identity.source/v1/operations/signed_by_code.json",

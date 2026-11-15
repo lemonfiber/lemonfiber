@@ -5,12 +5,14 @@
   "properties": {
     "at": {
       "description": "When it happened, as the service reported it — absent for a stage inferred\nrather than timed, such as being monitored.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "service": {
       "description": "The service that recorded it.",

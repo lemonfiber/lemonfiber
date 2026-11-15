@@ -12,13 +12,15 @@
     },
     "ends": {
       "description": "When it ends, where the server knows.",
-      "type": [
-        "integer",
-        "null"
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
       ],
-      "format": "uint64",
-      "default": null,
-      "minimum": 0
+      "default": null
     },
     "title": {
       "description": "What it is called.",

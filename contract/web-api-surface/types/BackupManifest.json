@@ -2,7 +2,7 @@
   "fields": {
     "created_at": {
       "type": [
-        "integer/uint64"
+        "ref:Instant"
       ],
       "required": true
     },
