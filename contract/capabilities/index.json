@@ -117,8 +117,8 @@
         1
       ],
       "openapi": "identity.source/v1/openapi.json",
-      "operations": 19,
-      "sha256": "142b10b8561fdc459f4a431db90573d26420c52d5b8a2c9f50795ff4d404e44d"
+      "operations": 21,
+      "sha256": "7b5e1a2e341d71ebf9a405908a827c31bf81c621d114e1328bf57460b7588cd2"
     },
     {
       "capability": "media.serve",
