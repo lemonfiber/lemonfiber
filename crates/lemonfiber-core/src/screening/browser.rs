@@ -203,7 +203,7 @@ async fn ready(
         id,
         &crate::secret::render(&[0; PLAY_BYTES]),
     )
-    .ok_or_else(|| told(asker, UNPLACED.to_owned()))?;
+    .ok_or(told(asker, UNPLACED.to_owned()))?;
     let key =
         crate::app::project::passing::key(ctx).ok_or_else(|| told(asker, KEYLESS.to_owned()))?;
     let nonce = nonce(ctx).ok_or_else(|| told(asker, UNSEALED.to_owned()))?;

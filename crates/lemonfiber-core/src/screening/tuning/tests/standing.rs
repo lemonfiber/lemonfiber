@@ -272,12 +272,16 @@ async fn channels_the_server_cannot_list_are_unanswered() {
         ),
         (media::serve("channels"), media::unavailable()),
     ]);
-    let ctx = ctx_over(transport, "channels-failing");
-    let answered = crate::screening::tuning::channels(&ctx, "Ada").await;
+    let ctx = ctx_over(Arc::clone(&transport), "channels-failing");
+    let Ok(server) = crate::screening::server(&ctx).await else {
+        unreachable!("the household has a media server");
+    };
+    let ada = media::member("a7f3", "Ada", true);
     assert_eq!(
-        code(answered),
+        code(crate::screening::tuning::reachable(&server, &ada).await),
         Some(crate::error::codes::play::SERVER_SILENT.to_string())
     );
+    assert!(was_asked(&transport, "channels"));
 }
 
 #[tokio::test]
