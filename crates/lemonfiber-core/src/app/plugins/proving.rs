@@ -20,10 +20,14 @@
 //! container leaves something Compose will never be asked about again. So the container
 //! comes off first and the rest is somebody else's machinery.
 
+mod asking;
 mod declaring;
 mod healthy;
+mod inside;
 mod restarting;
 mod waiting;
+
+pub(super) use asking::answering;
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -34,9 +38,7 @@ use lemonfiber_plugin::Manifest;
 
 use crate::error::{Problem, Remedy, State};
 use crate::instant::Instant;
-use crate::plugin::judging::{judge, live, method};
 use crate::plugin::{Evidence, Installed, Proving, Verdict};
-use crate::ports::http::Request;
 use crate::stack::closure::Plan;
 use crate::stack::compose::{build, Action};
 pub(in crate::app::plugins) use restarting::Restarted;
@@ -238,7 +240,10 @@ pub(crate) async fn asked(
                 healthy::passed(ctx, placed, address, deadline).await;
                 answering(ctx, request, &proof.expect, address, deadline).await
             }
-            (Some(_), None, _, None) => Verdict::Unproven {
+            (Some(request), None, Some(placed), None) => {
+                inside::answering(ctx, placed, request, &proof.expect, deadline).await
+            }
+            (Some(_), None, None, None) => Verdict::Unproven {
                 why: format!(
                     "{} publishes no port this machine can reach, so there is nowhere to ask it",
                     stated.of.as_deref().unwrap_or("the service it names")
@@ -404,77 +409,6 @@ async fn claiming(
     fault.map_or(Verdict::Passed, |fault| Verdict::Failed {
         faults: vec![fault],
     })
-}
-
-/// What asking one proof of one service came to.
-///
-/// A service that has not answered *yet* is asked again until the budget runs out,
-/// because a container Compose has just created is not a service that is listening —
-/// the gap is seconds and an install that took the first refusal would fail on every
-/// image that takes a moment to open its socket. A service that answers something is
-/// never asked twice: what it said is the evidence, and asking again until it says
-/// something else is not proving, it is waiting for luck.
-pub(super) async fn answering(
-    ctx: &Ctx,
-    asked: &lemonfiber_plugin::Request,
-    expect: &lemonfiber_plugin::Expect,
-    address: &str,
-    deadline: std::time::SystemTime,
-) -> Verdict {
-    // The method the transport can carry, or nothing where the manifest named one it
-    // cannot. Reported as unproven rather than sent as something else: a proof asked
-    // with a verb nobody wrote down is a proof about a question nobody declared.
-    let Some(method) = method(&asked.method) else {
-        return Verdict::Unproven {
-            why: format!(
-                "{} is not a method lemonfiber can send, so the proof was never put",
-                asked.method
-            ),
-        };
-    };
-    // A route on the service lemonfiber resolved, and nothing that could name another
-    // host once it is joined to that address. The reader refused any other path when
-    // the manifest was read; this is where the join happens, so it is asked again here.
-    if !lemonfiber_plugin::refusing::carried::is_route(&asked.path) {
-        return Verdict::Unproven {
-            why: format!(
-                "{} is not a route on {address}, so the proof was never put",
-                asked.path
-            ),
-        };
-    }
-    // No headers. A proof cannot present a credential, because there is nowhere in the
-    // block to write one — which is what keeps *this asks as nobody* a property of the
-    // format rather than a convention somebody has to hold.
-    let request = Request {
-        method,
-        url: format!("{address}{}", asked.path),
-        headers: Vec::new(),
-        body: None,
-        pinned: None,
-        deadline: None,
-    };
-    loop {
-        match ctx.seams.http.send(&request).await {
-            Ok(response) => {
-                let faults = judge(expect, &live(&response));
-                return if faults.is_empty() {
-                    Verdict::Passed
-                } else {
-                    Verdict::Failed { faults }
-                };
-            }
-            // Checked after the asking rather than before it, so a budget of nothing
-            // still reports what the service said rather than reporting that it was
-            // never asked.
-            Err(unreachable) if ctx.seams.clock.now() >= deadline => {
-                return Verdict::Unproven {
-                    why: format!("{} did not answer: {}", unreachable.url, unreachable.reason),
-                }
-            }
-            Err(_) => tokio::time::sleep(POLL).await,
-        }
-    }
 }
 
 /// What running the image's own program for one proof came to, with a throwaway copy of

@@ -30,7 +30,7 @@ pub(crate) const READ_AT_MOST: usize = 64 * 1024;
 pub(crate) const RECORDED_AT_MOST: usize = 1024;
 
 /// The bytes in one mebibyte, which a memory ceiling is declared in.
-const MEBIBYTE: i64 = 1024 * 1024;
+pub(crate) const MEBIBYTE: i64 = 1024 * 1024;
 
 /// What lemonfiber writes for a service as its time zone and the operator's ids.
 #[derive(Debug, Clone, PartialEq, Eq)]

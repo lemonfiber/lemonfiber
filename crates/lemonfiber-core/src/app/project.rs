@@ -36,6 +36,7 @@ use crate::topology::Topology;
 use crate::wiring::Chosen;
 
 pub(crate) use copying::{pending as copies, Copies};
+pub(crate) use fencing::asked_inside;
 #[cfg(test)]
 pub(crate) use fencing::{ASKED as FENCE_ASKED, PROBED as FENCE_PROBED};
 pub(crate) use host::{asked as host_asked, Asked};

@@ -49,6 +49,20 @@ fn a_run_reading_the_hosts_addresses_joins_the_hosts_network_and_nothing_else_ch
 }
 
 #[test]
+fn a_run_asking_a_service_inside_its_network_joins_that_containers_namespace_alone() {
+    let inside = Run {
+        network: Joined::Namespace("0f1e2d".to_owned()),
+        ..run()
+    };
+    let asked = body(&inside);
+    assert_eq!(asked.network_disabled, Some(false));
+    let config = asked.host_config.unwrap_or_default();
+    assert_eq!(config.network_mode.as_deref(), Some("container:0f1e2d"));
+    assert_eq!(config.cap_drop, Some(vec!["ALL".to_owned()]));
+    assert_eq!(config.readonly_rootfs, Some(true));
+}
+
+#[test]
 fn a_proofs_container_has_no_network_no_shell_and_only_what_the_run_settled() {
     let asked = body(&run());
     assert_eq!(
