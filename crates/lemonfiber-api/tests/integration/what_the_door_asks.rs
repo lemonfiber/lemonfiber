@@ -343,7 +343,7 @@ async fn everything_else_still_needs_a_secret_this_run_admits() {
 /// failure worth catching is a further exemption written beside these three, and a sweep
 /// over the paths that exist today would not see one added tomorrow.
 #[test]
-fn only_the_three_doors_are_let_through_without_a_token() {
+fn only_the_four_doors_are_let_through_without_a_token() {
     let Ok(guard) = fs::read_to_string("src/router.rs") else {
         unreachable!("the guard this crate ships is in the tree this test is built from")
     };
@@ -374,8 +374,8 @@ fn only_the_three_doors_are_let_through_without_a_token() {
         .collect();
     assert_eq!(
         doors,
-        "const DOORS: [&str; 3] = [crate::admission::SESSION,crate::keys::COLLECTING,crate::notify_events::EVENTS,];",
-        "the doors let through without a token are not the sign-in, claim and events doors"
+        "const DOORS: [&str; 4] = [crate::admission::SESSION,crate::admission::coded::CODE,crate::keys::COLLECTING,crate::notify_events::EVENTS,];",
+        "the doors let through without a token are not the sign-in, code, claim and events doors"
     );
 }
 

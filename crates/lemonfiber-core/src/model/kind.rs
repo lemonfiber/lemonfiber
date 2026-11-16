@@ -199,6 +199,8 @@ kinds! {
     SELF_UPDATE = "self-update",
     /// What setup settled on.
     SETUP = "setup",
+    /// A code a member signs in by, or the sign-in by a code still waiting.
+    SIGN_IN_CODE = "sign-in-code",
     /// Where the disk stands, where the room went, and what could be got back.
     SPACE = "space",
     /// One line said while services are starting: what the container engine wrote, or

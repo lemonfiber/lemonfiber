@@ -124,6 +124,7 @@ pub mod seed;
 pub mod self_update;
 pub(crate) mod settings;
 pub mod shell;
+pub mod sign_in_codes;
 /// Files what the environment files hold into the settings and secret stores, before
 /// anything of a run reads them.
 pub use settings::filing::everything as filed;

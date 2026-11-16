@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "approve_at": "https://approve.example/link",
+    "code": "WXYZ",
+    "lapses_at": 1700000600,
+    "waiting": "6162636465666768696a6b6c6d6e6f70"
+  },
+  "kind": "sign-in-code"
+}

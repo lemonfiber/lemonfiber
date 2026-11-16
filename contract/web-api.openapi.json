@@ -17957,6 +17957,38 @@
           }
         ]
       },
+      "SignInCode": {
+        "description": "A code to sign in by, or the sign-in by a code still waiting.",
+        "properties": {
+          "approve_at": {
+            "description": "Where the member approves the code, where one was just asked for.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "The code the member enters where they approve it, where one was just asked for.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lapses_at": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When the code lapses."
+          },
+          "waiting": {
+            "description": "The handle that finishes signing in by the code.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lapses_at",
+          "waiting"
+        ],
+        "type": "object"
+      },
       "Snapshot": {
         "description": "Everything the dashboard shows at one moment.\n\nEach source's panel is filled or marked unavailable on its own, so one dead\nsource degrades one region rather than the screen. The surface builds this from\nwhat it gathered; the standing is read from the same facts so it cannot\ndisagree with the panels.",
         "properties": {
@@ -23042,6 +23074,22 @@
         "title": "SignIn",
         "type": "object"
       },
+      "body-session-code": {
+        "additionalProperties": false,
+        "description": "What a caller sends to the door: nothing to ask for a code, the handle to finish one.",
+        "properties": {
+          "waiting": {
+            "default": null,
+            "description": "The handle a code was answered with, where this finishes signing in by it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "SignInByCode",
+        "type": "object"
+      },
       "body-setup-answer": {
         "description": "One answer, tagged by the step it belongs to.\n\nRead back as well as built, because a surface that is not in this process\nsubmits one: the tag is the step, so an answer names the question it belongs\nto rather than arriving as a field a reader has to guess the meaning of.",
         "oneOf": [
@@ -23465,6 +23513,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-setup"
+          },
+          {
+            "$ref": "#/components/schemas/kind-sign-in-code"
           },
           {
             "$ref": "#/components/schemas/kind-space"
@@ -26711,6 +26762,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/SetupReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-sign-in-code": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignInCode",
             "description": "The payload."
           },
           "host": {
@@ -33457,6 +33548,42 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/body-session"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelope"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/session/code": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-session-code"
               }
             }
           },

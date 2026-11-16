@@ -53,6 +53,14 @@ pub enum Refusal {
     NotOpen,
     /// The password chosen at a claim is too short.
     ShortChoice,
+    /// A sign-in by a code named a handle that waits on nothing for this caller.
+    NotWaiting,
+    /// One source asked for as many codes to sign in by as it may.
+    TooManyCodes,
+    /// A code was asked of a household whose members sign in with a password.
+    SignsInByPassword,
+    /// What was sent to sign in by a code is not a request for one.
+    NotACodeRequest,
     /// A read was given a parameter its answer has nowhere to put.
     Unwanted,
     /// A parameter carrying one value was given more than once.
@@ -132,7 +140,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 43] = [
+    pub const EVERY: [Self; 47] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotYours,
@@ -144,6 +152,10 @@ impl Refusal {
         Self::NotForAKey,
         Self::NotOpen,
         Self::ShortChoice,
+        Self::NotWaiting,
+        Self::TooManyCodes,
+        Self::SignsInByPassword,
+        Self::NotACodeRequest,
         Self::Unwanted,
         Self::Repeated,
         Self::NoSuchRead,
@@ -193,6 +205,10 @@ impl Refusal {
             Self::NotForAKey => admit::NOT_FOR_A_KEY,
             Self::NotOpen => admit::NOT_OPEN,
             Self::ShortChoice => admit::SHORT_CHOICE,
+            Self::NotWaiting => admit::CODE_NOT_WAITING,
+            Self::TooManyCodes => admit::TOO_MANY_CODES,
+            Self::SignsInByPassword => admit::SIGNS_IN_BY_PASSWORD,
+            Self::NotACodeRequest => admit::NOT_A_CODE_REQUEST,
             Self::Unwanted => read::UNWANTED,
             Self::Repeated => read::REPEATED,
             Self::NoSuchRead => read::NO_SUCH_READ,
@@ -270,6 +286,10 @@ impl Refusal {
             Self::NotAPassword => "The body of this request is not a password.",
             Self::NotOpen => "This invitation can no longer be claimed.",
             Self::ShortChoice => "That password is too short to choose.",
+            Self::NotWaiting => "This sign-in by a code can no longer be finished.",
+            Self::TooManyCodes => "Too many sign-in codes asked for. Try again later.",
+            Self::SignsInByPassword => "This household signs in with a name and password.",
+            Self::NotACodeRequest => "The body of this request is not a sign-in by a code.",
             // Said before the key was looked at, so it says nothing about whether the key
             // was right: only that it came the wrong way.
             Self::KeyInTheClear => {
@@ -374,6 +394,15 @@ impl Refusal {
             }
             Self::NotAPassword => Remedy::new("Send the password as the body's password"),
             Self::NotOpen => Remedy::new("Ask whoever invited you for a new invitation"),
+            Self::NotWaiting => Remedy::new("Ask for a new code and approve it before it lapses"),
+            Self::TooManyCodes => {
+                Remedy::new("Wait as long as the refusal says, or finish a code already shown")
+                    .with_detail("Retry-After")
+            }
+            Self::SignsInByPassword => Remedy::new("Sign in with the member's name and password"),
+            Self::NotACodeRequest => {
+                Remedy::new("Send {} to ask for a code, or the handle as waiting to finish one")
+            }
             Self::ShortChoice => Remedy::new(format!(
                 "Choose a password of at least {} characters",
                 lemonfiber_core::admission::LEAST

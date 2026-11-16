@@ -38,6 +38,46 @@
       {
         "choices": null,
         "environment": null,
+        "name": "LEMONFIBER_SIGN_IN_CODES_BY_ADDRESS",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_SIGN_IN_CODES_PERIOD",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_SIGN_IN_CODES_PER_PERIOD",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_SIGN_IN_CODES_WAITING",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
         "name": "PLEX_LINK_MODE",
         "readers": [],
         "value": null,

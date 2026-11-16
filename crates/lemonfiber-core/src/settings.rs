@@ -98,6 +98,28 @@ pub(crate) fn guide_hours(ctx: &Ctx) -> u32 {
         .unwrap_or(own::DEFAULT_GUIDE_HOURS)
 }
 
+/// How many codes to sign a member in by each source may ask for and have waiting, over
+/// what period, and whether finishing must come from the address that asked: each as
+/// recorded, or its default where none is or what is recorded is not one.
+pub(crate) fn sign_in_codes(ctx: &Ctx) -> crate::sign_in_codes::Limits {
+    let recorded = recorded::Recorded::of(ctx);
+    let [waiting, per_period, period] = own::CODE_COUNTS.map(|counted| {
+        recorded
+            .value(counted.0)
+            .and_then(|value| own::code_count(&counted, value).ok())
+            .unwrap_or(counted.3)
+    });
+    crate::sign_in_codes::Limits {
+        waiting: usize::try_from(waiting).unwrap_or(usize::MAX),
+        per_period: usize::try_from(per_period).unwrap_or(usize::MAX),
+        period: std::time::Duration::from_secs(u64::from(period) * 60),
+        by_address: recorded
+            .value(own::CODES_BY_ADDRESS)
+            .and_then(|value| own::switched(own::CODES_BY_ADDRESS, value).ok())
+            .unwrap_or(false),
+    }
+}
+
 /// What the setting `name` holds, where it holds anything.
 pub(crate) fn recorded_value(ctx: &Ctx, name: &str) -> Option<String> {
     recorded::Recorded::of(ctx).value(name).map(str::to_owned)

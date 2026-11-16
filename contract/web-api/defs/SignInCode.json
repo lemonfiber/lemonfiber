@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A code to sign in by, or the sign-in by a code still waiting.",
+  "type": "object",
+  "properties": {
+    "approve_at": {
+      "description": "Where the member approves the code, where one was just asked for.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "code": {
+      "description": "The code the member enters where they approve it, where one was just asked for.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lapses_at": {
+      "description": "When the code lapses.",
+      "$ref": "Instant.json"
+    },
+    "waiting": {
+      "description": "The handle that finishes signing in by the code.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lapses_at",
+    "waiting"
+  ]
+}

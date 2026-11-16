@@ -219,6 +219,13 @@ const MINTING: &[(&str, &str)] = &[
          the next mint is handed another",
     ),
     (
+        "crates/lemonfiber-core/src/sign_in_codes.rs",
+        "the handle a member's device finishes signing in by a code with. Drawn fresh for each \
+         code, held in memory against the session that asked until the code is spent or lapses, \
+         never written down or sent anywhere but back to that device — so it names one sign-in \
+         and nothing about the installation, and the next code is handed another",
+    ),
+    (
         "crates/lemonfiber-core/src/settings/secrets/keyed.rs",
         "the secret store's key, which every fingerprint of a secret in the change journal is \
          keyed under. It is drawn once, written into the owner-only secret store and read \

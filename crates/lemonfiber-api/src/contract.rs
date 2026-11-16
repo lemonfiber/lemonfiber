@@ -253,6 +253,11 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 /// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
+    describing(
+        kinds,
+        kind::SIGN_IN_CODE,
+        schema_for!(Envelope<crate::admission::coded::SignInCode>),
+    );
     describing(kinds, kind::ALERT, schema_for!(Envelope<Alert>));
     describing(
         kinds,
@@ -353,6 +358,7 @@ fn bodies() -> BTreeMap<String, Schema> {
             crate::push_endpoints::body(),
             crate::notify_events::body(),
             crate::admission::body(),
+            crate::admission::coded::body(),
         ])
         .map(|(route, schema)| (route.to_owned(), schema))
         .collect()

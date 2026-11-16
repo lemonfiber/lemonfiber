@@ -133,15 +133,17 @@ const DASHBOARD: &str = "dashboard";
 /// machine proves nothing to anybody, so it registers, lists and challenges none. The door
 /// a service tells the core what happened at is a curator's or the media server's, holding
 /// nothing but the key the core minted for it, and nobody at a command line has anything
-/// to tell it.
+/// to tell it. The door a member signs in by a code at is a household device's, holding no
+/// session yet, and a command line signs no member in.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 10] = [
+const UNREQUESTED: [&str; 11] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
     "/api/jobs/{job}",
     "/api/session",
+    "/api/session/code",
     "/api/keys/claim",
     "/api/device-keys",
     "/api/device-keys/{name}",

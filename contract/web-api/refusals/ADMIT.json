@@ -24,6 +24,26 @@
     "status": 400,
     "description": "Raised when the password chosen at a claim is shorter than the least this takes."
   },
+  "ADMIT-15": {
+    "name": "CODE_NOT_WAITING",
+    "status": 401,
+    "description": "Raised when a sign-in by a code names a handle that waits on nothing for this caller."
+  },
+  "ADMIT-16": {
+    "name": "TOO_MANY_CODES",
+    "status": 429,
+    "description": "Raised when one source has asked for as many codes to sign in by as it may."
+  },
+  "ADMIT-17": {
+    "name": "SIGNS_IN_BY_PASSWORD",
+    "status": 409,
+    "description": "Raised when a code to sign in by is asked of a household whose members sign in with a password."
+  },
+  "ADMIT-18": {
+    "name": "NOT_A_CODE_REQUEST",
+    "status": 400,
+    "description": "Raised when what was sent to ask for or finish a sign-in by a code cannot be read."
+  },
   "ADMIT-4": {
     "name": "NOT_ADMITTED",
     "status": 403,

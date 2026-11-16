@@ -71,6 +71,7 @@
     "/api/notify/events": "bodies/notify-events.json",
     "/api/push-endpoints": "bodies/push-endpoints.json",
     "/api/session": "bodies/session.json",
+    "/api/session/code": "bodies/session-code.json",
     "/api/setup/answer": "bodies/setup-answer.json",
     "/api/setup/recover": "bodies/setup-recover.json"
   },
@@ -226,6 +227,7 @@
     "settings": "kinds/settings.json",
     "settled": "kinds/settled.json",
     "setup": "kinds/setup.json",
+    "sign-in-code": "kinds/sign-in-code.json",
     "space": "kinds/space.json",
     "stack": "kinds/stack.json",
     "start": "kinds/start.json",
@@ -369,6 +371,7 @@
       "settings": "examples/kinds/settings.json",
       "settled": "examples/kinds/settled.json",
       "setup": "examples/kinds/setup.json",
+      "sign-in-code": "examples/kinds/sign-in-code.json",
       "space": "examples/kinds/space.json",
       "stack": "examples/kinds/stack.json",
       "start": "examples/kinds/start.json",

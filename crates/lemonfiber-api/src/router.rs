@@ -144,11 +144,13 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
 }
 
 /// The paths that open without a credential: the sign-in door, where a caller holding a
-/// password and nothing else carries none by definition, the door a key minted as a claim
+/// password and nothing else carries none by definition, the door a member signs in at by
+/// a code, holding nothing yet but the handle the core gave them, the door a key minted as a claim
 /// is collected at, by a program holding nothing but the claim, and the door a service
 /// tells the core what happened at, holding nothing but the key the core minted for it.
-const DOORS: [&str; 3] = [
+const DOORS: [&str; 4] = [
     crate::admission::SESSION,
+    crate::admission::coded::CODE,
     crate::keys::COLLECTING,
     crate::notify_events::EVENTS,
 ];

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SignInByCode",
+  "description": "What a caller sends to the door: nothing to ask for a code, the handle to finish one.",
+  "type": "object",
+  "properties": {
+    "waiting": {
+      "description": "The handle a code was answered with, where this finishes signing in by it.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "additionalProperties": false
+}

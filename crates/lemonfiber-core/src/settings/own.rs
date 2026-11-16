@@ -14,16 +14,50 @@ pub(crate) const GUIDE_HOURS: &str = "LEMONFIBER_GUIDE_HOURS";
 /// How many hours the live TV guide answers across where nothing is recorded.
 pub(crate) const DEFAULT_GUIDE_HOURS: u32 = 12;
 
+/// How many codes to sign a member in by one source may have waiting at once.
+pub(crate) const CODES_WAITING: &str = "LEMONFIBER_SIGN_IN_CODES_WAITING";
+
+/// How many codes to sign a member in by one source may ask for in each period.
+pub(crate) const CODES_PER_PERIOD: &str = "LEMONFIBER_SIGN_IN_CODES_PER_PERIOD";
+
+/// That period, in whole minutes.
+pub(crate) const CODES_PERIOD: &str = "LEMONFIBER_SIGN_IN_CODES_PERIOD";
+
+/// Whether finishing a sign-in by a code must come from the network address that asked.
+pub(crate) const CODES_BY_ADDRESS: &str = "LEMONFIBER_SIGN_IN_CODES_BY_ADDRESS";
+
+/// What each whole-number setting of sign-ins by a code holds, the range it takes, and
+/// what it is where nothing is recorded.
+pub(crate) const CODE_COUNTS: [(&str, &str, std::ops::RangeInclusive<u32>, u32); 3] = [
+    (
+        CODES_WAITING,
+        "how many codes to sign a member in by one source may have waiting at once",
+        1..=100,
+        3,
+    ),
+    (
+        CODES_PER_PERIOD,
+        "how many codes to sign a member in by one source may ask for in each period",
+        1..=1000,
+        10,
+    ),
+    (CODES_PERIOD, "that period in whole minutes", 1..=1440, 15),
+];
+
 /// The domain the household's names are under where nothing is recorded.
 pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
 
 /// The domain the household's names are under.
 pub(crate) const DOMAIN: &str = lemonfiber_manifest::container::DOMAIN;
 
-pub(crate) const CORE: [&str; 5] = [
+pub(crate) const CORE: [&str; 9] = [
     DEVICE_KEY_APPS,
     DASHBOARD_SEARCH,
     GUIDE_HOURS,
+    CODES_WAITING,
+    CODES_PER_PERIOD,
+    CODES_PERIOD,
+    CODES_BY_ADDRESS,
     DOMAIN,
     crate::plex_link::SETTING,
 ];
@@ -60,6 +94,12 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
     }
     if name == GUIDE_HOURS {
         return guide_hours(value).err();
+    }
+    if let Some(counted) = CODE_COUNTS.iter().find(|(counted, ..)| *counted == name) {
+        return code_count(counted, value).err();
+    }
+    if name == CODES_BY_ADDRESS {
+        return switched(name, value).err();
     }
     if name != DEVICE_KEY_APPS {
         return None;
@@ -103,6 +143,44 @@ pub(crate) fn guide_hours(value: &str) -> Result<u32, String> {
                 hours.end()
             )
         })
+}
+
+/// The number `value` holds for the setting of sign-ins by a code `counted` describes,
+/// where it is a whole number within its range.
+///
+/// # Errors
+///
+/// Why `value` is not one, naming the setting.
+pub(crate) fn code_count(
+    (name, holds, range, _): &(&str, &str, std::ops::RangeInclusive<u32>, u32),
+    value: &str,
+) -> Result<u32, String> {
+    value
+        .parse::<u32>()
+        .ok()
+        .filter(|held| range.contains(held))
+        .ok_or_else(|| {
+            format!(
+                "{name} is {holds}, a whole number from {} to {}, and {value} is not one",
+                range.start(),
+                range.end()
+            )
+        })
+}
+
+/// Whether `value` switches the setting `name` on, where it reads as on or as off.
+///
+/// # Errors
+///
+/// Why `value` is neither, naming the setting.
+pub(crate) fn switched(name: &str, value: &str) -> Result<bool, String> {
+    if crate::config::reads_as_on(value) {
+        Ok(true)
+    } else if crate::config::reads_as_off(value) {
+        Ok(false)
+    } else {
+        Err(format!("{name} is on or off, and {value} is neither"))
+    }
 }
 
 /// Whether `value` is a domain a name can be put in front of: labels of ASCII letters,

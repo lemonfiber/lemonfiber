@@ -9,6 +9,7 @@ mod acted;
 mod asked;
 mod authoring;
 mod beside;
+mod coded;
 mod companion;
 mod devices;
 mod disk;
@@ -44,6 +45,7 @@ async fn gather() -> Option<Examples> {
     asked::every(&mut seen).await?;
     beside::every(&mut seen).await?;
     devices::every(&mut seen).await?;
+    coded::every(&mut seen).await?;
     acted::every(&mut seen).await?;
     authoring::every(&mut seen).await?;
     Some(seen.examples)
