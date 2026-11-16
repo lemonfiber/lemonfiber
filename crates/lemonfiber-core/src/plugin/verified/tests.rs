@@ -284,3 +284,16 @@ fn whether_a_move_is_on_offer_is_not_held_against_the_install_making_it() {
     assert!(verification.held());
     assert!(verification.unsettled.is_empty());
 }
+
+/// Another part still starting when an install is verified is asked who holds it and gets
+/// no answer, which the owner check reads as unverified: it never takes the install back.
+#[test]
+fn another_part_still_starting_when_an_install_is_verified_does_not_reverse_it() {
+    let check = "config.claimed.navidrome";
+    let before = vec![about(check, "navidrome", Verdict::Pass { note: None })];
+    let after = vec![about(check, "navidrome", untold())];
+
+    let verification = against(&before, &after, &["request-gate"]);
+    assert!(verification.broke.is_empty(), "{:?}", verification.broke);
+    assert!(verification.held());
+}

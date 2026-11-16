@@ -25,6 +25,7 @@ enum Claiming {
 pub struct Part {
     holder: Option<Owner>,
     refusing: bool,
+    garbled: Option<&'static str>,
     claiming: Claiming,
     after_restart: Option<Owner>,
     restarts: AtomicUsize,
@@ -45,6 +46,15 @@ impl Part {
     pub const fn refusing() -> Self {
         let mut part = Self::new(None, Claiming::Refused, None);
         part.refusing = true;
+        part
+    }
+
+    /// A part answering who holds it with `said`, which is no answer, as one still starting
+    /// does.
+    #[must_use]
+    pub const fn garbled(said: &'static str) -> Self {
+        let mut part = Self::new(None, Claiming::Refused, None);
+        part.garbled = Some(said);
         part
     }
 
@@ -90,6 +100,7 @@ impl Part {
         Self {
             holder,
             refusing: false,
+            garbled: None,
             claiming,
             after_restart,
             restarts: AtomicUsize::new(0),
@@ -119,6 +130,12 @@ fn owner(fake: &Part) -> Result<Owner, Failure> {
     if fake.refusing {
         return Err(Failure::Unauthorised {
             service: SERVICE.to_owned(),
+        });
+    }
+    if let Some(said) = fake.garbled {
+        return Err(Failure::Refused {
+            service: SERVICE.to_owned(),
+            detail: said.to_owned(),
         });
     }
     let holder = match fake.after_restart {
