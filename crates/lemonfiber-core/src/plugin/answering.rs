@@ -18,3 +18,6 @@ pub(crate) fn up() -> Vec<Statuses> {
 pub(crate) fn passes(status: u16) -> bool {
     up().iter().any(|statuses| statuses.holds(status))
 }
+
+#[cfg(test)]
+mod tests;
