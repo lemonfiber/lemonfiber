@@ -4,6 +4,7 @@ use lemonfiber_fixtures::http::Fake as Transport;
 
 use super::*;
 use crate::model::StuckReport;
+use crate::ports::service::ReleaseProbe;
 use crate::test_support::curators::{told, MUSIC};
 
 /// The album the music curator holds.
@@ -99,6 +100,38 @@ async fn the_media_server_is_asked_for_the_album_in_its_music_library() {
             .filter_map(|asked| asked.get("kind").cloned())
             .collect();
     assert_eq!(kinds, [serde_json::json!("music")]);
+}
+
+#[tokio::test]
+async fn an_album_a_trace_is_asked_to_search_for_is_searched_for_by_the_curator_of_music() {
+    let http = Transport::by_path(vec![
+        (
+            crate::test_support::media::serve("has_item"),
+            answered(&false),
+        ),
+        (curating(MUSIC, "find_items"), answered(&[album()])),
+        (curated("find_items"), answered(&Vec::<FoundItem>::new())),
+        (curated("item_history"), nothing_happened()),
+        (curated("item_queue"), answered(&Vec::<QueueItem>::new())),
+        (curated("item_parts"), answered(&Vec::<ItemPart>::new())),
+        (curated("stuck_items"), answered(&Vec::<StuckItem>::new())),
+        (curated("wanting"), answered(&true)),
+        (
+            curated("probe_releases"),
+            answered(&ReleaseProbe::NoneMatch),
+        ),
+    ]);
+    let ctx = over(Arc::clone(&http));
+
+    let report = trace(&ctx, "kind of blue", None, true)
+        .await
+        .unwrap_or_default();
+
+    assert_eq!(report.item, "Kind of Blue", "{report:?}");
+    assert_eq!(
+        told::<TitleKind>(&http.requests(), MUSIC, "probe_releases", "kind"),
+        [TitleKind::Music]
+    );
 }
 
 #[tokio::test]
