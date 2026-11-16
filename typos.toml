@@ -2,7 +2,13 @@
 # Ignore hotkey mockup notation like [e]rror, [s]ervice in TUI examples.
 # A commit hash is hexadecimal, and its letters are not words: `8fa05ba718f7`
 # read as prose has `ba` in it.
-extend-ignore-re = ["\\[[a-z]\\][a-zA-Z]+", "\\b[0-9a-f]*[0-9][0-9a-f]*\\b"]
+# A Windows option is a slash and capitals, quoted as one argument: `"/FO"` is a
+# flag `schtasks` reads, not a word.
+extend-ignore-re = [
+    "\\[[a-z]\\][a-zA-Z]+",
+    "\\b[0-9a-f]*[0-9][0-9a-f]*\\b",
+    "\"/[A-Z]+\"",
+]
 
 [default.extend-words]
 ratatui = "ratatui"
