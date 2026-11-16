@@ -150,6 +150,9 @@ pub struct Asked {
     /// thing that tells the two answers apart is this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accept: Option<String>,
+    /// Each header a proof named and the request sent, by its name, to its value.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub headers: BTreeMap<String, String>,
 }
 
 /// What came back, in the terms an expectation can constrain.

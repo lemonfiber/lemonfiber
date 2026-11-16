@@ -68,3 +68,31 @@ fn a_recording_that_asked_for_something_else_is_of_another_call() {
     assert!(asked(&negotiated, json));
     assert!(!asked(&negotiated, None));
 }
+
+/// The headers a proof names are part of which call a recording is of, both ways.
+#[test]
+fn a_recording_that_sent_other_headers_is_of_another_call() {
+    let plain: Result<Recording, _> = serde_json::from_str(WHOLE);
+    let headed: Result<Recording, _> = serde_json::from_str(&WHOLE.replace(
+        r#""path": "/api/v1/series" }"#,
+        r#""path": "/api/v1/series", "headers": { "Target-URL": "http://watched:8989/ping" } }"#,
+    ));
+    let asked = |recording: &Result<Recording, serde_json::Error>, headers: &str| {
+        let text = format!(r#"{{"method": "GET", "path": "/api/v1/series"{headers}}}"#);
+        let read: Result<lemonfiber_plugin::Request, _> = serde_json::from_str(&text);
+        recording.as_ref().is_ok_and(|one| {
+            read.as_ref().is_ok_and(|asked| match &one.of {
+                Of::Request { request, .. } => records(request, asked),
+                Of::Run { .. } => false,
+            })
+        })
+    };
+    let named = r#", "headers": { "Target-URL": "http://watched:8989/ping" }"#;
+    let other = r#", "headers": { "Target-URL": "http://another:7878/ping" }"#;
+
+    assert!(asked(&plain, ""));
+    assert!(!asked(&plain, named));
+    assert!(asked(&headed, named));
+    assert!(!asked(&headed, other));
+    assert!(!asked(&headed, ""));
+}

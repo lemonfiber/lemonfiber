@@ -30,6 +30,7 @@ fn answered_with(status: u16, json: Value) -> Recording {
                 method: "GET".to_owned(),
                 path: "/identity".to_owned(),
                 accept: Some("application/json".to_owned()),
+                headers: std::collections::BTreeMap::new(),
             },
             response: Answer {
                 status,

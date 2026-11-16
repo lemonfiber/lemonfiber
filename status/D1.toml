@@ -6,7 +6,7 @@ requirement = [
   { id = "D1-R2", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs"] },
   { id = "D1-R3", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs", "crates/lemonfiber-core/src/seed/run/filing.rs"] },
   { id = "D1-R4", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs"] },
-  { id = "D1-R5", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs"] },
+  { id = "D1-R5", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs", "crates/lemonfiber-core/src/seed/run/again.rs", "crates/lemonfiber-core/src/seed/run/again/tests.rs::a_connection_not_answering_is_reported_as_the_second_try_found_it", "crates/lemonfiber-core/src/seed/run/again/tests.rs::only_a_connection_its_service_did_not_answer_is_tried_again"] },
   { id = "D1-R6", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs"] },
   { id = "D1-R7", state = "done", evidence = ["spec:20-architecture/contracts/prowlarr-application.md", "spec:20-architecture/contracts/jellyfin-seerr-identity.md", "crates/lemonfiber-contract/src/capabilities/indexer.rs", "crates/lemonfiber-ports/src/service.rs", "crates/lemonfiber-core/src/app/targets/media.rs", "crates/lemonfiber-contract/src/capabilities/request.rs"] },
   { id = "D1-R8", state = "done", evidence = ["crates/lemonfiber-core/src/seed.rs", "crates/lemonfiber-contract/src/capabilities/library.rs"] },

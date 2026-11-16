@@ -26,13 +26,10 @@ pub(crate) async fn answering(
         Ok(method) => method,
         Err(unaskable) => return unaskable,
     };
-    // No headers. A proof cannot present a credential, because there is nowhere in the
-    // block to write one — which is what keeps *this asks as nobody* a property of the
-    // format rather than a convention somebody has to hold.
     let request = Request {
         method,
         url: format!("{address}{}", asked.path),
-        headers: Vec::new(),
+        headers: asked.sent(),
         body: None,
         pinned: None,
         deadline: None,
@@ -86,3 +83,6 @@ pub(super) fn askable(
         })
     }
 }
+
+#[cfg(test)]
+mod tests;

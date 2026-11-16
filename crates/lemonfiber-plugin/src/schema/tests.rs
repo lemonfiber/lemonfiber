@@ -346,31 +346,6 @@ fn an_exact_value_is_a_word_a_flag_or_a_number() {
     );
 }
 
-#[test]
-fn reads_what_a_proof_asks_and_why_it_is_worth_asking() {
-    let read = parse(WHOLE)
-        .and_then(|manifest| manifest.proofs.into_iter().next())
-        .map(|proof| {
-            (
-                proof.id,
-                proof.title,
-                proof.request.map(|request| request.method),
-                proof.fixture,
-                proof.why.contains("health probe"),
-            )
-        });
-    assert_eq!(
-        read,
-        Some((
-            "komga.serves".to_owned(),
-            "Komga answers on its declared health path".to_owned(),
-            Some("GET".to_owned()),
-            Some("fixtures/health.json".to_owned()),
-            true,
-        ))
-    );
-}
-
 /// Which fields one row of a contribution filled in.
 ///
 /// Said as a list of names rather than as a tuple of options, because what the two
@@ -549,40 +524,6 @@ forms       = ["library"]
         )
     });
     assert_eq!(read, Some((0, false, false, 0)));
-}
-
-/// A service that answers its application shell for every unimplemented path.
-///
-/// The shape two of the published plugins already carry, and the reason
-/// `json_is_absent` is a flag rather than a list of keys: what has to be said is
-/// that the body was not a document at all. A status alone proves nothing against
-/// such a service, because the shell comes back `200` whether the API behind it
-/// exists or not.
-#[test]
-fn a_proof_can_say_the_answer_was_not_json_at_all() {
-    let text = WHOLE.replace(
-            r#"expect  = { status = 200, json = { status = "UP", claimed = true, libraries = 3 } }"#,
-            r#"expect  = { status = 200, content_type = "text/html", json_is_absent = true, body_starts_with = "<!DOCTYPE html>" }"#,
-        );
-    let read = parse(&text)
-        .and_then(|manifest| manifest.proofs.into_iter().next())
-        .map(|proof| {
-            (
-                proof.expect.json_is_absent,
-                proof.expect.content_type,
-                proof.expect.body_starts_with,
-                proof.expect.json.is_none(),
-            )
-        });
-    assert_eq!(
-        read,
-        Some((
-            Some(true),
-            Some("text/html".to_owned()),
-            Some("<!DOCTYPE html>".to_owned()),
-            true,
-        ))
-    );
 }
 
 #[test]
@@ -770,3 +711,4 @@ mod dashboard;
 mod fields;
 mod linking;
 mod networks;
+mod proofs;

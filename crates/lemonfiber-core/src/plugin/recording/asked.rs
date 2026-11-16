@@ -283,6 +283,7 @@ async fn recorded(
                         method: item.request.method.clone(),
                         path: item.request.path.clone(),
                         accept: item.request.accept.clone(),
+                        headers: item.request.headers.clone(),
                     },
                     response,
                 },
@@ -350,14 +351,10 @@ pub(super) async fn answered(
         return Err(format!("{} is not a route on the service", asked.path));
     }
     let url = format!("http://{LOOPBACK}:{port}{}", asked.path);
-    let mut headers = Vec::new();
-    if let Some(accept) = &asked.accept {
-        headers.push(("Accept".to_owned(), accept.clone()));
-    }
     let request = crate::ports::http::Request {
         method,
         url,
-        headers,
+        headers: asked.sent(),
         body: None,
         pinned: None,
         deadline: None,

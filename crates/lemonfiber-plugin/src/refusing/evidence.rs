@@ -37,6 +37,69 @@ pub(super) fn asking(manifest: &Manifest, found: &mut Vec<Violation>) {
     }
 }
 
+/// Whether each header a request sends is one a proof may send, on a proof, holding a
+/// value shaped like no secret.
+pub(super) fn heading(manifest: &Manifest, found: &mut Vec<Violation>) {
+    for (at, request) in asked(manifest) {
+        let proving = manifest
+            .proofs
+            .iter()
+            .any(|proof| format!("proof {}", proof.id) == at);
+        for (name, value) in &request.headers {
+            let refused = if !proving {
+                Some(format!(
+                    "{name} is a header, and only a proof sends one; a probe and a contributed \
+                     check present nothing beyond what they ask for"
+                ))
+            } else if !crate::schema::NAMED_HEADERS.contains(&name.as_str()) {
+                Some(format!(
+                    "{name} is not a header a proof may send; the headers a proof may send are \
+                     a closed list of names that carry no credential: {}",
+                    crate::schema::NAMED_HEADERS.join(", ")
+                ))
+            } else if secret_shaped(value) {
+                Some(format!(
+                    "{name} holds a value shaped like a secret, which a manifest anybody may \
+                     read never carries"
+                ))
+            } else {
+                None
+            };
+            if let Some(message) = refused {
+                found.push(Violation {
+                    location: format!("{at}.request.headers"),
+                    message,
+                });
+            }
+        }
+    }
+}
+
+/// The shortest run of the letters a secret is written in that is read as one.
+const SECRET_RUN: usize = 20;
+
+/// Whether `value` is shaped like a secret: it holds a URL's user information, or a run
+/// of [`SECRET_RUN`] or more letters, digits, `-`, `_`, `+`, `/` and `=` holding both a
+/// letter and a digit.
+pub(crate) fn secret_shaped(value: &str) -> bool {
+    let credentialed = value.split("://").skip(1).any(|after| {
+        after
+            .split(['/', '?', '#'])
+            .next()
+            .is_some_and(|authority| authority.contains('@'))
+    });
+    credentialed
+        || value
+            .split(|letter: char| {
+                !(letter.is_ascii_alphanumeric() || matches!(letter, '-' | '_' | '+' | '/' | '='))
+            })
+            .any(|run| {
+                run.len() >= SECRET_RUN
+                    && run.chars().any(|letter| letter.is_ascii_alphabetic())
+                    && run.chars().any(|letter| letter.is_ascii_digit())
+            })
+}
+
 /// Whether each value a request says varies is named by a place it can vary at and held
 /// to a shape this build compiles.
 pub(super) fn varying(manifest: &Manifest, found: &mut Vec<Violation>) {

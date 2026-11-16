@@ -126,6 +126,32 @@ async fn what_the_request_accepts_is_sent_and_no_credential_beside_it() {
     );
 }
 
+#[tokio::test]
+async fn each_header_a_proof_names_is_sent_after_what_it_accepts() {
+    let http = Fake::always(Answer::reply(403, "{}"));
+    let asked = Request {
+        headers: [(
+            "Target-URL".to_owned(),
+            "http://sonarr:8989/ping".to_owned(),
+        )]
+        .into(),
+        ..request("/cors-proxy", Some("application/json"))
+    };
+
+    let _ = answered(http.as_ref(), 8, &item(&asked, false)).await;
+
+    assert_eq!(
+        http.request().map(|one| one.headers),
+        Some(vec![
+            ("Accept".to_owned(), "application/json".to_owned()),
+            (
+                "Target-URL".to_owned(),
+                "http://sonarr:8989/ping".to_owned()
+            ),
+        ])
+    );
+}
+
 fn item(request: &Request, keyed: bool) -> Item<'_> {
     Item {
         named: "proof p".to_owned(),
@@ -142,6 +168,7 @@ fn request(path: &str, accept: Option<&str>) -> Request {
         path: path.to_owned(),
         accept: accept.map(str::to_owned),
         varies: std::collections::BTreeMap::new(),
+        headers: std::collections::BTreeMap::new(),
     }
 }
 

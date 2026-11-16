@@ -211,19 +211,18 @@ pub struct Run {
 
 /// What is asked, and where.
 ///
-/// Three fields and no more, and the third is the one worth explaining. A service that
-/// answers XML unless a caller asks for JSON cannot satisfy a capability whose probe
-/// requires a JSON assertion, and until this field there was nowhere to ask: Plex
-/// answers `text/xml` at every path, including the one its health probe uses, unless
-/// the request carries `Accept: application/json`.
+/// A method, a path and one media type, and on a plugin's own proof the headers it names
+/// from [`NAMED_HEADERS`]. A service that answers XML unless a caller asks for JSON cannot
+/// satisfy a capability whose probe requires a JSON assertion, so `accept` asks for one
+/// representation: Plex answers `text/xml` at every path unless the request carries
+/// `Accept: application/json`.
 ///
-/// **It is one media type and not a header map, and the difference is the point.** A
-/// probe declares who it is asked as, and `none` on every `guarded` probe has meant what
-/// it says partly because nothing could be presented. A map of headers would make that a
-/// convention a reviewer has to hold — any service may name its credential header
-/// whatever it likes, so no list of refused names could ever be closed — where one named
-/// field keeps it a property of the format. A probe still cannot present anything,
-/// because there is nowhere to write it.
+/// **The headers a proof may send are a closed list, and the difference is the point.**
+/// A probe declares who it is asked as, and `none` on every `guarded` probe means what it
+/// says because nothing can be presented. A service may name its credential header
+/// whatever it likes, so no list of refused names could ever be closed; a list of allowed
+/// names is, each a header the core has read as carrying no credential. A claim probe and
+/// a contributed check carry none, and a value shaped like a secret is refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "PluginRequest")]
@@ -242,6 +241,32 @@ pub struct Request {
     /// recording is taken again. Never sent.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub varies: BTreeMap<String, String>,
+    /// Each header a proof sends, by its name, to its value: a name from the closed list
+    /// the core holds, `Target-URL` alone, and a value shaped like no secret. A proof
+    /// alone may carry any.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub headers: BTreeMap<String, String>,
+}
+
+/// The headers a proof may send, a closed list that grows only by a change to the core:
+/// each one read as carrying no credential.
+pub const NAMED_HEADERS: [&str; 1] = ["Target-URL"];
+
+impl Request {
+    /// Every header this request puts on the wire: `Accept` where it asks for a
+    /// representation, then each header it names.
+    #[must_use]
+    pub fn sent(&self) -> Vec<(String, String)> {
+        self.accept
+            .iter()
+            .map(|accept| ("Accept".to_owned(), accept.clone()))
+            .chain(
+                self.headers
+                    .iter()
+                    .map(|(name, value)| (name.clone(), value.clone())),
+            )
+            .collect()
+    }
 }
 
 /// What the answer has to be.

@@ -26,6 +26,7 @@ fn asking(method: &str, path: &str) -> lemonfiber_plugin::Request {
         path: path.to_owned(),
         accept: None,
         varies: std::collections::BTreeMap::new(),
+        headers: std::collections::BTreeMap::new(),
     }
 }
 
@@ -157,8 +158,17 @@ async fn a_request_that_cannot_be_put_or_a_service_listening_nowhere_runs_no_pro
     let ctx = machine(&[SOLVER], &program);
     let mut nowhere = solver(false);
     nowhere.listens = None;
+    let headed = lemonfiber_plugin::Request {
+        headers: [(
+            "Target-URL".to_owned(),
+            "http://sonarr:8989/ping".to_owned(),
+        )]
+        .into(),
+        ..asking("GET", "/")
+    };
 
     for (placed, request, said) in [
+        (solver(true), headed, "sends no header"),
         (solver(false), asking("BREW", "/"), "is not a method"),
         (
             solver(false),

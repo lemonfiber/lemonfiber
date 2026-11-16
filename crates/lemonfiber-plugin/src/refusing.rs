@@ -94,6 +94,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     carried::carried(manifest, &mut found);
     evidence::asking(manifest, &mut found);
     evidence::varying(manifest, &mut found);
+    evidence::heading(manifest, &mut found);
     evidence::looking(manifest, &mut found);
     program::asked(manifest, &mut found);
     failing::declared(manifest, &mut found);

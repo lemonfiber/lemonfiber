@@ -162,3 +162,95 @@ expect  = { status = 401 }"#,
         );
     }
 }
+
+/// The proof's request in the fixture, sending `headers`.
+fn proving_with(headers: &str) -> Vec<String> {
+    without(
+        r#"request = { method = "GET", path = "/actuator/health" }"#,
+        &format!(
+            "request = {{ method = \"GET\", path = \"/actuator/health\", headers = {{ {headers} }} }}"
+        ),
+    )
+}
+
+/// A proof may send a header from the closed list, holding a value shaped like no secret.
+#[test]
+fn a_proof_may_send_a_named_header() {
+    for value in ["http://sonarr:8989/ping", "https://example.org/a/b?c=d"] {
+        let said = proving_with(&format!("\"Target-URL\" = \"{value}\""));
+        assert!(said.is_empty(), "{value}: {said:?}");
+    }
+}
+
+/// Any other header, a header on a probe or a contribution, and a value shaped like a
+/// secret are refused, each naming the field.
+#[test]
+fn a_header_off_the_list_off_a_proof_or_shaped_like_a_secret_is_refused_by_name() {
+    for (headers, words) in [
+        ("\"X-Api-Key\" = \"x\"", "not a header a proof may send"),
+        (
+            "Authorization = \"Basic x\"",
+            "not a header a proof may send",
+        ),
+        (
+            "\"target-url\" = \"http://sonarr:8989/ping\"",
+            "not a header a proof may send",
+        ),
+        (
+            "\"Target-URL\" = \"http://user:pass@sonarr:8989/ping\"",
+            "shaped like a secret",
+        ),
+        (
+            "\"Target-URL\" = \"http://sonarr:8989/ping?apikey=0123456789abcdef0123\"",
+            "shaped like a secret",
+        ),
+    ] {
+        let said = proving_with(headers);
+        assert!(
+            names(&said, &["proof komga.serves.request.headers", words]),
+            "{headers} was not refused for {words}: {said:?}"
+        );
+    }
+    for (was, now) in [
+        (
+            r#"id      = "guarded"
+request = { method = "GET", path = "/api/v1/series" }"#,
+            r#"id      = "guarded"
+request = { method = "GET", path = "/api/v1/series", headers = { "Target-URL" = "http://sonarr:8989/ping" } }"#,
+        ),
+        (
+            r#"request   = { method = "GET", path = "/api/v1/claim" }"#,
+            r#"request   = { method = "GET", path = "/api/v1/claim", headers = { "Target-URL" = "http://sonarr:8989/ping" } }"#,
+        ),
+    ] {
+        let said = without(was, now);
+        assert!(
+            names(&said, &["request.headers", "only a proof sends one"]),
+            "{now}: {said:?}"
+        );
+    }
+}
+
+/// What a value has to hold to be read as a secret, and what it may hold and not be.
+#[test]
+fn a_value_is_shaped_like_a_secret_by_user_information_or_a_long_mixed_run() {
+    for (case, secret) in [
+        "https://ana:hunter2@example.org/",
+        "ghp_0123456789abcdefABCDEF",
+        "Bearer YWxhZGRpbjpvcGVuc2VzYW1lMTIzNA==",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(super::secret_shaped(secret), "secret case {case}");
+    }
+    for plain in [
+        "http://sonarr:8989/ping",
+        "https://example.org/a@b",
+        "abcdefghijklmnopqrstuvwxyz",
+        "01234567890123456789012",
+        "mailto:ana@example.org",
+    ] {
+        assert!(!super::secret_shaped(plain), "{plain}");
+    }
+}
