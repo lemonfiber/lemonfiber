@@ -1,9 +1,11 @@
 //! The asks for music and books the core keeps itself, since no request service holds them.
 //!
 //! Each is named on the household list by a reference of its own, `music-<n>` or
-//! `books-<n>`, beside the request service's bare numbers, so a decision can never land
-//! on the wrong one. An ask for a whole artist, a whole author or a series always waits
-//! for the operator; an album or a book follows the household's policy.
+//! `books-<n>`, beside the request service's bare numbers and the `tv-<n>` and
+//! `movies-<n>` of the asks kept until they are filed as the request service's owner, so
+//! a decision can never land on the wrong one. An ask for a whole artist, a whole author
+//! or a series always waits for the operator; an album or a book follows the household's
+//! policy.
 
 mod collector;
 pub(crate) mod run;
@@ -16,6 +18,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ports::media::Kind;
 use crate::ports::service::{BookUnit, CuratedUnit, MusicUnit};
 
 /// A medium the core keeps asks for.
@@ -156,6 +159,9 @@ pub enum Reference {
     Filed(i64),
     /// One the core keeps, by its medium and its number among that medium's asks.
     Kept(Medium, u64),
+    /// One the core keeps until it is filed as the request service's owner, by its kind
+    /// and its number among that kind's asks.
+    AsOwner(Kind, u64),
 }
 
 impl fmt::Display for Reference {
@@ -163,6 +169,7 @@ impl fmt::Display for Reference {
         match self {
             Self::Filed(number) => write!(f, "{number}"),
             Self::Kept(medium, number) => write!(f, "{}-{number}", medium.word()),
+            Self::AsOwner(kind, number) => write!(f, "{}-{number}", kind.media_type()),
         }
     }
 }
@@ -203,7 +210,9 @@ pub struct NotAReference;
 
 impl fmt::Display for NotAReference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("a request is named by its number, or by music-<n> or books-<n>")
+        f.write_str(
+            "a request is named by its number, or by tv-<n>, movies-<n>, music-<n> or books-<n>",
+        )
     }
 }
 
@@ -215,14 +224,15 @@ impl FromStr for Reference {
     fn from_str(written: &str) -> Result<Self, Self::Err> {
         let written = written.trim();
         if let Some((word, number)) = written.split_once('-') {
-            let medium = Medium::ALL
-                .into_iter()
-                .find(|medium| medium.word() == word)
-                .ok_or(NotAReference)?;
-            return digits(number)
+            let number = digits(number)
                 .and_then(|number| number.parse().ok())
                 .filter(|number| *number > 0)
-                .map(|number| Self::Kept(medium, number))
+                .ok_or(NotAReference)?;
+            return Medium::ALL
+                .into_iter()
+                .find(|medium| medium.word() == word)
+                .map(|medium| Self::Kept(medium, number))
+                .or_else(|| Kind::for_media_type(word).map(|kind| Self::AsOwner(kind, number)))
                 .ok_or(NotAReference);
         }
         digits(written)

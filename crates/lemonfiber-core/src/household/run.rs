@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 
 use crate::app::targets::{household_requests, identity};
 use crate::app::{Ctx, Hostable, Whom};
-pub(crate) use allowance::{allowance_of, OwnAllowance};
+pub(crate) use allowance::{allowance_of, made_by, OwnAllowance};
 use grouping::{grouped, names};
 use naming::{library_titles, named_access, named_by_the_server, unheld_titles, Naming};
 
@@ -131,6 +131,9 @@ async fn everybody(ctx: &Ctx, member: Option<&str>) -> Result<HouseholdReport, B
             None
         }
     };
+    if let Some(access) = &reached {
+        crate::wishing::settled_beside(ctx, access.requests.as_ref()).await;
+    }
     let kept = as_owner::kept(ctx);
     let (requests, asked) = asked_of(reached.as_ref(), &accounts, &kept, &mut findings).await;
     if asked.household.is_none() {

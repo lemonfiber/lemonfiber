@@ -17,7 +17,29 @@ use crate::wishing::tests::{
     titled_as, Route, ACCOUNT,
 };
 
+mod beside;
 mod owner;
+mod planning;
+
+/// `ctx` on a disk with no room left for anything new.
+fn without_room(ctx: Ctx) -> Ctx {
+    let full = crate::ports::filesystem::StorageFacts {
+        point: std::path::PathBuf::new(),
+        kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
+        removable: false,
+        available: 0,
+        total: 4 * 1024 * 1024 * 1024 * 1024,
+    };
+    let mut ctx = ctx.with_filesystem(Arc::new(
+        crate::test_support::SeedFs::keyed(None).with_facts(full),
+    ));
+    ctx.settings.data_root = ctx
+        .settings
+        .env_file
+        .clone()
+        .and_then(|env| env.parent().map(std::path::Path::to_path_buf));
+    ctx
+}
 
 /// The report an ask answered with, or nothing where it was refused.
 fn report(outcome: Result<Outcome, Box<crate::error::Problem>>) -> Option<AskedReport> {
@@ -547,22 +569,7 @@ async fn an_ask_past_an_allowance_whose_dates_are_unknown_is_refused_with_the_pl
 #[tokio::test]
 async fn a_house_with_no_room_says_so_as_the_houses_and_files_nothing() {
     let transport = titled(Vec::new());
-    let mut ctx = ctx_over(Arc::clone(&transport), "ask-no-room");
-    let full = crate::ports::filesystem::StorageFacts {
-        point: std::path::PathBuf::new(),
-        kind: crate::ports::filesystem::FsKind::Linking("test".to_owned()),
-        removable: false,
-        available: 0,
-        total: 4 * 1024 * 1024 * 1024 * 1024,
-    };
-    ctx = ctx.with_filesystem(Arc::new(
-        crate::test_support::SeedFs::keyed(None).with_facts(full),
-    ));
-    ctx.settings.data_root = ctx
-        .settings
-        .env_file
-        .clone()
-        .and_then(|env| env.parent().map(std::path::Path::to_path_buf));
+    let ctx = without_room(ctx_over(Arc::clone(&transport), "ask-no-room"));
 
     let refused = asked(&ctx, "Ada", Kind::Movies, "603", &[]).await;
 

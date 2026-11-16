@@ -45,7 +45,8 @@ pub enum HouseholdCommand {
     /// Refused where there is no room left on the disk, and said as the disk rather
     /// than as anybody's limit — raising a limit would change nothing.
     Approve {
-        /// The request, by the reference beside it: a number, or music-<n> or books-<n>.
+        /// The request, by the reference beside it: a number, tv-<n>, movies-<n>, music-<n>
+        /// or books-<n>.
         request: Reference,
     },
     /// Turn one waiting request down, saying why.
@@ -54,7 +55,8 @@ pub enum HouseholdCommand {
     /// asked that it was declined and carries no reason with it, so what you write here
     /// is yours to pass on.
     Decline {
-        /// The request, by the reference beside it: a number, or music-<n> or books-<n>.
+        /// The request, by the reference beside it: a number, tv-<n>, movies-<n>, music-<n>
+        /// or books-<n>.
         request: Reference,
         /// Why, in a few words.
         #[arg(long, required = true)]

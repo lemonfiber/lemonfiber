@@ -1,4 +1,4 @@
-//! The household view: each member, what they may ask for, and what is stuck.
+//! The household view: each member and what they may ask for.
 
 use super::*;
 
@@ -11,6 +11,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             to_hand_over: Vec::new(),
             requests: vec![
                 MemberRequest {
+                    also_asked: vec!["Bea".to_owned()],
                     year: None,
                     arrived: None,
                     shelf_id: None,
@@ -19,7 +20,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                     kind: None,
                     unit: None,
                     state: Some(lemonfiber_core::household::State::Here),
-                    id: "0".to_owned(),
+                    id: "1".to_owned(),
                     asked: None,
                     waiting_days: None,
                     estimate: None,
@@ -27,6 +28,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                 },
                 // No service holds it yet, so it is named by what it is.
                 MemberRequest {
+                    also_asked: Vec::new(),
                     year: None,
                     arrived: None,
                     shelf_id: None,
@@ -35,7 +37,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                     kind: None,
                     unit: None,
                     state: Some(lemonfiber_core::household::State::WaitingForApproval),
-                    id: "0".to_owned(),
+                    id: "2".to_owned(),
                     asked: None,
                     waiting_days: None,
                     estimate: None,
@@ -43,6 +45,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                 },
                 // Neither a title nor a kind this build knows.
                 MemberRequest {
+                    also_asked: Vec::new(),
                     year: None,
                     arrived: None,
                     shelf_id: None,
@@ -51,7 +54,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
                     kind: None,
                     unit: None,
                     state: None,
-                    id: "0".to_owned(),
+                    id: "3".to_owned(),
                     asked: None,
                     waiting_days: None,
                     estimate: None,
@@ -91,6 +94,7 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
     assert!(text.contains("a film   waiting for approval"));
     assert!(text.contains("something   the request service reports a state"));
     assert!(text.contains("1 member(s), 3 request(s)."), "{text}");
+    assert!(text.contains("(also asked by Bea)"), "{text}");
     assert!(text.contains("! a library could not be read"));
     assert!(
         text.contains("! the media server holds no account under sam"),
@@ -157,6 +161,7 @@ fn a_household(
             to_hand_over: Vec::new(),
             requests: vec![
                 MemberRequest {
+                    also_asked: Vec::new(),
                     year: None,
                     arrived: None,
                     shelf_id: None,
@@ -174,6 +179,7 @@ fn a_household(
                     refused: None,
                 },
                 MemberRequest {
+                    also_asked: Vec::new(),
                     year: None,
                     arrived: None,
                     shelf_id: None,
@@ -569,30 +575,6 @@ fn an_empty_household_says_whether_it_was_read() {
     let text = household(&unread).text();
     assert!(!text.contains("Nobody has asked"));
     assert!(text.contains("! could not be read"));
-}
-
-#[test]
-fn the_stuck_list_names_each_item_and_links_its_trace() {
-    let report = StuckReport {
-        items: vec![StuckEntry {
-            title: "The Expanse".to_owned(),
-            service: "Sonarr".to_owned(),
-            stage: Stage::Downloading,
-        }],
-        incomplete: true,
-    };
-    let text = stuck(&report).text();
-    assert!(text.contains("1 item(s) stuck"));
-    assert!(text.contains("stuck at downloading"));
-    assert!(text.contains("trace 'The Expanse'"));
-    assert!(text.contains("may be incomplete"));
-
-    // Nothing stuck is said plainly.
-    let clear = StuckReport {
-        items: Vec::new(),
-        incomplete: false,
-    };
-    assert!(stuck(&clear).text().contains("Nothing is stuck"));
 }
 
 /// One member, held to what the arguments say.

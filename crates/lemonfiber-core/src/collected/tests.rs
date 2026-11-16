@@ -1,4 +1,5 @@
 use super::{Medium, NotAUnit, Reference, Unit};
+use crate::ports::media::Kind;
 use crate::ports::service::{BookUnit, MusicUnit};
 
 #[test]
@@ -15,6 +16,17 @@ fn a_kept_ask_reads_and_writes_with_its_medium() {
 }
 
 #[test]
+fn an_ask_kept_to_be_filed_as_the_owner_reads_and_writes_with_its_kind() {
+    assert_eq!("tv-4".parse(), Ok(Reference::AsOwner(Kind::Tv, 4)));
+    assert_eq!(
+        " movies-2 ".parse(),
+        Ok(Reference::AsOwner(Kind::Movies, 2))
+    );
+    assert_eq!(Reference::AsOwner(Kind::Tv, 4).to_string(), "tv-4");
+    assert_eq!(Reference::AsOwner(Kind::Movies, 2).to_string(), "movies-2");
+}
+
+#[test]
 fn anything_else_names_no_request() {
     for written in [
         "",
@@ -24,6 +36,9 @@ fn anything_else_names_no_request() {
         "music--1",
         "music-x",
         "film-1",
+        "movie-1",
+        "tv-0",
+        "movies-",
         "4 2",
         "+42",
         "-42",

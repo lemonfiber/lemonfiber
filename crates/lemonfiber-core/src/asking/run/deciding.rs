@@ -28,6 +28,7 @@
 //! because the two answer to different things: a decision the service would not take is
 //! a refusal to report, and a message that could not go is a line to read.
 
+use crate::asking::NOTHING_DECIDED;
 use crate::collected::Reference;
 use crate::error::{Diagnose, Problem};
 use crate::household::State;
@@ -47,16 +48,21 @@ pub(crate) async fn deciding(
         Reference::Filed(number) => number,
         Reference::Kept(medium, number) => {
             let said = crate::collected::run::decided(ctx, medium, number, reason).await?;
-            let mut report = crate::household::run::household(ctx, None).await?;
-            report.noted.insert(0, said);
-            return Ok(report);
+            return noting(ctx, said).await;
+        }
+        Reference::AsOwner(kind, number) => {
+            let access = reaching(ctx).await?;
+            let said = crate::household::run::as_owner::approving::decided(
+                ctx,
+                access.requests.as_ref(),
+                (kind, number),
+                reason,
+            )
+            .await?;
+            return noting(ctx, said).await;
         }
     };
-    let manifest = ctx
-        .stack
-        .checked_manifest(ctx.today())
-        .map_err(|err| Box::new(err.problem()))?;
-    let access = super::reached(ctx, &manifest).await?;
+    let access = reaching(ctx).await?;
     let asked = access
         .requests
         .requests()
@@ -102,8 +108,21 @@ pub(crate) async fn deciding(
     Ok(report)
 }
 
-/// What is said where the service could not be asked or would not rule.
-const NOTHING_DECIDED: &str = "nothing was decided";
+/// The request service, reached through the stack as it stands.
+async fn reaching(ctx: &Ctx) -> Result<crate::app::targets::HouseholdAccess, Box<Problem>> {
+    let manifest = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .map_err(|err| Box::new(err.problem()))?;
+    super::reached(ctx, &manifest).await
+}
+
+/// The household as it reads after a decision on an ask the core keeps, `said` first.
+async fn noting(ctx: &Ctx, said: String) -> Result<HouseholdReport, Box<Problem>> {
+    let mut report = crate::household::run::household(ctx, None).await?;
+    report.noted.insert(0, said);
+    Ok(report)
+}
 
 /// The reason a decline carries, refused where it says nothing.
 ///

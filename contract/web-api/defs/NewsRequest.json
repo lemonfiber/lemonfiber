@@ -30,7 +30,7 @@
       ]
     },
     "request": {
-      "description": "The reference the household list names it with: the request service's number\n(`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.",
+      "description": "The reference the household list names it with: the request service's number\n(`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or `books-<n>` for an ask the core\nkeeps.",
       "type": "string"
     },
     "title": {

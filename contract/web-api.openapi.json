@@ -8266,6 +8266,13 @@
       "MemberRequest": {
         "description": "One thing a household member asked for, and where it stands in their words.",
         "properties": {
+          "also_asked": {
+            "description": "The other members an ask the core keeps is also for, by name, where more than one\nmember asked for it: one ask, ruled on once for all of them. Only on the\nhousehold's whole list; a member's own read never names anybody else who asked.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "arrived": {
             "anyOf": [
               {
@@ -8300,7 +8307,7 @@
             "description": "About how much room it will want, at the quality in force.\n\nA guess and labelled as one — see [`crate::asking::Estimate`]. Absent where the\nrequest service names a kind this build does not know, since there is nothing to\nguess the length of."
           },
           "id": {
-            "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), or `music-<n>` or `books-<n>` for an ask\nfor music or books the core keeps itself.",
+            "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), `tv-<n>` or `movies-<n>` for an ask the core\nkeeps until it files it as the request service's owner, or `music-<n>` or\n`books-<n>` for an ask for music or books the core keeps itself.",
             "type": "string"
           },
           "kind": {
@@ -9010,7 +9017,7 @@
             "description": "The kind of title it asks for, as the household list names it."
           },
           "request": {
-            "description": "The reference the household list names it with: the request service's number\n(`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.",
+            "description": "The reference the household list names it with: the request service's number\n(`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or `books-<n>` for an ask the core\nkeeps.",
             "type": "string"
           },
           "title": {
@@ -28913,7 +28920,7 @@
                 "properties": {
                   "request": {
                     "default": null,
-                    "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask\nthe core keeps.",
+                    "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or\n`books-<n>` for an ask the core keeps.",
                     "type": [
                       "string",
                       "null"
@@ -28976,7 +28983,7 @@
                   },
                   "request": {
                     "default": null,
-                    "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask\nthe core keeps.",
+                    "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or\n`books-<n>` for an ask the core keeps.",
                     "type": [
                       "string",
                       "null"

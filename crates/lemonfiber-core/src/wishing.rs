@@ -14,6 +14,7 @@
 //! of the stack reads as asking not working right now, with whoever runs the house told.
 
 mod ask;
+mod beside;
 mod collect;
 mod cover;
 mod find;
@@ -31,7 +32,6 @@ use crate::app::{Ctx, Outcome, Wishing};
 use crate::error::codes::wish::{
     ALREADY_HERE, CANNOT_FETCH, NOBODY_ASKING, NOTHING_LEFT, NOT_ASKABLE, NOT_A_MEMBER,
     NOT_A_PLACE, NOT_A_SEARCH, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_PICTURE, NO_ROOM,
-    THROUGH_THE_HOUSE,
 };
 use crate::error::{Code, Problem, Remedy, State};
 use crate::ports::docker::Lifecycle;
@@ -42,12 +42,13 @@ use crate::wiring::Fillers;
 use crate::rating::Limits;
 use find::searched;
 
+pub(crate) use beside::settled as settled_beside;
 pub use cover::{cover, kept_cover};
 pub use poster::poster;
 
 /// Every refusal a member's search, ask or poster answers with, which a client names by
 /// its code.
-pub const REFUSALS: [Code; 14] = [
+pub const REFUSALS: [Code; 13] = [
     NOT_A_SEARCH,
     NOT_A_PLACE,
     NOT_ASKABLE,
@@ -61,7 +62,6 @@ pub const REFUSALS: [Code; 14] = [
     NOBODY_ASKING,
     NOT_A_MEMBER,
     NO_PICTURE,
-    THROUGH_THE_HOUSE,
 ];
 
 /// What a member's search or ask comes to.
@@ -128,6 +128,8 @@ struct Reached {
     limits: Limits,
     /// The kinds the house can fetch now.
     kinds: Vec<Kind>,
+    /// Where asks filed or kept as the request service's owner are kept.
+    kept: std::path::PathBuf,
 }
 
 /// The member `named`, their limits, the kinds the house can fetch and the service that
@@ -153,6 +155,8 @@ async fn reached(ctx: &Ctx, named: &str) -> Result<Reached, Box<Problem>> {
             "This house isn't set up for asking for new things.",
         ));
     };
+    let kept = crate::app::targets::beside_env(ctx, crate::config::paths::ASKED_AS_OWNER)
+        .ok_or_else(not_working)?;
     let requests = requests_as_owner(ctx, filler)
         .await
         .ok_or_else(not_working)?;
@@ -169,6 +173,7 @@ async fn reached(ctx: &Ctx, named: &str) -> Result<Reached, Box<Problem>> {
         member,
         limits,
         kinds: deliverable(ctx, &fillers).await,
+        kept,
     })
 }
 
@@ -255,6 +260,15 @@ fn refused(code: Code, summary: &str) -> Box<Problem> {
 fn refused_with(code: Code, summary: &str, remedy: &str) -> Box<Problem> {
     let meaning = code.declaration().map_or("", |declared| declared.meaning());
     Box::new(Problem::new(code, summary, meaning, Remedy::new(remedy)).in_state(State::Guided))
+}
+
+/// What a member is told where the house has no room for anything new, told as the
+/// house's and never as their own limit.
+const NO_ROOM_SAID: &str = "The house has no room for new things right now.";
+
+/// The refusal for an ask the house has no room for.
+fn no_room() -> Box<Problem> {
+    refused(NO_ROOM, NO_ROOM_SAID)
 }
 
 /// The refusal for whatever answers the household's asks not answering.

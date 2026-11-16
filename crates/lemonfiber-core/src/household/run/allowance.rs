@@ -122,7 +122,8 @@ pub(crate) struct OwnAllowance {
 
 /// What one member may ask for, as the request service holds it: their own account's
 /// standing where it holds one, and the household's own setting where it does not, with
-/// what the requests `kept` names as filed for them as the owner use of it counted.
+/// what the requests `kept` names as theirs, and the asks it keeps for them waiting, use
+/// of it counted on top.
 ///
 /// # Errors
 ///
@@ -136,7 +137,15 @@ pub(crate) async fn allowance_of(
     let asked = kept.attributed(requests.requests().await?);
     let (id, approves_own, headroom) =
         if let Some(requesting) = requests.requesting(&account.id).await? {
-            let headroom = requests.left(&requesting.id).await?;
+            let mut headroom = requests.left(&requesting.id).await?;
+            for (left, kind) in [
+                (&mut headroom.films, Kind::Movies),
+                (&mut headroom.television, Kind::Tv),
+            ] {
+                left.used =
+                    left.used
+                        .saturating_add(kept.used(&asked, &account.id, kind, left.days, now));
+            }
             (Some(requesting.id), requesting.approves_own, headroom)
         } else {
             let household = requests.asking().await?;
@@ -163,6 +172,13 @@ pub(crate) async fn allowance_of(
                 != Some(crate::household::State::Declined)
         })
         .filter_map(|request| request.made)
+        .chain(kept.waiting_of(&account.id).map(|ask| ask.asked_at))
+        .chain(
+            kept.beside
+                .iter()
+                .filter(|ask| ask.waits() && ask.member == account.id)
+                .map(|ask| ask.asked_at),
+        )
         .collect();
     let held = Held {
         id: id.clone().unwrap_or_default(),
@@ -182,7 +198,7 @@ pub(crate) async fn allowance_of(
 
 /// Whether `account` made `request`: by the media server's id where the record carries
 /// one, and by name only where it carries none.
-fn made_by(request: &HouseholdRequest, account: &Member) -> bool {
+pub(crate) fn made_by(request: &HouseholdRequest, account: &Member) -> bool {
     request.member_id.as_ref().map_or_else(
         || request.member.eq_ignore_ascii_case(&account.name),
         |id| id.eq_ignore_ascii_case(&account.id),

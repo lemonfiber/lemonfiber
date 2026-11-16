@@ -27,6 +27,7 @@ fn record() -> Option<Record> {
 /// A request named `id`, asked for at the hour `hour` of one day where one is given.
 fn asked(id: &str, hour: Option<u32>, title: Option<&str>) -> MemberRequest {
     MemberRequest {
+        also_asked: Vec::new(),
         year: None,
         arrived: None,
         shelf_id: None,
@@ -202,11 +203,13 @@ fn a_request_in_the_news_carries_the_kind_and_unit_the_household_list_names() {
         "Anna",
         vec![
             MemberRequest {
+                also_asked: Vec::new(),
                 kind: Some(TitleKind::Books),
                 unit: Some(TitleUnit::Author),
                 ..asked("books-2", Some(9), Some("Ursula K. Le Guin"))
             },
             MemberRequest {
+                also_asked: Vec::new(),
                 kind: Some(TitleKind::Tv),
                 ..asked("4", Some(8), Some("The Expanse"))
             },

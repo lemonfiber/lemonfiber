@@ -6,7 +6,7 @@ use super::{capitalised, not_working, reached, refused, searched};
 use crate::app::Ctx;
 use crate::collected::store::{Ask, Asking, Standing};
 use crate::collected::{Collector, Medium, Unit};
-use crate::error::codes::wish::{ALREADY_HERE, CANNOT_FETCH, NOT_A_PLACE, NO_ROOM};
+use crate::error::codes::wish::{ALREADY_HERE, CANNOT_FETCH, NOT_A_PLACE};
 use crate::error::Problem;
 use crate::model::{Askable, AskableReport, AskedReport, Became, LeftAfter, Stands, TitleKind};
 use crate::ports::service::{Candidate, CandidateState, Left};
@@ -124,10 +124,7 @@ pub(super) async fn asked(
         CandidateState::PartlyHere | CandidateState::MayAsk => {}
     }
     if crate::space::run::admits(ctx).await.is_err() {
-        return Err(refused(
-            NO_ROOM,
-            "The house has no room for new things right now.",
-        ));
+        return Err(super::no_room());
     }
     if left.remaining().is_some_and(|remaining| remaining < ONE) {
         return Err(nothing_left(&theirs));

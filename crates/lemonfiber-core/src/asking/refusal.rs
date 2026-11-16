@@ -17,6 +17,9 @@ use crate::error::codes::quota::{
 };
 use crate::error::{Problem, Remedy};
 
+/// What is said where whatever answers for an ask could not be asked or would not rule.
+pub(crate) const NOTHING_DECIDED: &str = "nothing was decided";
+
 /// Said where the request service could not be asked or would not answer.
 ///
 /// Named as nothing having been changed rather than as a failure, because those are

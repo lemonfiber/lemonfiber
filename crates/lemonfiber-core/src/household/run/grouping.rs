@@ -99,6 +99,7 @@ pub(super) fn grouped(
             waiting_days: allowance::waiting(state, made, naming.now),
             estimate: allowance::estimated(request.kind, naming.quality),
             refused: naming.reasons.of(Reference::Filed(request.id)).cloned(),
+            also_asked: Vec::new(),
         });
     }
     by_whom

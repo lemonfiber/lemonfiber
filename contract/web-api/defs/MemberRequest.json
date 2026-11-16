@@ -3,6 +3,13 @@
   "description": "One thing a household member asked for, and where it stands in their words.",
   "type": "object",
   "properties": {
+    "also_asked": {
+      "description": "The other members an ask the core keeps is also for, by name, where more than one\nmember asked for it: one ask, ruled on once for all of them. Only on the\nhousehold's whole list; a member's own read never names anybody else who asked.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "arrived": {
       "description": "When the title arrived on the media server, as the request service says. Absent,\nnot null, until it is there.",
       "anyOf": [
@@ -37,7 +44,7 @@
       ]
     },
     "id": {
-      "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), or `music-<n>` or `books-<n>` for an ask\nfor music or books the core keeps itself.",
+      "description": "The reference it is named by again when somebody rules on it: the number the\nrequest service files it under (`42`), `tv-<n>` or `movies-<n>` for an ask the core\nkeeps until it files it as the request service's owner, or `music-<n>` or\n`books-<n>` for an ask for music or books the core keeps itself.",
       "type": "string"
     },
     "kind": {

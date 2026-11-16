@@ -115,6 +115,7 @@ fn member(member: HouseholdMember) -> HouseholdMember {
             .into_iter()
             .map(|request| MemberRequest {
                 estimate: None,
+                also_asked: Vec::new(),
                 refused: request.refused.map(|mut refused| {
                     refused.told = None;
                     refused

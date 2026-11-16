@@ -94,7 +94,8 @@ pub struct NewsUpdate {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct NewsRequest {
     /// The reference the household list names it with: the request service's number
-    /// (`42`), or `music-<n>` or `books-<n>` for an ask the core keeps.
+    /// (`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or `books-<n>` for an ask the core
+    /// keeps.
     pub request: String,
     /// When it was asked for, where that is known.
     #[serde(skip_serializing_if = "Option::is_none")]
