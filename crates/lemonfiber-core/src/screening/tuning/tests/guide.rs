@@ -30,6 +30,7 @@ fn listing(channel: &str, programmes: Vec<Airing>) -> Listing {
     Listing {
         channel: channel.to_owned(),
         programmes,
+        until: None,
     }
 }
 
@@ -145,6 +146,35 @@ async fn each_channel_says_where_its_guide_ends_inside_the_window_and_none_where
         .map(|channel| channel.guide_until)
         .collect();
     assert_eq!(until, vec![Some(moment(6 * HOUR)), None]);
+}
+
+/// The server's own policy left the late quiz out of the children's channel, so where its
+/// guide ends is the adapter's word for it, beyond every programme answered; a past end
+/// says nothing.
+#[tokio::test]
+async fn where_the_adapter_says_a_guide_ends_reaches_past_the_programmes_its_policy_left_out() {
+    let mut listings = guided_evening();
+    if let Some(kids) = listings.first_mut() {
+        kids.until = Some(moment(6 * HOUR));
+    }
+    listings.push(Listing {
+        until: Some(moment(-HOUR)),
+        ..listing("quiet", Vec::new())
+    });
+    let (_, ctx) = guiding(&listings, "reported");
+    let Ok(report) = guide(&ctx, "Ada").await else {
+        unreachable!("the evening's guide is answered");
+    };
+    let until: Vec<_> = report
+        .channels
+        .iter()
+        .map(|channel| channel.guide_until)
+        .collect();
+    assert_eq!(until, vec![Some(moment(6 * HOUR)), None]);
+    assert_eq!(
+        titles(&report).first().map(|(_, titles)| titles.clone()),
+        Some(vec!["A cartoon".to_owned(), "A quiz".to_owned()])
+    );
 }
 
 #[tokio::test]

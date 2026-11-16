@@ -83,11 +83,22 @@
                       "type": "string"
                     },
                     "programmes": {
-                      "description": "Each programme the server's guide holds on it from now across the hours asked, in\nthe order they air, none past where the guide ends.",
+                      "description": "Each programme the server's guide holds on it from now across the hours asked, in\nthe order they air, none past where the guide ends, and from minor 6 none the\nserver's own policy keeps from the member's account.",
                       "items": {
                         "$ref": "#/$defs/Airing"
                       },
                       "type": "array"
+                    },
+                    "until": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/Instant"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "From minor 6, where the server's guide ends on it across the hours asked: the end of\nthe last programme it holds there before any is left out, none where it holds none."
                     }
                   },
                   "required": [

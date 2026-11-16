@@ -175,6 +175,7 @@ fn media_server() -> Vec<Route> {
             media::serve("guide"),
             answered(&vec![Listing {
                 channel: CHANNEL.to_owned(),
+                until: Some(Instant::from_seconds(crate::world::AT + HOUR)),
                 programmes: vec![Airing {
                     title: "The Evening News".to_owned(),
                     certificate: None,

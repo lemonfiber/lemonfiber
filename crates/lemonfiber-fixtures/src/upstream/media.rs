@@ -327,15 +327,17 @@ impl Tuning for Upstream {
             ends: Instant::from_seconds(ends),
         };
         let until = 1_794_594_600 + u64::from(hours) * lemonfiber_ports::instant::HOUR;
+        let programmes: Vec<Airing> = [
+            aired("The evening news", "PG", 1_794_594_600, 1_794_596_400),
+            aired("A late film", "18", 1_794_596_400, 1_794_603_600),
+        ]
+        .into_iter()
+        .filter(|airing| airing.starts.seconds() < until)
+        .collect();
         Ok(vec![Listing {
             channel: format!("{member}-news"),
-            programmes: [
-                aired("The evening news", "PG", 1_794_594_600, 1_794_596_400),
-                aired("A late film", "18", 1_794_596_400, 1_794_603_600),
-            ]
-            .into_iter()
-            .filter(|airing| airing.starts.seconds() < until)
-            .collect(),
+            until: programmes.iter().map(|airing| airing.ends).max(),
+            programmes,
         }])
     }
 

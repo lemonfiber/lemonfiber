@@ -131,7 +131,7 @@
     },
     {
       "path": "media.serve/v1/operations/guide.json",
-      "sha256": "f5dbbaa89576692af873e62d97592954414ae1285888db9aad8bbf236f755a14"
+      "sha256": "a149770cc337569cce61dca15d80c57523f632c870b8c520eea6019757fbff90"
     },
     {
       "path": "media.serve/v1/operations/tune.json",
