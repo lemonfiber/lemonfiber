@@ -123,12 +123,35 @@ async fn a_machine_with_no_part_claimed_first_skips_the_check() {
 }
 
 #[tokio::test]
-async fn a_part_answering_but_refusing_to_say_is_a_warning_naming_why() {
+async fn a_part_refusing_the_credential_while_it_starts_is_unverified_never_anybodys() {
     let verdicts = verdicts(vec![Asked::Refusing]).await;
 
     assert!(
-        matches!(verdicts.as_slice(), [verdict]
-            if warned_with(verdict, "could not be asked who holds it: part rejected the credential")),
+        matches!(verdicts.as_slice(), [Verdict::Unverified { reason, .. }]
+            if reason == "Part 0 could not be asked who holds it: part rejected the credential"),
         "{verdicts:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_part_answering_with_no_answer_while_it_starts_is_unverified_never_anybodys() {
+    let found = OwnedCheck::new(vec![(
+        Part {
+            id: "part-0".to_owned(),
+            name: "Part 0".to_owned(),
+            secrets: Vec::new(),
+        },
+        Some(Arc::new(owning::Part::garbled("502 Bad Gateway")) as Arc<dyn Ownership>),
+    )])
+    .run()
+    .await;
+    assert!(
+        matches!(found.as_slice(), [one] if matches!(&one.verdict, Verdict::Unverified { reason, .. }
+            if reason.ends_with("answered unexpectedly: 502 Bad Gateway"))),
+        "{found:?}"
+    );
+    assert!(
+        !format!("{found:?}").contains("Anybody may hold"),
+        "{found:?}"
     );
 }

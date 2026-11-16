@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use super::{Category, Check, Finding, Verdict};
 use crate::error::codes::config::PART_UNCLAIMED;
 use crate::error::{Problem, Remedy};
-use crate::ports::service::{Failure, Owner, Ownership};
+use crate::ports::service::{Owner, Ownership};
 
 /// The name this check and anything answering it share.
 const CHECK: &str = "config.claimed";
@@ -120,15 +120,14 @@ async fn asked(part: &Part, owner: Option<&dyn Ownership>) -> Verdict {
                 "If that was not you, reset {name}'s configuration and run lemonfiber seed"
             )),
         )),
-        Err(failure @ Failure::Unavailable { .. }) => Verdict::Unverified {
+        Err(failure) => Verdict::Unverified {
             reason: format!("{name} could not be asked who holds it: {failure}"),
             remedy: starting(),
         },
-        Err(failure) => Verdict::Warn(unknown(name, &failure.to_string())),
     }
 }
 
-/// A part that would not say who holds it, which may be anybody.
+/// A part that cannot be asked who holds it at all, which may be anybody.
 fn unknown(name: &str, why: &str) -> Problem {
     Problem::new(
         PART_UNCLAIMED,
