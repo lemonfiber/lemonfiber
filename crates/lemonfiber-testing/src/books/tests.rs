@@ -144,9 +144,7 @@ fn what_a_pass_told_the_curator_is_read_back_from_each_operation_it_asked() {
 
 #[test]
 fn a_curator_moved_in_is_keyed_where_its_stack_is_and_one_asked_holds_its_key_unwritten() {
-    let over = |directory: &Scratch| {
-        Source::External(Box::leak(directory.to_path_buf().into_boxed_path()))
-    };
+    let over = |directory: &Scratch| Source::External(directory.leaked());
     let written = Scratch::new("books-moved-in");
     let mut ctx = a_context().over(over(&written)).build();
     ctx.settings.env_file = Some(written.join(".env"));

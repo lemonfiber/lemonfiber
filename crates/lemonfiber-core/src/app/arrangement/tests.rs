@@ -5,11 +5,13 @@ use crate::test_support::{a_context, a_password, env_at};
 
 /// A context whose settings point at a scratch install of its own.
 fn ctx(name: &str) -> super::Ctx {
+    let env = env_at(name, &a_password());
     a_context()
         .settings(Settings {
-            env_file: Some(env_at(name, &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
 }
 

@@ -8,10 +8,11 @@ use crate::test_support::a_context;
 
 /// A context keeping what it opens in a directory of its own.
 fn ctx(tag: &str) -> Ctx {
-    let dir = Scratch::named(&format!("tuned-{tag}")).kept();
+    let dir_scratch = Scratch::named(&format!("tuned-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_context().build();
+    let mut ctx = a_context().holding(dir_scratch).build();
     ctx.settings.env_file = Some(dir.join(".env"));
     ctx
 }

@@ -25,7 +25,8 @@ fn keeping(directory: Option<std::path::PathBuf>) -> Ctx {
 /// Not asked for, nothing is made and nothing is presented.
 #[test]
 fn a_run_not_asked_to_encrypt_presents_nothing() {
-    let at = Scratch::new("encrypting-unasked").kept();
+    let at_scratch = Scratch::new("encrypting-unasked");
+    let at = at_scratch.to_path_buf();
     assert!(matches!(
         encrypting(&keeping(Some(at.clone())), false, None),
         Ok(None)
@@ -41,7 +42,8 @@ fn a_run_not_asked_to_encrypt_presents_nothing() {
 /// pins, and a later run presents the same one.
 #[test]
 fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
-    let at = Scratch::new("encrypting-asked").kept();
+    let at_scratch = Scratch::new("encrypting-asked");
+    let at = at_scratch.to_path_buf();
     let first = encrypting(&keeping(Some(at.clone())), true, Some(8443))
         .ok()
         .flatten()
@@ -69,7 +71,8 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
             .err()
             .map(|problem| problem.code)
     };
-    let at = Scratch::new("encrypting-refused").kept();
+    let at_scratch = Scratch::new("encrypting-refused");
+    let at = at_scratch.to_path_buf();
     assert_eq!(code(&keeping(Some(at.clone())), None), Some(UNSETTLED_PORT));
     assert_eq!(code(&keeping(None), Some(8443)), Some(NO_CERTIFICATE));
 
@@ -80,7 +83,8 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
     );
 
     let _ = certificate::replaced(&lemonfiber_adapters::Disk, &at);
-    let other = Scratch::new("encrypting-another-key").kept();
+    let other_scratch = Scratch::new("encrypting-another-key");
+    let other = other_scratch.to_path_buf();
     let _ = certificate::replaced(&lemonfiber_adapters::Disk, &other);
     let _ = std::fs::copy(other.join("key.pem"), at.join("key.pem"));
     assert_eq!(
@@ -93,7 +97,8 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
 /// A machine called `den`, served encrypted on the network on `port`, keeping what
 /// pairing needs.
 fn served_as_den(named: &str, port: u16) -> Ctx {
-    let at = Scratch::new(named).kept();
+    let at_scratch = Scratch::new(named);
+    let at = at_scratch.to_path_buf();
     let _ = certificate::kept_or_made(&lemonfiber_adapters::Disk, &at);
     let _ = served::record(
         &at,
@@ -104,6 +109,7 @@ fn served_as_den(named: &str, port: u16) -> Ctx {
         },
     );
     a_context()
+        .holding(at_scratch)
         .settings(Settings {
             companion: Some(at),
             ..Settings::default()

@@ -500,7 +500,7 @@ async fn a_machine_with_no_stack_directory_refuses_the_install_naming_it() {
     let env_file = env_at("no-stack", &a_password());
     let ctx = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env_file),
+            env_file: Some(env_file.to_path_buf()),
             stack_dir: None,
             ..crate::config::Settings::default()
         })
@@ -523,7 +523,7 @@ async fn a_rehearsal_is_refused_wherever_the_install_would_be() {
     let env_file = env_at("no-stack-rehearsed", &a_password());
     let mut ctx = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env_file),
+            env_file: Some(env_file.to_path_buf()),
             stack_dir: None,
             ..crate::config::Settings::default()
         })

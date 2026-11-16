@@ -351,8 +351,10 @@ fn every_part_the_bundle_installs_is_recorded_as_it_is_pinned() {
 /// it names none.
 #[test]
 fn a_kept_manifest_is_the_pinned_copy_beside_the_env_file() {
-    let env = Scratch::new("adapted-kept").join(".env");
+    let scratch = Scratch::new("adapted-kept");
+    let env = scratch.join(".env");
     let ctx = a_context()
+        .holding(scratch)
         .settings(Settings {
             env_file: Some(env.clone()),
             ..Settings::default()

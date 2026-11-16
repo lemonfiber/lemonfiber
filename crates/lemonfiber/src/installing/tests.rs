@@ -24,9 +24,11 @@ fn library() -> Vec<String> {
 /// A machine with lemonfiber's own files set up beneath `name` that has never run a part,
 /// so a start of the library form offers to install each one.
 fn never_ran(name: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     lemonfiber_testing::a_context()
+        .holding(dir_scratch)
         .settings(lemonfiber_core::config::Settings {
             env_file: Some(dir.join("config").join(".env")),
             stack_dir: Some(dir.join("data").join("stack")),

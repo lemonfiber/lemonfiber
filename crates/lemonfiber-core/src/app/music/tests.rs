@@ -17,12 +17,16 @@ fn ctx() -> Ctx {
 /// `tag` names a directory of this test's own: the choice file is a real file on disk, so
 /// tests sharing one directory would race on it when run in parallel.
 fn recording_ctx(applied: Answer, tag: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("music-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("music-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context().build().with_http(Fake::by_path(vec![(
-        curating(MUSIC, "apply_music_format"),
-        applied,
-    )]));
+    let mut context = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(Fake::by_path(vec![(
+            curating(MUSIC, "apply_music_format"),
+            applied,
+        )]));
     context.settings.env_file = Some(dir.join(".env"));
     MUSIC.reaching(context)
 }
@@ -82,7 +86,8 @@ async fn an_unreadable_stack_records_the_choice_and_reports_not_started() {
 /// format to, so the choice is recorded and the outcome is not started.
 #[tokio::test]
 async fn a_stack_with_no_music_curator_reports_not_started() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("music-none").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("music-none");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
     let mut context = ctx();
     context.settings.env_file = Some(dir.join(".env"));

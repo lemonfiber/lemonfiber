@@ -47,10 +47,9 @@ fn the_recorded_password() -> String {
 
 /// A settings file at a scratch path unique to the named case, holding whatever a
 /// test recorded in it.
-fn env_at(name: &str, settings: &[(&str, &str)]) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("credentials-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
+fn env_at(name: &str, settings: &[(&str, &str)]) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("credentials-{name}"));
+    let path = dir.within(".env");
     for (key, value) in settings {
         assert!(
             store::set(&path, key, value).is_ok(),
@@ -182,7 +181,7 @@ const WITH_A_SECRET: &str = r#"{
 }"#;
 
 /// A settings file for the named case with the given register kept beside it.
-fn beside(name: &str, register: &str) -> PathBuf {
+fn beside(name: &str, register: &str) -> lemonfiber_fixtures::scratch::Scratch {
     let env = env_at(name, &[]);
     let dir = env.parent().map(Path::to_path_buf).unwrap_or_default();
     assert!(

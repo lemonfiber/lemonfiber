@@ -374,12 +374,11 @@ async fn nothing_it_runs_or_hands_back_about_its_own_files_escalates() {
 /// What is still coming down is reported before anything stops.
 #[tokio::test]
 async fn what_is_still_coming_down_is_reported_before_anything_stops() {
+    let env = crate::test_support::env_without_password("uninstall-coming-down");
     let ctx = a_context()
         .settings(Settings {
             protocols: crate::config::Protocols::both(),
-            env_file: Some(crate::test_support::env_without_password(
-                "uninstall-coming-down",
-            )),
+            env_file: Some(env.to_path_buf()),
             ..settings()
         })
         .engine(Arc::new(

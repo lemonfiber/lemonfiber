@@ -5,11 +5,13 @@ use crate::stack::Source;
 use crate::test_support::{a_context, a_password, env_at, every_part_has_run};
 
 fn ctx(name: &str) -> crate::app::Ctx {
+    let env = env_at(name, &a_password());
     a_context()
         .settings(Settings {
-            env_file: Some(env_at(name, &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
 }
 
@@ -74,7 +76,8 @@ async fn a_part_this_build_installs_first_is_named_as_what_the_words_alone_do_no
 #[tokio::test]
 async fn an_own_stack_that_cannot_be_read_refuses_and_is_never_called_the_shipped_one() {
     let mut ctx = ctx("underneath-unreadable");
-    let missing = lemonfiber_fixtures::scratch::Scratch::named("underneath-no-stack").kept();
+    let missing_scratch = lemonfiber_fixtures::scratch::Scratch::named("underneath-no-stack");
+    let missing = missing_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&missing);
     ctx.stack = Source::External(Box::leak(missing.into_boxed_path()));
 

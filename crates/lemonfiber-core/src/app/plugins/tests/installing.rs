@@ -465,10 +465,11 @@ async fn an_install_or_update_on_an_unreadable_stack_is_refused_first() {
         refused
     );
 
+    let env = env_at("contest-blind-fresh", &a_password());
     let fresh = a_context()
         .over(crate::test_support::nowhere())
         .settings(crate::config::Settings {
-            env_file: Some(env_at("contest-blind-fresh", &a_password())),
+            env_file: Some(env.to_path_buf()),
             stack_dir: ctx.settings.stack_dir.clone(),
             ..crate::config::Settings::default()
         })
@@ -525,8 +526,9 @@ async fn the_reading_says_where_a_plugin_came_from_when_and_what_it_stands_in_fo
 #[tokio::test]
 async fn an_install_answering_a_reading_that_moved_writes_nothing() {
     let ctx = ctx("install-moved");
+    let plugin = source("install-moved", MANIFEST);
     let asked = Asked::Install {
-        source: crate::plugin::Source::Path(source("install-moved", MANIFEST)),
+        source: crate::plugin::Source::Path(plugin.to_path_buf()),
         consent: stale(),
     };
     let (code, said) = refused(plugins(&ctx, &asked).await);
@@ -543,7 +545,7 @@ async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
     let ctx = ctx("install-rewritten");
     let at = source("install-rewritten", MANIFEST);
     let asked = |consent| Asked::Install {
-        source: crate::plugin::Source::Path(at.clone()),
+        source: crate::plugin::Source::Path(at.to_path_buf()),
         consent,
     };
     let reading = plugins(&ctx, &asked(crate::app::plugins::Consent::default())).await;
@@ -568,7 +570,8 @@ async fn an_install_whose_source_was_rewritten_after_the_reading_is_refused() {
 #[tokio::test]
 async fn a_port_the_stacks_model_publishes_is_refused_before_anything_is_written() {
     let mut ctx = ctx("occupied-port");
-    let fork = lemonfiber_fixtures::scratch::Scratch::named("occupied-port-fork").kept();
+    let fork_scratch = lemonfiber_fixtures::scratch::Scratch::named("occupied-port-fork");
+    let fork = fork_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&fork);
     let mut stack = lemonfiber_fixtures::stack::carried();
     stack
@@ -694,8 +697,9 @@ async fn a_plugin_carrying_a_pinned_id_from_a_path_is_refused_naming_it_and_writ
             "[[service]]\nid          = \"komga\"",
             "[[service]]\nid          = \"jellyfin-reader\"",
         );
+    let plugin = source("install-pinned-elsewhere", &manifest);
     let asked = Asked::Install {
-        source: crate::plugin::Source::Path(source("install-pinned-elsewhere", &manifest)),
+        source: crate::plugin::Source::Path(plugin.to_path_buf()),
         consent: crate::app::plugins::Consent::default(),
     };
     let (code, said) = refused(plugins(&ctx, &asked).await);
@@ -720,7 +724,7 @@ async fn a_starting_file_outside_a_declared_services_directory_is_refused_naming
         assert!(std::fs::write(file, bytes).is_ok());
     }
     let asked = Asked::Install {
-        source: crate::plugin::Source::Path(at),
+        source: crate::plugin::Source::Path(at.to_path_buf()),
         consent: crate::app::plugins::Consent::default(),
     };
     let detail = plugins(&ctx, &asked)

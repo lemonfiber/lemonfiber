@@ -344,7 +344,7 @@ fn a_contracted_servers_password_is_handed_to_its_adapter() {
     let scratch = env.parent().unwrap_or(std::path::Path::new(".")).to_owned();
     let ctx = crate::test_support::a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();

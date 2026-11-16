@@ -3,11 +3,8 @@ use crate::collected::{Medium, Reference, Unit};
 use crate::instant::Instant;
 use crate::ports::service::{BookUnit, MusicUnit};
 
-fn path(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join("household-asks.json")
+fn path(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::new(name).within("household-asks.json")
 }
 
 fn asking(unit: Unit, standing: Standing) -> Asking {

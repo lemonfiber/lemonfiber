@@ -69,9 +69,8 @@ fn recording(status: u16, body: &str) -> String {
 
 /// A machine of its own, with a plugin source on it holding this manifest, and the
 /// catalogue recorded as answering with this status.
-fn machine(named: &str, manifest: &str, recorded: u16) -> PathBuf {
-    let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("unattended-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&root);
+fn machine(named: &str, manifest: &str, recorded: u16) -> lemonfiber_fixtures::scratch::Scratch {
+    let root = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("unattended-{named}"));
     for dir in ["source/fixtures", "config", "data", "empty"] {
         let _ = std::fs::create_dir_all(root.join(dir));
     }
@@ -228,12 +227,10 @@ fn plain() -> String {
 /// The engine is a script rather than a real one, and that is enough for the question
 /// here — whether each verb reaches its end with nobody present and says how it went —
 /// because what it would have started is proved elsewhere, by the verbs' own tests.
-fn engine_agreeing(named: &str) -> PathBuf {
+fn engine_agreeing(named: &str) -> lemonfiber_fixtures::scratch::Scratch {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let root =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("unattended-verbs-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&root);
+    let root = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("unattended-verbs-{named}"));
     for dir in ["bin", "source", "next", "config", "data"] {
         let _ = std::fs::create_dir_all(root.join(dir));
     }

@@ -28,10 +28,12 @@ fn record(name: &str, owner: Option<&str>) -> Record {
 }
 
 fn machine(name: &str) -> (Ctx, PathBuf) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
             stack_dir: Some(dir.join("data").join("stack")),
@@ -56,7 +58,7 @@ fn endpoint(path: &Path, name: &str) -> Option<Record> {
 
 #[test]
 fn a_wake_taken_waits_for_its_phone_and_one_refused_is_a_failure_kept() {
-    let (_, path) = machine("push-wakes-sent");
+    let (_ctx, path) = machine("push-wakes-sent");
 
     sent(&path, "ada-phone", "w1", &DeliveryOutcome::Sent, 10);
     sent(
@@ -109,7 +111,7 @@ fn only_whoever_registered_the_phone_confirms_its_wake_and_only_once() {
 
 #[test]
 fn a_wake_to_a_phone_no_longer_registered_is_written_nowhere() {
-    let (_, path) = machine("push-wakes-gone");
+    let (_ctx, path) = machine("push-wakes-gone");
     let before = std::fs::read_to_string(&path).unwrap_or_default();
 
     sent(&path, "pixel", "w1", &DeliveryOutcome::Sent, 10);

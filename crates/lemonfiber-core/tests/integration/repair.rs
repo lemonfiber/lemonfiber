@@ -26,12 +26,13 @@ use lemonfiber_core::repair::{Attempt, Outcome, Repair, Stance, Writing};
 
 /// A context whose records land in a scratch directory of this test's own.
 fn ctx(name: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("repair-{name}")).kept();
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("repair-{name}"));
     lemonfiber_testing::a_live_context()
         .settings(Settings {
             env_file: Some(dir.join(".env")),
             ..Settings::default()
         })
+        .holding(dir)
         .build()
 }
 
@@ -43,9 +44,7 @@ fn ctx(name: &str) -> Ctx {
 /// because none of these tests is about what an HTTP service answers, and a suite
 /// assembled for real would otherwise reach the network.
 fn ctx_over(name: &str, engine: Arc<tunnel::Fake>) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("repair-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("repair-{name}"));
     lemonfiber_testing::a_live_context()
         .engine(engine)
         .settings(Settings {
@@ -55,6 +54,7 @@ fn ctx_over(name: &str, engine: Arc<tunnel::Fake>) -> Ctx {
             protocols: Protocols::both(),
             ..Settings::default()
         })
+        .holding(dir)
         .build()
         .with_http(lemonfiber_fixtures::http::Fake::silent())
 }
@@ -678,7 +678,8 @@ async fn a_repair_whose_change_cannot_be_recorded_is_stopped_saying_so() {
         "{recorded:?}"
     );
 
-    let dir = lemonfiber_fixtures::scratch::Scratch::new("repair-unrecordable").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::new("repair-unrecordable");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(dir.join("journal.jsonl.writing").join("held"));
     let unrecordable = lemonfiber_testing::a_live_context()
         .settings(Settings {

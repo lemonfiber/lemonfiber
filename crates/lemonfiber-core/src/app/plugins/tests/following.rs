@@ -73,7 +73,8 @@ async fn installed_with(
     name: &str,
     given: &[(&str, &str)],
 ) -> Result<Installs, Box<Problem>> {
-    let source = crate::plugin::Source::Path(source(name, &reciped()));
+    let plugin = source(name, &reciped());
+    let source = crate::plugin::Source::Path(plugin.to_path_buf());
     let asked = Asked::Install {
         source: source.clone(),
         consent: super::super::Consent::default(),
@@ -152,7 +153,8 @@ async fn installed_naming_the_secret(ctx: &Ctx, name: &str) -> Option<Installs> 
         "config_path = \"/app/data\"\n",
         "config_path = \"/app/data\"\n\n[service.env]\nKOMGA_TOKEN = { secret = \"token\" }\n",
     );
-    let source = crate::plugin::Source::Path(source(name, &manifest));
+    let plugin = source(name, &manifest);
+    let source = crate::plugin::Source::Path(plugin.to_path_buf());
     let reading = plugins(
         ctx,
         &Asked::Install {
@@ -226,7 +228,8 @@ async fn a_secret_nothing_holds_yet_leaves_its_file_there_and_empty() {
         "config_path = \"/app/data\"\n\n[service.env]\nKOMGA_KEY = { secret = \"key\" }\n",
     )
         + "\n[[secret]]\nid  = \"key\"\nof  = \"komga\"\nwhy = \"Signs the library in\"\n";
-    let source = crate::plugin::Source::Path(source("emptyfile", &manifest));
+    let plugin = source("emptyfile", &manifest);
+    let source = crate::plugin::Source::Path(plugin.to_path_buf());
     let reading = plugins(
         &ctx,
         &Asked::Install {
@@ -715,7 +718,8 @@ async fn an_install_asks_nothing_of_a_host_the_operator_refused() {
     )
     .is_ok());
     let manifest = format!("{}{DESCRIBING}", reciped());
-    let source = crate::plugin::Source::Path(source("refused-reach", &manifest));
+    let plugin = source("refused-reach", &manifest);
+    let source = crate::plugin::Source::Path(plugin.to_path_buf());
     let reading = plugins(
         &ctx,
         &Asked::Install {

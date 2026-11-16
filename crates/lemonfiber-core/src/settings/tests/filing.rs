@@ -75,10 +75,11 @@ fn machine_declaring(name: &str, value: Option<&str>, text: &str) -> Ctx {
     }
     a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             stack_dir: Some(env.with_file_name("data").join("stack")),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build()
 }
 

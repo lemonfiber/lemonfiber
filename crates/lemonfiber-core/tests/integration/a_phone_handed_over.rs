@@ -590,7 +590,8 @@ async fn over(env: &Path, stack: Source) -> Ran {
 #[tokio::test]
 async fn a_stack_with_no_media_server_hands_nothing_over() {
     let env = recorded_admin("handoff-no-server");
-    let ran = over(&env, stack_without("jellyfin", "handoff")).await;
+    let stack = stack_without("jellyfin", "handoff");
+    let ran = over(&env, Source::External(stack.leaked())).await;
     gone(&env);
 
     assert_eq!(ran.refusal.as_deref(), Some("HANDOFF-2"));

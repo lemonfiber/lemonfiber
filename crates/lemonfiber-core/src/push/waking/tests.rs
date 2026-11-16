@@ -67,11 +67,13 @@ async fn a_distributor_that_cannot_be_reached_is_a_failure_and_not_gone() {
 
 #[tokio::test]
 async fn nothing_is_sent_where_no_id_can_be_drawn_for_a_wake() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("push-undrawn").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("push-undrawn");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let http = Fake::always(Answer::reply(201, ""));
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
             ..Settings::default()

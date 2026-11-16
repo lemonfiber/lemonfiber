@@ -35,9 +35,10 @@ fn stacked(scratch: &str, tz: Option<&str>, http: std::sync::Arc<Fake>) -> crate
     crate::test_support::torrent::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env),
+                env_file: Some(env.to_path_buf()),
                 ..Settings::default()
             })
+            .holding(env)
             .build()
             .with_http(http),
     )

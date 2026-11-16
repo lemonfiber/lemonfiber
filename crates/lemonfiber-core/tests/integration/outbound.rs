@@ -368,7 +368,7 @@ async fn a_whole_diagnosis_reaches_nowhere_the_operator_was_not_told_about() {
 /// count as expected.
 #[tokio::test]
 async fn a_diagnosis_with_a_plugin_installed_is_measured_against_its_declared_reach_too() {
-    let with = beside("leak-plugin", INSTALLED);
+    let (with, _dir) = beside("leak-plugin", INSTALLED);
 
     let unexpected = unexpected_after_a_diagnosis(with.clone()).await;
     assert!(
@@ -457,21 +457,17 @@ async fn a_request_that_went_is_written_down_where_the_operator_can_read_it() {
 
 /// A settings file for the named case with the given register kept beside it, the
 /// way an install leaves one.
-fn beside(name: &str, register: &str) -> Settings {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("outbound-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    assert!(
-        std::fs::create_dir_all(&dir).is_ok(),
-        "the scratch directory"
-    );
+fn beside(name: &str, register: &str) -> (Settings, lemonfiber_fixtures::scratch::Scratch) {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("outbound-{name}"));
     assert!(
         std::fs::write(dir.join("plugins.json"), register).is_ok(),
         "the register"
     );
-    Settings {
+    let settings = Settings {
         env_file: Some(dir.join(".env")),
         ..Settings::default()
-    }
+    };
+    (settings, dir)
 }
 
 /// One installed plugin whose recipes reach a host outside the stack.
@@ -499,7 +495,8 @@ const INSTALLED: &str = r#"{
 /// every line of it says whose it is.
 #[tokio::test]
 async fn what_a_plugin_brings_is_in_the_account_and_says_it_is_the_plugins() {
-    let report = listed(beside("plugin", INSTALLED)).await;
+    let (settings, _dir) = beside("plugin", INSTALLED);
+    let report = listed(settings).await;
 
     let services: Vec<&str> = report
         .theirs
@@ -525,12 +522,10 @@ async fn what_a_plugin_brings_is_in_the_account_and_says_it_is_the_plugins() {
 /// read past: one that quietly left a stranger's plugin out would be believed.
 #[tokio::test]
 async fn a_register_that_will_not_read_refuses_the_account() {
+    let (settings, _dir) = beside("broken", "{ not a register");
     let answered = dispatch(
         Command::Outbound,
-        &ctx(
-            Source::External(project()),
-            beside("broken", "{ not a register"),
-        ),
+        &ctx(Source::External(project()), settings),
     )
     .await;
 

@@ -99,9 +99,11 @@ fn reaching(name: &str, account: UsenetAccount) -> Ctx {
             answered(&vec![fast_indexer()]),
         ),
     ]);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("providers-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("providers-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let ctx = lemonfiber_testing::a_context()
+        .holding(dir_scratch)
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
         .settings(Settings {
             env_file: Some(dir.join(".env")),

@@ -224,7 +224,8 @@ mod sweeping;
 
 #[test]
 fn a_part_a_choice_passed_over_is_not_among_what_starting_everything_starts() {
-    let dir = crate::app::fixtures::scratch("engine-replaced").kept();
+    let dir_scratch = crate::app::fixtures::scratch("engine-replaced");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let _ = std::fs::write(
@@ -232,6 +233,7 @@ fn a_part_a_choice_passed_over_is_not_among_what_starting_everything_starts() {
         "LEMONFIBER_FILLS=indexer.search=nzbhydra2\n",
     );
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(crate::config::Settings {
             env_file: Some(dir.join(".env")),
             ..crate::config::Settings::default()

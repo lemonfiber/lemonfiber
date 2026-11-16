@@ -16,7 +16,7 @@ use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::http::Fake;
 use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_testing::torrent;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -55,10 +55,9 @@ async fn a_confirmed_run_records_what_it_moved_and_where_the_capture_went() {
 
 /// A private environment file, at a scratch path unique to this case so concurrent tests
 /// do not share one.
-fn env_at(name: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("update-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(".env")
+fn env_at(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("update-{name}"));
+    dir.within(".env")
 }
 
 /// The same context, reaching the torrent client moved into its plugin over `http`, its
@@ -70,15 +69,17 @@ fn transferring(
     name: &str,
 ) -> Ctx {
     let machine = Arc::clone(machine).beside(Arc::new(torrent::running()));
+    let env = env_at(name);
     let ctx = lemonfiber_testing::a_context()
         .runner(Arc::clone(&machine) as Arc<dyn Runner>)
         .engine(machine as Arc<dyn Engine>)
         .filesystem(Files::empty())
         .settings(Settings {
             protocols: Protocols::both(),
-            env_file: Some(env_at(name)),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
         .with_images(Pulled::holding(behind(&[("sonarr", CURATOR_BEHIND)])))
         .with_http(http)

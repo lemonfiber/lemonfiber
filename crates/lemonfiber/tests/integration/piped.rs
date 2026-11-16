@@ -11,7 +11,7 @@
 //! paints, and a setting decides what several of these commands say — a run that
 //! inherited any of them would pass or fail by whose machine it was on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// The binary Cargo built for this test.
 const BINARY: &str = env!("CARGO_BIN_EXE_lemonfiber");
@@ -32,9 +32,8 @@ const UNATTENDED: [&[&str]; 6] = [
 ];
 
 /// A machine of its own for one test, with nothing on it yet.
-fn machine(name: &str) -> PathBuf {
-    let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("piped-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&root);
+fn machine(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let root = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("piped-{name}"));
     let _ = std::fs::create_dir_all(root.join("config"));
     let _ = std::fs::create_dir_all(root.join("data"));
     root

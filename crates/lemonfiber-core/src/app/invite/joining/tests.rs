@@ -43,7 +43,8 @@ fn ana() -> Member {
 /// A machine served encrypted on the network from a directory of its own, keeping its
 /// record of offers in another, minting from `random`.
 fn served_machine(named: &str, random: Option<Vec<u8>>) -> (Ctx, PathBuf) {
-    let companion = Scratch::new(&format!("{named}-companion")).kept();
+    let companion_scratch = Scratch::new(&format!("{named}-companion"));
+    let companion = companion_scratch.to_path_buf();
     let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
     let _ = served::record(
         &companion,
@@ -53,8 +54,11 @@ fn served_machine(named: &str, random: Option<Vec<u8>>) -> (Ctx, PathBuf) {
             network: true,
         },
     );
-    let kept = Scratch::new(&format!("{named}-kept")).kept();
+    let kept_scratch = Scratch::new(&format!("{named}-kept"));
+    let kept = kept_scratch.to_path_buf();
     let ctx = a_context()
+        .holding(kept_scratch)
+        .holding(companion_scratch)
         .settings(Settings {
             companion: Some(companion),
             env_file: Some(kept.join(".env")),
@@ -223,11 +227,13 @@ async fn a_machine_that_will_not_mint_a_claim_says_why_it_has_no_link() {
 /// command.
 #[tokio::test]
 async fn a_machine_never_served_encrypted_says_why_it_has_no_link() {
+    let companion = Scratch::new("joining-unserved");
     let ctx = a_context()
         .settings(Settings {
-            companion: Some(Scratch::new("joining-unserved").kept()),
+            companion: Some(companion.to_path_buf()),
             ..Settings::default()
         })
+        .holding(companion)
         .build();
 
     let said = joining(&ctx, &ana(), InvitationStanding::Made).await;

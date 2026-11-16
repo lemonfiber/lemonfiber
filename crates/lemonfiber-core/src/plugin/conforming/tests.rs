@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use lemonfiber_fixtures::scratch::Scratch;
 
 use super::CaseVerdict as Verdict;
@@ -77,9 +75,8 @@ fn conforming() -> Vec<(&'static str, String)> {
 }
 
 /// The plugin's source, holding `manifest` and these recordings by case.
-fn source(tag: &str, manifest: &str, recorded: &[(&str, String)]) -> PathBuf {
-    let root = Scratch::named(&format!("conforming-{tag}")).kept();
-    let _ = std::fs::remove_dir_all(&root);
+fn source(tag: &str, manifest: &str, recorded: &[(&str, String)]) -> Scratch {
+    let root = Scratch::unmade(&format!("conforming-{tag}"));
     let cases = root.join("conformance").join("subtitles.fetch@1");
     let _ = std::fs::create_dir_all(&cases);
     let _ = std::fs::write(root.join("plugin.toml"), manifest);
@@ -236,7 +233,7 @@ async fn an_adapter_naming_no_upstream_or_an_unspoken_contract_is_refused_and_ju
     let read = judged(&source("unspoken", &unspoken, &conforming())).await;
     assert!(!read.conforms && read.cases.is_empty() && !read.refusals.is_empty());
 
-    assert!(conformed(&Scratch::named("conforming-nothing-here").kept())
+    assert!(conformed(&Scratch::named("conforming-nothing-here"))
         .await
         .is_err());
 }

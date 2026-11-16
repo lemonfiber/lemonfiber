@@ -10,7 +10,7 @@
 //! installed is a register written here, which is the only thing a diagnosis a month
 //! after an install has to go on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_core::app::{diagnose, Ctx};
@@ -70,14 +70,12 @@ const NONE: &str = r#"{ "installed": [] }"#;
 
 /// Where this case keeps its register, beside an environment file the way an install
 /// does.
-fn kept(name: &str, register: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("contributed-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
+fn kept(name: &str, register: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("contributed-{name}"));
+    let env = dir.within(".env");
     assert!(std::fs::write(&env, "").is_ok(), "the environment file");
     assert!(
-        std::fs::write(dir.join("plugins.json"), register).is_ok(),
+        std::fs::write(env.with_file_name("plugins.json"), register).is_ok(),
         "the register"
     );
     env

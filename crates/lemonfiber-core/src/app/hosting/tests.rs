@@ -5,6 +5,7 @@ use crate::config::Settings;
 use crate::model::HostingReport;
 use crate::ports::hosting::{Manager, Program};
 use crate::ports::Host;
+use crate::test_support::Holds as _;
 use lemonfiber_fixtures::hosting::Hosting as Fake;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -39,8 +40,7 @@ fn a_machine(manager: Arc<Fake>) -> Ctx {
 /// beside an install rather than reported by one, and a machine with nowhere to
 /// keep it would read back the default whatever had been asked for.
 fn recording(name: &str, manager: Arc<Fake>) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("hosting-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("hosting-{name}"));
     machine(
         Settings {
             env_file: Some(dir.join(".env")),
@@ -48,6 +48,7 @@ fn recording(name: &str, manager: Arc<Fake>) -> Ctx {
         },
         manager,
     )
+    .holding(dir)
 }
 
 /// What this machine has recorded about bringing the stack back after a restart.
@@ -559,9 +560,7 @@ fn what_is_installed_is_the_command_as_it_would_be_typed() {
 /// A machine that knows where it is, with this manager, holding a plugin whose
 /// `configarr` runs on a schedule and whose `kept` does not.
 fn scheduling(name: &str, manager: Arc<Fake>) -> (Ctx, Vec<crate::plugin::Installed>) {
-    let scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("hosting-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&scratch);
-    let _ = std::fs::create_dir_all(&scratch);
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new(&format!("hosting-{name}"));
     let installed =
         crate::scheduled::fixtures::installed(&[("configarr", Some("@daily")), ("kept", None)]);
     let _ = std::fs::write(
@@ -574,7 +573,8 @@ fn scheduling(name: &str, manager: Arc<Fake>) -> (Ctx, Vec<crate::plugin::Instal
             ..knowing()
         },
         manager,
-    );
+    )
+    .holding(scratch);
     (ctx, installed)
 }
 

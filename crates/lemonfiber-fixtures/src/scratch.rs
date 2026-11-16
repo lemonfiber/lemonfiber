@@ -1,10 +1,9 @@
 //! A directory of one test's own, removed when the test is done with it.
 //!
-//! Most tests hold a [`Scratch`] and the directory goes when they finish. Some fixtures
-//! hand a path to a context that outlives them, and [`Scratch::kept`] leaves those in
-//! place. Every directory a process asks for sits in one directory of that process's
-//! own, and the first ask in each process sweeps every other process's directory that
-//! has gone [`STALE`].
+//! A test holds a [`Scratch`], or hands it to the context it builds, and the directory
+//! goes when the last holder is done with it. Every directory a process asks for sits in
+//! one directory of that process's own, and the first ask in each process sweeps every
+//! other process's directory that has gone [`STALE`].
 
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -84,8 +83,6 @@ impl Scratch {
     /// The same directory, standing for `relative` inside it.
     #[must_use]
     pub fn within(mut self, relative: &str) -> Self {
-        // Taken rather than cloned: `self` is dropped on the way out, and a drop that
-        // still held the root would remove the directory being handed back.
         let root = std::mem::take(&mut self.root);
         Self {
             at: root.join(relative),
@@ -93,18 +90,17 @@ impl Scratch {
         }
     }
 
-    /// The path, left in place when this is dropped: for a fixture handing it to a
-    /// context that outlives the fixture. The sweep removes it once it is stale.
-    #[must_use]
-    pub fn kept(mut self) -> PathBuf {
-        self.root = PathBuf::new();
-        std::mem::take(&mut self.at)
-    }
-
     /// The path it stands for.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.at
+    }
+
+    /// The path it stands for as a `&'static Path`, for what holds one, such as a stack
+    /// source. The directory still goes when this is dropped.
+    #[must_use]
+    pub fn leaked(&self) -> &'static Path {
+        Box::leak(self.at.clone().into_boxed_path())
     }
 }
 

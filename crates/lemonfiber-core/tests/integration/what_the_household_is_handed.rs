@@ -84,7 +84,8 @@ fn behind_the_door(manifest: &Manifest, service: &Service) -> bool {
 async fn answered(chose: Option<&str>) -> FrontDoorReport {
     static ASKED: AtomicU32 = AtomicU32::new(0);
     let nth = ASKED.fetch_add(1, Ordering::Relaxed);
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("handed-{nth}")).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("handed-{nth}"));
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
@@ -95,6 +96,7 @@ async fn answered(chose: Option<&str>) -> FrontDoorReport {
         ..Settings::default()
     };
     let ctx = lemonfiber_testing::a_context()
+        .holding(at_scratch)
         .engine(Arc::new(Reporting::holding(
             &["seerr", "door"],
             Lifecycle::Running,

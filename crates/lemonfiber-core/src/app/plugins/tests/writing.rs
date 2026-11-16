@@ -188,14 +188,11 @@ async fn the_record_is_what_the_assertions_above_turn_on() {
 /// unrecorded write is the one that cannot be put back.
 #[tokio::test]
 async fn a_machine_that_cannot_say_where_its_own_files_are_refuses_the_install() {
+    let root = lemonfiber_fixtures::scratch::Scratch::named("unrooted");
     let ctx = a_context()
         .settings(crate::config::Settings {
             env_file: None,
-            stack_dir: Some(
-                lemonfiber_fixtures::scratch::Scratch::named("unrooted")
-                    .kept()
-                    .join("stack"),
-            ),
+            stack_dir: Some(root.join("stack")),
             ..crate::config::Settings::default()
         })
         .build();

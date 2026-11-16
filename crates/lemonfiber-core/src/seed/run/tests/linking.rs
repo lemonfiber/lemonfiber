@@ -32,10 +32,8 @@ const GATES_KEY: &str = "gates-key";
 
 /// A stack directory, and a gate routing to the media server under [`GATES_KEY`] and
 /// accepting each of `accepted` there.
-fn project(name: &str, accepted: &[&str]) -> (std::path::PathBuf, Arc<Gate>) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+fn project(name: &str, accepted: &[&str]) -> (lemonfiber_fixtures::scratch::Scratch, Arc<Gate>) {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(name);
     (at, Arc::new(media_route(accepted)))
 }
 
@@ -135,7 +133,7 @@ async fn seeded(
 ) -> Vec<Wiring> {
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
     let mut ctx = asking(
-        seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone()),
+        recorded_ctx(true, bytes, name).with_http(http.clone()),
         project,
         gate,
     );
@@ -442,10 +440,10 @@ async fn an_old_token_that_cannot_be_retired_is_said() {
     let gate = Arc::new(media_route(&["older", &minted()]).refusing(&["admit_tokens"]));
     let http = serving(&[true], at_the_gate("stale"), requests::taken());
     let ctx = asking(
-        seed_ctx(
+        recorded_ctx(
             true,
             Some(vec![0xab; crate::secret::SECRET_BYTES]),
-            Some(recorded_admin("linking-unretired")),
+            "linking-unretired",
         )
         .with_http(http.clone()),
         &at,

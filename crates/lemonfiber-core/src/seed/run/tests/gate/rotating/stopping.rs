@@ -90,7 +90,7 @@ async fn a_certificate_that_cannot_be_withdrawn_stays_handed_beside_the_new_one(
 
 #[tokio::test(start_paused = true)]
 async fn a_replacement_with_nobody_to_hand_it_says_so() {
-    let (_, at, _, _) = machine("rotating-unheld", answering(now(), true));
+    let (_ctx, at, _, _) = machine("rotating-unheld", answering(now(), true));
     let (_, fillers, server) = parts(&at);
     let alone = stack(false);
 

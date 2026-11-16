@@ -39,10 +39,11 @@ fn a_grant_lapses_only_once_its_thirty_days_are_past() {
 
 #[test]
 fn a_renewal_is_kept_beside_the_configuration_and_a_removal_forgets_it() {
-    let dir = Scratch::named("grants-kept").kept();
+    let dir_scratch = Scratch::named("grants-kept");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_context().build();
+    let mut ctx = a_context().holding(dir_scratch).build();
     ctx.settings.env_file = Some(dir.join(".env"));
 
     let today = renewed(&ctx, "a7f3");
@@ -56,10 +57,11 @@ fn a_renewal_is_kept_beside_the_configuration_and_a_removal_forgets_it() {
 /// the day already kept and leaves the file as it was.
 #[test]
 fn a_second_renewal_on_the_same_day_leaves_the_file_alone() {
-    let dir = Scratch::named("grants-same-day").kept();
+    let dir_scratch = Scratch::named("grants-same-day");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_context().build();
+    let mut ctx = a_context().holding(dir_scratch).build();
     ctx.settings.env_file = Some(dir.join(".env"));
     let kept = dir.join("grants.json");
     let today = written(ctx.today());

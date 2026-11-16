@@ -21,11 +21,13 @@ use crate::test_support::a_context;
 /// A machine keeping its configuration in a directory of this case's own, with a
 /// password set, its clock at the moment the recorded chain is valid.
 fn a_machine(named: &str) -> (Ctx, Arc<Heard>) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("device-{named}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("device-{named}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let heard = Arc::new(Heard::default());
     let ctx = a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join(".env")),
             stack_dir: Some(dir.join("stack")),

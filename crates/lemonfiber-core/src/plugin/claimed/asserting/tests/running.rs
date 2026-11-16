@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use super::{changed, proofs, PINNED};
 use crate::plugin::Verdict;
 
@@ -14,9 +12,8 @@ why     = "It starts as the service runs it."
 [[proof]]
 id      = "guarded""#;
 
-fn source(named: &str, recording: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("asserting-run-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn source(named: &str, recording: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("asserting-run-{named}"));
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(
         at.join("fixtures/guarded.json"),

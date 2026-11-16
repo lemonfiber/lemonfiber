@@ -106,15 +106,17 @@ pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
         stdout: String::new(),
         stderr: String::new(),
     })));
+    let path = env.to_path_buf();
     let ctx = a_context()
         .runner(runner.clone())
         .engine(Arc::new(engine))
         .over(crate::test_support::unguarded_stack())
         .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             stack_dir: Some(stack),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build();
     let generated = ctx
         .stack
@@ -127,7 +129,7 @@ pub(super) fn holding(name: &str, engine: Reporting, plugin: &str) -> Machine {
     Machine {
         ctx,
         runner,
-        env,
+        env: path,
         document,
     }
 }

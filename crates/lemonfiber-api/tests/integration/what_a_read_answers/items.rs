@@ -138,7 +138,8 @@ async fn the_one_address_for_the_household_is_answered_under_its_own_kind() {
         Lifecycle::Running,
         Health::Healthy,
     );
-    let at = lemonfiber_fixtures::scratch::Scratch::named("front-door-read").kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named("front-door-read");
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let settings = Settings {

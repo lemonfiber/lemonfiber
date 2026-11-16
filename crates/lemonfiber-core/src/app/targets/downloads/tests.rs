@@ -68,7 +68,7 @@ fn an_unreadable_register_leaves_the_stacks_own_services() {
     assert!(std::fs::write(&beside, "not a register").is_ok());
     let ctx = a_context()
         .settings(Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
         .build();

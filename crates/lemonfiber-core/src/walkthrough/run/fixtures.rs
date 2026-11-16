@@ -17,6 +17,7 @@ use crate::ports::service::{
 };
 use crate::test_support::adapted::{running, Adapted};
 use crate::test_support::curators::{answered, curated, FILM, TELEVISION};
+use crate::test_support::Holds as _;
 use crate::test_support::{a_context, json, media, usenet, Reporting, SeedFs};
 use crate::trace::{Outcome, Stage};
 use crate::walkthrough::{Line, Narrator};
@@ -219,10 +220,10 @@ pub(super) fn ctx_with(fake: &Fake) -> Ctx {
 fn of_its_own(mut ctx: Ctx) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("walkthrough-{nth}")).kept();
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("walkthrough-{nth}"));
     let _ = std::fs::create_dir_all(&dir);
     ctx.settings.env_file = Some(dir.join(".env"));
-    ctx
+    ctx.holding(dir)
 }
 
 /// The same, reachable media server and all, moved into its plugin.

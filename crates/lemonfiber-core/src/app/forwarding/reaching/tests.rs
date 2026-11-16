@@ -29,11 +29,13 @@ fn fillers(installed: &[crate::plugin::Installed]) -> Fillers {
 }
 
 fn ctx(name: &str) -> crate::app::Ctx {
+    let env = env_without_password(&format!("forwarding-reaching-{name}"));
     a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env_without_password(&format!("forwarding-reaching-{name}"))),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build()
 }
 

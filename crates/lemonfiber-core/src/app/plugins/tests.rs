@@ -149,10 +149,11 @@ fn ctx(name: &str) -> Ctx {
     a_context()
         .over(unguarded_stack())
         .settings(crate::config::Settings {
-            env_file: Some(env_file),
+            env_file: Some(env_file.to_path_buf()),
             stack_dir: Some(stack),
             ..crate::config::Settings::default()
         })
+        .holding(env_file)
         .build()
 }
 
@@ -168,10 +169,11 @@ fn proving(name: &str, runner: Arc<dyn crate::ports::Runner>, http: Arc<dyn Http
         .runner(runner)
         .over(unguarded_stack())
         .settings(crate::config::Settings {
-            env_file: Some(env_file),
+            env_file: Some(env_file.to_path_buf()),
             stack_dir: Some(stack),
             ..crate::config::Settings::default()
         })
+        .holding(env_file)
         .build()
         .with_http(http)
         .with_patience(std::time::Duration::ZERO)
@@ -257,10 +259,8 @@ fn staging_of(record: &Path) -> PathBuf {
 
 /// A plugin source written to a scratch directory, with every recording its adapters owe
 /// answered inside their contracts.
-fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("installing-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+fn source(named: &str, manifest: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(&format!("installing-{named}"));
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
     crate::test_support::recordings_owed(&at);
     at

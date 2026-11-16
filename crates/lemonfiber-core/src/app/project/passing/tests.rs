@@ -9,6 +9,7 @@ use crate::app::Ctx;
 use crate::config::{Reaching, REACH_REGISTRY_KEY};
 use crate::pass::{File, Key, Paths, PINNED, SERVICE};
 use crate::stack::RUNNING;
+use crate::test_support::Holds as _;
 
 const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
@@ -38,7 +39,8 @@ fn machine_with(
         .build()
         .with_registry(Arc::clone(registry) as Arc<dyn lemonfiber_ports::registry::Registry>);
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let mut register = crate::plugin::Register::empty();
     for id in also {
         let service = crate::test_support::a_placed(id, &[], None);

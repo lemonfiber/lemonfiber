@@ -284,20 +284,21 @@ fn minted_moving_in(
     }
     let at = crate::app::targets::service_config_dir(&stack_of(&ctx), &plugin).join(part.file);
     let _ = std::fs::create_dir_all(at.parent().unwrap_or(&at));
-    match left {
+    let _elsewhere = match left {
         Left::Written => {
             let _ = std::fs::write(&at, part.holding);
+            None
         }
-        Left::Absent => {}
+        Left::Absent => None,
         Left::LeadingAway => {
             let elsewhere =
-                lemonfiber_fixtures::scratch::Scratch::new(&format!("{name}-elsewhere")).kept();
-            let _ = std::fs::create_dir_all(&elsewhere);
+                lemonfiber_fixtures::scratch::Scratch::new(&format!("{name}-elsewhere"));
             let target = elsewhere.join("key");
             let _ = std::fs::write(&target, part.holding);
             link(&target, &at);
+            Some(elsewhere)
         }
-    }
+    };
     let manifest = lemonfiber_bundled::PINNED
         .iter()
         .find(|one| one.first_party.plugin == plugin)

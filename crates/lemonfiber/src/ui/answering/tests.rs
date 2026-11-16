@@ -341,8 +341,10 @@ mod encrypted {
 
     /// What this run presents, from a certificate kept in a directory of its own.
     fn presenting(named: &str) -> Option<Encrypting> {
-        let at = lemonfiber_fixtures::scratch::Scratch::new(named).kept();
+        let at_scratch = lemonfiber_fixtures::scratch::Scratch::new(named);
+        let at = at_scratch.to_path_buf();
         let ctx = lemonfiber_testing::context::a_context()
+            .holding(at_scratch)
             .settings(lemonfiber_core::config::Settings {
                 companion: Some(at),
                 ..lemonfiber_core::config::Settings::default()

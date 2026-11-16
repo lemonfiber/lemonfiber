@@ -4,6 +4,7 @@ use super::unlinked;
 use crate::app::Ctx;
 use crate::error::codes::life::MOUNT_LINKED;
 use crate::project::FILE;
+use crate::test_support::Holds as _;
 
 const PROJECT: &str = "services:\n  shelf:\n    volumes:\n      - library:/data\n      - ./config/shelf:/config\n      - ./mounts/shelf/cache:/cache:ro\n  reader:\n    volumes:\n      - ./config/reader:/config\n";
 
@@ -16,7 +17,8 @@ fn machine(name: &str, text: Option<&str>) -> (Ctx, PathBuf) {
     let env = crate::test_support::env_without_password(name);
     let project = env.with_file_name("stack");
     ctx.settings.stack_dir = Some(project.clone());
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     for source in ["config/shelf", "mounts/shelf/cache", "config/reader"] {
         let _ = std::fs::create_dir_all(project.join(source));
     }

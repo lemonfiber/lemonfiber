@@ -7,6 +7,7 @@ use crate::app::Ctx;
 use crate::archive::Archiving;
 use crate::config::paths::Paths;
 use crate::test_support::a_context;
+use crate::test_support::Holds as _;
 
 /// A run keeping its own files under `dir`, which is a real directory.
 fn keeping_at(dir: &Path) -> Ctx {
@@ -19,14 +20,14 @@ fn keeping_at(dir: &Path) -> Ctx {
 
 /// A bundles directory holding one file of the given name and contents.
 fn holding(test: &str, name: &str, contents: &str) -> Ctx {
-    let dir = scratch(test).kept();
+    let dir = scratch(test);
     let bundles = dir.join("support");
     assert!(
         std::fs::create_dir_all(&bundles).is_ok(),
         "the scratch directory is writable"
     );
     assert!(std::fs::write(bundles.join(name), contents).is_ok());
-    keeping_at(&dir)
+    keeping_at(&dir).holding(dir)
 }
 
 #[test]

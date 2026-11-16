@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_manifest::{Claimed, Manifest};
 
@@ -64,8 +64,12 @@ fn pinned(manifest: &Manifest) -> String {
 }
 
 /// A stack directory holding the recordings named, each answering `status` with `body`.
-fn recorded(tag: &str, from: &str, answers: &[(&str, u16, &str)]) -> PathBuf {
-    let root = lemonfiber_fixtures::scratch::Scratch::named(tag).kept();
+fn recorded(
+    tag: &str,
+    from: &str,
+    answers: &[(&str, u16, &str)],
+) -> lemonfiber_fixtures::scratch::Scratch {
+    let root = lemonfiber_fixtures::scratch::Scratch::named(tag);
     let under = root.join("recordings").join(ASSEMBLED);
     let _ = std::fs::create_dir_all(&under);
     for (name, status, body) in answers {

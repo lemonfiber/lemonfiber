@@ -41,10 +41,8 @@ async fn a_part_only_answering_refuses_a_claim() {
 /// A part claimed while a path blocks it leaves the path a directory, and holds the claim.
 #[tokio::test]
 async fn a_held_part_claimed_through_a_blocking_path_leaves_it_a_directory() {
-    let blocking = crate::scratch::Scratch::named("owning-blocking")
-        .kept()
-        .join("blocked");
-    let part = Part::held(Owner::Open, Owner::Ours).blocking(blocking.clone());
+    let blocking = crate::scratch::Scratch::named("owning-blocking").within("blocked");
+    let part = Part::held(Owner::Open, Owner::Ours).blocking(blocking.to_path_buf());
 
     assert!(part
         .claim()

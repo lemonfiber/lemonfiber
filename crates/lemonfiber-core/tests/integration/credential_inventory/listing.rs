@@ -17,7 +17,11 @@ async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
         "unproven",
         &[("INDEXER_APIKEY", "the-key"), ("INDEXER_VALIDATED", "off")],
     );
-    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let inventory = asked(
+        &ctx(env.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
     let said = format!(
         "{:?}",
         inventory
@@ -37,7 +41,11 @@ async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
         "proven",
         &[("INDEXER_APIKEY", "the-key"), ("INDEXER_VALIDATED", "on")],
     );
-    let inventory = asked(&ctx(proven, Files::empty(), silent()), Asking::Read).await;
+    let inventory = asked(
+        &ctx(proven.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
     let said = format!(
         "{:?}",
         inventory
@@ -52,7 +60,7 @@ async fn a_credential_kept_without_being_proven_is_stale_and_says_so() {
 #[tokio::test]
 async fn the_inventory_names_every_credential_the_operator_supplies_and_every_one_it_mints() {
     let env = env_at("declared", &[]);
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
     lemonfiber_testing::adapted::parts_recorded(&ctx);
     let inventory = asked(&ctx, Asking::Read).await;
     let named: Vec<&str> = inventory.held.iter().map(|one| one.name.as_str()).collect();
@@ -71,7 +79,11 @@ async fn the_inventory_names_every_credential_the_operator_supplies_and_every_on
 #[tokio::test]
 async fn every_line_says_what_uses_it_where_it_is_and_where_it_stands() {
     let env = env_at("columns", &[]);
-    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let inventory = asked(
+        &ctx(env.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
 
     assert!(!inventory.held.is_empty());
     for held in &inventory.held {
@@ -94,7 +106,7 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
             ("INDEXER_APIKEY", &indexer),
         ],
     );
-    let ctx = ctx(env, Files::anywhere(SERVICE_CONFIG), silent());
+    let ctx = ctx(env.to_path_buf(), Files::anywhere(SERVICE_CONFIG), silent());
     lemonfiber_testing::adapted::parts_recorded(&ctx);
 
     let inventory = asked(&ctx, Asking::Read).await;
@@ -125,7 +137,11 @@ async fn no_recorded_value_appears_anywhere_in_the_answer() {
 #[tokio::test]
 async fn what_the_storage_protects_against_is_stated_with_what_it_does_not() {
     let env = env_at("honesty", &[]);
-    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let inventory = asked(
+        &ctx(env.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
 
     assert!(inventory.protection.summary.contains("not encrypted"));
     assert!(!inventory.protection.against.is_empty());
@@ -141,7 +157,7 @@ async fn what_the_storage_protects_against_is_stated_with_what_it_does_not() {
 #[tokio::test]
 async fn asking_to_see_something_this_stack_does_not_hold_says_what_it_does() {
     let env = env_at("noreveal", &[]);
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -174,7 +190,7 @@ async fn a_stack_that_cannot_be_read_refuses_rather_than_reporting_none() {
         .filesystem(Files::empty())
         .over(lemonfiber_testing::nowhere())
         .settings(Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
         .build();

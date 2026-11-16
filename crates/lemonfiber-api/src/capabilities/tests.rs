@@ -220,8 +220,10 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
 /// a member's key and the operator's are known to reach one stack.
 #[test]
 fn every_credential_is_told_the_stack_it_reaches() {
-    let kept = lemonfiber_fixtures::scratch::Scratch::new("capabilities-stack").kept();
+    let kept_scratch = lemonfiber_fixtures::scratch::Scratch::new("capabilities-stack");
+    let kept = kept_scratch.to_path_buf();
     let ctx = lemonfiber_testing::a_context()
+        .holding(kept_scratch)
         .settings(Settings {
             companion: Some(kept),
             ..Settings::default()

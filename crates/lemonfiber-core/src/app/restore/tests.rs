@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::test_support::Holds as _;
 use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::support::Reporting;
 
@@ -587,7 +588,7 @@ async fn settings_that_landed_but_could_not_be_re_pointed_are_reported() {
 /// whose library is at `root`, its password set and one device key, `pixel`,
 /// registered under that password; and where the device keys are kept.
 fn holding_a_device_key(named: &str, root: &str, vault: &Arc<FakeArchive>) -> (Ctx, PathBuf) {
-    let dir = scratch(named).kept();
+    let dir = scratch(named);
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = rooted_at(&dir, root, vault);
@@ -628,7 +629,7 @@ fn holding_a_device_key(named: &str, root: &str, vault: &Arc<FakeArchive>) -> (C
         Ok(())
     });
     assert!(seeded.is_ok());
-    (ctx, device_keys)
+    (ctx.holding(dir), device_keys)
 }
 
 /// Whether the device key `pixel` still stands in the record at `device_keys`.

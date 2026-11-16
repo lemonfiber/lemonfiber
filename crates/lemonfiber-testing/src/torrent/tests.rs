@@ -92,9 +92,7 @@ fn a_carried_download_has_bytes_left_and_a_finished_one_none() {
 
 #[test]
 fn a_client_moved_in_is_keyed_where_its_stack_is_and_one_keyed_holds_its_key_unwritten() {
-    let over = |directory: &Scratch| {
-        Source::External(Box::leak(directory.to_path_buf().into_boxed_path()))
-    };
+    let over = |directory: &Scratch| Source::External(directory.leaked());
     let written = Scratch::new("torrent-moved-in");
     let mut ctx = a_context().over(over(&written)).build();
     ctx.settings.env_file = Some(written.join(".env"));

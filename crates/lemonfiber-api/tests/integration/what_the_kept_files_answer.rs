@@ -179,8 +179,12 @@ fn header_of(headers: &[(String, String)], name: &str) -> Option<String> {
 }
 
 /// A directory holding one bundle of the given name and contents.
-fn holding_a_bundle(test: &str, name: &str, contents: &str) -> PathBuf {
-    let dir = scratch(test).kept();
+fn holding_a_bundle(
+    test: &str,
+    name: &str,
+    contents: &str,
+) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = scratch(test);
     let bundles = dir.join("support");
     assert!(
         std::fs::create_dir_all(&bundles).is_ok(),

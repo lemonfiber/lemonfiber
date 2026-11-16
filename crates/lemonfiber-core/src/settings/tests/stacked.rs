@@ -358,7 +358,7 @@ fn a_fold_the_journal_will_not_take_is_not_made() {
 
 #[test]
 fn stores_that_cannot_be_read_answer_nothing_and_the_file_is_never_read_in_their_place() {
-    let (_, env) = stacked("unread-stores", &[("VPN_COUNTRIES", "Sweden")]);
+    let (_ctx, env) = stacked("unread-stores", &[("VPN_COUNTRIES", "Sweden")]);
     assert!(std::fs::write(env.with_file_name(SETTINGS), "not a store").is_ok());
     assert!(std::fs::write(env.with_file_name(SECRETS), "not a store").is_ok());
     let file = store::read(&env).unwrap_or_default();

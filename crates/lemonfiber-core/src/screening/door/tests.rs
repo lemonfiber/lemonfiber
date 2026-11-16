@@ -111,7 +111,8 @@ fn a_door_nothing_is_known_about_locates_nothing_and_says_why() {
 
 #[test]
 fn the_door_is_https_on_its_own_port_only_with_an_address_and_a_certificate() {
-    let dir = Scratch::named("door-made").kept();
+    let dir_scratch = Scratch::named("door-made");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let kept = ensured(&lemonfiber_adapters::Disk, &dir).ok();
     let fingerprint = kept.as_ref().map(|kept| kept.fingerprint.clone());
@@ -378,10 +379,11 @@ fn a_pass_travels_in_its_one_parameter_beside_whatever_query_is_there() {
 /// A household whose every bundled part is recorded, reached at a recorded address, with
 /// the household's proxy serving `domain` where it names one.
 fn bundled(tag: &str, domain: Option<&str>) -> crate::app::Ctx {
-    let at = Scratch::named(&format!("door-browser-{tag}")).kept();
+    let at_scratch = Scratch::named(&format!("door-browser-{tag}"));
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
-    let mut ctx = crate::test_support::a_context().build();
+    let mut ctx = crate::test_support::a_context().holding(at_scratch).build();
     ctx.settings.env_file = Some(at.join(".env"));
     ctx.settings.household_host = Some("192.168.1.20".to_owned());
     ctx.settings.household_domain = domain.map(str::to_owned);

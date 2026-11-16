@@ -12,9 +12,11 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 
 /// A context whose environment file is in an emptied scratch directory.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name).kept();
+    let dir_scratch = scratch(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     a_context()
+        .holding(dir_scratch)
         .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
             crate::test_support::spoke(""),
         ))))

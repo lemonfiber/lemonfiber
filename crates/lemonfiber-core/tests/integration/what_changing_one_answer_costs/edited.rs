@@ -61,7 +61,7 @@ async fn a_record_that_cannot_be_read_leaves_the_change_free_to_be_made() {
     let env = env_at("record-lost", &from);
     let baseline = env.with_file_name("baseline.json");
     let _ = std::fs::write(&baseline, "not json at all");
-    let ctx = reaching(env.clone(), &from, Protocols::none(), Vec::new());
+    let ctx = reaching(env.to_path_buf(), &from, Protocols::none(), Vec::new());
 
     let review = changing(&ctx, USENET, "on", AGREED).await;
 
@@ -84,7 +84,7 @@ async fn a_setting_edited_by_hand_is_shown_from_both_sides_before_anything_is_wr
     let env = env_at("edited", &from);
     remembering(&env, DATA_ROOT, "/srv/old");
     let ctx = over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Fake::by_path(vec![("", unavailable())]),
@@ -126,7 +126,7 @@ async fn a_credential_edited_by_hand_is_reported_without_being_printed() {
         "the-one-they-set",
     );
     remembering(&env, "USENET_PASS", "the-one-we-wrote");
-    let ctx = reaching(env, &from, Protocols::none(), Vec::new());
+    let ctx = reaching(env.to_path_buf(), &from, Protocols::none(), Vec::new());
 
     let review = changing(
         &ctx,
@@ -158,7 +158,7 @@ async fn a_line_taken_out_of_the_file_by_hand_is_an_edit_too() {
     let from = PathBuf::from("/srv/media");
     let env = env_at("removed", &from);
     remembering(&env, USENET, "on");
-    let ctx = reaching(env, &from, Protocols::none(), Vec::new());
+    let ctx = reaching(env.to_path_buf(), &from, Protocols::none(), Vec::new());
 
     let review = changing(&ctx, USENET, "off", UNSAID).await;
 

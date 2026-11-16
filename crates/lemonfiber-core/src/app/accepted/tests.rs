@@ -1,6 +1,7 @@
 use super::{load, save};
 use crate::doctor::acknowledged::Accepted;
 use crate::test_support::a_context;
+use crate::test_support::Holds as _;
 
 /// Where a test's scratch record lives. Naming it does not touch it.
 fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -9,9 +10,9 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 
 /// A context whose environment file is in an emptied scratch directory.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name).kept();
+    let dir = scratch(name);
     let _ = std::fs::remove_dir_all(&dir);
-    ctx_with(Some(dir.join(".env")))
+    ctx_with(Some(dir.join(".env"))).holding(dir)
 }
 
 /// A context with the given environment file, or none at all.

@@ -180,7 +180,7 @@ async fn the_forwarded_port_is_passed_on_once_a_minute() {
             a_context()
                 .engine(Arc::new(guard::running()))
                 .settings(Settings {
-                    env_file: Some(env.clone()),
+                    env_file: Some(env.to_path_buf()),
                     stack_dir: env.parent().map(|config| config.join("data").join("stack")),
                     port_forward: forwarding(),
                     ..Settings::default()

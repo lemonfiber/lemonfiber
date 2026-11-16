@@ -214,7 +214,8 @@ fn a_key_reads_as_its_name_and_scope() {
 /// the other.
 #[test]
 fn a_setting_edited_since_is_read_off_the_settings_file() {
-    let root = lemonfiber_fixtures::scratch::Scratch::named("history-edited").kept();
+    let root_scratch = lemonfiber_fixtures::scratch::Scratch::named("history-edited");
+    let root = root_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&root);
     let env = root.join("config").join(".env");
     let settings = crate::config::Settings {
@@ -222,7 +223,10 @@ fn a_setting_edited_since_is_read_off_the_settings_file() {
         stack_dir: Some(root.join("data").join("stack")),
         ..crate::config::Settings::default()
     };
-    let ctx = crate::test_support::a_context().settings(settings).build();
+    let ctx = crate::test_support::a_context()
+        .holding(root_scratch)
+        .settings(settings)
+        .build();
     let journal = crate::app::targets::layout(&ctx).map(|paths| paths.journal());
     let change = crate::journal::Change {
         at: Instant::from_seconds(2000),
@@ -314,11 +318,13 @@ fn a_grant_reads_as_given_or_ended_by_its_credential_and_plugin() {
 
 #[test]
 fn a_setting_recorded_since_is_read_off_the_settings_store() {
-    let root = lemonfiber_fixtures::scratch::Scratch::named("history-setting").kept();
+    let root_scratch = lemonfiber_fixtures::scratch::Scratch::named("history-setting");
+    let root = root_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&root);
     let config = root.join("config");
     let env = config.join(".env");
     let ctx = crate::test_support::a_context()
+        .holding(root_scratch)
         .settings(crate::config::Settings {
             env_file: Some(env),
             stack_dir: Some(root.join("data").join("stack")),

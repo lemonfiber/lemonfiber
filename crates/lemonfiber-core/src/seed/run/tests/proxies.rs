@@ -10,12 +10,14 @@ const DOOR: &str = "10.80.96.18";
 /// A context asking the media server moved into its plugin as its administrator where
 /// `administered` says.
 fn proxies_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-env")).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-env"));
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     let ctx = a_context()
+        .holding(at_scratch)
         .settings(Settings {
             env_file: Some(env),
             ..Settings::default()

@@ -15,12 +15,9 @@ fn root_folder_wirings(report: &crate::seed::Report) -> Vec<&crate::seed::Wiring
 /// Each curator already holds the folders, so each is left as wired.
 #[tokio::test]
 async fn seed_wires_each_curators_root_folders() {
+    let env = crate::test_support::env_without_password("roots-held");
     let ctx = curating(
-        seed_ctx(
-            true,
-            Some(vec![0x11; 24]),
-            Some(crate::test_support::env_without_password("roots-held")),
-        ),
+        seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf())),
         true,
     )
     .with_http(seeding_curated(Vec::new()));
@@ -75,12 +72,9 @@ async fn seed_makes_each_root_folders_directory_under_the_data_root_first() {
 /// skipped for a re-run, not failed.
 #[tokio::test]
 async fn seed_skips_curator_root_folders_when_the_key_is_not_readable() {
+    let env = crate::test_support::env_without_password("roots-unkeyed");
     let ctx = curating(
-        seed_ctx(
-            true,
-            Some(vec![0x11; 24]),
-            Some(crate::test_support::env_without_password("roots-unkeyed")),
-        ),
+        seed_ctx(true, Some(vec![0x11; 24]), Some(env.to_path_buf())),
         false,
     );
 

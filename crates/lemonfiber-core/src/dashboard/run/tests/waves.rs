@@ -27,7 +27,7 @@ fn engine_taking(name: &str, tunnel: Tunnel, listing: Duration, delay: Duration)
         ip_echo: vec!["https://echo".to_owned()],
         port_forward: forwarding(),
         stack_dir: env.parent().map(|config| config.join("data").join("stack")),
-        env_file: Some(env),
+        env_file: Some(env.to_path_buf()),
         ..Settings::default()
     };
     let engine = tunnel_engine(true, Some(tunnel)).alongside(guard::running());
@@ -39,6 +39,7 @@ fn engine_taking(name: &str, tunnel: Tunnel, listing: Duration, delay: Duration)
                 inside: delay,
             }))
             .settings(settings)
+            .holding(env)
             .build()
             .with_patience(Duration::ZERO)
             .with_http(Fake::by_path(vec![guard::forwarding(Some(51413))])),

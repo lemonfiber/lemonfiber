@@ -1,6 +1,7 @@
 //! The stack, door, queue, storage and transfers panels.
 
 use super::*;
+use crate::test_support::Holds as _;
 
 /// A queue as a curator reports it: four items, one of them stuck.
 fn four_queued() -> Answer {
@@ -160,7 +161,7 @@ async fn an_unreadable_register_leaves_the_door_panel_on_the_stacks_own_door() {
     let watching = a_context()
         .engine(Arc::new(engine))
         .settings(Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
         .build()
@@ -199,8 +200,7 @@ fn curating(queue: Answer, running: bool, keyed: bool) -> Ctx {
     use crate::test_support::curators::ALL;
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("dashboard-queue-{nth}")).kept();
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("dashboard-queue-{nth}"));
     let _ = std::fs::create_dir_all(&dir);
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
     let mut ctx = ctx(if running {
@@ -220,7 +220,7 @@ fn curating(queue: Answer, running: bool, keyed: bool) -> Ctx {
         let adapters: Vec<&str> = ALL.iter().map(|curator| curator.adapter).collect();
         ctx.seams.confined = adapted::holding_keys(Arc::clone(&ctx.seams.confined), &adapters);
     }
-    ctx
+    ctx.holding(dir)
 }
 
 #[tokio::test]
@@ -347,11 +347,8 @@ fn ctx_downloads(fs: SeedFs, http: Arc<dyn Http>, env_file: Option<PathBuf>) -> 
 async fn the_transfers_panel_fills_from_each_download_client() {
     let http: Arc<dyn Http> =
         usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
-    let ctx = ctx_downloads(
-        SeedFs::keyed(None),
-        http,
-        Some(env_without_password("transfers-fill")),
-    );
+    let env = env_without_password("transfers-fill");
+    let ctx = ctx_downloads(SeedFs::keyed(None), http, Some(env.to_path_buf()));
     usenet::moved_in(&ctx);
     torrent::moved_in(&ctx);
     let snapshot = gather(&ctx, None).await;
@@ -394,10 +391,11 @@ async fn a_client_not_yet_seeded_is_left_out_not_a_failure() {
 #[tokio::test]
 async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
     let http = Fake::silent();
+    let env = env_without_password("transfers-unkeyed");
     let ctx = ctx_downloads(
         SeedFs::keyed(None),
         Arc::clone(&http) as Arc<dyn Http>,
-        Some(env_without_password("transfers-unkeyed")),
+        Some(env.to_path_buf()),
     );
     usenet::unkeyed(&ctx);
     torrent::unkeyed(&ctx);
@@ -411,11 +409,8 @@ async fn a_client_whose_key_is_not_on_disk_yet_is_left_out() {
 #[tokio::test]
 async fn a_download_client_that_will_not_answer_is_left_out() {
     let http: Arc<dyn Http> = Fake::silent();
-    let ctx = ctx_downloads(
-        SeedFs::keyed(None),
-        http,
-        Some(env_without_password("transfers-silent")),
-    );
+    let env = env_without_password("transfers-silent");
+    let ctx = ctx_downloads(SeedFs::keyed(None), http, Some(env.to_path_buf()));
     usenet::moved_in(&ctx);
     torrent::moved_in(&ctx);
     let snapshot = gather(&ctx, None).await;

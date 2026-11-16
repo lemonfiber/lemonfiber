@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::scratch::Scratch;
 
 use crate::app::{answered_under, dispatch, rehearsal, Command, Ctx, Outcome, Rehearsal};
 use crate::error::codes::plugin::{KEY_UNREADABLE, UNREADABLE};
@@ -57,22 +58,20 @@ fn running() -> String {
     )
 }
 
-fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("authoring-{named}")).kept();
-    let _ = std::fs::create_dir_all(&at);
+fn source(named: &str, manifest: &str) -> Scratch {
+    let at = Scratch::new(&format!("authoring-{named}"));
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
     at
 }
 
-fn written(named: &str, text: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::new(&format!("authoring-{named}")).kept();
-    let file = at.join("key.pem");
+fn written(named: &str, text: &str) -> Scratch {
+    let file = Scratch::new(&format!("authoring-{named}")).within("key.pem");
     let _ = std::fs::write(&file, text);
     file
 }
 
 fn nowhere(named: &str) -> PathBuf {
-    lemonfiber_fixtures::scratch::Scratch::unmade(&format!("authoring-{named}")).kept()
+    Scratch::unmade(&format!("authoring-{named}")).to_path_buf()
 }
 
 fn registry_answering(status: u16, body: &'static str) -> Arc<dyn Registry> {
@@ -114,9 +113,10 @@ async fn answered(asked: Asked, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
 
 #[tokio::test]
 async fn a_plugin_nothing_refuses_answers_under_its_claims_kind_and_is_installable() {
+    let plugin = source("whole", WHOLE);
     let outcome = answered(
         Asked::Claims {
-            path: source("whole", WHOLE),
+            path: plugin.to_path_buf(),
         },
         &plain(),
     )
@@ -132,9 +132,10 @@ async fn a_plugin_nothing_refuses_answers_under_its_claims_kind_and_is_installab
 
 #[tokio::test]
 async fn a_refused_manifest_is_an_answer_that_says_it_would_not_install() {
+    let plugin = source("unpinned", &unpinned());
     let outcome = answered(
         Asked::Claims {
-            path: source("unpinned", &unpinned()),
+            path: plugin.to_path_buf(),
         },
         &plain(),
     )
@@ -151,7 +152,13 @@ async fn a_refused_manifest_is_an_answer_that_says_it_would_not_install() {
 async fn a_directory_and_the_manifest_inside_it_are_the_same_plugin() {
     let at = source("either-way", WHOLE);
 
-    let directory = answered(Asked::Claims { path: at.clone() }, &plain()).await;
+    let directory = answered(
+        Asked::Claims {
+            path: at.to_path_buf(),
+        },
+        &plain(),
+    )
+    .await;
     let file = answered(
         Asked::Claims {
             path: at.join("plugin.toml"),
@@ -165,9 +172,10 @@ async fn a_directory_and_the_manifest_inside_it_are_the_same_plugin() {
 
 #[tokio::test]
 async fn conforming_answers_whether_the_plugin_would_fill_what_it_speaks() {
+    let plugin = source("conform-whole", WHOLE);
     let whole = answered(
         Asked::Conform {
-            path: source("conform-whole", WHOLE),
+            path: plugin.to_path_buf(),
         },
         &plain(),
     )
@@ -177,9 +185,10 @@ async fn conforming_answers_whether_the_plugin_would_fill_what_it_speaks() {
     };
     assert!(whole.conforms && whole.cases.is_empty(), "{whole:?}");
 
+    let plugin = source("conform-unpinned", &unpinned());
     let refused = answered(
         Asked::Conform {
-            path: source("conform-unpinned", &unpinned()),
+            path: plugin.to_path_buf(),
         },
         &plain(),
     )
@@ -226,9 +235,10 @@ async fn a_path_holding_no_plugin_is_refused_with_the_unreadable_code() {
 
 #[tokio::test]
 async fn an_image_no_registry_offers_a_signature_for_is_unproven_and_allowed() {
+    let plugin = source("unproven", WHOLE);
     let outcome = answered(
         Asked::Provenance {
-            path: source("unproven", WHOLE),
+            path: plugin.to_path_buf(),
             keys: Vec::new(),
         },
         &plain(),
@@ -253,10 +263,12 @@ async fn an_image_whose_signature_does_not_hold_would_not_be_installed() {
         registry_offering(elsewhere),
     );
 
+    let plugin = source("refused", WHOLE);
+    let key = written("refusing-key", PUBLIC_KEY);
     let outcome = answered(
         Asked::Provenance {
-            path: source("refused", WHOLE),
-            keys: vec![written("refusing-key", PUBLIC_KEY)],
+            path: plugin.to_path_buf(),
+            keys: vec![key.to_path_buf()],
         },
         &ctx,
     )
@@ -270,13 +282,15 @@ async fn an_image_whose_signature_does_not_hold_would_not_be_installed() {
 
 #[tokio::test]
 async fn a_key_that_cannot_be_used_stops_the_verification_naming_it() {
+    let gibberish = written("gibberish", "hello");
     for (key, why) in [
         (PathBuf::from("/nowhere/signing.pem"), "could not be read"),
-        (written("gibberish", "hello"), "PEM"),
+        (gibberish.to_path_buf(), "PEM"),
     ] {
+        let plugin = source("bad-key", WHOLE);
         let refused = answered(
             Asked::Provenance {
-                path: source("bad-key", WHOLE),
+                path: plugin.to_path_buf(),
                 keys: vec![key.clone()],
             },
             &plain(),
@@ -309,7 +323,7 @@ async fn recording_writes_what_the_run_said_and_reproduces_it_once_noted() {
         registry_answering(404, "{}"),
     );
     let asked = Asked::Record {
-        path: at.clone(),
+        path: at.to_path_buf(),
         taking: Retaking::default(),
     };
 
@@ -342,9 +356,10 @@ async fn recording_writes_what_the_run_said_and_reproduces_it_once_noted() {
 
 #[tokio::test]
 async fn a_run_proof_that_cannot_be_made_is_not_recorded() {
+    let plugin = source("record-unmade", &running());
     let outcome = answered(
         Asked::Record {
-            path: source("record-unmade", &running()),
+            path: plugin.to_path_buf(),
             taking: Retaking::default(),
         },
         &plain(),
@@ -366,9 +381,10 @@ async fn a_rehearsed_recording_that_would_write_is_refused_before_it_runs() {
     let mut ctx = plain();
     ctx.dry_run = true;
 
+    let plugin = source("record-rehearsed", &running());
     let refused = answered(
         Asked::Record {
-            path: source("record-rehearsed", &running()),
+            path: plugin.to_path_buf(),
             taking: Retaking::default(),
         },
         &ctx,

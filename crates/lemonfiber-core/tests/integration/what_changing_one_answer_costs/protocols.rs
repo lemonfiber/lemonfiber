@@ -39,7 +39,7 @@ async fn dropping_torrents_while_one_is_coming_down_reports_it_and_offers_to_wai
     let from = PathBuf::from("/srv/media");
     let env = env_at("in-flight", &from);
     let ctx = downloading(over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::both(),
         usenet::beside_torrents(&[torrent::carrying()], &[]),
@@ -80,7 +80,7 @@ async fn dropping_usenet_names_what_is_coming_down_over_usenet_and_not_the_torre
     let from = PathBuf::from("/srv/media");
     let env = env_at("usenet-in-flight", &from);
     let ctx = downloading(over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::both(),
         usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]),
@@ -118,7 +118,7 @@ async fn the_offer_to_wait_taken_up_lets_the_downloads_finish_and_then_makes_the
     let from = PathBuf::from("/srv/media");
     let env = env_at("waited", &from);
     let ctx = downloading(over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::both(),
         usenet::beside_torrents(&[torrent::finished()], &[]),
@@ -149,7 +149,7 @@ async fn asking_a_change_that_takes_nothing_away_to_wait_waits_for_nothing() {
     let env = env_at("not-a-reduction", &from);
     let fake = usenet::beside_torrents(&[torrent::carrying()], &[]);
     let ctx = downloading(over(
-        env,
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Arc::clone(&fake),
@@ -170,7 +170,7 @@ async fn asking_a_change_that_takes_nothing_away_to_wait_waits_for_nothing() {
 async fn adding_usenet_asks_for_its_own_login_and_never_for_a_tunnel() {
     let from = PathBuf::from("/srv/media");
     let env = env_at("adding", &from);
-    let ctx = reaching(env.clone(), &from, Protocols::none(), Vec::new());
+    let ctx = reaching(env.to_path_buf(), &from, Protocols::none(), Vec::new());
 
     let review = changing(&ctx, USENET, "on", AGREED).await;
 
@@ -199,7 +199,7 @@ async fn switching_on_what_is_already_on_opens_nothing_and_keeps_nothing() {
     let from = PathBuf::from("/srv/media");
     let env = env_at("already-on", &from);
     let ctx = reaching(
-        env,
+        env.to_path_buf(),
         &from,
         Protocols {
             usenet: true,

@@ -194,7 +194,7 @@ async fn answers_arriving_together_are_each_counted_before_any_is_checked() {
 #[tokio::test]
 async fn the_door_counts_each_device_by_where_it_connected_from() {
     let path = keeping("by-device");
-    let (router, _, _) = door(Some(path), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
     let wrong = offering(&chosen().to_uppercase());
 
     for attempt in 0..4u8 {
@@ -207,13 +207,16 @@ async fn the_door_counts_each_device_by_where_it_connected_from() {
     // The device that guessed waits; the operator on another one signs in.
     let answer = offered_from(router, a_device(7), &offering(&chosen())).await;
     assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
-    let _ = fs::remove_dir_all(a_directory("by-device"));
 }
 
 #[tokio::test]
 async fn a_member_signing_in_from_a_guessing_device_still_waits_at_the_operators_door() {
     let path = keeping("member-guessing");
-    let (router, _, _) = door_with(Some(path), Recognising::knowing("ana-id"), not_the_token());
+    let (router, _, _) = door_with(
+        Some(path.path()),
+        Recognising::knowing("ana-id"),
+        not_the_token(),
+    );
     let wrong = offering(&chosen().to_uppercase());
 
     for _ in 0..3u8 {
@@ -228,13 +231,16 @@ async fn a_member_signing_in_from_a_guessing_device_still_waits_at_the_operators
     assert_eq!(fourth.status, StatusCode::UNAUTHORIZED);
     let fifth = offered_from(router, a_device(66), &wrong).await;
     assert_eq!(fifth.status, StatusCode::TOO_MANY_REQUESTS);
-    let _ = fs::remove_dir_all(a_directory("member-guessing"));
 }
 
 #[tokio::test]
 async fn a_member_back_at_their_own_door_signs_in_while_strangers_are_guessing() {
     let path = keeping("member-during-guessing");
-    let (router, _, _) = door_with(Some(path), Recognising::knowing("ana-id"), not_the_token());
+    let (router, _, _) = door_with(
+        Some(path.path()),
+        Recognising::knowing("ana-id"),
+        not_the_token(),
+    );
     let first = offered_from(router.clone(), a_device(2), &offering_as("ana", &hers())).await;
     assert_eq!(first.status, StatusCode::OK, "{}", first.body);
 
@@ -256,5 +262,4 @@ async fn a_member_back_at_their_own_door_signs_in_while_strangers_are_guessing()
     // Ana's own door is still open to her, from where she opened it before.
     let again = offered_from(router, a_device(2), &offering_as("ana", &hers())).await;
     assert_eq!(again.status, StatusCode::OK, "{}", again.body);
-    let _ = fs::remove_dir_all(a_directory("member-during-guessing"));
 }

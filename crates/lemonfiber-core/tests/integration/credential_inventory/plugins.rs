@@ -10,7 +10,8 @@ use lemonfiber_fixtures::files::Files;
 /// that nothing holds it yet, and carrying no likeness of a value there is not.
 #[tokio::test]
 async fn a_plugins_secret_is_listed_as_the_plugins_and_as_held_by_nothing() {
-    let ctx = ctx(beside("plugin", WITH_A_SECRET), Files::empty(), silent());
+    let env = beside("plugin", WITH_A_SECRET);
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(&ctx, Asking::Read).await;
 
@@ -42,11 +43,8 @@ async fn a_plugins_secret_is_listed_as_the_plugins_and_as_held_by_nothing() {
 /// or printing anything.
 #[tokio::test]
 async fn asking_to_see_a_plugins_secret_says_nothing_holds_it() {
-    let ctx = ctx(
-        beside("pluginreveal", WITH_A_SECRET),
-        Files::empty(),
-        silent(),
-    );
+    let env = beside("pluginreveal", WITH_A_SECRET);
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -68,7 +66,7 @@ async fn asking_to_see_a_plugins_secret_says_nothing_holds_it() {
 #[tokio::test]
 async fn rotating_a_plugins_secret_replaces_nothing_and_says_why() {
     let env = beside("pluginrotate", WITH_A_SECRET);
-    let ctx = ctx(env.clone(), Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -106,7 +104,7 @@ async fn a_captured_plugin_secret_is_read_from_the_secret_store() {
         r#"{"schema":1,"written_by":"","held":{"comics:api_key":{"value":"v4lue","from":"recipe","at":1}}}"#
     )
     .is_ok());
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(&ctx, Asking::Read).await;
 
@@ -154,10 +152,18 @@ async fn a_crossing_secret_is_read_from_its_holder_and_never_kept() {
         "plugincrossing",
         &WITH_A_SECRET.replace(r#""of": "komga""#, r#""of": "sonarr""#),
     );
-    let absent = asked(&ctx(env.clone(), Files::empty(), silent()), Asking::Read).await;
+    let absent = asked(
+        &ctx(env.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
     assert!(store::set(&env, "LIBRARY_CURATE_TV_API_KEY", "abc").is_ok());
 
-    let inventory = asked(&ctx(env, Files::empty(), silent()), Asking::Read).await;
+    let inventory = asked(
+        &ctx(env.to_path_buf(), Files::empty(), silent()),
+        Asking::Read,
+    )
+    .await;
 
     let line = |inventory: &lemonfiber_core::credential::Inventory| {
         inventory
@@ -179,7 +185,7 @@ async fn a_minted_plugin_secret_is_lemonfibers_and_rotating_it_holds_a_new_one()
         "pluginminted",
         &WITH_A_SECRET.replace(r#""of": "komga","#, r#""of": "komga", "minted": true,"#),
     );
-    let ctx = ctx(env.clone(), Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let listed = asked(&ctx, Asking::Read).await;
     let line = listed
@@ -227,11 +233,8 @@ async fn a_minted_plugin_secret_is_lemonfibers_and_rotating_it_holds_a_new_one()
 /// missing from it would be believed.
 #[tokio::test]
 async fn a_register_that_will_not_read_refuses_the_inventory() {
-    let ctx = ctx(
-        beside("pluginbroken", "{ not a register"),
-        Files::empty(),
-        silent(),
-    );
+    let env = beside("pluginbroken", "{ not a register");
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let refused = dispatch(Command::Credentials(Asking::Read), &ctx).await;
 
@@ -269,7 +272,7 @@ fn granted() -> String {
 async fn a_grant_is_revoked_over_its_offer_and_one_not_held_is_refused() {
     let env = beside("pluginrevoke", &granted());
     assert!(store::set(&env, GRANTED, "abc").is_ok());
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
     let revoking = |credential: &str, agreement: Option<String>| Asking::Revoke {
         plugin: "comics".to_owned(),
         credential: credential.to_owned(),

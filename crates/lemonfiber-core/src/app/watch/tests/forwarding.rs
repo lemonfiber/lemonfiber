@@ -18,7 +18,7 @@ async fn a_watch_asks_the_guard_once_a_minute_while_the_volume_holds() {
             .engine(std::sync::Arc::new(guard::running()))
             .clock(Following::started())
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 stack_dir: env.parent().map(|config| config.join("data").join("stack")),
                 data_root: Some("/data".into()),
                 port_forward: crate::config::PortForward {

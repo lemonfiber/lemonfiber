@@ -76,8 +76,7 @@ const BEAT: Duration = Duration::from_millis(5);
 /// A world guarding a directory that is really there, so a guard holds rather
 /// than ending before a test can do anything to it.
 fn guarding(volume: Arc<dyn Volume>) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("job").kept();
-    let _ = std::fs::create_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::new("job");
     lemonfiber_testing::a_live_context()
         .runner(Arc::new(Idle))
         // Faked so a start's port pre-flight never reaches a real daemon: what
@@ -86,9 +85,10 @@ fn guarding(volume: Arc<dyn Volume>) -> Ctx {
         .images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()))
         .over(lemonfiber_testing::nowhere())
         .settings(Settings {
-            data_root: Some(dir),
+            data_root: Some(dir.to_path_buf()),
             ..Settings::default()
         })
+        .holding(dir)
         .build()
         .with_random(Arc::new(Chance::cycling()))
         .with_volume(volume)

@@ -447,11 +447,13 @@ async fn an_update_refuses_before_anything_moves_for_what_it_cannot_read() {
     );
     let before = runner.seen().len();
 
-    let empty = lemonfiber_fixtures::scratch::Scratch::named("update-empty").kept();
+    let empty_scratch = lemonfiber_fixtures::scratch::Scratch::named("update-empty");
+    let empty = empty_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&empty);
     assert_eq!(refusal(updating(&ctx, &empty).await), "PLUGIN-2");
 
     let blind = a_context()
+        .holding(empty_scratch)
         .over(crate::test_support::nowhere())
         .settings(ctx.settings.clone())
         .build();
@@ -513,9 +515,10 @@ async fn an_update_answering_a_reading_that_moved_changes_nothing() {
         counted(installing(&ctx, &source("update-moved", PROVING)).await),
         Some(1)
     );
+    let plugin = source("update-moved-next", &next());
     let asked = Asked::Update {
         plugin: "komga".to_owned(),
-        source: crate::plugin::Source::Path(source("update-moved-next", &next())),
+        source: crate::plugin::Source::Path(plugin.to_path_buf()),
         consent: stale(),
     };
     assert_eq!(refusal(plugins(&ctx, &asked).await), "PLUGIN-25");
@@ -531,9 +534,10 @@ async fn an_update_answering_a_reading_that_moved_changes_nothing() {
 #[tokio::test]
 async fn an_update_whose_source_holds_another_plugin_is_refused_naming_both() {
     let ctx = ctx("update-another");
+    let plugin = source("update-another", &next());
     let asked = Asked::Update {
         plugin: "kavita".to_owned(),
-        source: crate::plugin::Source::Path(source("update-another", &next())),
+        source: crate::plugin::Source::Path(plugin.to_path_buf()),
         consent: super::super::Consent::default(),
     };
     let refusal = plugins(&ctx, &asked).await.err();

@@ -4,9 +4,10 @@ use crate::test_support::{a_context, a_password, env_at};
 
 #[test]
 fn each_host_a_cover_was_fetched_from_is_kept_once_in_order() {
+    let env = env_at("cover-hosts", &a_password());
     let ctx = a_context()
         .settings(Settings {
-            env_file: Some(env_at("cover-hosts", &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
         .build();

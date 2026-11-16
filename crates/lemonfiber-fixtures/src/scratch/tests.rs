@@ -49,11 +49,13 @@ fn a_scratch_standing_for_a_file_keeps_the_directory_until_it_is_dropped() {
 }
 
 #[test]
-fn a_kept_scratch_is_left_where_it_is() {
-    let kept = Scratch::new("kept").kept();
+fn a_leaked_path_is_the_scratch_s_own_and_goes_with_it() {
+    let scratch = Scratch::new("leaked");
+    let leaked = scratch.leaked();
 
-    assert!(kept.is_dir());
-    let _ = std::fs::remove_dir_all(&kept);
+    assert_eq!(leaked, scratch.path());
+    drop(scratch);
+    assert!(!leaked.exists());
 }
 
 #[test]

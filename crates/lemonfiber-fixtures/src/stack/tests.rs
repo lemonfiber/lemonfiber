@@ -3,7 +3,8 @@ use crate::scratch::Scratch;
 
 #[test]
 fn a_copy_reads_back_as_the_carried_stack() {
-    let into = Scratch::named("fixtures-stack-copy").kept();
+    let into_scratch = Scratch::named("fixtures-stack-copy");
+    let into = into_scratch.to_path_buf();
     manifest_into(&into);
     let read: Option<toml::Table> = lemonfiber_manifest::read(&into)
         .ok()
@@ -50,7 +51,8 @@ fn the_carried_stack_leaves_out_each_secret_and_only_the_variables_naming_one() 
 
 #[test]
 fn a_service_taken_out_takes_its_file_its_entry_and_its_links() {
-    let into = Scratch::named("fixtures-stack-without").kept();
+    let into_scratch = Scratch::named("fixtures-stack-without");
+    let into = into_scratch.to_path_buf();
     manifest_into(&into);
     manifest_without(&into, "decline");
     assert!(!into.join("services/decline.toml").exists());
@@ -66,7 +68,8 @@ fn a_service_taken_out_takes_its_file_its_entry_and_its_links() {
 
 #[test]
 fn a_manifest_in_one_text_is_laid_out_a_file_per_service() {
-    let into = Scratch::named("fixtures-stack-written").kept();
+    let into_scratch = Scratch::named("fixtures-stack-written");
+    let into = into_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&into);
     manifest_written(
         &into,
@@ -91,7 +94,8 @@ fn a_manifest_in_one_text_is_laid_out_a_file_per_service() {
 
 #[test]
 fn a_manifest_with_no_services_is_written_as_it_is() {
-    let into = Scratch::named("fixtures-stack-bare").kept();
+    let into_scratch = Scratch::named("fixtures-stack-bare");
+    let into = into_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&into);
     manifest_written(&into, "version = \n");
     assert_eq!(

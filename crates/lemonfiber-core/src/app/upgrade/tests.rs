@@ -32,18 +32,22 @@ fn ctx(reached: bool, searched: Answer, below: Answer) -> Ctx {
 fn ctx_of(curators: &[adapted::Adapted], reached: bool, searched: Answer, below: Answer) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("upgrade-{nth}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("upgrade-{nth}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context().build().with_http(Fake::by_path(vec![
-        (
-            adapted::path_of(curate::CAPABILITY, curate::MAJOR, "search_upgrades"),
-            searched,
-        ),
-        (
-            adapted::path_of(curate::CAPABILITY, curate::MAJOR, "cutoff_unmet"),
-            below,
-        ),
-    ]));
+    let mut context = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(Fake::by_path(vec![
+            (
+                adapted::path_of(curate::CAPABILITY, curate::MAJOR, "search_upgrades"),
+                searched,
+            ),
+            (
+                adapted::path_of(curate::CAPABILITY, curate::MAJOR, "cutoff_unmet"),
+                below,
+            ),
+        ]));
     context.settings.env_file = Some(dir.join(".env"));
     if reached {
         return adapted::reaching(context, curators);

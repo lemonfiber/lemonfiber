@@ -173,13 +173,15 @@ pub(super) fn ctx_running(transport: Arc<Transport>, tag: &str, running: &[&str]
 /// A house over `transport` whose engine is `engine`, its media server, its curators and
 /// its request service moved into their plugins and their adapters running.
 pub(super) fn ctx_engine(transport: Arc<Transport>, tag: &str, engine: Reporting) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("wishing-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("wishing-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let engine = engine
         .alongside(crate::test_support::adapted::running(&PARTS))
         .alongside(media::running());
     let mut context = a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(engine))
         .build()
         .with_filesystem(Arc::new(SeedFs::keyed(None)))
@@ -287,10 +289,12 @@ async fn somebody_the_household_does_not_hold_is_refused_as_not_in_it() {
 #[tokio::test]
 async fn a_house_with_no_request_service_is_not_set_up_for_asking() {
     let transport = house(Vec::new());
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("wishing-no-requests").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("wishing-no-requests");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     lemonfiber_fixtures::stack::manifest_without(&dir, "seerr");
     let ctx = a_context()
+        .holding(dir_scratch)
         .over(crate::stack::Source::External(Box::leak(
             dir.into_boxed_path(),
         )))
@@ -306,10 +310,12 @@ async fn a_house_with_no_request_service_is_not_set_up_for_asking() {
 #[tokio::test]
 async fn a_house_whose_stack_cannot_be_read_is_asking_not_working() {
     let transport = house(Vec::new());
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("wishing-no-stack").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("wishing-no-stack");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let ctx = a_context()
+        .holding(dir_scratch)
         .over(crate::stack::Source::External(Box::leak(
             dir.into_boxed_path(),
         )))
@@ -354,10 +360,12 @@ async fn a_held_member_whose_rating_table_or_country_is_unread_is_offered_nothin
 #[tokio::test]
 async fn an_engine_that_cannot_say_what_runs_leaves_asking_not_working() {
     let transport = house(Vec::new());
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("wishing-engine-absent").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("wishing-engine-absent");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(Reporting::absent()))
         .build()
         .with_http(transport.clone());

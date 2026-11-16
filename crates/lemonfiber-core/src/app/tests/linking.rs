@@ -4,6 +4,7 @@
 use super::*;
 use crate::app::command::Restarting;
 use crate::error::codes::life::MOUNT_LINKED;
+use crate::test_support::Holds as _;
 
 /// A machine running the stack this build carries beneath a project directory of its
 /// own, its engine reporting `up` running, with `service`'s own directory a link to one
@@ -28,7 +29,8 @@ fn linked(name: &str, up: &[&str], service: &str) -> (Ctx, Arc<Recording>) {
         .with_http(Fake::silent())
         .with_patience(Duration::ZERO);
     ctx.settings.stack_dir = Some(project.clone());
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     lemonfiber_fixtures::scratch::linked_away(&project, service);
     crate::test_support::every_part_has_run(&ctx);
     (ctx, runner)

@@ -17,8 +17,8 @@ const FAILED: &str =
 /// A surface whose curator was handed [`KEY`].
 fn a_machine(named: &str) -> axum::Router {
     let admission = keeping(&format!("events-{named}"));
-    let mut ctx = world(Some(admission.clone()), Chance::exactly(None));
-    let env = a_directory(&format!("events-env-{named}")).join(".env");
+    let mut ctx = world(Some(admission.to_path_buf()), Chance::exactly(None));
+    let env = a_directory(&format!("events-env-{named}")).within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
         let kept = serde_json::json!({
@@ -28,12 +28,12 @@ fn a_machine(named: &str) -> axum::Router {
         });
         let _ = fs::write(dir.join("notify-events.json"), kept.to_string());
     }
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
     let admitting = Arc::new(Admitting {
-        kept: Some(admission),
+        kept: Some(admission.to_path_buf()),
         ..Admitting::default()
     });
-    surface(ctx, &admitting).0
+    surface(ctx.holding(env).holding(admission), &admitting).0
 }
 
 /// What the surface answers `body` sent with `key`, from `from`.

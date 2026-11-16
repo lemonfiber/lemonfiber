@@ -5,18 +5,18 @@ use crate::wiring::{Reaches, FILLS_KEY};
 
 /// A scratch layout with somewhere to keep a setting and somewhere to keep a
 /// journal, which is what a substitution needs and a listing does not.
-fn dir(named: &str) -> std::path::PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("wiring-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn dir(named: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("wiring-{named}"));
     let _ = std::fs::create_dir_all(at.join("config"));
     let _ = std::fs::create_dir_all(at.join("data"));
     at
 }
 
 /// A context over the stack this build pins, its guards moved onto their plugins,
-/// keeping its settings in `named`.
+/// keeping its settings in `named`, which it holds, and where that is.
 fn ctx(named: &str) -> (crate::app::Ctx, std::path::PathBuf) {
-    let at = dir(named);
+    let scratch = dir(named);
+    let at = scratch.to_path_buf();
     let settings = crate::config::Settings {
         env_file: Some(at.join("config").join(".env")),
         stack_dir: Some(at.join("data").join("stack")),
@@ -24,7 +24,10 @@ fn ctx(named: &str) -> (crate::app::Ctx, std::path::PathBuf) {
     };
     (
         crate::test_support::guards::moved(
-            crate::test_support::a_context().settings(settings).build(),
+            crate::test_support::a_context()
+                .holding(scratch)
+                .settings(settings)
+                .build(),
         ),
         at,
     )

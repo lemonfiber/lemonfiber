@@ -107,19 +107,19 @@ async fn what_each_service_is_for_carries_the_cost_of_going_without_it() {
 /// browser is served against what a shell prints would be comparing two moments and
 /// would fail on a machine that happened to be busy.
 fn measuring(named: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("space-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("space-{named}"));
     let _ = std::fs::create_dir_all(dir.join("films"));
     let _ = std::fs::write(dir.join("films").join("a.mkv"), "0123456789");
     holding(
         running(),
         stack(),
         Settings {
-            data_root: Some(dir),
+            data_root: Some(dir.to_path_buf()),
             ..Settings::default()
         },
     )
     .with_filesystem(lemonfiber_fixtures::files::Files::empty())
+    .holding(dir)
 }
 
 #[tokio::test]

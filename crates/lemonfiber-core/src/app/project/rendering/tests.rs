@@ -7,6 +7,7 @@ use lemonfiber_manifest::container::{Shape, RENDER_DEVICE};
 use crate::app::Ctx;
 use crate::fence::RENDER_HELD;
 use crate::ports::program::{Bound, Joined, Program};
+use crate::test_support::Holds as _;
 
 const IMAGE: &str =
     "ghcr.io/lemonfiber/fence:0.18.0@sha256:9e1d000000000000000000000000000000000000000000000000000000000000";
@@ -21,7 +22,8 @@ fn machine(name: &str, renders: bool, program: &Arc<Proving>) -> (Ctx, PathBuf) 
         .build()
         .with_program(Arc::clone(program) as Arc<dyn Program>);
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let mut service = crate::test_support::a_placed("viewer", &[], None);
     service.shape = renders.then_some(Shape::Render);
     let mut register = crate::plugin::Register::empty();

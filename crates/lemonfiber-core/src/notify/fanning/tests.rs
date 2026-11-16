@@ -215,11 +215,13 @@ fn a_message_sent_but_not_seen_is_delivered_and_one_no_longer_first_is_left_alon
 }
 
 fn machine(name: &str, http: Arc<Fake>) -> Arc<Ctx> {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     Arc::new(
         crate::test_support::a_context()
+            .holding(dir_scratch)
             .settings(Settings {
                 env_file: Some(dir.join("config").join(".env")),
                 stack_dir: Some(dir.join("data").join("stack")),

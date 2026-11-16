@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use super::{Gate, GateRecordCheck, LOST, REFUSED};
@@ -30,10 +30,8 @@ fn record(entries: &[(&str, &str, &str, Outcome)], kept: usize) -> Vec<GateEntry
 }
 
 /// A scratch directory holding the place last read at `read` where there is one.
-fn scene(name: &str, read: Option<&str>) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+fn scene(name: &str, read: Option<&str>) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(name);
     if let Some(read) = read {
         let _ = store::write(&at.join("gate-read.json"), read);
     }

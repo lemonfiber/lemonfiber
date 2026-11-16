@@ -144,9 +144,13 @@ fn answering(tag: &str, broken: Vec<(&'static str, Answer)>) -> Ctx {
         ("", Answer::reply(200, "[]")),
     ]);
     let transport = Fake::by_path(routes);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("asking-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("asking-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context().build().with_http(transport);
+    let mut context = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
     let _ = crate::app::targets::record_secret(
         &context,

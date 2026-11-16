@@ -56,10 +56,10 @@ fn removed(said: &Result<Outcome, Box<super::Problem>>) -> Option<&crate::model:
 }
 
 /// A scratch environment file holding the media server's recorded password.
-fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("invite-{name}")).kept();
+fn recorded_admin(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("invite-{name}"));
     let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
+    let env = dir.within(".env");
     let _ = crate::config::store::set(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,

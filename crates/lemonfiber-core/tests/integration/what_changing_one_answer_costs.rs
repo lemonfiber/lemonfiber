@@ -57,10 +57,9 @@ const AGREED: Said = Said {
 };
 
 /// A scratch environment file, holding the data location a move starts from.
-fn env_at(name: &str, from: &Path) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("change-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let env = dir.join(".env");
+fn env_at(name: &str, from: &Path) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("change-{name}"));
+    let env = dir.within(".env");
     let _ = lemonfiber_core::config::store::set(&env, DATA_ROOT, &from.display().to_string());
     env
 }

@@ -76,7 +76,6 @@ async fn a_member_the_media_server_recognises_is_admitted_as_that_member() {
         Knocking::Known(Caller::Member("a7f3".to_owned()))
     );
     assert_eq!(said(&answer.body, "/data/name"), "Ana");
-    let _ = fs::remove_dir_all(a_directory("stack-admits"));
 }
 
 #[tokio::test]
@@ -96,7 +95,6 @@ async fn a_member_whose_name_cannot_be_read_is_not_admitted() {
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
     assert!(session(&answer.body).is_empty());
-    let _ = fs::remove_dir_all(a_directory("stack-unnamed"));
 }
 
 /// The text at `pointer` in an answer's body, or nothing.
@@ -121,7 +119,6 @@ async fn a_pair_the_media_server_does_not_recognise_is_refused() {
 
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     assert!(session(&answer.body).is_empty());
-    let _ = fs::remove_dir_all(a_directory("stack-refuses"));
 }
 
 /// The household is opened from the stack when somebody knocks, so a stack seeded
@@ -137,7 +134,6 @@ async fn a_stack_seeded_while_serving_admits_its_members_from_then_on() {
 
     assert_eq!(before.status, StatusCode::UNAUTHORIZED, "{}", before.body);
     assert_eq!(after.status, StatusCode::OK, "{}", after.body);
-    let _ = fs::remove_dir_all(a_directory("stack-seeded-later"));
 }
 
 /// Write down that the member's account was offered as an invitation running out at
@@ -175,7 +171,6 @@ async fn an_invitation_claimed_after_it_ran_out_is_refused_with_no_sweep() {
             .all(|operation| media::asked(&sent, operation).is_empty()),
         "the refusal rested on something being taken back"
     );
-    let _ = fs::remove_dir_all(a_directory("stack-lapsed"));
 }
 
 /// A member who signs in while their invitation stands has taken it up, and the offer is
@@ -198,5 +193,4 @@ async fn signing_in_while_an_invitation_stands_admits_and_closes_it() {
         !record.contains("a7f3"),
         "the offer was not closed: {record}"
     );
-    let _ = fs::remove_dir_all(a_directory("stack-in-time"));
 }

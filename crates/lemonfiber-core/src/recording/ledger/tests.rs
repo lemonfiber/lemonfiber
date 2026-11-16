@@ -4,17 +4,15 @@ use super::{Ledger, KEPT, TRIM_AT};
 ///
 /// Writing the record makes its parent owner-only, so a test pointing at the shared
 /// temporary directory would take everyone else's out from under them.
-fn record(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name);
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join("outbound.log")
+fn record(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(name).within("outbound.log")
 }
 
 /// Lines noted together all arrive, each whole and in the order noted.
 #[tokio::test]
 async fn lines_noted_together_all_arrive_whole() {
     let at = record("together");
-    let ledger = Ledger::at(at.clone());
+    let ledger = Ledger::at(at.to_path_buf());
 
     tokio::join!(
         ledger.note("1 first".to_owned()),
@@ -36,7 +34,7 @@ async fn lines_noted_together_all_arrive_whole() {
 #[tokio::test]
 async fn whoever_writes_next_takes_every_line_queued_and_the_other_writes_nothing() {
     let at = record("taken");
-    let ledger = std::sync::Arc::new(Ledger::at(at.clone()));
+    let ledger = std::sync::Arc::new(Ledger::at(at.to_path_buf()));
     let held = ledger.writing.lock().await;
 
     let first = tokio::spawn({
@@ -67,7 +65,7 @@ async fn whoever_writes_next_takes_every_line_queued_and_the_other_writes_nothin
 #[tokio::test]
 async fn the_record_keeps_what_is_recent_rather_than_growing_for_ever() {
     let at = record("bounded");
-    let ledger = Ledger::at(at.clone());
+    let ledger = Ledger::at(at.to_path_buf());
     let filler = "x".repeat(200);
     let mut noted = 0_usize;
     while std::fs::metadata(&at).map_or(0, |meta| meta.len()) <= TRIM_AT / 2 || noted < KEPT * 3 {
@@ -96,7 +94,7 @@ async fn the_record_keeps_what_is_recent_rather_than_growing_for_ever() {
 async fn the_record_is_its_owners_alone() {
     use std::os::unix::fs::PermissionsExt as _;
     let at = record("private");
-    Ledger::at(at.clone()).note("1 one".to_owned()).await;
+    Ledger::at(at.to_path_buf()).note("1 one".to_owned()).await;
     let mode = std::fs::metadata(&at).map_or(0, |meta| meta.permissions().mode() & 0o777);
     assert_eq!(mode, 0o600);
     let _ = at.parent().map(std::fs::remove_dir_all);
@@ -108,7 +106,7 @@ async fn a_record_that_cannot_be_written_is_passed_over() {
     let at = record("blocked");
     let _ = at.parent().map(std::fs::create_dir_all);
     let _ = std::fs::create_dir_all(&at);
-    Ledger::at(at.clone()).note("1 one".to_owned()).await;
+    Ledger::at(at.to_path_buf()).note("1 one".to_owned()).await;
     assert!(at.is_dir(), "nothing was written over what was there");
     let _ = at.parent().map(std::fs::remove_dir_all);
 }

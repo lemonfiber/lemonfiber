@@ -3,19 +3,18 @@ use std::time::{Duration, SystemTime};
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope, Secret, Used};
 use lemonfiber_fixtures::ports::Chance;
+use lemonfiber_fixtures::scratch::Scratch;
 
 use super::{Holding, Keyring};
 
 /// A directory of this case's own, emptied first.
-fn a_directory(named: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("keyring-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir
+fn a_directory(named: &str) -> Scratch {
+    Scratch::new(&format!("keyring-{named}"))
 }
 
-/// A keyring over one key minted from `byte`, revoked where `revoked`.
-fn one_key(named: &str, byte: u8, revoked: bool) -> (Keyring, Secret) {
+/// A keyring over one key minted from `byte`, revoked where `revoked`, and the directory
+/// it keeps its files in.
+fn one_key(named: &str, byte: u8, revoked: bool) -> (Keyring, Secret, Scratch) {
     let dir = a_directory(named);
     let Some(secret) = Secret::mint(&Chance::exactly(Some(vec![byte; 32]))) else {
         unreachable!("thirty-two bytes mint a secret")
@@ -36,12 +35,13 @@ fn one_key(named: &str, byte: u8, revoked: bool) -> (Keyring, Secret) {
     (
         Keyring::at(Some(kept), Some(dir.join("keys-used.json"))),
         secret,
+        dir,
     )
 }
 
 #[test]
 fn an_active_key_is_found_by_its_secret() {
-    let (keyring, secret) = one_key("active", 1, false);
+    let (keyring, secret, _dir) = one_key("active", 1, false);
     assert!(
         matches!(keyring.holding(secret.as_str()), Holding::Active(record) if record.name == "home-assistant")
     );
@@ -49,13 +49,13 @@ fn an_active_key_is_found_by_its_secret() {
 
 #[test]
 fn a_revoked_key_is_known_and_refused_rather_than_unknown() {
-    let (keyring, secret) = one_key("revoked", 2, true);
+    let (keyring, secret, _dir) = one_key("revoked", 2, true);
     assert_eq!(keyring.holding(secret.as_str()), Holding::Known);
 }
 
 #[test]
 fn a_secret_nobody_minted_is_unknown() {
-    let (keyring, _) = one_key("unknown", 3, false);
+    let (keyring, _, _dir) = one_key("unknown", 3, false);
     let Some(stranger) = Secret::mint(&Chance::exactly(Some(vec![9; 32]))) else {
         unreachable!("thirty-two bytes mint a secret")
     };
@@ -68,7 +68,7 @@ fn a_secret_nobody_minted_is_unknown() {
 
 #[test]
 fn a_record_that_does_not_read_refuses_every_key_without_calling_any_a_guess() {
-    let (keyring, secret) = one_key("damaged", 4, false);
+    let (keyring, secret, _dir) = one_key("damaged", 4, false);
     if let Some(path) = keyring.kept.as_deref() {
         assert!(std::fs::write(path, "not keys").is_ok());
     }
@@ -77,7 +77,7 @@ fn a_record_that_does_not_read_refuses_every_key_without_calling_any_a_guess() {
 
 #[tokio::test]
 async fn a_use_is_written_down_once_a_minute_at_most() {
-    let (keyring, _) = one_key("noted", 5, false);
+    let (keyring, _, _dir) = one_key("noted", 5, false);
     let then = SystemTime::UNIX_EPOCH + Duration::from_secs(1_790_000_000);
     keyring.note("home-assistant", then).await;
     let used = keyring.used.as_deref().map(Used::at).unwrap_or_default();
@@ -107,7 +107,7 @@ async fn a_keyring_with_nowhere_to_write_a_use_writes_nothing() {
 
 #[tokio::test]
 async fn a_use_at_a_moment_no_date_can_name_is_not_written() {
-    let (keyring, _) = one_key("undated", 6, false);
+    let (keyring, _, _dir) = one_key("undated", 6, false);
     let before = SystemTime::UNIX_EPOCH - Duration::from_secs(1);
     keyring.note("home-assistant", before).await;
     let used = keyring.used.as_deref().map(Used::at).unwrap_or_default();

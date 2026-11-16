@@ -29,8 +29,8 @@ fn routes(key: &str) -> Vec<Gated> {
 #[tokio::test]
 async fn the_gate_key_is_listed_shown_and_replaced() {
     let env = recorded_admin("gate-key-credentials");
-    let stack: &'static Path =
-        Box::leak(crate::common::stack::with_the_gate("key-credentials").into_boxed_path());
+    let stack_dir = crate::common::stack::with_the_gate("key-credentials");
+    let stack = stack_dir.leaked();
     let gate = Arc::new(Gate::admitting(routes("old")));
     let filed = |keys: &[&str]| media::answered(&keys);
     let http = Fake::by_path_in_turn(vec![
@@ -51,7 +51,7 @@ async fn the_gate_key_is_listed_shown_and_replaced() {
             .over(Source::External(stack))
             .engine(Arc::new(media::running()))
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 ..Settings::default()
             })
             .build()

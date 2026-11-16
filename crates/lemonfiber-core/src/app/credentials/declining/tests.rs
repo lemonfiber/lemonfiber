@@ -124,9 +124,8 @@ fn scene(
     decline: Decline,
     http: Arc<Fake>,
 ) -> (Ctx, PathBuf, Arc<Decline>) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+    let held = lemonfiber_fixtures::scratch::Scratch::new(name);
+    let at = held.to_path_buf();
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     if administered {
@@ -140,6 +139,7 @@ fn scene(
             env_file: Some(env),
             ..Settings::default()
         })
+        .holding(held)
         .build()
         .with_http(Serving::beside(http).decline(&decline).transport());
     (ctx, at, decline)

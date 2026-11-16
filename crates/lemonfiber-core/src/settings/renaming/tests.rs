@@ -9,10 +9,11 @@ fn machine(name: &str, dry_run: bool) -> Ctx {
     assert!(store::set(&env, "JELLYFIN_MODE", "native").is_ok());
     let ctx = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             stack_dir: Some(env.with_file_name("data").join("stack")),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build();
     if dry_run {
         ctx.rehearsing()
@@ -329,7 +330,7 @@ fn a_machine_with_nowhere_to_journal_or_no_readable_environment_file_moves_nothi
     assert!(store::set(&env, "JELLYFIN_MODE", "native").is_ok());
     let nowhere = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();

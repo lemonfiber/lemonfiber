@@ -8,6 +8,7 @@ use crate::app::Ctx;
 use crate::config::{Reaching, REACH_REGISTRY_KEY};
 use crate::fence::{HELD, NFTABLES_HELD};
 use crate::ports::program::{Ended, Joined, Program, Ran, Unran};
+use crate::test_support::Holds as _;
 
 const IMAGE: &str =
     "ghcr.io/lemonfiber/fence:0.18.0@sha256:9e1d000000000000000000000000000000000000000000000000000000000000";
@@ -30,7 +31,8 @@ fn machine(name: &str, fenced: bool, program: &Arc<Proving>) -> (Ctx, PathBuf) {
         ctx.stack = crate::stack::Source::External(Box::leak(fork.into_boxed_path()));
     }
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let mut service = crate::test_support::a_placed("solver", &[], None);
     service.fields.network = fenced.then_some(Network {
         via: None,

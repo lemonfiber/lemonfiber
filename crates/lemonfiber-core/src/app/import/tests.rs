@@ -63,8 +63,10 @@ fn theirs() -> Container {
 /// A machine running their stack beside lemonfiber's, whose television curator has moved
 /// into its plugin, their copy's key on disk, and an engine that serves as `serves` does.
 fn importing(name: &str, serves: &Arc<Serves>) -> crate::app::Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("import-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("import-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join(".env")),
             ..Settings::default()

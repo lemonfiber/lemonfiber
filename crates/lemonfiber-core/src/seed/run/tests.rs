@@ -19,6 +19,7 @@ use crate::test_support::guards::Gate;
 use crate::test_support::indexer::INDEXER;
 use crate::test_support::requests::REQUESTS;
 use crate::test_support::syncing::minted_for_every_part;
+use crate::test_support::Holds as _;
 use crate::test_support::{
     a_context, a_contracted_decline, a_contracted_gate, contracted, first_party, seeding,
     seeding_with, FixedRandom, Reporting, SeedFs, DECLINE_TRUSTED, GATE_TRUSTED,
@@ -118,6 +119,13 @@ fn seed_ctx(reachable: bool, bytes: Option<Vec<u8>>, env: Option<std::path::Path
     ctx
 }
 
+/// [`seed_ctx`] over an env file named for `name` holding the media server's recorded
+/// password, holding the directory it lies in.
+fn recorded_ctx(reachable: bool, bytes: Option<Vec<u8>>, name: &str) -> Ctx {
+    let env = recorded_admin(name);
+    seed_ctx(reachable, bytes, Some(env.to_path_buf())).holding(env)
+}
+
 /// Each secret `installed` mints, kept in `ctx`'s secret store holding what `value` says
 /// for the part of an adapter's upstream credential it holds, or for nothing where it
 /// holds none.
@@ -173,15 +181,13 @@ fn keeping_minted(
 /// scratch env file of the test `name`, holding `key` as the key lemonfiber minted for each
 /// of `parts`.
 fn minted_ctx(name: &str, parts: &[crate::test_support::adapted::Adapted], key: &str) -> Ctx {
-    let env = lemonfiber_fixtures::scratch::Scratch::new(&format!("minted-{name}"))
-        .kept()
-        .join(".env");
+    let env = lemonfiber_fixtures::scratch::Scratch::new(&format!("minted-{name}")).within(".env");
     let _ = std::fs::write(&env, "");
-    let ctx = seed_ctx(true, None, Some(env));
+    let ctx = seed_ctx(true, None, Some(env.to_path_buf()));
     for part in parts {
         part.minted(&ctx, key);
     }
-    ctx
+    ctx.holding(env)
 }
 
 /// The key lemonfiber minted for the Usenet client moved into its plugin.
@@ -672,10 +678,10 @@ fn book_curator_svc() -> lemonfiber_manifest::Service {
 
 /// A scratch settings file holding the media server's recorded password, so a
 /// client built from it can sign in.
-fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("seed-{name}")).kept();
+fn recorded_admin(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("seed-{name}"));
     let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
+    let env = dir.within(".env");
     crate::test_support::recorded_as(
         &env,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,

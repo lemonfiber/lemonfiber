@@ -29,7 +29,8 @@ const ENVIRONMENT: &str = "PUID=1001\nPGID=1002\nTZ=Pacific/Auckland\nLAN_BIND=1
 /// A machine running the stack this build carries, its settings in a directory of their
 /// own.
 fn machine(name: &str, overlay: Option<&str>) -> (Ctx, PathBuf) {
-    let config = Scratch::new(name).kept().canonicalize().unwrap_or_default();
+    let held = Scratch::new(name);
+    let config = held.canonicalize().unwrap_or_default();
     let env = config.join(".env");
     let data = config.join("data");
     let _ = std::fs::create_dir_all(&data);
@@ -77,6 +78,7 @@ fn machine(name: &str, overlay: Option<&str>) -> (Ctx, PathBuf) {
             stack_dir: Some(directory.clone()),
             ..Settings::default()
         })
+        .holding(held)
         .build()
         .with_patience(Duration::from_secs(180));
     (ctx, directory)

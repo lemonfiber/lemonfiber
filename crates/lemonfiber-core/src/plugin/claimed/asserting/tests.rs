@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_plugin::Manifest;
 
@@ -98,9 +98,8 @@ fn changed(edits: &[(&str, &str)]) -> String {
 /// The recording moves and the manifest does not, because a refuted proof is a
 /// service answering something other than what its author declared — and a case
 /// that edited the declaration instead would be about a different manifest.
-fn source(named: &str, answered: u16) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("asserting-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn source(named: &str, answered: u16) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("asserting-{named}"));
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(
         at.join("fixtures/guarded.json"),

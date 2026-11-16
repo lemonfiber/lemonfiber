@@ -41,7 +41,7 @@ async fn any_command(env: &std::path::Path, http: Arc<Fake>, rehearsing: bool) {
 
 /// A settings file holding the administrator's password in force and a replacement
 /// beside it.
-fn both(name: &str) -> std::path::PathBuf {
+fn both(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     env_at(
         name,
         &[
@@ -133,7 +133,7 @@ async fn a_stack_that_cannot_be_read_leaves_both_for_later() {
             std::path::Path::new("/lemonfiber/no/such/stack"),
         ))
         .settings(lemonfiber_core::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..lemonfiber_core::config::Settings::default()
         })
         .build()

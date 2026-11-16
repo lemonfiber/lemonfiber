@@ -16,13 +16,15 @@ use crate::wizard::{Phase, Wizard};
 const OWNER: u32 = 4321;
 
 fn machine(name: &str) -> (crate::app::Ctx, PathBuf) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("settled-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("settled-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let config = dir.join("config");
     let stack = dir.join("data").join("stack");
     assert!(std::fs::create_dir_all(&config).is_ok());
     assert!(std::fs::create_dir_all(&stack).is_ok());
     let ctx = a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(config.join(".env")),
             stack_dir: Some(stack),

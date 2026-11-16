@@ -1,5 +1,6 @@
 use crate::collected::Reference;
 use crate::ports::service::{MediaStatus, RequestStatus};
+use crate::test_support::Holds as _;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,11 +19,13 @@ const ASKED: Instant = Instant::from_seconds(1_787_000_649);
 
 /// A context whose settings point at a scratch install of its own.
 fn ctx(name: &str) -> crate::app::Ctx {
+    let env = env_at(name, &a_password());
     a_context()
         .settings(Settings {
-            env_file: Some(env_at(name, &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
 }
 
@@ -364,7 +367,9 @@ fn listing(name: &str, closes: Answer, lists: Answer) -> (Ctx, Arc<Transport>) {
         ))
         .build()
         .with_http(held);
-    ctx.settings.env_file = Some(env_at(name, &a_password()));
+    let env = env_at(name, &a_password());
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let _ = crate::app::targets::record_secret(
         &ctx,
         crate::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,

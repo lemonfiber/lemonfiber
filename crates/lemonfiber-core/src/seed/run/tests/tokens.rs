@@ -42,10 +42,8 @@ fn moved(
 
 /// A stack directory, and a gate reaching the curator on its route with the key lemonfiber
 /// minted and accepting each of `accepted` there.
-fn project(name: &str, accepted: &[&str]) -> (std::path::PathBuf, Arc<Gate>) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+fn project(name: &str, accepted: &[&str]) -> (lemonfiber_fixtures::scratch::Scratch, Arc<Gate>) {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(name);
     let mut route = gated_route("tv", Some("tv"), MINTED_CURATOR_KEY);
     route.tokens = accepting(accepted);
     (at, Arc::new(Gate::admitting(vec![route])))
@@ -134,7 +132,7 @@ fn asking(project: &std::path::Path, gate: &Arc<Gate>, http: &Arc<Fake>, random:
         .and_then(std::ffi::OsStr::to_str)
         .unwrap_or("tokens");
     let bytes = random.then(|| vec![0xab; crate::secret::SECRET_BYTES]);
-    let ctx = seed_ctx(true, bytes, Some(recorded_admin(name))).with_http(http.clone());
+    let ctx = recorded_ctx(true, bytes, name).with_http(http.clone());
     TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
     crate::test_support::gated(
         crate::test_support::adapted::asking(ctx, &[TELEVISION, REQUESTS]),

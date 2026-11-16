@@ -4,7 +4,7 @@
 //! The token goes out once, in the address. What is written down in the offer record, and
 //! what the service is handed, is its hash, so neither declines anybody.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
@@ -22,16 +22,16 @@ use lemonfiber_testing::media;
 
 /// The shipped stack with the decline service taken out, written under a scratch
 /// directory named for `tag`.
-fn stack_without_decline(tag: &str) -> PathBuf {
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("undeclinable-{tag}")).kept();
+fn stack_without_decline(tag: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("undeclinable-{tag}"));
     lemonfiber_fixtures::stack::manifest_without(&to, "decline");
     to
 }
 
 /// The shipped stack, which runs the decline service, written under a scratch directory
 /// named for `tag`.
-fn stack_with_decline(tag: &str) -> PathBuf {
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("declinable-{tag}")).kept();
+fn stack_with_decline(tag: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("declinable-{tag}"));
     lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }
@@ -135,7 +135,8 @@ fn gone(env: &Path, stack: &Path) {
 #[tokio::test]
 async fn an_invitation_carries_the_address_that_declines_it() {
     let env = recorded_admin("declinable");
-    let stack: &'static Path = Box::leak(stack_with_decline("made").into_boxed_path());
+    let stack_dir = stack_with_decline("made");
+    let stack = stack_dir.leaked();
     let decline = Arc::new(paging());
     let ctx = context(&env, stack, Some(&decline));
 
@@ -179,7 +180,8 @@ async fn an_invitation_carries_the_address_that_declines_it() {
 #[tokio::test]
 async fn a_rehearsal_carries_no_decline_address() {
     let env = recorded_admin("declinable-rehearsed");
-    let stack: &'static Path = Box::leak(stack_with_decline("rehearsed").into_boxed_path());
+    let stack_dir = stack_with_decline("rehearsed");
+    let stack = stack_dir.leaked();
     let decline = Arc::new(paging());
     let ctx = context(&env, stack, Some(&decline));
 
@@ -194,7 +196,8 @@ async fn a_rehearsal_carries_no_decline_address() {
 #[tokio::test]
 async fn without_the_decline_service_there_is_no_decline_address() {
     let env = recorded_admin("undeclinable");
-    let stack: &'static Path = Box::leak(stack_without_decline("none").into_boxed_path());
+    let stack_dir = stack_without_decline("none");
+    let stack = stack_dir.leaked();
     let ctx = context(&env, stack, None);
 
     let invitation = invited(&ctx, true).await;
@@ -254,8 +257,8 @@ async fn ana_stands_in(
     Vec<lemonfiber_core::ports::http::Request>,
 ) {
     let env = recorded_admin(&format!("declined-{tag}"));
-    let stack: &'static Path =
-        Box::leak(stack_with_decline(&format!("declined-{tag}")).into_boxed_path());
+    let stack_dir = stack_with_decline(&format!("declined-{tag}"));
+    let stack = stack_dir.leaked();
     let decline = offered_and_maybe_refused(&env, "ana-token", refused);
     let http = a_server_holding(&[ana(disabled)], suspending);
     let ctx = over(&env, stack, http.clone(), Some(&decline));
@@ -362,7 +365,8 @@ fn offered_with(env: &Path, token: &str) -> Arc<Decline> {
 #[tokio::test]
 async fn offering_again_replaces_the_token_the_first_address_carried() {
     let env = recorded_admin("declinable-again");
-    let stack: &'static Path = Box::leak(stack_with_decline("again").into_boxed_path());
+    let stack_dir = stack_with_decline("again");
+    let stack = stack_dir.leaked();
     let decline = offered_with(&env, "first-token");
     let ctx = over(
         &env,
@@ -395,7 +399,8 @@ async fn offering_again_replaces_the_token_the_first_address_carried() {
 #[tokio::test]
 async fn reissuing_a_declined_account_offers_it_under_a_new_token() {
     let env = recorded_admin("declined-reissued");
-    let stack: &'static Path = Box::leak(stack_with_decline("reissued").into_boxed_path());
+    let stack_dir = stack_with_decline("reissued");
+    let stack = stack_dir.leaked();
     let decline = offered_and_maybe_refused(&env, "ana-token", true);
     let ctx = over(
         &env,
@@ -446,7 +451,8 @@ async fn reissuing_a_declined_account_offers_it_under_a_new_token() {
 #[tokio::test]
 async fn the_decline_key_is_listed_shown_and_replaced() {
     let env = recorded_admin("decline-key-credentials");
-    let stack: &'static Path = Box::leak(stack_with_decline("key-credentials").into_boxed_path());
+    let stack_dir = stack_with_decline("key-credentials");
+    let stack = stack_dir.leaked();
     let decline = Arc::new(Decline::holding("old", &[]));
     let filed = |keys: &[&str]| media::answered(&keys);
     let http = Fake::by_path_in_turn(vec![
@@ -505,7 +511,8 @@ async fn the_decline_key_is_listed_shown_and_replaced() {
 #[tokio::test]
 async fn the_doctor_dates_the_decline_key_from_the_media_server() {
     let env = recorded_admin("decline-key-doctor");
-    let stack: &'static Path = Box::leak(stack_with_decline("key-doctor").into_boxed_path());
+    let stack_dir = stack_with_decline("key-doctor");
+    let stack = stack_dir.leaked();
     let http = Fake::by_path(vec![(
         media::serve("dated"),
         media::answered(&[Dated {

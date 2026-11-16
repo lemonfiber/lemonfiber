@@ -8,7 +8,6 @@
 //! test that really waited would be one nobody runs — what matters is that it looks
 //! again at all, and that it stops when there is nothing left to wait for.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,15 +27,15 @@ const DOWNLOADING: [&str; 3] = ["sabnzbd", "gluetun", "qbittorrent"];
 
 /// A private environment file, at a scratch path unique to this case so concurrent tests
 /// do not share one.
-fn env_at(name: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("drain-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(".env")
+fn env_at(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("drain-{name}"));
+    dir.within(".env")
 }
 
 /// A context reaching the torrent client, moved into its plugin, over `http`, against the
 /// stack this repository carries, saying what it waits for through `heard`.
 fn ctx(http: Arc<dyn Http>, name: &str, heard: &Arc<Heard>) -> Ctx {
+    let env = env_at(name);
     let ctx = lemonfiber_testing::a_context()
         .engine(Arc::new(
             Reporting::holding(&DOWNLOADING, Lifecycle::Running, Health::Healthy)
@@ -48,9 +47,10 @@ fn ctx(http: Arc<dyn Http>, name: &str, heard: &Arc<Heard>) -> Ctx {
         .images(lemonfiber_fixtures::pulled::Pulled::holding(Vec::new()))
         .settings(Settings {
             protocols: Protocols::both(),
-            env_file: Some(env_at(name)),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
         .with_http(http)
         .with_narrator(Arc::clone(heard) as Arc<dyn Narrator>)

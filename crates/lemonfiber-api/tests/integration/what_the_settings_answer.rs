@@ -23,10 +23,12 @@ use lemonfiber_fixtures::ports::{Chance, Stopped};
 
 /// A run over the stack this repository carries, keeping its settings in `named`.
 fn world(named: &str) -> Ctx {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("settings-web-{named}")).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("settings-web-{named}"));
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(at.join("config"));
     lemonfiber_testing::a_context()
+        .holding(at_scratch)
         .settings(Settings {
             env_file: Some(at.join("config").join(".env")),
             stack_dir: Some(at.join("data").join("stack")),

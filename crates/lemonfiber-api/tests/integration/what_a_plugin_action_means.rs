@@ -52,12 +52,14 @@ criticality = "enhancing"
 /// A run over the stack this repository carries, keeping its settings and a plugin's
 /// source under `named`.
 fn world(named: &str) -> (Ctx, std::path::PathBuf) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("plugin-{named}")).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("plugin-{named}"));
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(at.join("config"));
     let _ = std::fs::create_dir_all(at.join("source"));
     let _ = std::fs::write(at.join("source").join("plugin.toml"), MANIFEST);
     let ctx = lemonfiber_testing::a_context()
+        .holding(at_scratch)
         .settings(Settings {
             env_file: Some(at.join("config").join(".env")),
             stack_dir: Some(at.join("data").join("stack")),

@@ -22,11 +22,13 @@ fn messages(distributor: &Fake) -> usize {
 
 /// A machine keeping its files beneath a directory named for `name`, reaching `distributor`.
 fn machine(name: &str, status: u16) -> (Ctx, Arc<Fake>) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let distributor = Fake::distributing(vec![("", Answer::reply(status, ""))]);
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
             stack_dir: Some(dir.join("data").join("stack")),

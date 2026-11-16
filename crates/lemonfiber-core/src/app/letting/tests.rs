@@ -47,12 +47,14 @@ fn facts() -> StorageFacts {
 /// Settings naming a data location, and the directory this case keeps its own
 /// files in — different per case, because they are written to a real disk and the
 /// cases run at the same time.
-fn measuring(scratch: &str) -> Settings {
-    Settings {
+fn measuring(scratch: &str) -> (Settings, lemonfiber_fixtures::scratch::Scratch) {
+    let env = env_without_password(scratch);
+    let settings = Settings {
         data_root: Some(PathBuf::from("/srv/media")),
-        env_file: Some(env_without_password(scratch)),
+        env_file: Some(env.to_path_buf()),
         ..Settings::default()
-    }
+    };
+    (settings, env)
 }
 
 /// The tree every case here walks: one download imported into a library, which is
@@ -94,9 +96,11 @@ fn standing() -> String {
 /// A context over that tree, its torrent client moved into its plugin, whose transport
 /// answers from `routes`.
 fn over(scratch: &str, routes: Arc<Fake>) -> crate::app::Ctx {
+    let (settings, env) = measuring(scratch);
     torrent::reaching(
         a_context()
-            .settings(measuring(scratch))
+            .settings(settings)
+            .holding(env)
             .build()
             .with_http(routes)
             .with_filesystem(Arc::new(SeedFs::keyed(None).with_facts(facts())))
@@ -266,11 +270,12 @@ async fn a_torrent_client_speaking_its_contract_is_told_over_it_to_let_go() {
             Answer::reply(200, "null"),
         ),
     ]);
+    let env = env_without_password("letting-contracted");
     let ctx = contracted_context(&project, "fetcher", true)
         .over(crate::stack::Source::Embedded(&crate::stack::BUNDLED))
         .settings(Settings {
             data_root: Some(PathBuf::from("/srv/media")),
-            env_file: Some(env_without_password("letting-contracted")),
+            env_file: Some(env.to_path_buf()),
             stack_dir: Some(project.to_path_buf()),
             ..Settings::default()
         })

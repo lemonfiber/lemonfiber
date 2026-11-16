@@ -132,7 +132,7 @@ async fn the_offer_is_read_from_the_machines_record_each_time_it_is_asked() {
     let env = crate::test_support::env_without_password("moving-in-offering");
     let ctx = crate::test_support::a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();

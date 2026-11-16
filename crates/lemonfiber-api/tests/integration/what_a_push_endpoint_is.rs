@@ -17,18 +17,18 @@ use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};
 /// A machine keeping its files beneath a directory named for `named`, and its own token.
 fn a_machine(named: &str) -> (axum::Router, String) {
     let admission = keeping(&format!("push-{named}"));
-    let mut ctx = world(Some(admission.clone()), Chance::exactly(None));
-    let env = a_directory(&format!("push-env-{named}")).join(".env");
+    let mut ctx = world(Some(admission.to_path_buf()), Chance::exactly(None));
+    let env = a_directory(&format!("push-env-{named}")).within(".env");
     if let Some(dir) = env.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     let admitting = Arc::new(Admitting {
-        kept: Some(admission),
+        kept: Some(admission.to_path_buf()),
         ..Admitting::default()
     });
-    let (router, token) = surface(ctx, &admitting);
+    let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
     (router, token.as_str().to_owned())
 }
 
@@ -192,7 +192,7 @@ fn an_alert_said(env: &std::path::Path) {
 /// the endpoint, which is reached all the same.
 #[tokio::test]
 async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
-    let env = a_directory("push-hanging").join(".env");
+    let env = a_directory("push-hanging").within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
@@ -200,7 +200,7 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
     let ctx = lemonfiber_testing::a_context()
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
         .settings(lemonfiber_core::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             stack_dir: env.parent().map(|dir| dir.join("stack")),
             ..lemonfiber_core::config::Settings::default()
         })

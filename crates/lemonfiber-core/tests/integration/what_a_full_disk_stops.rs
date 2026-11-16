@@ -79,7 +79,8 @@ fn table(broken: Vec<(&'static str, Answer)>) -> Arc<Fake> {
 
 /// An install over the given transport, on a volume described as `facts` says.
 fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
-    let dir = scratch(name).kept();
+    let dir_scratch = scratch(name);
+    let dir = dir_scratch.to_path_buf();
     let env = dir.join(".env");
     let _ = lemonfiber_core::config::store::set(
         &env,
@@ -88,6 +89,7 @@ fn context(name: &str, transport: &Arc<Fake>, facts: StorageFacts) -> Ctx {
     );
     REQUESTS.keyed_in(media::keyed_in(
         lemonfiber_testing::a_context()
+            .holding(dir_scratch)
             .engine(Arc::new(
                 Reporting::holding(&["jellyfin"], Lifecycle::Running, Health::Healthy)
                     .alongside(media::running())
