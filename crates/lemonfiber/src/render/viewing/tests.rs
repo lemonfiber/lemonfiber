@@ -225,6 +225,81 @@ fn channels_are_listed_with_what_is_on_and_none_is_said_as_the_answer() {
         .contains("No channel this member may watch now"));
 }
 
+/// A guide is a line for each channel, then each programme with when it starts and ends
+/// and its certificate where it has one, then where the guide ends or that it holds
+/// nothing; no channel at all is said as the answer.
+#[test]
+fn a_guide_lists_each_channels_programmes_and_where_its_guide_ends() {
+    use lemonfiber_core::instant::Instant;
+    use lemonfiber_core::model::{GuideReport, Guided};
+    use lemonfiber_core::ports::service::Airing;
+    let at = |hour: u64| Instant::from_seconds(1_794_592_800 + hour * 3_600);
+    let mut report = GuideReport {
+        member: "Ada".to_owned(),
+        id: "a7f3".to_owned(),
+        channels: vec![
+            Guided {
+                id: "c1".to_owned(),
+                name: "Kids".to_owned(),
+                number: Some("7".to_owned()),
+                programmes: vec![
+                    Airing {
+                        title: "Cartoons".to_owned(),
+                        certificate: Some("U".to_owned()),
+                        starts: at(0),
+                        ends: at(1),
+                    },
+                    Airing {
+                        title: "A quiz".to_owned(),
+                        certificate: None,
+                        starts: at(2),
+                        ends: at(3),
+                    },
+                ],
+                guide_until: Some(at(3)),
+            },
+            Guided {
+                id: "c3".to_owned(),
+                name: "Quiet".to_owned(),
+                ..Guided::default()
+            },
+        ],
+        rehearsed: false,
+    };
+    let text = super::guide(&report).text();
+    assert!(text.contains("Ada — live TV guide"), "{text}");
+    assert!(text.contains("  7 Kids  [c1]"), "{text}");
+    assert!(
+        text.contains(&format!(
+            "    {} to {} — Cartoons (U)",
+            at(0).said(),
+            at(1).said()
+        )),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!(
+            "    {} to {} — A quiz\n",
+            at(2).said(),
+            at(3).said()
+        )),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!("    The guide reaches {}.", at(3).said())),
+        "{text}"
+    );
+    assert!(text.contains("  Quiet  [c3]"), "{text}");
+    assert!(
+        text.contains("    The media server's guide holds nothing on it from now."),
+        "{text}"
+    );
+    report.channels.clear();
+    assert!(super::guide(&report)
+        .text()
+        .contains("No channel this member may watch now"));
+}
+
 /// A live stream opened says where each path is served, the door it presents and a code
 /// for each; one closed, rehearsed or unlocated says that instead.
 #[test]

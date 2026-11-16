@@ -32,6 +32,7 @@
     "front-door": "ref:FrontDoorReport",
     "glossary": "ref:Vocabulary",
     "grant": "ref:GrantReport",
+    "guide": "ref:GuideReport",
     "handoff": "ref:HandoffReport",
     "held": "ref:HeldReport",
     "history": "ref:HistoryReport",

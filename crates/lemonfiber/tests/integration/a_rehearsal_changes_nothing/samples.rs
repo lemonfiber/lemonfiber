@@ -45,12 +45,19 @@ pub(super) fn samples() -> Vec<(&'static str, Command)> {
     all
 }
 
-/// What a member watches: the live TV channels, a channel tuned, and a title played.
+/// What a member watches: the live TV channels and guide, a channel tuned, and a title
+/// played.
 fn over_what_a_member_watches() -> Vec<(&'static str, Command)> {
     vec![
         (
             "channels",
             Command::Viewing(Viewing::Channels {
+                member: "anybody".to_owned(),
+            }),
+        ),
+        (
+            "guide",
+            Command::Viewing(Viewing::Guide {
                 member: "anybody".to_owned(),
             }),
         ),

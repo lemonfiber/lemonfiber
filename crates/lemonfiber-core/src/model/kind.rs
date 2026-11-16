@@ -121,6 +121,8 @@ kinds! {
     WATCHED = "watched",
     /// The live TV channels a member may watch, each with the programme on it now.
     CHANNELS = "channels",
+    /// The live TV guide a member may watch: each channel's programmes from now.
+    GUIDE = "guide",
     /// A channel's live stream opened for a member, on passes.
     TUNED = "tuned",
     /// Where a title plays from in a member's browser, on a pass.

@@ -172,6 +172,38 @@ pub struct ChannelsReport {
     pub rehearsed: bool,
 }
 
+/// The live TV guide one member may watch: each channel with its programmes from now
+/// across the guide window.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct GuideReport {
+    /// The member this was asked for, by the name they are known by.
+    pub member: String,
+    /// The identifier the media server files them under.
+    pub id: String,
+    /// Each channel their own account may watch whose programme now is within their
+    /// limits. Empty where their account may not watch live TV.
+    pub channels: Vec<Guided>,
+    /// Whether this was a rehearsal: what would have happened, with none of it done.
+    pub rehearsed: bool,
+}
+
+/// One channel in a member's guide.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Guided {
+    /// The identifier the server tells it apart by.
+    pub id: String,
+    /// What it is called.
+    pub name: String,
+    /// Its number, where it has one.
+    pub number: Option<String>,
+    /// Each programme on it from now across the guide window, in the order they air, the
+    /// one on now first; one outside the member's limits is left out, a gap.
+    pub programmes: Vec<crate::ports::service::Airing>,
+    /// When the last programme the media server's guide holds on it inside the window
+    /// ends; none where it holds none.
+    pub guide_until: Option<crate::instant::Instant>,
+}
+
 /// A channel's live stream opened for a member, where its bytes are served at the
 /// guarded front door, each on a pass for that live stream and that member.
 #[derive(Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]

@@ -201,6 +201,9 @@ pub(crate) fn their_viewing(id: &str, viewing: &Viewing) -> Viewing {
         Viewing::Channels { .. } => Viewing::Channels {
             member: id.to_owned(),
         },
+        Viewing::Guide { .. } => Viewing::Guide {
+            member: id.to_owned(),
+        },
         Viewing::Tune { live, .. } => Viewing::Tune {
             member: id.to_owned(),
             live,
@@ -263,8 +266,8 @@ fn members(id: &str, command: &Command) -> Permitted {
         // be borrowed to read another member's sessions.
         Command::Playing { .. } => Permitted::This(their_playing(id)),
         // Theirs, narrowed the same way: a title, what they were part-way through, a
-        // grant for their own device, their own progress, the channels they may watch,
-        // a live stream opened for them and a title played in their browser. Whoever the
+        // grant for their own device, their own progress, the channels they may watch
+        // and their guide, a live stream opened for them and a title played in their browser. Whoever the
         // request named is discarded, so a member cannot grant a device to somebody
         // else's account, move somebody else's place in a film, or renew a pass on
         // somebody else's live stream.

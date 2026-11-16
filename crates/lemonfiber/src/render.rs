@@ -239,6 +239,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Granted(report) => viewing::grant(report),
         Outcome::Watched(report) => viewing::watched(report),
         Outcome::Channels(report) => viewing::channels(report),
+        Outcome::Guide(report) => viewing::guide(report),
         Outcome::Tuned(report) => viewing::tuned(report),
         Outcome::Play(report) => viewing::play(report),
         Outcome::Askable(report) => wishing::askable(report),

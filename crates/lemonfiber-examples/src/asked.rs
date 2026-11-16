@@ -63,6 +63,7 @@ fn household() -> Vec<String> {
         format!("/api/askable/kinds?member={MEMBER}"),
         "/api/playing".to_owned(),
         format!("/api/channels?member={MEMBER}"),
+        format!("/api/guide?member={MEMBER}"),
         format!("/api/notify/mine?member={MEMBER}"),
     ]
 }

@@ -40,6 +40,7 @@
     {"asked":{"path":"{certificate}","pin":"{certificate:sha256}"},"case":"serve_tls-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"serve_tls","since":0},
     {"asked":{"address":"https://core.conformance.invalid/api/notify/events","every":60,"key":"00000000000000000000000000000000","pin":"0000000000000000000000000000000000000000000000000000000000000000"},"case":"events-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"events","since":3},
     {"asked":{"member":"{identity.source@1/household-answers#/0/id}"},"case":"channels-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"channels","since":4},
+    {"asked":{"hours":12,"member":"{identity.source@1/household-answers#/0/id}"},"case":"guide-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"guide","since":5},
     {"asked":{"channel":"00000000000000000000000000000000","member":"{identity.source@1/household-answers#/0/id}"},"case":"tune-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"tune","since":4},
     {"asked":{"closes_by":"conformance-live-stream"},"case":"untune-answers","expect":{"conforms":true},"keyed":true,"live":false,"operation":"untune","since":4}
   ]

@@ -33,7 +33,7 @@ mod naming;
 
 pub(crate) use naming::{askable, THE_STACK, THIS_BINARY};
 use naming::{
-    askable_kinds, channels, diagnosing, following, household, moving, narrowed, part_way,
+    askable_kinds, channels, diagnosing, following, guide, household, moving, narrowed, part_way,
     removing, setting, shelf, titled, watching,
 };
 
@@ -118,6 +118,10 @@ pub const WATCHING: &str = "/api/watching";
 /// Read as the member, so a channel whose programme now is outside their limits is left
 /// out and a member whose account may not watch live TV is answered none.
 pub const CHANNELS: &str = "/api/channels";
+
+/// The live TV channels a member may watch with their programmes across the guide window,
+/// read as the member, so whatever is outside their limits is left out.
+pub const GUIDE: &str = "/api/guide";
 
 /// One page of a member's search for titles the house does not hold yet, under their
 /// limits.
@@ -321,6 +325,7 @@ pub const OFFERED: &[&str] = &[
     TITLE,
     WATCHING,
     CHANNELS,
+    GUIDE,
     ASKABLE,
     ASKABLE_KINDS,
     PLAYING,
@@ -474,6 +479,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         TITLE => titled(member, defaults.as_deref(), title),
         WATCHING => part_way(member, most),
         CHANNELS => channels(member),
+        GUIDE => guide(member),
         ASKABLE => askable(member, term, after, kind.as_deref(), unit.as_deref()),
         ASKABLE_KINDS => Ok(askable_kinds(member)),
         HOSTING => Ok(Command::Hosting(Keeping::Read)),

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One channel in a member's guide.",
+  "type": "object",
+  "properties": {
+    "guide_until": {
+      "description": "When the last programme the media server's guide holds on it inside the window\nends; none where it holds none.",
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "description": "The identifier the server tells it apart by.",
+      "type": "string"
+    },
+    "name": {
+      "description": "What it is called.",
+      "type": "string"
+    },
+    "number": {
+      "description": "Its number, where it has one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "programmes": {
+      "description": "Each programme on it from now across the guide window, in the order they air, the\none on now first; one outside the member's limits is left out, a gap.",
+      "type": "array",
+      "items": {
+        "$ref": "Airing.json"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "programmes"
+  ]
+}

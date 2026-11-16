@@ -915,6 +915,37 @@
         ],
         "type": "object"
       },
+      "Airing": {
+        "additionalProperties": false,
+        "description": "A programme in a channel's guide.",
+        "properties": {
+          "certificate": {
+            "description": "Its certificate, as the server holds it, where it has one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it ends."
+          },
+          "starts": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it starts."
+          },
+          "title": {
+            "description": "What it is called.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "starts",
+          "ends"
+        ],
+        "type": "object"
+      },
       "Alert": {
         "description": "One interruption: what happened, which way, and how much it matters.",
         "properties": {
@@ -5530,6 +5561,81 @@
           "trouble",
           "only_at_home",
           "nothing_is_installed"
+        ],
+        "type": "object"
+      },
+      "GuideReport": {
+        "description": "The live TV guide one member may watch: each channel with its programmes from now\nacross the guide window.",
+        "properties": {
+          "channels": {
+            "description": "Each channel their own account may watch whose programme now is within their\nlimits. Empty where their account may not watch live TV.",
+            "items": {
+              "$ref": "#/components/schemas/Guided"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "The identifier the media server files them under.",
+            "type": "string"
+          },
+          "member": {
+            "description": "The member this was asked for, by the name they are known by.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether this was a rehearsal: what would have happened, with none of it done.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "member",
+          "id",
+          "channels",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
+      "Guided": {
+        "description": "One channel in a member's guide.",
+        "properties": {
+          "guide_until": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the last programme the media server's guide holds on it inside the window\nends; none where it holds none."
+          },
+          "id": {
+            "description": "The identifier the server tells it apart by.",
+            "type": "string"
+          },
+          "name": {
+            "description": "What it is called.",
+            "type": "string"
+          },
+          "number": {
+            "description": "Its number, where it has one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "programmes": {
+            "description": "Each programme on it from now across the guide window, in the order they air, the\none on now first; one outside the member's limits is left out, a gap.",
+            "items": {
+              "$ref": "#/components/schemas/Airing"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "programmes"
         ],
         "type": "object"
       },
@@ -23010,6 +23116,9 @@
             "$ref": "#/components/schemas/kind-grant"
           },
           {
+            "$ref": "#/components/schemas/kind-guide"
+          },
+          {
             "$ref": "#/components/schemas/kind-handoff"
           },
           {
@@ -24435,6 +24544,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/GrantReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-guide": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GuideReport",
             "description": "The payload."
           },
           "host": {
@@ -31988,6 +32137,41 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/kind-front-door"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/guide": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-guide"
                 }
               }
             },

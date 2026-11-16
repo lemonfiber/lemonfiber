@@ -608,6 +608,14 @@ fn each_word_about_watching_reaches_the_core_as_the_one_request_it_names() {
         watching(Watching::Channels { member: None }),
         Ok(Command::Viewing(Viewing::Channels { member })) if member.is_empty()
     ));
+    assert!(matches!(
+        watching(Watching::Guide { member: ada() }),
+        Ok(Command::Viewing(Viewing::Guide { member })) if Some(member.clone()) == ada()
+    ));
+    assert!(matches!(
+        watching(Watching::Guide { member: None }),
+        Ok(Command::Viewing(Viewing::Guide { member })) if member.is_empty()
+    ));
 
     let tune = |channel: Option<&str>, stream: Option<&str>, stop: bool| {
         watching(Watching::Tune(RawTune {

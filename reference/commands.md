@@ -33,6 +33,7 @@ Commands:
   held           Show what one member can actually watch
   playing        Show what the media server is playing now: who is watching what, and where
   channels       Show the live TV channels one member may watch, each with what is on it now
+  guide          Show the live TV guide one member may watch: each channel's programmes from now
   tune           Open a channel's live stream for one member, and say where it is served
   play           Say where one title plays in a member's browser, on a pass holding a session on their own account
   walkthrough    Add one thing, end to end, and watch every step of it happen
@@ -129,6 +130,7 @@ Options:
 - [`lemonfiber held`](commands/held.md)
 - [`lemonfiber playing`](commands/playing.md)
 - [`lemonfiber channels`](commands/channels.md)
+- [`lemonfiber guide`](commands/guide.md)
 - [`lemonfiber tune`](commands/tune.md)
 - [`lemonfiber play`](commands/play.md)
 - [`lemonfiber walkthrough`](commands/walkthrough.md)

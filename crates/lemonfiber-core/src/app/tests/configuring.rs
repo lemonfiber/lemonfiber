@@ -52,6 +52,7 @@ fn settings_of(
             | Outcome::Granted(_)
             | Outcome::Watched(_)
             | Outcome::Channels(_)
+            | Outcome::Guide(_)
             | Outcome::Tuned(_)
             | Outcome::Play(_)
             | Outcome::Askable(_)

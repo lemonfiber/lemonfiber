@@ -144,6 +144,8 @@ outcomes! {
     Watched(crate::model::WatchedReport) => WATCHED [rehearsed],
     /// The live TV channels a member may watch, each with the programme on it now.
     Channels(crate::model::ChannelsReport) => CHANNELS [rehearsed],
+    /// The live TV guide a member may watch: each channel's programmes from now.
+    Guide(crate::model::GuideReport) => GUIDE [rehearsed],
     /// A channel's live stream opened for a member, on passes.
     Tuned(crate::model::TunedReport) => TUNED [rehearsed],
     /// Where a title plays from in a member's browser, on a pass.

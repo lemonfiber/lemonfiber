@@ -1,0 +1,25 @@
+{
+  "api_version": 1,
+  "data": {
+    "channels": [
+      {
+        "guide_until": 1893459600,
+        "id": "c1",
+        "name": "Channel One",
+        "number": "1",
+        "programmes": [
+          {
+            "certificate": null,
+            "ends": 1893459600,
+            "starts": 1893456000,
+            "title": "The Evening News"
+          }
+        ]
+      }
+    ],
+    "id": "a7f3",
+    "member": "ana",
+    "rehearsed": false
+  },
+  "kind": "guide"
+}

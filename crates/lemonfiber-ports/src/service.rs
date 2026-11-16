@@ -128,7 +128,7 @@ pub use subtitles::{Subtitles, Watched, Watching};
 pub use syncing::{Edited, Profiled, Reapplied, Syncing};
 pub use throttling::{Hours, Rates, Throttled, Throttling, Wanted, Window};
 pub use trace::{FoundItem, ItemPart, Library, Pipeline, QueueItem, StuckItem, TraceEvent};
-pub use tuning::{Channel, Programme, Tuned, Tuning};
+pub use tuning::{Airing, Channel, Listing, Programme, Tuned, Tuning, GUIDE_HOURS};
 pub use tunnelling::Tunnelling;
 pub use upkeep::{SeriesHeld, Upkeep, SERIES_MOST};
 
