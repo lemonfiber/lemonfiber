@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One run-and-exit service, as its runs left it.",
+  "type": "object",
+  "properties": {
+    "fired": {
+      "description": "Whether this machine's scheduler holds its job, so its times are fired.",
+      "type": "boolean"
+    },
+    "health": {
+      "description": "Its health: how its last run exited.",
+      "$ref": "RunHealth.json"
+    },
+    "id": {
+      "description": "Its id, which is its Compose service name.",
+      "type": "string"
+    },
+    "last": {
+      "description": "Its last run, where it has run.",
+      "anyOf": [
+        {
+          "$ref": "ScheduledRun.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "description": "What it is called in front of an operator.",
+      "type": "string"
+    },
+    "running": {
+      "description": "Whether a run of it is going now.",
+      "type": "boolean"
+    },
+    "skipped": {
+      "description": "How many of its times fell due while a run was still going, each skipped.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "running",
+    "fired",
+    "health",
+    "skipped"
+  ]
+}

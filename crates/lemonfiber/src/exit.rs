@@ -237,6 +237,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::News(_)
         | Outcome::Stuck(_)
         | Outcome::Boot(_)
+        | Outcome::Ran(_)
         | Outcome::Watcher(_)
         | Outcome::Queue(_)
         | Outcome::Status(_)

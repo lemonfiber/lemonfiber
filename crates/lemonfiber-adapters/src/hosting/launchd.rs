@@ -16,7 +16,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
+use lemonfiber_ports::hosting::{
+    Cadence, Failure, Held, Host, Hosted, Manager, Placed, Program, Standing,
+};
 use lemonfiber_ports::process::Output;
 use lemonfiber_ports::Runner;
 
@@ -33,6 +35,12 @@ const HELD: &str = "state = ";
 
 /// The line a plist writes its output paths under, and the one before the program.
 const OUT: &str = "<key>StandardOutPath</key>";
+
+/// The key a plist names the seconds between the starts of a command started on a clock.
+const INTERVAL: &str = "<key>StartInterval</key>";
+
+/// The seconds between those starts for a command started every minute.
+const MINUTE: u32 = 60;
 
 /// A launch agent, written into a directory and loaded through `launchctl`.
 pub struct Launchd {
@@ -70,8 +78,9 @@ impl Launchd {
         (output.succeeded() && !uid.is_empty()).then_some(uid)
     }
 
-    /// What launchd says about a label it may or may not be running.
-    async fn says(&self, name: &str) -> Standing {
+    /// What launchd says about a label it may or may not be running, where `timed` is
+    /// whether its definition starts it on a clock, which launchd holding it is all of.
+    async fn says(&self, name: &str, timed: bool) -> Standing {
         let Some(uid) = self.session().await else {
             return Standing::Unsaid;
         };
@@ -85,7 +94,7 @@ impl Launchd {
             // is installed and not running rather than not installed.
             return Standing::Stopped;
         }
-        if output.stdout.contains(RUNNING) {
+        if timed || output.stdout.contains(RUNNING) {
             Standing::Running
         } else if output.stdout.contains(HELD) {
             Standing::Stopped
@@ -121,6 +130,10 @@ fn written(label: &str, hosted: &Hosted) -> String {
             line
         })
         .collect();
+    let interval = match hosted.cadence {
+        Cadence::Kept => String::new(),
+        Cadence::Minutely => format!("{INTERVAL}\n<integer>{MINUTE}</integer>\n"),
+    };
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <plist version=\"1.0\">\n\
@@ -133,6 +146,7 @@ fn written(label: &str, hosted: &Hosted) -> String {
          </array>\n\
          <key>RunAtLoad</key>\n\
          <true/>\n\
+         {interval}\
          {OUT}\n\
          <string>{out}</string>\n\
          <key>StandardErrorPath</key>\n\
@@ -240,8 +254,9 @@ async fn standing_of(launchd: &Launchd, name: &str) -> Result<Held, Failure> {
         return Ok(Held::absent());
     };
     let arguments = arguments(&text);
+    let timed = text.lines().any(|line| line.trim() == INTERVAL);
     Ok(Held {
-        standing: launchd.says(name).await,
+        standing: launchd.says(name, timed).await,
         definition: Some(at),
         program: arguments.first().map(|at| Program {
             at: PathBuf::from(at),
@@ -259,7 +274,7 @@ async fn withdrawn(launchd: &Launchd, name: &str) -> Result<Vec<PathBuf>, Failur
         return Ok(Vec::new());
     }
     launchd.unload(name).await;
-    if matches!(launchd.says(name).await, Standing::Running) {
+    if matches!(launchd.says(name, false).await, Standing::Running) {
         return Err(refused("it is still running"));
     }
     take(&at)?;

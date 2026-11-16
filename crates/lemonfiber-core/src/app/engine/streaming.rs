@@ -223,6 +223,7 @@ pub async fn started(
     // one way and not the other would leave the next boot bringing back whatever the
     // last start through the *other* path named, which is worse than nothing.
     super::super::autostart::noted(ctx, &action, forms, &report);
+    super::super::scheduled::started(ctx, &action, &report);
     if status == Some(0) {
         let addressed = super::addressed(&action, &report.plan);
         settled_into(ctx, &manifest, &mut report, &addressed).await?;

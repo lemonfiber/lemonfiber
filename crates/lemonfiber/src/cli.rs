@@ -55,7 +55,7 @@ pub use plugin::{Authoring, PluginCommand};
 pub use pushing::{PushEndpointCommand, RawPushEndpoint};
 pub use removing::{RawRemoval, RawRemoving};
 pub use repair::{Fixing, Mending, RawDoctor};
-pub use serving::{Asked, RawUi};
+pub use serving::{Asked, RawPass, RawUi};
 pub use setup::RawSetup;
 pub use space::{RawSpace, RawStopSeeding};
 pub use starting::{RawDown, RawRestart, RawSwitch, RawUp};

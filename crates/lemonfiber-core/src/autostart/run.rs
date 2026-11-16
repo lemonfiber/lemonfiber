@@ -63,6 +63,7 @@ const fn said(action: &Action) -> Option<Said> {
         | Action::Remove(_)
         | Action::Restart(_)
         | Action::Pull(_)
+        | Action::Once(_)
         | Action::Config => None,
     }
 }

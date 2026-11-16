@@ -107,6 +107,27 @@ fn a_guard_reaches_the_command_and_the_forms_it_will_stop() {
     );
 }
 
+#[test]
+fn a_run_reaches_the_command_the_scheduler_calls_for_the_service_it_names() {
+    let one = Arguments {
+        service: Some("configarr".to_owned()),
+        ..Arguments::default()
+    };
+    assert_eq!(
+        command("run", one),
+        Some(Command::Run {
+            service: "configarr".to_owned()
+        })
+    );
+    assert_eq!(
+        refusal("run", nothing()),
+        Some(Refused::Missing {
+            action: "run".to_owned(),
+            argument: "service".to_owned()
+        })
+    );
+}
+
 /// Both halves of hosting need to be told which command, and by a word that names one.
 ///
 /// The two refusals are different and both matter: installing without saying which

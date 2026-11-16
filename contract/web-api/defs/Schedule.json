@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The setting naming when a run-and-exit service runs, and the times where it holds\nnothing.",
+  "type": "object",
+  "properties": {
+    "default": {
+      "description": "The times where the setting holds nothing: a five-field cron expression or one of\n`@hourly`, `@daily`, `@weekly` and `@monthly`.",
+      "type": "string"
+    },
+    "setting": {
+      "description": "The setting, as `<plugin>:<name>`.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "setting",
+    "default"
+  ]
+}

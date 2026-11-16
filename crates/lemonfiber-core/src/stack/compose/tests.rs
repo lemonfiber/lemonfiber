@@ -267,6 +267,19 @@ fn each_action_becomes_its_own_subcommand() {
 }
 
 #[test]
+fn a_run_to_completion_removes_its_container_starts_nothing_else_and_fetches_only_where_allowed() {
+    let once = Action::Once("configarr".to_owned());
+    assert_eq!(
+        once.argv(true).join(" "),
+        "run --rm --no-deps --no-TTY -- configarr"
+    );
+    assert_eq!(
+        once.argv(false).join(" "),
+        "run --rm --no-deps --no-TTY --pull never -- configarr"
+    );
+}
+
+#[test]
 fn every_action_reports_the_name_it_runs_under() {
     for (action, name) in [
         (Action::Up, "up"),
@@ -275,6 +288,7 @@ fn every_action_reports_the_name_it_runs_under() {
         (Action::Stop(Vec::new()), "stop"),
         (Action::Restart(Vec::new()), "restart"),
         (Action::Pull(Vec::new()), "pull"),
+        (Action::Once("configarr".to_owned()), "run"),
         (Action::Config, "config"),
     ] {
         assert_eq!(action.name(), name);

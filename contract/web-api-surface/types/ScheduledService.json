@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "fired": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "health": {
+      "type": [
+        "ref:RunHealth"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "last": {
+      "type": [
+        "anyOf(null,ref:ScheduledRun)"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "running": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "skipped": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

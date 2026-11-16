@@ -139,6 +139,12 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
                 offer: None,
             }),
         ),
+        (
+            "run",
+            Command::Run {
+                service: "configarr".to_owned(),
+            },
+        ),
         ("pull", Command::Pull { forms: Vec::new() }),
         ("ps", Command::Status { forms: Vec::new() }),
         (

@@ -344,6 +344,8 @@ pub struct Snapshot {
     pub storage: Panel<Storage>,
     /// Every service and what it is doing.
     pub services: Panel<Vec<Service>>,
+    /// Each run-and-exit service, with how its last run ended.
+    pub scheduled: Vec<crate::model::ScheduledService>,
     /// The one address to hand somebody who lives here.
     ///
     /// On the screen rather than only behind a question, because the operator who

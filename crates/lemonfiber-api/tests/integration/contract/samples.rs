@@ -15,9 +15,10 @@ use lemonfiber_core::model::{
     AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,
     DoctorReport, FormsReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
     LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport, RemovedService,
-    ReplaceReport, ResetReport, ServiceProvenance, StatusReport, StuckReport, SupervisionReport,
-    TraceReport, UpgradeReport, VersionReport,
+    ReplaceReport, ResetReport, RunHealth, RunReport, ScheduledService, ServiceProvenance,
+    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
 };
+use lemonfiber_core::scheduled::kept::ScheduledRun;
 
 use built::{
     a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
@@ -108,6 +109,15 @@ fn running() -> Vec<Outcome> {
             services: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             waiting: Vec::new(),
+            scheduled: vec![a_scheduled_service()],
+        }),
+        Outcome::Ran(RunReport {
+            service: "configarr".to_owned(),
+            rehearsed: false,
+            due: true,
+            ran: Some(a_failed_run()),
+            skipped: 1,
+            held: Some("a run of it is still going".to_owned()),
         }),
         Outcome::Wizard(a_setup_part_way()),
         Outcome::Watch(SupervisionReport {
@@ -421,6 +431,30 @@ fn keeping() -> Vec<Outcome> {
 
 /// A pause one client took and one nothing reached, with the caution a spent cap
 /// carries, so every optional half of the shape is compared.
+/// A run that exited non-zero, with the lines it wrote last.
+fn a_failed_run() -> ScheduledRun {
+    ScheduledRun {
+        started: lemonfiber_core::instant::Instant::from_seconds(1_759_400_000),
+        ended: lemonfiber_core::instant::Instant::from_seconds(1_759_400_042),
+        exit: Some(1),
+        log: vec!["sync failed: the quality guide could not be reached".to_owned()],
+    }
+}
+
+/// A run-and-exit service whose last run failed, every optional half filled.
+fn a_scheduled_service() -> ScheduledService {
+    let last = a_failed_run();
+    ScheduledService {
+        id: "configarr".to_owned(),
+        name: "Configarr".to_owned(),
+        running: false,
+        fired: true,
+        health: RunHealth::of(Some(&last)),
+        last: Some(last),
+        skipped: 2,
+    }
+}
+
 fn every_client_paused() -> lemonfiber_core::bandwidth::Pauses {
     use lemonfiber_core::bandwidth::{Paused, Pauses, Pausing, Pulling};
     Pauses {

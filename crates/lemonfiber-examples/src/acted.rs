@@ -7,7 +7,7 @@ use lemonfiber_fixtures::passwords::another_password;
 
 use crate::house::{house, CHANNEL, FOUND, HELD, MEMBER, SEEDED};
 use crate::surface::Surface;
-use crate::world::World;
+use crate::world::{World, SCHEDULED};
 use crate::Seen;
 
 /// The action whose work is released before it ran.
@@ -33,6 +33,8 @@ enum About {
     Member,
     /// The stack, its engine writing a line of a pull for every command.
     Pulling,
+    /// The stack, a plugin of it holding a run-and-exit service.
+    Scheduled,
 }
 
 /// Each action, whom it is about, and what it is sent with.
@@ -140,7 +142,7 @@ fn household() -> Vec<(&'static str, About, Value)> {
 /// Each action about operating the stack: notifying, support, hosting, repairs, plugins
 /// and settings.
 fn operating() -> Vec<(&'static str, About, Value)> {
-    use About::{Archived, Household, Stack, Unmounted};
+    use About::{Archived, Household, Scheduled, Stack, Unmounted};
     vec![
         ("notify-choose", Stack, json!({ "backends": ["home-ntfy"] })),
         (
@@ -157,6 +159,7 @@ fn operating() -> Vec<(&'static str, About, Value)> {
             json!({ "kept": "watch", "forms": ["library"] }),
         ),
         ("hosting-remove", Stack, json!({ "kept": "watch" })),
+        ("run", Scheduled, json!({ "service": SCHEDULED })),
         ("walkthrough", Household, json!({ "item": "Sintel" })),
         ("diagnose", Stack, json!({ "disruptive": true })),
         ("repair", Stack, json!({})),
@@ -274,6 +277,7 @@ async fn taken(
         About::Stopped | About::Archived => world.stopped(),
         About::Unmounted => world.unmounting(),
         About::Pulling => world.pulling(),
+        About::Scheduled => world.scheduling(),
         About::Served => {
             companion::serving(&world);
             world

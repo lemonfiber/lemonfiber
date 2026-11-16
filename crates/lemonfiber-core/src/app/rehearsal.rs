@@ -321,6 +321,7 @@ pub const fn asked(command: &Command) -> Asked {
         // clock: what it was prepared to wait is what somebody reads back afterwards to
         // understand why a four-in-the-morning start gave up when it did.
         Command::AtBoot => reports("up --at-boot", LIFECYCLE).disturbing(Situation::Starting),
+        Command::Run { .. } => reports("run", &[kind::RAN]),
         Command::Start { .. } => reports("start", LIFECYCLE).disturbing(Situation::Starting),
         Command::Down(teardown) => reports("down", LIFECYCLE).disturbing(stopping(teardown)),
         Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),

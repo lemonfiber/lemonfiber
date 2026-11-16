@@ -29,7 +29,7 @@
       "type": "string"
     },
     "variable": {
-      "description": "The variable it is read into.",
+      "description": "The variable it is read into, or `schedule` where the setting names when the\nservice runs.",
       "type": "string"
     }
   },

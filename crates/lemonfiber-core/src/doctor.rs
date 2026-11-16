@@ -43,6 +43,7 @@ pub(crate) mod proved;
 pub mod providers;
 pub mod releases;
 pub(crate) mod requested;
+pub mod scheduled;
 pub mod seasons;
 pub mod storage;
 pub mod telling;

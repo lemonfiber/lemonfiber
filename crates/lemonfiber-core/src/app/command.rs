@@ -94,6 +94,12 @@ pub enum Command {
     /// is still starting, and it reports what it found to a condition store rather than to somebody
     /// watching. What it shares with `Up` is the start in the middle, which it runs by calling it.
     AtBoot,
+    /// Run a run-and-exit service where one of its times fell due since the last minute a
+    /// run accounted for, or a run is owed; what the host's scheduler calls every minute.
+    Run {
+        /// The service.
+        service: String,
+    },
     /// Start named services, leaving the rest of the form where it is.
     ///
     /// Apart from [`Command::Up`] for the reason [`Command::Halt`] is apart from

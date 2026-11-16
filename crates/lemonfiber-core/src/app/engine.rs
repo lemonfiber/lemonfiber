@@ -85,7 +85,10 @@ pub(crate) async fn verified(ctx: &Ctx) -> Result<(), Box<Problem>> {
 ///
 /// The refusal of a start or a restart over a directory reached through a link.
 pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) -> Result<(), Box<Problem>> {
-    if matches!(action, Action::Up | Action::Start(_) | Action::Restart(_)) {
+    if matches!(
+        action,
+        Action::Up | Action::Start(_) | Action::Restart(_) | Action::Once(_)
+    ) {
         super::project::unlinked(ctx)?;
     }
     halted::before(ctx, action, addressed);
@@ -253,6 +256,7 @@ pub(crate) fn addressed(action: &Action, plan: &Plan) -> Vec<String> {
         {
             named.clone()
         }
+        Action::Once(service) => vec![service.clone()],
         Action::Up
         | Action::Down
         | Action::Start(_)
@@ -480,6 +484,7 @@ async fn worked(
     // on. A start whose services never settle has still started them, and a boot
     // that forgot which form that was would bring back the wrong one.
     super::autostart::noted(ctx, action, forms, &report);
+    super::scheduled::started(ctx, action, &report);
 
     // Starting waits for the services to be usable, because "started" that
     // means "a process exists" is a claim the operator will disprove by opening

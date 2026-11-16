@@ -1,4 +1,5 @@
 use super::{Failure, Held, Host, Hosted, Hosting, Manager, Placed, Program, Standing};
+use lemonfiber_ports::hosting::Cadence;
 use std::path::PathBuf;
 
 fn a_command() -> Hosted {
@@ -8,6 +9,7 @@ fn a_command() -> Hosted {
         arguments: vec!["watch".to_owned(), "full".to_owned()],
         output: PathBuf::from("/records/watch.log"),
         about: "guards the data location".to_owned(),
+        cadence: Cadence::Kept,
     }
 }
 

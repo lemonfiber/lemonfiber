@@ -125,6 +125,8 @@ pub(crate) const GRANTS: &str = "grants.json";
 pub(crate) const TUNED: &str = "tuned.json";
 /// What is wrong, and since when.
 pub(crate) const CONDITIONS: &str = "conditions.json";
+/// What each run-and-exit service's runs left, one record per service.
+pub(crate) const SCHEDULED: &str = "scheduled";
 
 impl Paths {
     /// The layout beneath a configuration base and a data base.
@@ -245,33 +247,6 @@ impl Paths {
     #[must_use]
     pub fn notifications(&self) -> PathBuf {
         self.config.join(NOTIFICATIONS)
-    }
-
-    /// The operator's autostart answer: whether they asked for the stack to come
-    /// back after this machine restarts. Kept with configuration rather than as a
-    /// setting in the environment file, because the environment file is handed to
-    /// Compose as it stands and this is not a thing Compose has any use for — and
-    /// kept at all because an answer gathered at setup and then discarded leaves
-    /// the operator believing they chose something they did not.
-    #[must_use]
-    pub fn autostart(&self) -> PathBuf {
-        self.config.join(AUTOSTART)
-    }
-
-    /// Which restart of this machine lemonfiber last acted on.
-    ///
-    /// The observation half of autostart, kept apart from the answer beside it on
-    /// purpose: one records what the operator asked for and the other records what
-    /// this machine did, and a single file holding both is the `enabled-unverified`
-    /// trap committed to disk — a record that cannot tell wanting from working.
-    ///
-    /// Kept with configuration rather than beside the stack because losing it is not
-    /// free: a run that forgot which restart it had already acted on would verify the
-    /// same boot again, and report a failure the operator was told about a week ago as
-    /// though it had just happened.
-    #[must_use]
-    pub fn boot(&self) -> PathBuf {
-        self.config.join(BOOT)
     }
 
     /// The monitors lemonfiber provisioned in the outside watcher: the id the watcher
@@ -543,6 +518,7 @@ impl Paths {
 }
 
 mod household;
+mod machine;
 mod notifying;
 
 #[cfg(test)]

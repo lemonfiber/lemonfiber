@@ -35,9 +35,9 @@ pub use refusing::{
 pub use schema::{
     Ask, Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration,
     Declared, Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On,
-    Origin, Override, Pair, Plugin, Proof, Reach, Recipe, Request, Requires, Retry, Run, Secret,
-    Service, Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION, HEADER,
-    LARGEST_ANSWER, LONGEST_ARG, LONGEST_WAIT, MOST_ARGS, MOST_RETRIES, RUN, RUN_TIMEOUT,
+    Origin, Override, Pair, Plugin, Proof, Reach, Recipe, Request, Requires, Retry, Run, Schedule,
+    Secret, Service, Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION,
+    HEADER, LARGEST_ANSWER, LONGEST_ARG, LONGEST_WAIT, MOST_ARGS, MOST_RETRIES, RUN, RUN_TIMEOUT,
 };
 
 /// The manifest schema version this crate prefers.

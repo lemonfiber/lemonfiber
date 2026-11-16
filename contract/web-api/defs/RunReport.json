@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What `lemonfiber run` came to for one service.",
+  "type": "object",
+  "properties": {
+    "due": {
+      "description": "Whether a time fell due or a run was owed, so it ran or would have.",
+      "type": "boolean"
+    },
+    "held": {
+      "description": "Why nothing was looked at, where something held it back.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ran": {
+      "description": "The run, where one went.",
+      "anyOf": [
+        {
+          "$ref": "ScheduledRun.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rehearsed": {
+      "description": "Whether nothing was run because this was a rehearsal.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The service.",
+      "type": "string"
+    },
+    "skipped": {
+      "description": "How many times fell due while that run was still going, each skipped.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "service",
+    "rehearsed",
+    "due",
+    "skipped"
+  ]
+}

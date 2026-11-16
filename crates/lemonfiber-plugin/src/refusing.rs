@@ -47,6 +47,7 @@ mod reaching;
 mod readable;
 mod recipes;
 mod replacing;
+mod scheduling;
 mod shaping;
 mod speaking;
 mod starting;
@@ -102,6 +103,7 @@ pub fn refusals(manifest: &Manifest, occupied: &[&str]) -> Vec<Violation> {
     readable::readable(manifest, &mut found);
     earlier::named(manifest, &mut found);
     choosing::chosen(manifest, &mut found);
+    scheduling::scheduled(manifest, &mut found);
     found
 }
 

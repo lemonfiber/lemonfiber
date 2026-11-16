@@ -106,14 +106,12 @@ async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) ->
     let mut last = dashboard.last.lock().await;
     let gathered = waves(&dashboard.ctx, last.as_ref(), |first| {
         if let Some(early) = early {
-            early.say(Rendered::of(EventKind::Dashboard, &first));
+            early.say(shared(&first));
         }
     })
     .await;
     let snapshot = &gathered.snapshot;
-    let mut said: Vec<Rendered> = Rendered::of(EventKind::Dashboard, snapshot)
-        .into_iter()
-        .collect();
+    let mut said: Vec<Rendered> = shared(snapshot).into_iter().collect();
     said.extend(newly(dashboard, snapshot, joined).await);
     said.extend(alerted(dashboard, &snapshot.alerts).await);
     dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
@@ -121,6 +119,14 @@ async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) ->
     said.extend(playing(dashboard, joined).await);
     *last = Some(gathered);
     said
+}
+
+/// The dashboard as the shared stream says it: every run-and-exit service without the
+/// lines its last run wrote, since a key and a member hear the stream too.
+fn shared(snapshot: &Snapshot) -> Option<Rendered> {
+    let mut said = snapshot.clone();
+    said.scheduled = lemonfiber_core::scheduled::unlogged(said.scheduled);
+    Rendered::of(EventKind::Dashboard, &said)
 }
 
 /// Each alert the dashboard carries that it did not at the last gather, oldest first, as

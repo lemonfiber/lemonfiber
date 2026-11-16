@@ -478,6 +478,7 @@ fn a_status_report_leads_with_the_condition() {
         condition: Condition::Degraded,
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Unhealthy, None)],
+        scheduled: Vec::new(),
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         waiting: Vec::new(),
     };
@@ -554,6 +555,7 @@ fn a_container_the_stack_never_declared_is_shown_with_an_unknown_description() {
             describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
         }],
         services: vec![service("sonarr", State::Absent, None)],
+        scheduled: Vec::new(),
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         waiting: Vec::new(),
     };
@@ -589,6 +591,7 @@ fn a_stranger_that_failed_is_worded_without_an_exit_code_to_quote() {
             describes: lemonfiber_core::docker::UNDESCRIBED.to_owned(),
         }],
         services: vec![service("sonarr", State::Absent, None)],
+        scheduled: Vec::new(),
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         waiting: Vec::new(),
     };
@@ -613,6 +616,7 @@ fn a_stack_with_nothing_strange_running_says_nothing_about_strangers() {
         condition: Condition::Inactive,
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Absent, None)],
+        scheduled: Vec::new(),
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         waiting: Vec::new(),
     };
@@ -735,6 +739,7 @@ fn a_status_report_names_the_running_forms_and_what_they_left_out() {
         condition: Condition::Active,
         undeclared: Vec::new(),
         services: vec![service("sonarr", State::Healthy, None)],
+        scheduled: Vec::new(),
         disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
         waiting: Vec::new(),
     };

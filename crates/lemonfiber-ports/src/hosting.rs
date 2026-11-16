@@ -40,6 +40,8 @@ pub enum Manager {
     Launchd,
     /// Linux, through a user service in the operator's own session.
     Systemd,
+    /// Windows, through a task in the operator's own Task Scheduler.
+    TaskScheduler,
     /// A platform lemonfiber does not configure.
     #[default]
     Unsupported,
@@ -52,6 +54,7 @@ impl Manager {
         match self {
             Self::Launchd => "launchd",
             Self::Systemd => "systemd",
+            Self::TaskScheduler => "Task Scheduler",
             Self::Unsupported => "none",
         }
     }
@@ -61,6 +64,16 @@ impl Manager {
     pub const fn configurable(self) -> bool {
         !matches!(self, Self::Unsupported)
     }
+}
+
+/// How often the manager starts a command.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Cadence {
+    /// Once at each login, kept running from there.
+    #[default]
+    Kept,
+    /// Again at the start of every minute, each run exiting by itself.
+    Minutely,
 }
 
 /// One command to be kept running, described the way every manager needs it.
@@ -76,6 +89,8 @@ pub struct Hosted {
     pub output: PathBuf,
     /// One sentence saying what it is, for a manager that carries a description.
     pub about: String,
+    /// How often the manager starts it.
+    pub cadence: Cadence,
 }
 
 /// What the manager says about a name it may or may not hold.

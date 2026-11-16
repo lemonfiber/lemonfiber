@@ -91,7 +91,8 @@ pub enum SecretFrom {
 pub struct Reader {
     /// The service.
     pub service: String,
-    /// The variable it is read into.
+    /// The variable it is read into, or `schedule` where the setting names when the
+    /// service runs.
     pub variable: String,
     /// What the service's manifest declares while no value is recorded.
     pub default: Option<String>,

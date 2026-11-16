@@ -58,4 +58,25 @@ codes! {
         remedy: "Name the forms to guard, as you would when running the guard yourself.",
         household: fault,
     }
+    /// Raised when the service named to run on its schedule is no run-and-exit service.
+    NOT_SCHEDULED = "HOST-7" {
+        severity: Error,
+        status: 404,
+        since: "0.18.0",
+        meaning: "The service named is no installed run-and-exit service, so it has no times to \
+            run at.",
+        remedy: "Name a service an installed plugin declares a schedule for.",
+        household: fault,
+    }
+    /// Raised when a run-and-exit service's last run did not exit zero, or its schedule
+    /// names no time.
+    SCHEDULED_RUN_FAILED = "HOST-8" {
+        severity: Warning,
+        status: 500,
+        since: "0.18.0",
+        meaning: "What a run-and-exit service runs to do was not done: its last run did not exit \
+            zero, or its schedule setting names no time it runs at.",
+        remedy: "Read what its last run wrote, deal with it, then run it again.",
+        household: fault,
+    }
 }

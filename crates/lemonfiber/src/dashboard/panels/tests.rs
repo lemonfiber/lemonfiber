@@ -195,7 +195,7 @@ fn an_empty_panel_says_so_rather_than_rendering_a_blank_region() {
         vec!["no service reported a queue".to_owned()]
     );
     assert_eq!(
-        said(&services(&Panel::Ready(Vec::new()), WIDE)),
+        said(&services(&Panel::Ready(Vec::new()), &[], WIDE)),
         vec!["no services are running".to_owned()]
     );
 }
@@ -356,7 +356,7 @@ fn a_panel_whose_source_has_not_answered_says_it_is_waiting() {
     assert_eq!(said(&transfers(&Panel::Pending, WIDE)), waiting);
     assert_eq!(said(&queues(&Panel::Pending, WIDE)), waiting);
     assert_eq!(said(&storage(&Panel::Pending, WIDE)), waiting);
-    assert_eq!(said(&services(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&services(&Panel::Pending, &[], WIDE)), waiting);
     assert_eq!(said(&front_door(&Panel::Pending, WIDE)), waiting);
     assert_eq!(said(&household(&Panel::Pending, WIDE)), waiting);
 }
@@ -373,7 +373,7 @@ fn an_unavailable_queue_or_storage_or_service_panel_says_why() {
     assert!(said(&storage(&store, WIDE))
         .first()
         .is_some_and(|line| line.starts_with("unavailable —")));
-    assert!(said(&services(&running, WIDE))
+    assert!(said(&services(&running, &[], WIDE))
         .first()
         .is_some_and(|line| line.starts_with("unavailable —")));
 }
@@ -492,7 +492,7 @@ fn a_service_is_named_with_what_it_is_doing() {
         depends_on: Vec::new(),
         exit: None,
     };
-    let lines = said(&services(&Panel::Ready(vec![running]), WIDE));
+    let lines = said(&services(&Panel::Ready(vec![running]), &[], WIDE));
     assert!(lines
         .first()
         .is_some_and(|line| line.contains("sonarr") && line.contains("running")));
@@ -688,3 +688,49 @@ fn a_pipeline_with_nothing_stuck_says_so() {
 }
 
 mod door;
+
+#[test]
+fn a_run_and_exit_service_shows_its_last_run_and_a_failed_one_its_last_line() {
+    use lemonfiber_core::instant::Instant;
+    use lemonfiber_core::model::ScheduledService;
+    use lemonfiber_core::scheduled::kept::ScheduledRun;
+
+    let ran = |exit| ScheduledRun {
+        started: Instant::EPOCH,
+        ended: Instant::EPOCH,
+        exit,
+        log: vec!["refused: 401".to_owned()],
+    };
+    let one = |id: &str, last: Option<ScheduledRun>, running: bool| ScheduledService {
+        id: id.to_owned(),
+        name: id.to_owned(),
+        running,
+        fired: true,
+        health: lemonfiber_core::model::RunHealth::of(last.as_ref()),
+        last,
+        skipped: 0,
+    };
+    let lines = said(&services(
+        &Panel::Ready(Vec::new()),
+        &[
+            one("configarr", Some(ran(Some(2))), false),
+            one("fine", Some(ran(Some(0))), false),
+            one("new", None, false),
+            one("busy", None, true),
+            one("ended", Some(ran(None)), false),
+            ScheduledService {
+                fired: false,
+                ..one("lost", None, false)
+            },
+        ],
+        WIDE,
+    ));
+    let text = lines.join("\n");
+    assert!(text.contains("failed (2)"), "{text}");
+    assert!(text.contains("  refused: 401"), "{text}");
+    assert!(text.contains("ran"), "{text}");
+    assert!(text.contains("scheduled"), "{text}");
+    assert!(text.contains("running"), "{text}");
+    assert!(text.contains("not fired"), "{text}");
+    assert_eq!(text.matches("refused: 401").count(), 2, "{text}");
+}

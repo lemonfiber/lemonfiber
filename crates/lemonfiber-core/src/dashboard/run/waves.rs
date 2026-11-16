@@ -216,6 +216,7 @@ pub(super) async fn assembled(
             alerts,
             storage,
             services,
+            scheduled: crate::app::scheduled::installed_standing(ctx).await,
             door,
             household,
         },

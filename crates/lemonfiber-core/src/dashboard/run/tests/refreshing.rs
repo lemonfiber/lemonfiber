@@ -120,6 +120,7 @@ fn a_download_carries_its_last_speed_across_a_refresh_that_did_not_report_one() 
         alerts: Vec::new(),
         storage: Panel::unavailable("not read here"),
         services: Panel::Ready(Vec::new()),
+        scheduled: Vec::new(),
         door: Panel::unavailable("not read here"),
         household: Panel::unavailable("not read here"),
     };

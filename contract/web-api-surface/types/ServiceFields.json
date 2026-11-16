@@ -66,6 +66,12 @@
       ],
       "required": false
     },
+    "schedule": {
+      "type": [
+        "anyOf(null,ref:Schedule)"
+      ],
+      "required": false
+    },
     "shares_config": {
       "type": [
         "null|string"

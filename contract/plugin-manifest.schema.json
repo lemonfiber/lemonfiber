@@ -736,6 +736,13 @@
           "type": ["string", "null"],
           "default": null
         },
+        "schedule": {
+          "description": "When it runs, for a run-and-exit service: run to completion at each time the\nsetting names, never kept running.",
+          "anyOf": [
+            {"$ref": "#/$defs/Schedule"},
+            {"type": "null"}
+          ]
+        },
         "shape": {
           "description": "The one privileged shape lemonfiber writes for it, from a closed set.",
           "anyOf": [
@@ -888,6 +895,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "Schedule": {
+      "description": "The setting naming when a run-and-exit service runs, and the times where it holds\nnothing.",
+      "type": "object",
+      "properties": {
+        "default": {"description": "The times where the setting holds nothing: a five-field cron expression or one of\n`@hourly`, `@daily`, `@weekly` and `@monthly`.", "type": "string"},
+        "setting": {"description": "The setting, as `<plugin>:<name>`.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["setting", "default"]
     },
     "Secret": {
       "description": "A value a service holds, declared before anything captures or enters it.",

@@ -31,6 +31,7 @@
     },
     "filtered": [],
     "forms": [],
+    "scheduled": [],
     "services": [
       {
         "criticality": "enhancing",

@@ -252,4 +252,6 @@ kinds! {
     SETTINGS = "settings",
     /// What setup settled, and whether this stack is set up.
     SETTLED = "settled",
+    /// What one minute's look at a run-and-exit service came to.
+    RAN = "ran",
 }

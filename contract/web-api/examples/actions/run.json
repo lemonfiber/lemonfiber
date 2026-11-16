@@ -1,0 +1,13 @@
+{
+  "arguments": {
+    "service": "configarr"
+  },
+  "answered": {
+    "api_version": 1,
+    "data": {
+      "action": "run",
+      "job": "6162636465666768"
+    },
+    "kind": "job"
+  }
+}

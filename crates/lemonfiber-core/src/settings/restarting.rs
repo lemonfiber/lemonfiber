@@ -34,10 +34,19 @@ pub(crate) async fn listed(ctx: &Ctx) -> Vec<String> {
 }
 
 pub(crate) async fn restarted(ctx: &Ctx, services: &[String]) -> Option<String> {
-    if services.is_empty() {
+    let installed = crate::app::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    let scheduled = crate::scheduled::all(&installed);
+    let (owed, kept): (Vec<String>, Vec<String>) = services
+        .iter()
+        .cloned()
+        .partition(|service| scheduled.iter().any(|one| one.service == *service));
+    crate::app::scheduled::owe(ctx, &installed, Some(&owed));
+    if kept.is_empty() {
         return None;
     }
-    let action = Action::Start(services.to_vec());
+    let action = Action::Start(kept);
     let invocation = match crate::app::engine::invocation(ctx, &[], &action) {
         Ok(invocation) => invocation,
         Err(problem) => return Some(problem.summary),

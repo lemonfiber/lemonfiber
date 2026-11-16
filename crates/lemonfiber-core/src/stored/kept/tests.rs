@@ -9,6 +9,7 @@ use super::EVERY;
 const LAYOUT: &str = concat!(
     include_str!("../../config/paths.rs"),
     include_str!("../../config/paths/household.rs"),
+    include_str!("../../config/paths/machine.rs"),
     include_str!("../../config/paths/notifying.rs")
 );
 

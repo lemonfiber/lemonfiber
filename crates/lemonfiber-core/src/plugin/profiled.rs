@@ -52,7 +52,7 @@ pub fn profile_of(installed: &Installed) -> String {
     )
 }
 
-/// Every service of `installed` that sits in a stack profile, in the order each plugin
+/// Every service of `installed` kept running in a stack profile, in the order each plugin
 /// declares them.
 #[must_use]
 pub fn profiled(installed: &[Installed]) -> Vec<Profiled> {
@@ -67,7 +67,7 @@ pub fn profiled(installed: &[Installed]) -> Vec<Profiled> {
         for (service, placed) in declared.iter().filter_map(|service| {
             one.services
                 .iter()
-                .find(|placed| placed.service == service.id)
+                .find(|placed| placed.service == service.id && placed.fields.schedule.is_none())
                 .map(|placed| (service, placed))
         }) {
             found.push(Profiled {

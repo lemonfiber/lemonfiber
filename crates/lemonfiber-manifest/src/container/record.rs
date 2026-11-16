@@ -54,6 +54,9 @@ pub struct Fields {
     /// The arguments its image's own entrypoint is handed, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
+    /// When it runs, where it runs to completion on a schedule rather than for good.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<crate::schedule::Schedule>,
 }
 
 impl Fields {

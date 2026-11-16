@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "scheduled": {
+      "type": [
+        "array[ref:ScheduledService]"
+      ],
+      "required": true
+    },
     "services": {
       "type": [
         "array[ref:Service]"

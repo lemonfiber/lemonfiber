@@ -6,6 +6,9 @@ use lemonfiber_core::error::household::Words;
 use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_fixtures::unhoused::unhoused;
 
+use lemonfiber_core::app::Outcome;
+use lemonfiber_core::model::{Disturbances, RunHealth, RunReport, ScheduledService, StatusReport};
+
 use super::{for_audience, refused, Audience, Refused};
 use crate::admission::Caller;
 
@@ -98,4 +101,82 @@ async fn an_answer_that_is_no_refusal_is_left_as_it_is() {
     let spoken = for_audience(Audience::Household, answered);
     assert!(spoken.extensions().get::<Refused>().is_none());
     assert_eq!(body(spoken).await, "{\"kind\":\"held\"}");
+}
+
+/// A run that exited non-zero, with the line it wrote last.
+fn a_failed_run() -> lemonfiber_core::scheduled::kept::ScheduledRun {
+    lemonfiber_core::scheduled::kept::ScheduledRun {
+        started: lemonfiber_core::instant::Instant::from_seconds(1_759_400_000),
+        ended: lemonfiber_core::instant::Instant::from_seconds(1_759_400_042),
+        exit: Some(1),
+        log: vec!["sync failed".to_owned()],
+    }
+}
+
+/// What a status read and a run answer, each carrying a run that wrote a line.
+fn logged() -> [Outcome; 2] {
+    let last = a_failed_run();
+    [
+        Outcome::Status(StatusReport {
+            forms: Vec::new(),
+            active_forms: Vec::new(),
+            filtered: Vec::new(),
+            condition: lemonfiber_core::docker::Condition::Inactive,
+            undeclared: Vec::new(),
+            services: Vec::new(),
+            disturbs: Disturbances::all(lemonfiber_core::app::PATIENCE),
+            waiting: Vec::new(),
+            scheduled: vec![ScheduledService {
+                id: "configarr".to_owned(),
+                name: "Configarr".to_owned(),
+                running: false,
+                fired: true,
+                health: RunHealth::of(Some(&last)),
+                last: Some(last.clone()),
+                skipped: 0,
+            }],
+        }),
+        Outcome::Ran(RunReport {
+            service: "configarr".to_owned(),
+            rehearsed: false,
+            due: true,
+            ran: Some(last),
+            skipped: 0,
+            held: None,
+        }),
+    ]
+}
+
+/// The lines each run in `outcome` wrote.
+fn lines(outcome: &Outcome) -> Vec<String> {
+    match outcome {
+        Outcome::Status(report) => report
+            .scheduled
+            .iter()
+            .filter_map(|one| one.last.as_ref())
+            .flat_map(|run| run.log.clone())
+            .collect(),
+        Outcome::Ran(report) => report.ran.iter().flat_map(|run| run.log.clone()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+#[test]
+fn what_a_run_wrote_reaches_the_operator_alone() {
+    let read = lemonfiber_core::keys::Scope::Read;
+    let key = Caller::Key(crate::admission::Keyed {
+        name: "home-assistant".to_owned(),
+        scope: read,
+    });
+    assert_eq!(Audience::of(&key), Audience::Key);
+    for outcome in logged() {
+        assert_eq!(
+            lines(&Audience::Operator.outcome(outcome.clone())),
+            ["sync failed"]
+        );
+        let keyed = Audience::Key.outcome(outcome.clone());
+        assert!(lines(&keyed).is_empty());
+        let housed = Audience::Household.outcome(outcome);
+        assert!(lines(&housed).is_empty());
+    }
 }

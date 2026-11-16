@@ -4,12 +4,8 @@ use super::{engine_is_desktop, engine_is_orbstack, manager, Environment, HostOs,
 fn each_platform_names_the_service_manager_it_actually_has() {
     assert_eq!(manager(HostOs::MacOs), Manager::Launchd);
     assert_eq!(manager(HostOs::Linux), Manager::Systemd);
-    for host in [HostOs::Windows, HostOs::Other] {
-        assert!(
-            !manager(host).configurable(),
-            "{host:?} has nothing lemonfiber configures"
-        );
-    }
+    assert_eq!(manager(HostOs::Windows), Manager::TaskScheduler);
+    assert!(!manager(HostOs::Other).configurable());
 }
 
 /// Docker Desktop on Linux is told apart by the context it installs and the socket it

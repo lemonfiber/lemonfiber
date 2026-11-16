@@ -128,6 +128,7 @@ impl<'a> Fencing<'a> {
             hostname: None,
             granted: &crate::fence::GRANTED,
             reaches_host: false,
+            schedule: None,
         }
     }
 }

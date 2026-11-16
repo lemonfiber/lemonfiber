@@ -303,6 +303,32 @@ fn nothing_that_cannot_be_undone_or_widens_trust_is_callable_by_a_key() {
     }
 }
 
+#[test]
+fn a_run_of_a_scheduled_service_is_the_operators_alone() {
+    use lemonfiber_core::keys::Scope;
+    let run = || Command::Run {
+        service: "configarr".to_owned(),
+    };
+    assert_eq!(
+        may(&Caller::Operator, Door::Acting, run()),
+        Permitted::This(run())
+    );
+    assert_eq!(may(&member(), Door::Acting, run()), Permitted::Nothing);
+    assert_eq!(
+        may(&key(Scope::Act), Door::Acting, run()),
+        Permitted::NotForAKey(Scope::Act.written())
+    );
+    assert_eq!(
+        may(&key(Scope::Read), Door::Acting, run()),
+        Permitted::NotForAKey(Scope::Read.written())
+    );
+    let theirs = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    assert_eq!(may(&theirs, Door::Acting, run()), Permitted::Nothing);
+}
+
 /// **What is playing is narrowed as the shelf is.** A member naming somebody else, or
 /// nobody, is answered with their own sessions — never with another member's and never
 /// with the whole house, which is the operator's reading.

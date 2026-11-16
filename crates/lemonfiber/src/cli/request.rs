@@ -16,9 +16,9 @@ use clap::Subcommand;
 use super::{
     AlertCommand, Asked, ConfigAction, HostingCommand, HouseholdCommand, MigrateCommand,
     PluginCommand, QualityCommand, QueueCommand, RawAllowance, RawBandwidth, RawCompanion,
-    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPushEndpoint,
-    RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding, RawSwitch, RawTrace,
-    RawUi, RawUp, RawWhom, UpdateCommand, Watching,
+    RawCredentials, RawDoctor, RawDown, RawDownloads, RawKey, RawLogs, RawNotify, RawPass,
+    RawPushEndpoint, RawRemoving, RawRestart, RawSetup, RawShelf, RawSpace, RawStopSeeding,
+    RawSwitch, RawTrace, RawUi, RawUp, RawWhom, UpdateCommand, Watching,
 };
 
 /// What the operator asked for.
@@ -70,6 +70,15 @@ pub enum Request {
     Switch(RawSwitch),
     /// Restart services without touching the rest.
     Restart(RawRestart),
+    /// Run a run-and-exit service where one of its times fell due since its last run.
+    ///
+    /// What this machine's scheduler calls every minute for each installed
+    /// run-and-exit service. Where none of its times fell due it exits at once and
+    /// records nothing; a run still going when a time falls due has that time skipped.
+    Run {
+        /// The service.
+        service: String,
+    },
     /// Fetch newer images without applying them.
     Pull {
         /// The forms whose images to fetch.
@@ -509,15 +518,7 @@ pub enum Request {
     /// Run by the stack as a service of its own, holding the pass key read-only, and
     /// never by hand.
     #[command(hide = true, name = lemonfiber_core::pass::REQUEST)]
-    Pass {
-        /// The directory holding the pass key and the media server's live-stream paths.
-        #[arg(long, value_name = "PATH", default_value = lemonfiber_core::pass::CONFIGURATION)]
-        config: PathBuf,
-        /// The address to answer at: the service's own on the network it shares with the
-        /// guard.
-        #[arg(long, value_name = "ADDRESS")]
-        listen: std::net::SocketAddr,
-    },
+    Pass(RawPass),
     /// Pair a phone with this stack, or replace the certificate a paired phone pins.
     Companion(RawCompanion),
     /// Mint, list or revoke the keys another program reaches the web interface with.

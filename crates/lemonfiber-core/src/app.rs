@@ -85,6 +85,7 @@ pub(crate) mod remove;
 pub(crate) mod replace;
 pub(crate) mod reset;
 pub mod restore;
+pub(crate) mod scheduled;
 pub(crate) mod screen;
 mod settled;
 pub mod setup;
@@ -124,6 +125,7 @@ pub use walkthrough::{walkthrough, worth_offering};
 // one are together long enough that spelling it out there takes the arm past a line.
 use self_update::standing as stands;
 
+pub use scheduled::REFUSALS as SCHEDULED_REFUSALS;
 // The data-location watch is a self-contained feature in its own module; these
 // are the names the rest of the crate and the binary reach it by.
 pub use watch::{supervise, WATCH};
@@ -386,6 +388,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Preview { forms } => engine::preview(ctx, &forms).await.map(Outcome::Preview),
         Command::Up { forms, offer } => engine::up(ctx, &forms, offer).await,
         Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::from),
+        Command::Run { service } => scheduled::run(ctx, &service).await.map(Outcome::Ran),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,

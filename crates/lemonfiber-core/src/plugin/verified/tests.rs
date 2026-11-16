@@ -297,3 +297,40 @@ fn another_part_still_starting_when_an_install_is_verified_does_not_reverse_it()
     assert!(verification.broke.is_empty(), "{:?}", verification.broke);
     assert!(verification.held());
 }
+
+/// A warning about the machine rather than a part of the stack is reported, naming the
+/// check, and keeps the install; a failure about the machine, and a warning about another
+/// service, reverse it.
+#[test]
+fn a_warning_about_the_machine_is_reported_and_a_failure_or_another_service_reverses_it() {
+    let before = vec![
+        finding("storage.quality-headroom", Verdict::Pass { note: None }),
+        about("services.health", "jellyfin", Verdict::Pass { note: None }),
+    ];
+    let own = ["byparr", "byparr-adapter"];
+
+    let machine = against(
+        &before,
+        &[finding("storage.quality-headroom", raised(false))],
+        &own,
+    );
+    assert!(machine.held());
+    assert!(machine.broke.is_empty());
+    assert_eq!(named(&machine.unsettled), ["storage.quality-headroom"]);
+
+    let failing = against(
+        &before,
+        &[finding("storage.quality-headroom", raised(true))],
+        &own,
+    );
+    assert!(!failing.held());
+    assert_eq!(named(&failing.broke), ["storage.quality-headroom"]);
+
+    let elsewhere = against(
+        &before,
+        &[about("services.health", "jellyfin", raised(false))],
+        &own,
+    );
+    assert!(!elsewhere.held());
+    assert_eq!(named(&elsewhere.broke), ["services.health"]);
+}

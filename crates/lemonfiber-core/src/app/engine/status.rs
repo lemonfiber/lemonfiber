@@ -1,7 +1,9 @@
 //! What every service is doing, and what the stack amounts to.
 
 use super::super::Ctx;
-use crate::docker::{condition, condition_of_the_stack, survey_beside, undeclared_beside, State};
+use crate::docker::{
+    condition, condition_of_the_stack, survey_beside, undeclared_beside, Condition, State,
+};
 use crate::error::{Diagnose, Problem};
 use crate::model::StatusReport;
 use crate::stack::closure::resolve;
@@ -65,11 +67,15 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
                     || waiting.iter().any(|held| held.service == service.id))
         })
         .collect();
-    let condition = if forms.is_empty() {
-        condition_of_the_stack(&services, &active_forms)
-    } else {
-        condition(&services)
-    };
+    let scheduled = crate::app::scheduled::standing(ctx, &installed, &containers).await;
+    let condition = with_runs(
+        if forms.is_empty() {
+            condition_of_the_stack(&services, &active_forms)
+        } else {
+            condition(&services)
+        },
+        &scheduled,
+    );
 
     Ok(StatusReport {
         forms: forms.to_vec(),
@@ -77,8 +83,12 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         filtered,
         waiting,
         condition,
-        undeclared: undeclared_beside(&manifest, &beside, &containers, &halted),
+        undeclared: undeclared_beside(&manifest, &beside, &containers, &halted)
+            .into_iter()
+            .filter(|stranger| !scheduled.iter().any(|one| one.id == stranger.id))
+            .collect(),
         services,
+        scheduled,
         disturbs: crate::model::Disturbances::all(ctx.patience),
     })
 }
@@ -102,3 +112,16 @@ pub(crate) async fn active(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) 
         .map(|(form, _)| form)
         .collect()
 }
+
+/// `read`, degraded where it reads running and a run-and-exit service's last run failed.
+fn with_runs(read: Condition, scheduled: &[crate::model::ScheduledService]) -> Condition {
+    match read {
+        Condition::Active | Condition::Partial if scheduled.iter().any(|one| !one.healthy()) => {
+            Condition::Degraded
+        }
+        read => read,
+    }
+}
+
+#[cfg(test)]
+mod tests;

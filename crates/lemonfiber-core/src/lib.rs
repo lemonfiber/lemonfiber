@@ -117,6 +117,7 @@ pub mod repair;
 pub use crate::error::retry;
 pub mod rollback;
 pub(crate) use lemonfiber_outward::schemes;
+pub mod scheduled;
 pub mod screening;
 pub mod secret;
 pub mod seed;

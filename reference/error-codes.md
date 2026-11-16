@@ -208,6 +208,8 @@ that it is a fault of the stack.
 | `HOST-4` | `NOWHERE_TO_WRITE` | error | 1 | 500 | 0.12.0 | Raised when this machine will not say where it keeps its own files. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `HOST-5` | `NO_PROGRAM` | error | 1 | 500 | 0.12.0 | Raised when this run cannot say where its own program is. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `HOST-6` | `NOTHING_NAMED_TO_GUARD` | error | 1 | 500 | 0.12.0 | Raised when the guard is to be hosted against nothing. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `HOST-7` | `NOT_SCHEDULED` | error | 1 | 404 | 0.18.0 | Raised when the service named to run on its schedule is no run-and-exit service. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `HOST-8` | `SCHEDULED_RUN_FAILED` | warning | 1 | 500 | 0.18.0 | Raised when a run-and-exit service's last run did not exit zero, or its schedule names no time. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `INVITE` — offering somebody an account
 

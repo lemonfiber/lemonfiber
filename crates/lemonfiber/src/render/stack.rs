@@ -14,6 +14,7 @@ use lemonfiber_core::text::plain;
 use super::Lines;
 
 mod reset;
+mod scheduled;
 pub(super) use reset::reset;
 
 /// What naming a set of forms comes to, in the words to say before acting on it.
@@ -337,6 +338,7 @@ pub(super) fn status(report: &StatusReport) -> Lines {
     lines.extend(filtered(&report.filtered));
     lines.extend(super::waiting::waiting(&report.waiting));
     lines.extend(strangers(&report.undeclared));
+    lines.extend(scheduled::scheduled(&report.scheduled));
     lines
 }
 

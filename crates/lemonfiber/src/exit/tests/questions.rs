@@ -437,6 +437,7 @@ fn asking_where_something_is_is_never_a_failure_whatever_the_answer() {
             condition: lemonfiber_core::docker::Condition::Inactive,
             undeclared: Vec::new(),
             services: Vec::new(),
+            scheduled: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             waiting: Vec::new(),
         }),

@@ -555,3 +555,102 @@ fn what_is_installed_is_the_command_as_it_would_be_typed() {
         "lemonfiber household expiring"
     );
 }
+
+/// A machine that knows where it is, with this manager, holding a plugin whose
+/// `configarr` runs on a schedule and whose `kept` does not.
+fn scheduling(name: &str, manager: Arc<Fake>) -> (Ctx, Vec<crate::plugin::Installed>) {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("hosting-{name}")).kept();
+    let _ = std::fs::remove_dir_all(&scratch);
+    let _ = std::fs::create_dir_all(&scratch);
+    let installed =
+        crate::scheduled::fixtures::installed(&[("configarr", Some("@daily")), ("kept", None)]);
+    let _ = std::fs::write(
+        scratch.join(crate::config::paths::PLUGINS),
+        serde_json::json!({ "installed": installed }).to_string(),
+    );
+    let ctx = machine(
+        Settings {
+            env_file: Some(scratch.join(".env")),
+            ..knowing()
+        },
+        manager,
+    );
+    (ctx, installed)
+}
+
+#[tokio::test]
+async fn a_run_and_exit_service_is_handed_a_job_every_minute_running_it_and_listed() {
+    let manager = Fake::with(Manager::Launchd);
+    let (ctx, installed) = scheduling("runs-placed", Arc::clone(&manager));
+
+    super::runs_placed(&ctx, &installed).await;
+    super::runs_placed(&ctx, &installed).await;
+
+    let placed = manager.placed();
+    let [job] = placed.as_slice() else {
+        unreachable!("one job, placed once: {placed:?}");
+    };
+    assert_eq!(job.name, "run-configarr");
+    assert_eq!(
+        job.arguments,
+        vec!["run".to_owned(), "configarr".to_owned()]
+    );
+    assert_eq!(job.cadence, crate::ports::hosting::Cadence::Minutely);
+    assert_eq!(job.output, PathBuf::from("/records/run-configarr.log"));
+
+    let report = read(&ctx, Keeping::Read).await;
+    assert_eq!(standing(&report, "run-configarr"), Some(Hosting::Hosted));
+    let listed = report
+        .commands
+        .iter()
+        .find(|command| command.name == "run-configarr");
+    assert_eq!(
+        listed.map(|command| command.command.as_str()),
+        Some("lemonfiber run configarr")
+    );
+    assert!(standing(&report, "run-kept").is_none());
+}
+
+#[tokio::test]
+async fn a_job_held_against_a_program_now_gone_is_placed_again() {
+    let manager = Fake::holding(
+        Manager::Launchd,
+        "run-configarr",
+        Fake::orphaned("run-configarr"),
+    );
+    let (ctx, installed) = scheduling("runs-replaced", Arc::clone(&manager));
+    super::runs_placed(&ctx, &installed).await;
+    assert_eq!(manager.placed().len(), 1);
+}
+
+#[tokio::test]
+async fn a_rehearsal_or_a_machine_that_cannot_say_where_it_is_places_no_job() {
+    let manager = Fake::with(Manager::Launchd);
+    let (mut ctx, installed) = scheduling("runs-rehearsed", Arc::clone(&manager));
+    ctx.dry_run = true;
+    super::runs_placed(&ctx, &installed).await;
+    super::runs_withdrawn(&ctx, &["configarr".to_owned()]).await;
+    ctx.dry_run = false;
+    ctx.settings.program = None;
+    super::runs_placed(&ctx, &installed).await;
+    assert!(manager.placed().is_empty());
+    assert!(manager.withdrawn().is_empty());
+}
+
+#[tokio::test]
+async fn a_run_and_exit_service_leaving_takes_its_job_with_it() {
+    let manager = Fake::with(Manager::Systemd);
+    let (ctx, _) = scheduling("runs-withdrawn", Arc::clone(&manager));
+    super::runs_withdrawn(&ctx, &["configarr".to_owned()]).await;
+    assert_eq!(manager.withdrawn(), vec!["run-configarr".to_owned()]);
+}
+
+#[tokio::test]
+async fn a_job_on_a_platform_with_no_manager_is_listed_as_unsupported() {
+    let (ctx, _) = scheduling("runs-unsupported", Fake::unsupported());
+    let report = read(&ctx, Keeping::Read).await;
+    assert_eq!(
+        standing(&report, "run-configarr"),
+        Some(Hosting::Unsupported)
+    );
+}

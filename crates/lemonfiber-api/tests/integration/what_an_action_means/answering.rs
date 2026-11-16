@@ -19,6 +19,7 @@ fn an_action_reaching_the_engine_is_answered_with_a_name_for_the_work() {
         "seed",
         "adopt",
         "watch",
+        "run",
         "walkthrough",
     ] {
         // Given what each takes: seeding and adopting are whole-stack requests and

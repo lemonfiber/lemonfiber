@@ -18,6 +18,7 @@
 
 pub mod launchd;
 pub mod systemd;
+pub mod task_scheduler;
 
 use std::path::{Path, PathBuf};
 

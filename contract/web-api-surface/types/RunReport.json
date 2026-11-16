@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "due": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "held": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "ran": {
+      "type": [
+        "anyOf(null,ref:ScheduledRun)"
+      ],
+      "required": false
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "skipped": {
+      "type": [
+        "integer/uint32"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

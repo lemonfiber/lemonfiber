@@ -226,6 +226,9 @@ async fn recorded(
         )
     })?;
     account.install.recorded = true;
+    super::super::hosting::runs_withdrawn(ctx, &crate::scheduled::dropped(was, would)).await;
+    super::super::hosting::runs_placed(ctx, std::slice::from_ref(would)).await;
+    super::super::scheduled::owe(ctx, std::slice::from_ref(would), None);
     super::kept::kept(ctx, would, coming.source);
     let _ = super::conformance::cleared(ctx, &would.plugin);
     crate::seed::run::reinstalled(ctx).await;

@@ -172,6 +172,7 @@ impl Placed {
                 certificate: service.certificate.clone(),
                 container_hostname: service.container_hostname.clone(),
                 args: service.args.clone().unwrap_or_default(),
+                schedule: service.schedule.clone(),
             },
             service: service.id.clone(),
             image: service.image.clone(),

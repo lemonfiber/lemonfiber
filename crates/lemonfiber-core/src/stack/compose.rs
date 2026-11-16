@@ -45,6 +45,9 @@ pub enum Action {
     /// Fetch newer images without applying them, for named services or, where none
     /// are named, for the whole project.
     Pull(Vec<String>),
+    /// Run one service to completion in a container of its own, removed once it exits,
+    /// starting nothing it depends on.
+    Once(String),
     /// Resolve the project and print it, changing nothing.
     Config,
 }
@@ -60,6 +63,7 @@ impl Action {
             Self::Remove(_) => "rm",
             Self::Restart(_) => "restart",
             Self::Pull(_) => "pull",
+            Self::Once(_) => "run",
             Self::Config => "config",
         }
     }
@@ -94,6 +98,19 @@ impl Action {
             ),
             Self::Restart(services) => fenced(vec!["restart".to_owned()], services),
             Self::Pull(services) => fenced(vec!["pull".to_owned()], services),
+            Self::Once(service) => {
+                let mut argv = vec![
+                    "run".to_owned(),
+                    "--rm".to_owned(),
+                    "--no-deps".to_owned(),
+                    "--no-TTY".to_owned(),
+                ];
+                if !registry {
+                    argv.push("--pull".to_owned());
+                    argv.push("never".to_owned());
+                }
+                fenced(argv, std::slice::from_ref(service))
+            }
             Self::Config => vec!["config".to_owned()],
         }
     }

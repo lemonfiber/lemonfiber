@@ -30,6 +30,13 @@
       "description": "The per-service queues.",
       "$ref": "PanelArray_of_Queue.json"
     },
+    "scheduled": {
+      "description": "Each run-and-exit service, with how its last run ended.",
+      "type": "array",
+      "items": {
+        "$ref": "ScheduledService.json"
+      }
+    },
     "services": {
       "description": "Every service and what it is doing.",
       "$ref": "PanelArray_of_Service.json"
@@ -75,6 +82,7 @@
     "alerts",
     "storage",
     "services",
+    "scheduled",
     "door",
     "household"
   ]

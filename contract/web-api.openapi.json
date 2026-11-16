@@ -8109,6 +8109,11 @@
             "type": "string"
           },
           {
+            "const": "task-scheduler",
+            "description": "Windows, through a task in the operator's own Task Scheduler.",
+            "type": "string"
+          },
+          {
             "const": "unsupported",
             "description": "A platform lemonfiber does not configure.",
             "type": "string"
@@ -14322,7 +14327,7 @@
             "type": "string"
           },
           "variable": {
-            "description": "The variable it is read into.",
+            "description": "The variable it is read into, or `schedule` where the setting names when the\nservice runs.",
             "type": "string"
           }
         },
@@ -15722,6 +15727,178 @@
         ],
         "type": "object"
       },
+      "RunHealth": {
+        "description": "How a run-and-exit service's last run exited.",
+        "oneOf": [
+          {
+            "const": "not-run",
+            "description": "It has not run yet.",
+            "type": "string"
+          },
+          {
+            "const": "succeeded",
+            "description": "It exited zero.",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "description": "It exited non-zero, or ended before it exited.",
+            "type": "string"
+          }
+        ]
+      },
+      "RunReport": {
+        "description": "What `lemonfiber run` came to for one service.",
+        "properties": {
+          "due": {
+            "description": "Whether a time fell due or a run was owed, so it ran or would have.",
+            "type": "boolean"
+          },
+          "held": {
+            "description": "Why nothing was looked at, where something held it back.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ran": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduledRun"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run, where one went."
+          },
+          "rehearsed": {
+            "description": "Whether nothing was run because this was a rehearsal.",
+            "type": "boolean"
+          },
+          "service": {
+            "description": "The service.",
+            "type": "string"
+          },
+          "skipped": {
+            "description": "How many times fell due while that run was still going, each skipped.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "service",
+          "rehearsed",
+          "due",
+          "skipped"
+        ],
+        "type": "object"
+      },
+      "Schedule": {
+        "additionalProperties": false,
+        "description": "The setting naming when a run-and-exit service runs, and the times where it holds\nnothing.",
+        "properties": {
+          "default": {
+            "description": "The times where the setting holds nothing: a five-field cron expression or one of\n`@hourly`, `@daily`, `@weekly` and `@monthly`.",
+            "type": "string"
+          },
+          "setting": {
+            "description": "The setting, as `<plugin>:<name>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "setting",
+          "default"
+        ],
+        "type": "object"
+      },
+      "ScheduledRun": {
+        "description": "One run of a run-and-exit service, as it ended.",
+        "properties": {
+          "ended": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it ended."
+          },
+          "exit": {
+            "description": "How it exited, absent where it never started or a signal ended it.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "log": {
+            "description": "The last lines it wrote, oldest first, each with any credential in it withheld;\nnone to a key, a member or the shared stream, none of which is handed them.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "started": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it started."
+          }
+        },
+        "required": [
+          "started",
+          "ended",
+          "log"
+        ],
+        "type": "object"
+      },
+      "ScheduledService": {
+        "description": "One run-and-exit service, as its runs left it.",
+        "properties": {
+          "fired": {
+            "description": "Whether this machine's scheduler holds its job, so its times are fired.",
+            "type": "boolean"
+          },
+          "health": {
+            "$ref": "#/components/schemas/RunHealth",
+            "description": "Its health: how its last run exited."
+          },
+          "id": {
+            "description": "Its id, which is its Compose service name.",
+            "type": "string"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduledRun"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its last run, where it has run."
+          },
+          "name": {
+            "description": "What it is called in front of an operator.",
+            "type": "string"
+          },
+          "running": {
+            "description": "Whether a run of it is going now.",
+            "type": "boolean"
+          },
+          "skipped": {
+            "description": "How many of its times fell due while a run was still going, each skipped.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "running",
+          "fired",
+          "health",
+          "skipped"
+        ],
+        "type": "object"
+      },
       "Scope": {
         "description": "How much of the stack a backup covers.\n\nWhole-stack is the common case, but restoring one service is often what is\nactually wanted — one curator's configuration mangled while the rest is fine —\nso the scope is recorded in the archive and honoured on the way back.",
         "oneOf": [
@@ -16560,6 +16737,17 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Schedule"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it runs, where it runs to completion on a schedule rather than for good."
           },
           "shares_config": {
             "description": "Where the whole configuration directory of the service it fronts lands in it.",
@@ -17799,6 +17987,13 @@
             "$ref": "#/components/schemas/PanelArray_of_Queue",
             "description": "The per-service queues."
           },
+          "scheduled": {
+            "description": "Each run-and-exit service, with how its last run ended.",
+            "items": {
+              "$ref": "#/components/schemas/ScheduledService"
+            },
+            "type": "array"
+          },
           "services": {
             "$ref": "#/components/schemas/PanelArray_of_Service",
             "description": "Every service and what it is doing."
@@ -17844,6 +18039,7 @@
           "alerts",
           "storage",
           "services",
+          "scheduled",
           "door",
           "household"
         ],
@@ -18482,6 +18678,13 @@
             },
             "type": "array"
           },
+          "scheduled": {
+            "description": "Each run-and-exit service, with how its last run ended.\n\nApart from the services, which are kept running: one of these has a container\nonly while a run of it is going, and its health is the exit of its last run.",
+            "items": {
+              "$ref": "#/components/schemas/ScheduledService"
+            },
+            "type": "array"
+          },
           "services": {
             "description": "Each service, worst first.\n\nA service the active forms filtered out is listed only while it is there; one\nthat is not is in `filtered` and nowhere else.",
             "items": {
@@ -18512,6 +18715,7 @@
           "condition",
           "services",
           "undeclared",
+          "scheduled",
           "disturbs"
         ],
         "type": "object"
@@ -23230,6 +23434,9 @@
             "$ref": "#/components/schemas/kind-queue"
           },
           {
+            "$ref": "#/components/schemas/kind-ran"
+          },
+          {
             "$ref": "#/components/schemas/kind-removal"
           },
           {
@@ -26064,6 +26271,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/QueueHealth",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-ran": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunReport",
             "description": "The payload."
           },
           "host": {
@@ -30228,6 +30475,61 @@
                     "default": false,
                     "description": "Whether re-pointing to this machine's data root was accepted.",
                     "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelope"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-job"
+                }
+              }
+            },
+            "description": "Accepted, and named so that what became of it can be asked."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/actions/run": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "service": {
+                    "default": null,
+                    "description": "The one service to act on instead of the whole stack.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 },
                 "type": "object"

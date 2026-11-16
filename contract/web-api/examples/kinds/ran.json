@@ -1,0 +1,16 @@
+{
+  "api_version": 1,
+  "data": {
+    "due": true,
+    "ran": {
+      "ended": 1893456000,
+      "exit": 0,
+      "log": [],
+      "started": 1893456000
+    },
+    "rehearsed": false,
+    "service": "configarr",
+    "skipped": 0
+  },
+  "kind": "ran"
+}

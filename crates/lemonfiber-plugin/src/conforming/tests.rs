@@ -472,6 +472,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "reaches",
         "rebuilt",
         "replaces",
+        "schedule",
         "shape",
         "shares_config",
         "speaks",

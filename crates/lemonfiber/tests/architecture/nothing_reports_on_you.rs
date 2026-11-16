@@ -114,6 +114,12 @@ const NAMED: &[(&str, Reach, &str)] = &[
          else, and hands the member the picture so their own device never reaches it",
     ),
     (
+        "schemas.microsoft.com",
+        Reach::Printed,
+        "the namespace a Windows task definition is written in, which names the format Task \
+         Scheduler reads; it is an identifier inside the file and nothing fetches it",
+    ),
+    (
         "trash-guides.info",
         Reach::Printed,
         "named in a comment as where the community profiles come from; the quality sync tool \

@@ -46,6 +46,7 @@
       "/api/actions/reset": "available",
       "/api/actions/restart": "available",
       "/api/actions/restore": "available",
+      "/api/actions/run": "available",
       "/api/actions/search": "available",
       "/api/actions/seed": "available",
       "/api/actions/settings-clear": "available",

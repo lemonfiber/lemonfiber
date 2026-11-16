@@ -15,11 +15,13 @@
 //! Installing is asked for and never arrived at. No other command reaches this,
 //! and running one of the long commands does not offer it: an operator who
 //! asked to guard a volume this afternoon has not asked for something on their
-//! machine that starts at every login.
+//! machine that starts at every login. A run-and-exit service's job is the one
+//! that comes and goes by itself, with the plugin declaring it: installing that
+//! plugin is the asking.
 
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::model::{Changed, HostedCommand, Hosting, HostingReport};
-use crate::ports::hosting::{Held, Hosted, Manager, Standing};
+use crate::ports::hosting::{Cadence, Held, Hosted, Manager, Standing};
 
 use super::command::{Hostable, Keeping, HOSTABLE};
 use super::Ctx;
@@ -62,6 +64,12 @@ async fn reading(ctx: &Ctx, changed: Option<Changed>) -> HostingReport {
     for what in HOSTABLE {
         commands.push(described(ctx, what).await);
     }
+    let installed = super::plugins::read(ctx)
+        .map(|register| register.installed().to_vec())
+        .unwrap_or_default();
+    for scheduled in crate::scheduled::all(&installed) {
+        commands.push(runs(ctx, &scheduled.service).await);
+    }
     HostingReport {
         rehearsed: false,
         manager,
@@ -93,6 +101,86 @@ async fn described(ctx: &Ctx, what: Hostable) -> HostedCommand {
             .filter(|program| !program.present)
             .map(|program| program.at),
     }
+}
+
+/// A run-and-exit service's job, and what stands between it and the machine.
+async fn runs(ctx: &Ctx, service: &str) -> HostedCommand {
+    let name = crate::scheduled::job(service);
+    let (standing, held) = match ctx.seams.hosting.standing(&name).await {
+        Err(_) => (Hosting::Unsupported, Held::absent()),
+        Ok(held) => (settled(&held), held),
+    };
+    HostedCommand {
+        name,
+        guarantees: crate::scheduled::guarantees(service),
+        command: format!("lemonfiber {}", run_arguments(service).join(" ")),
+        standing,
+        definition: held.definition,
+        runs: held.runs,
+        output: held.output,
+        missing: held
+            .program
+            .filter(|program| !program.present)
+            .map(|program| program.at),
+    }
+}
+
+/// Hand this machine's scheduler a job for each run-and-exit service of `installed`
+/// it does not fire yet.
+///
+/// Best effort: a job that could not be placed is read back as not hosted, and the
+/// doctor names the service nothing fires.
+pub(crate) async fn runs_placed(ctx: &Ctx, installed: &[crate::plugin::Installed]) {
+    if ctx.dry_run {
+        return;
+    }
+    let (Some(program), Some(hosted)) = (ctx.settings.program.clone(), ctx.settings.hosted.clone())
+    else {
+        return;
+    };
+    for scheduled in crate::scheduled::all(installed) {
+        let name = crate::scheduled::job(&scheduled.service);
+        let fired = ctx
+            .seams
+            .hosting
+            .standing(&name)
+            .await
+            .is_ok_and(|held| crate::scheduled::fires(&held));
+        if fired {
+            continue;
+        }
+        let _ = ctx
+            .seams
+            .hosting
+            .place(&Hosted {
+                output: hosted.join(format!("{name}.log")),
+                name,
+                program: program.clone(),
+                arguments: run_arguments(&scheduled.service),
+                about: crate::scheduled::guarantees(&scheduled.service),
+                cadence: Cadence::Minutely,
+            })
+            .await;
+    }
+}
+
+/// Take back the job of each of `services` from this machine's scheduler.
+pub(crate) async fn runs_withdrawn(ctx: &Ctx, services: &[String]) {
+    if ctx.dry_run {
+        return;
+    }
+    for service in services {
+        let _ = ctx
+            .seams
+            .hosting
+            .withdraw(&crate::scheduled::job(service))
+            .await;
+    }
+}
+
+/// The words after the program a run-and-exit service's job runs.
+fn run_arguments(service: &str) -> Vec<String> {
+    vec!["run".to_owned(), service.to_owned()]
 }
 
 /// Whether this machine is running one of them, rather than whether one is installed.
@@ -236,6 +324,7 @@ fn wanted(ctx: &Ctx, what: Hostable, forms: &[String]) -> Result<Hosted, Box<Pro
         arguments: what.arguments(forms),
         output: hosted.join(format!("{}.log", what.name())),
         about: what.guarantees().to_owned(),
+        cadence: Cadence::Kept,
     })
 }
 

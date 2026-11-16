@@ -383,6 +383,7 @@ pub(crate) fn assembling(ctx: &Ctx, stack: &Stack, disruptive: bool) -> Vec<Box<
         Box::new(wiring),
         Box::new(seasons),
         Box::new(telling),
+        Box::new(crate::app::scheduled::checked(ctx)),
         Box::new(owned),
         Box::new(gate),
         Box::new(decline),
