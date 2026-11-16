@@ -22,18 +22,20 @@ on:
     types: [completed]
   pull_request_review:
     types: [submitted]
-  # Fork PRs carry a read-only token under `pull_request`, so the close event has
-  # to run in the base repo's context to be able to edit a label at all.
-  pull_request_target:
+  pull_request:
     types: [closed]
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   awaiting:
     permissions:
       contents: read
       pull-requests: write
-    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@7aaa0b068eebfefb516e1abc34628d95bb299051 # v1.0.151
+    uses: lemonfiber/spec/.github/workflows/awaiting-maintainer.yml@74bf6bf2d9214bed1dcb832f2c1e77855b5a51f5 # v1.0.155
     secrets:
       DISCORD_MAINTAINERS_WEBHOOK: ${{ secrets.DISCORD_MAINTAINERS_WEBHOOK }}
