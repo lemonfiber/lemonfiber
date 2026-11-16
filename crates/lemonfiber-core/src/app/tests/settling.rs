@@ -374,7 +374,10 @@ async fn a_compose_invocation_that_failed_is_not_then_waited_on() {
         ..Settings::default()
     };
     let ctx = a_context()
-        .runner(Arc::new(Scripted(Ok(refused("no such image")))))
+        .runner(lemonfiber_fixtures::support::Keyed::answering(
+            vec![("rm", Ok(spoke("")))],
+            Ok(refused("no such image")),
+        ))
         .engine(Arc::new(Reporting::holding(
             &LIBRARY,
             Lifecycle::Running,

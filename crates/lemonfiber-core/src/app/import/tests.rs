@@ -57,6 +57,9 @@ fn theirs() -> Container {
             destination: std::path::PathBuf::from("/config"),
         }],
         exit: None,
+        entry: None,
+        networks: Vec::new(),
+        image_id: String::new(),
     }
 }
 

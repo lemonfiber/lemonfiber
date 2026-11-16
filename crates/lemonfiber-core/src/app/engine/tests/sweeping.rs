@@ -12,12 +12,8 @@ use crate::model::LifecycleReport;
 use crate::ports::process::Runner;
 
 /// What the project names each network the engine holds: one nothing declares any more,
-/// one the project declares, and one the operator's overlay does.
-const HELD: [(&str, &str); 3] = [
-    ("lemonfiber", "default"),
-    ("lemonfiber", "own__prowlarr"),
-    ("lemonfiber", "theirs"),
-];
+/// and one the operator's overlay does.
+const HELD: [(&str, &str); 2] = [("lemonfiber", "default"), ("lemonfiber", "theirs")];
 
 /// The engine's name for the network the project no longer declares.
 const STALE: &str = "lemonfiber_default";

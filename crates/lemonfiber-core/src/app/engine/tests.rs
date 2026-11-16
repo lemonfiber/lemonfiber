@@ -220,6 +220,31 @@ async fn an_overlay_change_the_journal_cannot_hold_starts_nothing() {
     assert!(problem.summary.contains("journal"), "{problem:?}");
 }
 
+#[tokio::test]
+async fn a_rehearsed_start_takes_nothing_away() {
+    let runner = std::sync::Arc::new(crate::test_support::Recording::answering(Ok(
+        crate::test_support::spoke(""),
+    )));
+    let ctx = crate::test_support::a_context()
+        .runner(runner.clone())
+        .settings(crate::config::Settings {
+            protocols: crate::config::Protocols::both(),
+            ..crate::config::Settings::default()
+        })
+        .build()
+        .rehearsing();
+    let action = crate::stack::compose::Action::Up;
+
+    let composed = super::composing::compose(&ctx, &["library".to_owned()], &action).await;
+    let carried = match composed {
+        Ok(composed) => composed.renewal.carried_out(&ctx).await.is_ok(),
+        Err(_) => false,
+    };
+
+    assert!(carried);
+    assert!(runner.seen().is_empty(), "{:?}", runner.seen());
+}
+
 mod sweeping;
 
 #[test]

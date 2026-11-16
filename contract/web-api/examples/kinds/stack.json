@@ -80,6 +80,8 @@
       "/srv/lemonfiber/stack",
       "--file",
       "/srv/lemonfiber/stack/compose.generated.yml",
+      "--file",
+      "/srv/lemonfiber/stack/compose.labels.yml",
       "--profile",
       "books",
       "--profile",
@@ -103,7 +105,8 @@
       "--profile",
       "tv",
       "up",
-      "--detach"
+      "--detach",
+      "--no-recreate"
     ],
     "project": "/srv/lemonfiber/stack",
     "source": {

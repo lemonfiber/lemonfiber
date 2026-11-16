@@ -18,7 +18,7 @@ pub struct Remote {
     fetch: Option<String>,
     /// What a checkout leaves as the plugin's manifest.
     manifest: String,
-    /// The Compose verb refused once something has been removed, where one is.
+    /// The Compose verb refused once something it started has been removed, where one is.
     refusing: Option<&'static str>,
     /// How long every call takes, where it takes any time at all.
     delay: Option<Duration>,
@@ -56,7 +56,8 @@ impl Remote {
         self
     }
 
-    /// The same source, with Compose refusing `verb` once something has been removed.
+    /// The same source, with Compose refusing `verb` once something it started has been
+    /// removed.
     #[must_use]
     pub fn refusing_after_removal(mut self, verb: Option<&'static str>) -> Self {
         self.refusing = verb;
@@ -132,12 +133,15 @@ impl Remote {
         }
     }
 
-    /// Whether Compose refuses this call, something having been removed before it.
+    /// Whether Compose refuses this call, something it started having been removed before
+    /// it.
     fn refuses(&self, argv: &[String]) -> bool {
-        let removed = self
-            .ran
-            .lock()
-            .is_ok_and(|ran| ran.iter().any(|one| one.iter().any(|word| word == "rm")));
+        let saying = |one: &Vec<String>, said: &str| one.iter().any(|word| word == said);
+        let removed = self.ran.lock().is_ok_and(|ran| {
+            ran.iter()
+                .skip_while(|one| !saying(one, "up"))
+                .any(|one| saying(one, "rm"))
+        });
         removed
             && self
                 .refusing

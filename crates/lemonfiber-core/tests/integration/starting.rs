@@ -12,12 +12,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{start_progress, started, Ctx};
+use lemonfiber_core::app::{start_progress, started, Containers, Ctx};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::model::LifecycleReport;
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::process::{Failure, Output, Progress};
-use lemonfiber_fixtures::support::{spoke, Reporting, Scripted};
+use lemonfiber_fixtures::support::{spoke, Keyed, Reporting};
 
 /// Everything the `library` form declares — the services carrying the `media`
 /// profile, which is the one that form holds.
@@ -32,10 +32,11 @@ const LIBRARY: [&str; 8] = [
     "navidrome",
 ];
 
-/// A context whose Compose answers this way, with the stack reported healthy.
+/// A context whose Compose answers this way, taking away whatever a start creates again,
+/// with the stack reported healthy.
 fn ctx(compose: Result<Output, Failure>) -> Ctx {
     lemonfiber_testing::a_context()
-        .runner(Arc::new(Scripted(compose)))
+        .runner(Keyed::answering(vec![("rm", Ok(spoke("")))], compose))
         .engine(Arc::new(Reporting::holding(
             &LIBRARY,
             Lifecycle::Running,
@@ -58,7 +59,7 @@ fn named(forms: &[&str]) -> Vec<String> {
 /// Everything the start said and the status it ended on, or nothing where it could
 /// not be spawned at all.
 async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
-    let mut progress = start_progress(ctx, &named(&["library"]), &[], None)
+    let (mut progress, _) = start_progress(ctx, &named(&["library"]), &[], None)
         .await
         .ok()?;
     let mut said = Vec::new();
@@ -78,7 +79,14 @@ async fn narrated(ctx: &Ctx) -> Option<(Vec<String>, Option<i32>)> {
 /// refused and a start that reported something unexpected are different failures and
 /// an assertion that cannot tell them apart names neither.
 async fn reported(ctx: &Ctx, status: Option<i32>) -> Result<LifecycleReport, String> {
-    match started(ctx, &named(&["library"]), &[], status).await {
+    match started(
+        ctx,
+        &named(&["library"]),
+        &[],
+        (status, &Containers::default()),
+    )
+    .await
+    {
         Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     }
@@ -115,7 +123,12 @@ async fn a_start_that_cannot_be_spawned_is_refused_rather_than_silent() {
 
     let opened = start_progress(&ctx(Err(missing)), &named(&["library"]), &[], None).await;
 
-    assert!(opened.is_err(), "the spawn failure reaches the caller");
+    assert!(
+        opened
+            .is_err_and(|problem| problem.code
+                != lemonfiber_core::error::codes::stack::CONTAINER_NOT_RENEWED),
+        "the spawn failure reaches the caller"
+    );
 }
 
 /// A start that worked waits for its services, because "started" that means "a
@@ -160,7 +173,14 @@ async fn a_start_that_failed_is_not_then_waited_on() {
 async fn a_start_aimed_at_services_names_only_those() {
     let ctx = ctx(Ok(spoke("")));
 
-    let report = match started(&ctx, &named(&["library"]), &named(&["jellyfin"]), Some(1)).await {
+    let report = match started(
+        &ctx,
+        &named(&["library"]),
+        &named(&["jellyfin"]),
+        (Some(1), &Containers::default()),
+    )
+    .await
+    {
         Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     };
@@ -168,6 +188,7 @@ async fn a_start_aimed_at_services_names_only_those() {
     assert!(
         report.is_ok_and(|report| report.command.ends_with(&[
             "--detach".to_owned(),
+            "--no-recreate".to_owned(),
             "--".to_owned(),
             "jellyfin".to_owned()
         ])),
@@ -181,8 +202,14 @@ async fn a_start_aimed_at_services_names_only_those() {
 async fn naming_no_form_starts_everything_the_stack_declares() {
     let ctx = ctx(Ok(spoke("")));
 
-    let everything = started(&ctx, &[], &[], Some(1)).await;
-    let one_form = started(&ctx, &named(&["library"]), &[], Some(1)).await;
+    let everything = started(&ctx, &[], &[], (Some(1), &Containers::default())).await;
+    let one_form = started(
+        &ctx,
+        &named(&["library"]),
+        &[],
+        (Some(1), &Containers::default()),
+    )
+    .await;
 
     let counted = |outcome: Result<LifecycleReport, Box<lemonfiber_core::error::Problem>>| {
         outcome.ok().map(|report| report.plan.services.len())

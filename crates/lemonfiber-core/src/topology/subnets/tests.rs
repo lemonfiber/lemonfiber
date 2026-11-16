@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 
 use super::super::{internal, Block, Network, MEDIA_SUBNET, PROXY_SUBNET};
-use super::{assigned, hashed, PREFIX, RANGE};
+use super::{assigned, block, hashed, PREFIX, RANGE, SLOTS};
 
 /// Networks named `names`, the first two carrying the fixed subnets.
 fn networks(names: &[&str]) -> BTreeMap<String, Network> {
@@ -47,7 +47,7 @@ fn every_network_is_given_its_own_subnet_inside_the_range_and_outside_the_fixed_
             }),
     );
 
-    assigned(&mut all);
+    assigned(&mut all, &BTreeMap::new());
 
     let given = given(&all);
     assert_eq!(given.len(), all.len(), "every network names a subnet");
@@ -79,8 +79,8 @@ fn a_network_keeps_its_subnet_when_another_comes_or_goes() {
     ]);
     let mut after = before.clone();
     after.insert("own__komga".to_owned(), internal(None));
-    assigned(&mut before);
-    assigned(&mut after);
+    assigned(&mut before, &BTreeMap::new());
+    assigned(&mut after, &BTreeMap::new());
 
     let (before, after) = (given(&before), given(&after));
     assert!(before
@@ -96,6 +96,61 @@ fn a_name_hashes_the_same_on_every_build() {
 
 #[test]
 fn the_first_slot_is_the_range_s_first_subnet() {
-    assert_eq!(super::block(0), (Ipv4Addr::new(10, 80, 0, 0), PREFIX));
-    assert_eq!(super::block(1), (Ipv4Addr::new(10, 80, 0, 8), PREFIX));
+    assert_eq!(block(0), (Ipv4Addr::new(10, 80, 0, 0), PREFIX));
+    assert_eq!(block(1), (Ipv4Addr::new(10, 80, 0, 8), PREFIX));
+}
+
+/// A name sorting before `held` whose slot, counted from its name, is the one `held`'s is.
+fn meeting(held: &str) -> String {
+    (0..u32::MAX)
+        .map(|at| format!("link__a{at}"))
+        .find(|name| hashed(name) % SLOTS == hashed(held) % SLOTS)
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_network_held_keeps_its_subnet_and_one_coming_to_its_slot_takes_the_next() {
+    let held = "own__prowlarr";
+    let coming = meeting(held);
+    let slot = hashed(held) % SLOTS;
+    let mut alone = networks(&["p", "m", held]);
+    assigned(&mut alone, &BTreeMap::new());
+    let mut both = networks(&["p", "m", held, &coming]);
+
+    assigned(&mut both, &given(&alone));
+
+    let given = given(&both);
+    assert_eq!(given.get(held), Some(&block(slot)));
+    assert_eq!(given.get(&coming), Some(&block((slot + 1) % SLOTS)));
+}
+
+#[test]
+fn a_held_subnet_outside_the_range_or_a_slot_or_inside_a_fixed_one_or_kept_already_is_left() {
+    let names = ["fixed-proxy", "fixed-media", "a", "b", "c", "d", "e", "f"];
+    let mut fresh = networks(&names);
+    assigned(&mut fresh, &BTreeMap::new());
+    let fresh = given(&fresh);
+    let first = fresh.get("a").copied().unwrap_or(block(0));
+    let held: BTreeMap<String, Block> = [
+        ("a", first),
+        ("b", first),
+        ("c", (Ipv4Addr::new(172, 20, 0, 0), PREFIX)),
+        ("d", (Ipv4Addr::new(10, 80, 0, 4), PREFIX)),
+        ("e", (Ipv4Addr::new(10, 80, 0, 0), 24)),
+        ("f", PROXY_SUBNET.whole),
+    ]
+    .into_iter()
+    .map(|(name, block)| (name.to_owned(), block))
+    .collect();
+    let mut all = networks(&names);
+
+    assigned(&mut all, &held);
+
+    let given = given(&all);
+    assert_eq!(given.get("a"), Some(&first));
+    for name in ["b", "c", "d", "e", "f"] {
+        let block = given.get(name).copied();
+        assert_ne!(block, held.get(name).copied(), "{name}");
+        assert_eq!(block.map(|block| block.1), Some(PREFIX), "{name}");
+    }
 }

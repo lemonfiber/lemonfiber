@@ -11,7 +11,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dispatch, started, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, started, Command, Containers, Ctx, Outcome};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::docker::State;
 use lemonfiber_core::model::LifecycleReport;
@@ -21,7 +21,7 @@ use lemonfiber_core::ports::Narrator;
 use lemonfiber_fixtures::files::Files;
 use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::ports::Following;
-use lemonfiber_fixtures::support::{Reporting, Scripted};
+use lemonfiber_fixtures::support::{spoke, Keyed, Reporting};
 
 /// Everything the `library` form declares.
 const LIBRARY: [&str; 8] = [
@@ -39,11 +39,14 @@ const LIBRARY: [&str; 8] = [
 /// way, with the budget a real start is given.
 fn ctx(status: i32, lifecycle: Lifecycle, health: Health) -> Ctx {
     lemonfiber_testing::a_context()
-        .runner(Arc::new(Scripted(Ok(Output {
-            status: Some(status),
-            stdout: String::new(),
-            stderr: String::new(),
-        }))))
+        .runner(Keyed::answering(
+            vec![("rm", Ok(spoke("")))],
+            Ok(Output {
+                status: Some(status),
+                stdout: String::new(),
+                stderr: String::new(),
+            }),
+        ))
         .engine(Arc::new(Reporting::holding(&LIBRARY, lifecycle, health)))
         .clock(Following::started())
         .filesystem(Files::empty())
@@ -89,7 +92,13 @@ async fn a_streamed_start_that_failed_says_where_each_service_stands_without_wai
     let ctx = ctx(1, Lifecycle::Running, Health::Starting)
         .with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>);
 
-    let report = started(&ctx, &named(&["library"]), &[], Some(1)).await;
+    let report = started(
+        &ctx,
+        &named(&["library"]),
+        &[],
+        (Some(1), &Containers::default()),
+    )
+    .await;
 
     assert_eq!(report.as_ref().map(read).ok(), Some(all(State::Starting)));
     assert!(
@@ -131,7 +140,13 @@ async fn a_start_that_failed_reports_a_service_it_left_created_as_failed() {
 async fn a_start_that_succeeded_still_waits_for_what_settles() {
     let ctx = ctx(0, Lifecycle::Running, Health::Healthy);
 
-    let report = started(&ctx, &named(&["library"]), &[], Some(0)).await;
+    let report = started(
+        &ctx,
+        &named(&["library"]),
+        &[],
+        (Some(0), &Containers::default()),
+    )
+    .await;
 
     assert_eq!(report.as_ref().map(read).ok(), Some(all(State::Healthy)));
 }

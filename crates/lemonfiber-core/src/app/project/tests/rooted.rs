@@ -10,14 +10,12 @@ use lemonfiber_fixtures::ports::STAMPED;
 const REFUSED: &str = "nfs://nas local/volume1";
 
 /// What preparing the project for a run, starting where `starting`, came to.
-fn preparing(ctx: &Ctx, starting: bool) -> Result<(), String> {
-    manifest()
-        .map(|manifest| super::super::prepared(ctx, &manifest, &plan(), starting))
-        .map_or(Err(String::new()), |prepared| {
-            prepared
-                .map(|_| ())
-                .map_err(|problem| problem.code.to_string())
-        })
+async fn preparing(ctx: &Ctx, starting: bool) -> Result<(), String> {
+    let manifest = manifest().ok_or_else(String::new)?;
+    super::super::prepared(ctx, &manifest, &plan(), starting)
+        .await
+        .map(|_| ())
+        .map_err(|problem| problem.code.to_string())
 }
 
 /// Write `value` as the machine's data root, by hand.
@@ -26,27 +24,27 @@ fn rooted_at(ctx: &Ctx, value: &str) {
     assert!(crate::config::store::set(&env, crate::config::DATA_ROOT_KEY, value).is_ok());
 }
 
-#[test]
-fn a_start_over_a_refused_data_root_is_refused_naming_it_and_writes_nothing() {
+#[tokio::test]
+async fn a_start_over_a_refused_data_root_is_refused_naming_it_and_writes_nothing() {
     let (ctx, project) = machine("rooted-start");
     rooted_at(&ctx, REFUSED);
 
-    assert_eq!(preparing(&ctx, true), Err(ROOT_REFUSED.to_string()));
+    assert_eq!(preparing(&ctx, true).await, Err(ROOT_REFUSED.to_string()));
     assert!(!project.join(crate::project::FILE).exists());
 }
 
-#[test]
-fn a_run_starting_nothing_over_a_refused_data_root_leaves_the_project_as_it_stands() {
+#[tokio::test]
+async fn a_run_starting_nothing_over_a_refused_data_root_leaves_the_project_as_it_stands() {
     let (ctx, project) = machine("rooted-stop");
     rooted_at(&ctx, "/srv/media");
-    assert_eq!(preparing(&ctx, false), Ok(()));
+    assert_eq!(preparing(&ctx, false).await, Ok(()));
     let written = std::fs::read_to_string(project.join(crate::project::FILE)).ok();
     assert!(written
         .as_deref()
         .is_some_and(|text| text.contains("/srv/media")));
     rooted_at(&ctx, REFUSED);
 
-    assert_eq!(preparing(&ctx, false), Ok(()));
+    assert_eq!(preparing(&ctx, false).await, Ok(()));
     assert_eq!(
         std::fs::read_to_string(project.join(crate::project::FILE)).ok(),
         written

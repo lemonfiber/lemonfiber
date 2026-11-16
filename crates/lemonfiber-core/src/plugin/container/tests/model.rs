@@ -344,6 +344,7 @@ fn a_service_inside_its_guards_network_has_none_of_its_own_and_waits_for_it() {
         network: Some(Network {
             via: Some("network.egress-guard".to_owned()),
             fenced: false,
+            internal: false,
             egress_for: None,
         }),
         ..Fields::default()

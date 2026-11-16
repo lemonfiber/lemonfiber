@@ -320,6 +320,9 @@ enum Came {
 /// caller decides what a failure puts back, because on an update that is two things.
 async fn on(ctx: &Ctx, coming: &Coming<'_>, install: &mut Install) -> Came {
     let asked = super::planned::asked(ctx, coming.would).await;
+    if let Err(why) = super::planned::networked(ctx, coming.stack_manifest, coming.would).await {
+        return Came::Stopped(why.detail.unwrap_or(why.summary));
+    }
     let put = super::planned::fenced(ctx, coming.would, &asked)
         .and_then(|()| super::planned::writes(ctx, coming.would, coming.stack, Some(coming.source)))
         .and_then(|planned| {
@@ -446,7 +449,13 @@ pub(super) fn brought_back(
 /// document is one Compose has no description of.
 async fn restored(ctx: &Ctx, was: &Installed, stack: &Path, stamp: Instant) -> Restored {
     let asked = super::planned::asked(ctx, was).await;
-    let startable = super::planned::fenced(ctx, was, &asked).is_ok();
+    let networked =
+        futures_util::future::OptionFuture::from(super::writing::stack_manifest(ctx).ok().map(
+            |manifest| async move { super::planned::networked(ctx, &manifest, was).await.is_ok() },
+        ))
+        .await
+        .unwrap_or(false);
+    let startable = networked && super::planned::fenced(ctx, was, &asked).is_ok();
     let placed = super::writing::unlinked(ctx, was, stack).is_ok()
         && super::planned::writes(ctx, was, stack, None)
             .and_then(|planned| carry_out(ctx, &was.plugin, stamp, &planned))

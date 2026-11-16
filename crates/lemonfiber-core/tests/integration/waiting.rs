@@ -11,7 +11,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{dispatch, started, Command, Ctx};
+use lemonfiber_core::app::{dispatch, started, Command, Containers, Ctx};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
 use lemonfiber_core::ports::Narrator;
@@ -65,7 +65,13 @@ fn named(forms: &[&str]) -> Vec<String> {
 async fn starting(health: Health) -> (Vec<String>, bool) {
     let heard = Arc::new(Heard::default());
     let ctx = ctx(health).with_narrator(Arc::clone(&heard) as Arc<dyn Narrator>);
-    let outcome = started(&ctx, &named(&["library"]), &[], Some(0)).await;
+    let outcome = started(
+        &ctx,
+        &named(&["library"]),
+        &[],
+        (Some(0), &Containers::default()),
+    )
+    .await;
     (heard.said(), outcome.is_ok())
 }
 
@@ -184,7 +190,13 @@ async fn a_rehearsal_waits_for_nothing_and_says_nothing_about_waiting() {
 async fn a_wait_nobody_is_listening_to_ends_the_same_way() {
     let ctx = ctx(Health::Starting);
 
-    let refused = started(&ctx, &named(&["library"]), &[], Some(0)).await;
+    let refused = started(
+        &ctx,
+        &named(&["library"]),
+        &[],
+        (Some(0), &Containers::default()),
+    )
+    .await;
 
     assert!(refused.is_err(), "the stack never settled");
 }

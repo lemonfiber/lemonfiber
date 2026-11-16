@@ -22,6 +22,7 @@ fn fenced(id: &str) -> Installed {
     solver.fields.network = Some(Network {
         via: None,
         fenced: true,
+        internal: false,
         egress_for: None,
     });
     an_installed(id, vec![solver])

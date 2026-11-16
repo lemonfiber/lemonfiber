@@ -9,6 +9,7 @@ use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::container::{Network, Posture};
 use lemonfiber_manifest::{Manifest, Service};
 
+use crate::fence::Rules;
 use crate::plugin::{Installed, Reached};
 use crate::topology::{self, Member, Named, Settled, Topology};
 use crate::wiring::{settle, Chosen, Reaches};
@@ -26,10 +27,22 @@ pub(super) struct Standing {
     pub(super) inside: Option<String>,
     /// The upstream it fronts, where it is an adapter.
     pub(super) fronts: Option<String>,
-    /// Whether it declares itself fenced.
-    pub(super) fenced: bool,
+    /// The rules the fence it declares holds it to, where it declares itself fenced or
+    /// held inside the stack.
+    pub(super) fence: Option<Rules>,
     /// The service of its own plugin it carries out of the machine, where it is its egress.
     pub(super) egress_for: Option<String>,
+}
+
+/// One service a fence is written beside.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Fenced {
+    /// The service.
+    pub(super) service: String,
+    /// The rules its fence holds it to.
+    pub(super) rules: Rules,
+    /// Its fence's id, or none where another service already holds it.
+    pub(super) fence: Option<String>,
 }
 
 /// One settled ask: what asked, the capability and the medium it asked of, and the service
@@ -59,9 +72,10 @@ pub(super) struct Inputs {
     pub(super) guard: Option<String>,
     /// Whether the pass service runs beside the guard.
     pub(super) pass: bool,
-    /// Each service declaring itself fenced, with the fence it runs inside, or none where
-    /// another service already holds that fence's id.
-    pub(super) fenced: Vec<(String, Option<String>)>,
+    /// Each service declaring itself fenced or held inside the stack, the rules its fence
+    /// holds it to, and the fence it runs inside, or none where another service already
+    /// holds that fence's id.
+    pub(super) fenced: Vec<Fenced>,
 }
 
 impl Inputs {
@@ -112,7 +126,7 @@ pub(super) fn read(
             publishes: service.port.is_some() || !service.publish.is_empty(),
             inside: inside(&service.id),
             fronts: None,
-            fenced: service.fenced(),
+            fence: service.network.as_ref().and_then(rules),
             egress_for: None,
         })
         .chain(
@@ -127,11 +141,7 @@ pub(super) fn read(
                         || (placed.listens.is_some() && !placed.speaks.is_empty()),
                     inside: inside(&placed.service),
                     fronts: placed.fronts.clone(),
-                    fenced: placed
-                        .fields
-                        .network
-                        .as_ref()
-                        .is_some_and(|network| network.fenced),
+                    fence: placed.fields.network.as_ref().and_then(rules),
                     egress_for: placed
                         .fields
                         .network
@@ -161,7 +171,7 @@ pub(super) fn read(
             publishes: false,
             inside: None,
             fronts: None,
-            fenced: false,
+            fence: None,
             egress_for: None,
         });
     }
@@ -266,15 +276,22 @@ fn joined(
 /// A fence beside each of `members` that declares one, holding the networks and the
 /// ports it would have held, with the member placed inside it: each such member with its
 /// fence, or with none where another member already holds the fence's id.
-fn fences(members: &mut Vec<Standing>) -> Vec<(String, Option<String>)> {
+fn fences(members: &mut Vec<Standing>) -> Vec<Fenced> {
     let ids: std::collections::BTreeSet<String> =
         members.iter().map(|standing| standing.id.clone()).collect();
     let mut fenced = Vec::new();
     let mut written = Vec::new();
-    for standing in members.iter_mut().filter(|standing| standing.fenced) {
+    for standing in members.iter_mut() {
+        let Some(rules) = standing.fence else {
+            continue;
+        };
         let fence = crate::fence::of(&standing.id);
         if ids.contains(&fence) {
-            fenced.push((standing.id.clone(), None));
+            fenced.push(Fenced {
+                service: standing.id.clone(),
+                rules,
+                fence: None,
+            });
             continue;
         }
         written.push(Standing {
@@ -283,14 +300,27 @@ fn fences(members: &mut Vec<Standing>) -> Vec<(String, Option<String>)> {
             publishes: false,
             inside: None,
             fronts: standing.fronts.clone(),
-            fenced: false,
+            fence: None,
             egress_for: None,
         });
         standing.inside = Some(fence.clone());
-        fenced.push((standing.id.clone(), Some(fence)));
+        fenced.push(Fenced {
+            service: standing.id.clone(),
+            rules,
+            fence: Some(fence),
+        });
     }
     members.extend(written);
     fenced
+}
+
+/// The rules the fence `network` declares holds its service to, where it declares one.
+fn rules(network: &Network) -> Option<Rules> {
+    if network.internal {
+        Some(Rules::Inward)
+    } else {
+        network.fenced.then_some(Rules::Outward)
+    }
 }
 
 /// Whether a service of the stack or of a plugin holds the id the pass service runs

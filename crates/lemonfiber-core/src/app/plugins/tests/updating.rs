@@ -337,6 +337,31 @@ async fn an_update_with_no_engine_to_start_it_says_so() {
         .is_some_and(|why| why.contains("docker was not found")));
 }
 
+#[tokio::test]
+async fn an_update_whose_networks_cannot_be_made_stops_and_starts_nothing_back() {
+    let mut ctx = proving(
+        "update-unnetworked",
+        Arc::new(Recording::answering(Ok(spoke("")))),
+        answering(200),
+    );
+    assert_eq!(
+        counted(installing(&ctx, &source("update-unnetworked", PROVING)).await),
+        Some(1)
+    );
+    ctx.seams.networks = lemonfiber_fixtures::networked::Networked::unmaking(Vec::new())
+        as Arc<dyn lemonfiber_ports::docker::Networks>;
+
+    let failed = update(updating(&ctx, &source("update-unnetworked-next", &next())).await);
+
+    assert!(
+        failed
+            .as_ref()
+            .and_then(|one| one.stopped.as_deref())
+            .is_some_and(|why| why.contains("could not be created")),
+        "{failed:?}"
+    );
+}
+
 /// A new version that holds its own proofs and breaks the stack's checks does not
 /// hold, for the reason an install that did would not: what it broke is said in its
 /// own account, and the version it replaced is put back on.

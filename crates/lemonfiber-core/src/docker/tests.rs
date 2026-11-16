@@ -24,6 +24,9 @@ fn container(service: &str, lifecycle: Lifecycle, health: Health) -> Container {
         published: Vec::new(),
         mounts: Vec::new(),
         exit: None,
+        entry: None,
+        networks: Vec::new(),
+        image_id: String::new(),
     }
 }
 

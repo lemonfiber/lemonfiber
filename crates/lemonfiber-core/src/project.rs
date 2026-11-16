@@ -46,6 +46,10 @@ pub const REPLACED: &str = "lemonfiber.replaced";
 /// activates, and no form or plugin can be named.
 pub const UNFENCED: &str = "lemonfiber.unfenced";
 
+/// The file each service's label naming the digest of its entry is written to, beneath the
+/// project directory, layered over the project by every start.
+pub const LABELS: &str = "compose.labels.yml";
+
 /// What the project's values are read from beyond the manifest and the register.
 pub struct Reading<'a> {
     /// The operator's value for the named setting, where one is recorded.
@@ -74,6 +78,8 @@ pub struct Reading<'a> {
     pub fence: Option<&'a str>,
     /// The addresses of the engine's host, as the engine last answered them.
     pub host: &'a [IpAddr],
+    /// Each network of the project, by declared name, as the engine last answered it.
+    pub networks: &'a BTreeMap<String, crate::fence::Answered>,
     /// Whether the engine's containers held the rules a fence installs, as the engine
     /// last answered.
     pub nftables: bool,
@@ -81,6 +87,9 @@ pub struct Reading<'a> {
     /// where that owner can be read.
     pub owner: Option<(u32, u32)>,
 }
+
+/// No network answered by the engine.
+static NO_NETWORKS: BTreeMap<String, crate::fence::Answered> = BTreeMap::new();
 
 impl Reading<'_> {
     /// Nothing recorded, no secrets file, no render devices, the library on this machine,
@@ -99,6 +108,7 @@ impl Reading<'_> {
             held: &|_| false,
             fence: None,
             host: &[],
+            networks: &NO_NETWORKS,
             nftables: false,
             owner: None,
         }
@@ -142,7 +152,7 @@ pub fn generated(
     .map(|held| held.service)
     .collect();
     let replaced = crate::wiring::replaced(manifest, installed, chosen);
-    let fencing = fencing::Fencing::of(&inputs, reading);
+    let fencing = fencing::Fencing::of(&inputs, &topology, reading);
     let address =
         |service: &str, url: &UrlOf| address(manifest, installed, &inputs, &topology, service, url);
     let values = Values {
@@ -219,7 +229,7 @@ pub fn generated(
     let document = Document {
         name: literal(reading.name),
         services: Services(entries),
-        networks: document::networks(&topology),
+        networks: document::networks(&topology, reading.name),
         volumes: document::library(reading.nfs, taken),
     };
     Project {
@@ -361,6 +371,7 @@ fn pass_unit<'a>(
         shape: None,
         secrets_file: None,
         command: crate::pass::command(at),
+        dns_search: &[],
         hostname: None,
         granted: &[],
         reaches_host: false,
@@ -436,6 +447,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
             .then(|| (reading.secrets_file)(&service.id))
             .flatten(),
         command: Vec::new(),
+        dns_search: &[],
         hostname: service.container_hostname.as_deref(),
         granted: &[],
         reaches_host: false,

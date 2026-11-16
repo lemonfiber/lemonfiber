@@ -250,6 +250,9 @@ fn list(fake: &Fake, _project: &str) -> Result<Vec<Container>, Failure> {
             published: Vec::new(),
             mounts: Vec::new(),
             exit: None,
+            entry: None,
+            networks: Vec::new(),
+            image_id: String::new(),
         })
         .collect())
 }

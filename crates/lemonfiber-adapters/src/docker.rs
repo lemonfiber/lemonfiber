@@ -264,7 +264,28 @@ impl Images for Daemon {
             &self.every_container(docker).await?,
         ))
     }
+
+    async fn identified(&self, reference: &str) -> Result<Option<String>, Failure> {
+        identified(self, reference).await
+    }
 }
+
+/// The engine's id for the image `reference` names on `daemon`'s machine, or none where it
+/// names none there.
+async fn identified(daemon: &Daemon, reference: &str) -> Result<Option<String>, Failure> {
+    let docker = daemon.client().await?;
+    match docker.inspect_image(reference).await {
+        Ok(inspected) => Ok(inspected.id),
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: NOT_FOUND,
+            ..
+        }) => Ok(None),
+        Err(error) => Err(daemon.refused(&error)),
+    }
+}
+
+/// What the engine answers about an image it does not hold.
+const NOT_FOUND: u16 = 404;
 
 /// How long a request may take before the engine counts as unreachable.
 const TIMEOUT: u64 = 30;

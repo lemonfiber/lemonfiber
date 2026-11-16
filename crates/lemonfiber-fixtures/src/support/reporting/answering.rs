@@ -133,6 +133,15 @@ fn listed(reporting: &Reporting, project: &str) -> Result<Vec<Container>, Engine
         .iter()
         .filter(|container| container.project == project)
         .map(|container| Container {
+            id: if reporting
+                .recreated
+                .as_ref()
+                .is_some_and(|(after, service)| asked >= *after && container.service == *service)
+            {
+                format!("{}-again", container.id)
+            } else {
+                container.id.clone()
+            },
             health: if settled {
                 Health::Healthy
             } else {

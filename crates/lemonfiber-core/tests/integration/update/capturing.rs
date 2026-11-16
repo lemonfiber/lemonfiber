@@ -38,7 +38,7 @@ async fn a_confirmed_run_captures_before_anything_opens_its_state_on_the_new_ima
     assert!(
         machine
             .last()
-            .ends_with(&["up".to_owned(), "--detach".to_owned()]),
+            .ends_with(&["--detach".to_owned(), "--no-recreate".to_owned()]),
         "the stack was left down: {:?}",
         machine.last()
     );

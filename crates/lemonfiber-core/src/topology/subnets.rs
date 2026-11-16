@@ -4,11 +4,12 @@
 //! default install holds pools for about thirty networks: fewer than one stack's asks
 //! come to. So every network names one, and the engine draws none.
 //!
-//! Each network's subnet is a slot of [`RANGE`] chosen from its name, so the slot a
-//! network holds does not move when another network comes or goes, except where the two
-//! met at one slot. The fixed subnets [`super::PROXY_SUBNET`], [`super::MEDIA_SUBNET`] and
-//! [`super::PASS_SUBNET`] lie in the range too, and no other network is given a slot inside
-//! them.
+//! A network the engine already holds keeps the slot of [`RANGE`] it holds while no fixed
+//! subnet and no other network kept there covers it, so no network held moves when another
+//! comes or goes. Every other network is given the first free slot counting on from one
+//! chosen from its name. The fixed subnets [`super::PROXY_SUBNET`], [`super::MEDIA_SUBNET`]
+//! and [`super::PASS_SUBNET`] lie in the range too, and no other network is given a slot
+//! inside them.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;
@@ -22,35 +23,54 @@ pub const RANGE: Block = (Ipv4Addr::new(10, 80, 0, 0), 16);
 /// network's own, its gateway's and its broadcast, where no network joins more than two.
 pub const PREFIX: u8 = 29;
 
+/// How many subnets of [`PREFIX`] the range holds.
+const SLOTS: u32 = 1 << (PREFIX - RANGE.1);
+
 /// The FNV-1a offset basis.
 const BASIS: u32 = 0x811c_9dc5;
 
 /// The FNV-1a prime.
 const PRIME: u32 = 0x0100_0193;
 
-/// Give every network in `networks` its subnet: a fixed one its own, and every other a
-/// slot of [`RANGE`] no other network holds.
-pub(super) fn assigned(networks: &mut BTreeMap<String, Network>) {
-    let slots = 1_u32 << (PREFIX - RANGE.1);
+/// Give every network in `networks` its subnet: a fixed one its own, one `held` names the
+/// subnet the engine holds it at where that is a slot of [`RANGE`] still free, and every
+/// other a slot of [`RANGE`] no other network holds.
+pub(super) fn assigned(networks: &mut BTreeMap<String, Network>, held: &BTreeMap<String, Block>) {
     let mut taken: BTreeSet<u32> = networks
         .values()
         .filter_map(|network| network.fixed)
         .flat_map(|fixed| covered(fixed.whole))
         .collect();
     for (name, network) in networks.iter_mut() {
-        if let Some(fixed) = network.fixed {
-            network.subnet = Some(fixed.whole);
-            continue;
-        }
-        let start = hashed(name) % slots;
-        let free = (0..slots)
-            .map(|step| (start + step) % slots)
+        network.subnet = match network.fixed {
+            Some(fixed) => Some(fixed.whole),
+            None => held
+                .get(name)
+                .and_then(|whole| slot(*whole))
+                .filter(|slot| taken.insert(*slot))
+                .map(block),
+        };
+    }
+    for (name, network) in networks
+        .iter_mut()
+        .filter(|(_, network)| network.subnet.is_none())
+    {
+        let start = hashed(name) % SLOTS;
+        let free = (0..SLOTS)
+            .map(|step| (start + step) % SLOTS)
             .find(|slot| !taken.contains(slot));
         if let Some(slot) = free {
             taken.insert(slot);
             network.subnet = Some(block(slot));
         }
     }
+}
+
+/// The slot of [`RANGE`] that is `whole`, where it is one.
+fn slot(whole: Block) -> Option<u32> {
+    let offset = u32::from(whole.0).checked_sub(u32::from(RANGE.0))?;
+    let slot = offset >> (32 - PREFIX);
+    (slot < SLOTS && block(slot) == whole).then_some(slot)
 }
 
 /// The subnet of `slot`.

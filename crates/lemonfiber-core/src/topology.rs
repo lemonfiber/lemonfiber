@@ -17,6 +17,14 @@ pub use subnets::{PREFIX, RANGE};
 /// A block of addresses, as its first address and its prefix length.
 pub type Block = (Ipv4Addr, u8);
 
+/// The block `written` names, an address and a prefix length joined by `/`, where it
+/// reads whole.
+#[must_use]
+pub fn block(written: &str) -> Option<Block> {
+    let (address, prefix) = written.split_once('/')?;
+    Some((address.parse().ok()?, prefix.parse().ok()?))
+}
+
 /// A subnet lemonfiber holds, and the part of it the engine hands out, which holds no
 /// fixed address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +128,18 @@ pub enum Placed {
     Nowhere,
 }
 
+impl Placed {
+    /// The networks it is on, each with its fixed address where it holds one, where it is
+    /// on networks of its own.
+    #[must_use]
+    pub const fn on(&self) -> Option<&BTreeMap<String, Option<Ipv4Addr>>> {
+        match self {
+            Self::On(on) => Some(on),
+            Self::Inside(_) | Self::Nowhere => None,
+        }
+    }
+}
+
 /// The whole project's networks and every service's place on them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Topology {
@@ -130,6 +150,15 @@ pub struct Topology {
 }
 
 impl Topology {
+    /// These networks with each that `held` names, by its name, kept on the subnet the
+    /// engine holds it at where that is still a free slot of [`RANGE`], and every other
+    /// given a free slot counting on from the one its name gives.
+    #[must_use]
+    pub fn holding(mut self, held: &BTreeMap<String, Block>) -> Self {
+        subnets::assigned(&mut self.networks, held);
+        self
+    }
+
     /// The address the guard holds on the network of its ask of `media.serve`, the one
     /// proxy the media server trusts to name a client, where something guards the
     /// household's streams there.
@@ -263,7 +292,7 @@ pub fn derived(
             }
         }
     }
-    subnets::assigned(&mut networks);
+    subnets::assigned(&mut networks, &BTreeMap::new());
     Topology { networks, placed }
 }
 

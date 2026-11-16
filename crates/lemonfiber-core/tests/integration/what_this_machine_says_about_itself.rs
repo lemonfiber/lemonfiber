@@ -19,7 +19,7 @@ use std::sync::Arc;
 use common::stack::project;
 
 use crate::common;
-use lemonfiber_core::app::{dispatch, started, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, started, Command, Containers, Ctx, Outcome};
 use lemonfiber_core::config::{Protocols, Settings};
 use lemonfiber_core::model::{FrontDoorReport, LifecycleReport};
 use lemonfiber_core::ports::docker::{Health, Lifecycle};
@@ -82,7 +82,7 @@ fn publisher() -> (String, u16) {
 /// The status says the command failed, so nothing is waited on: what is under test is
 /// settled before anything is spawned, and waiting would only add a minute to it.
 async fn lifecycle(ctx: &Ctx) -> Result<LifecycleReport, String> {
-    match started(ctx, &[], &[], Some(1)).await {
+    match started(ctx, &[], &[], (Some(1), &Containers::default())).await {
         Ok(report) => Ok(report),
         Err(problem) => Err(problem.summary.clone()),
     }

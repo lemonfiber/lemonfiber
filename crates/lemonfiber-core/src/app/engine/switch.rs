@@ -130,7 +130,9 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         stack,
         stack_edits,
         project,
-    } = compose(ctx, forms, &Action::Up)?;
+        networking,
+        renewal,
+    } = Box::pin(compose(ctx, forms, &Action::Up)).await?;
 
     let running = standing(ctx, &manifest).await?;
     let mut switched = moved(&running, &plan.services);
@@ -174,7 +176,14 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
         moves: Vec::new(),
         guards,
         installing: Vec::new(),
-        swept: sweep.networks.clone(),
+        swept: networking
+            .swept
+            .iter()
+            .chain(&sweep.networks)
+            .cloned()
+            .collect(),
+        networks_created: networking.created,
+        networks_recreated: networking.recreated,
         passing: beside.passing,
         fencing: beside.fencing,
         unfenced: super::fenced::held_back(&Action::Up, &project)?,
@@ -204,6 +213,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
 
     sweep.taken_away(ctx).await;
     copies.made(ctx).await?;
+    let held = renewal.carried_out(ctx).await?;
     let started = ctx
         .seams
         .runner
@@ -218,7 +228,7 @@ async fn moving(ctx: &Ctx, forms: &[String]) -> Result<LifecycleReport, Box<Prob
     // Waited for last rather than inside a branch, because what a switch started is
     // the same thing bringing a form up starts, and it is owed the same wait.
     let addressed = report.plan.services.clone();
-    settled_into(ctx, &manifest, &mut report, &addressed).await?;
+    settled_into(ctx, &manifest, &mut report, (&addressed, &held)).await?;
     Ok(report)
 }
 

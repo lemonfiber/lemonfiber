@@ -68,3 +68,49 @@ fn a_held_group_is_its_digits_alone_and_anything_else_is_none() {
         assert_eq!(super::group(held), group, "{held:?}");
     }
 }
+
+#[test]
+fn a_held_network_reads_whole_with_its_gateway_inside_its_subnet_or_not_at_all() {
+    let held = super::answered(
+        "own 10.80.0.8/29 10.80.0.9 abc\n\
+         outside 10.80.0.16/29 10.80.0.33 def\n\
+         unaligned 10.80.0.9/29 10.80.0.10 ghi\n\
+         short 10.80.0.24/29 10.80.0.25\n\
+         long 10.80.0.24/29 10.80.0.25 jkl more\n",
+    );
+    assert_eq!(held.keys().collect::<Vec<_>>(), ["own"]);
+    let own = held.get("own").cloned();
+    assert_eq!(
+        own.as_ref().map(|own| own.line("own")),
+        Some("own 10.80.0.8/29 10.80.0.9 abc\n".to_owned())
+    );
+    assert_eq!(
+        own.as_ref().map(|own| super::networks([own])),
+        Some("10.80.0.8/29=10.80.0.9".to_owned())
+    );
+    assert_eq!(super::Answered::of("10.80.0.8/29", "10.80.0.9", ""), None);
+}
+
+#[test]
+fn a_held_network_of_either_family_reads_only_with_a_prefix_its_family_fits() {
+    let six = super::Answered::of("fd00:80::/64", "fd00:80::1", "abc");
+    assert_eq!(
+        six.map(|six| six.line("six")),
+        Some("six fd00:80::/64 fd00:80::1 abc\n".to_owned())
+    );
+    assert_eq!(
+        super::Answered::of("10.80.0.8/33", "10.80.0.9", "abc"),
+        None
+    );
+    assert_eq!(
+        super::Answered::of("fd00:80::/129", "fd00:80::1", "abc"),
+        None
+    );
+}
+
+#[test]
+fn a_service_held_inside_the_stack_is_named_so_where_its_networks_are_unread() {
+    let why = Unfenced::Unread.why("dashy");
+    assert!(why.starts_with("dashy is held inside the stack"), "{why}");
+    assert!(why.contains("subnet and gateway"), "{why}");
+}

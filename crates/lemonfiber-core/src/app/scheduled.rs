@@ -251,9 +251,15 @@ async fn ran(ctx: &Ctx, service: &str, started: Instant) -> ScheduledRun {
 
 /// What carrying out `action` said, or why it could not be carried out.
 async fn said(ctx: &Ctx, action: &Action) -> Result<crate::ports::process::Output, String> {
-    let invocation =
-        super::engine::invocation(ctx, &[], action).map_err(|problem| problem.summary)?;
+    let invocation = super::engine::invocation(ctx, &[], action)
+        .await
+        .map_err(|problem| problem.summary)?;
     super::engine::before(ctx, action, &invocation.addressed).map_err(|problem| problem.summary)?;
+    invocation
+        .renewal
+        .carried_out(ctx)
+        .await
+        .map_err(|problem| problem.summary)?;
     ctx.seams
         .runner
         .run(&invocation.command)

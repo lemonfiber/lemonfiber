@@ -197,6 +197,9 @@ fn observations_carry_the_service_they_describe() {
         health: Health::Healthy,
         mounts: Vec::new(),
         exit: None,
+        entry: None,
+        networks: Vec::new(),
+        image_id: String::new(),
     };
     assert_eq!(container.clone(), container);
     assert_eq!(container.service, "sonarr");

@@ -328,6 +328,8 @@ pub fn unstarted(action: &str, plan: Plan, offline: Offline) -> LifecycleReport 
         installing: offline.installs,
         guards: Vec::new(),
         swept: Vec::new(),
+        networks_created: Vec::new(),
+        networks_recreated: Vec::new(),
         passing: None,
         fencing: None,
         unfenced: Vec::new(),

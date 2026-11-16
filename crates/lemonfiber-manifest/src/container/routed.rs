@@ -2,11 +2,19 @@
 
 use super::{Container, Network, Posture, Value, VIA};
 
+/// The capabilities that let a process mark a socket, which a service held inside the
+/// stack never holds, so only its fence's own questions reach the engine's resolver.
+const MARKING: [&str; 2] = ["NET_ADMIN", "NET_RAW"];
+
 impl Container<'_> {
     pub(super) fn routed(&self, found: &mut Vec<(String, String)>) {
         let Some(network) = self.network else {
             return;
         };
+        if network.internal {
+            self.held_inside(network, found);
+            return;
+        }
         if let Some(sibling) = network.egress_for() {
             self.carrying(network, sibling, found);
             return;
@@ -15,7 +23,7 @@ impl Container<'_> {
             if !network.fenced {
                 found.push((
                     self.at("network"),
-                    "says none of via, fenced and egress_for, and a network is one of them"
+                    "says none of via, fenced, internal and egress_for, and a network is one of them"
                         .to_owned(),
                 ));
             }
@@ -39,6 +47,35 @@ impl Container<'_> {
                 format!("names {via}, which the service provides itself"),
             ));
         }
+    }
+
+    /// What a service held inside the stack, under `network`, takes beside it that is a
+    /// network namespace of its own.
+    fn held_inside(&self, network: &Network, found: &mut Vec<(String, String)>) {
+        let marking = self.shape.is_some_and(|shape| {
+            shape
+                .grants()
+                .iter()
+                .any(|granted| MARKING.contains(granted))
+        });
+        let beside = [
+            (network.via().is_some(), "via"),
+            (network.fenced, "fenced"),
+            (network.egress_for().is_some(), "egress_for"),
+            (marking, "a shape granting what marks a socket"),
+            (
+                self.provides
+                    .iter()
+                    .any(|provided| VIA.contains(&provided.as_str())),
+                "provides a capability another service runs inside the network of",
+            ),
+        ];
+        found.extend(beside.into_iter().filter(|(taken, _)| *taken).map(|(_, what)| {
+            (
+                self.at("network"),
+                format!("says both internal and {what}, and each is a network namespace of its own"),
+            )
+        }));
     }
 
     /// What an egress service carrying `sibling` out of the machine, under `network`, holds

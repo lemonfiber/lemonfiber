@@ -83,16 +83,19 @@ pub(crate) async fn readied(
     answered.err().or(unkept).or(why)
 }
 
-/// Whether a service of `stack`'s or of `installed`'s declares itself fenced.
+/// Whether a service of `stack`'s or of `installed`'s declares itself fenced or held
+/// inside the stack, either of which runs behind a fence.
 fn fenced(stack: &[Service], installed: &[Installed]) -> bool {
-    stack.iter().any(Service::fenced)
+    stack
+        .iter()
+        .any(|service| service.fenced() || service.internal())
         || installed.iter().any(|one| {
             one.services.iter().any(|placed| {
                 placed
                     .fields
                     .network
                     .as_ref()
-                    .is_some_and(|network| network.fenced)
+                    .is_some_and(|network| network.fenced || network.internal)
             })
         })
 }

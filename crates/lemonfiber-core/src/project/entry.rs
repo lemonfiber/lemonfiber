@@ -23,6 +23,9 @@ mod running_as;
 pub(crate) use mounting::{configuration, mounts, tmpfs};
 pub(crate) use running_as::{operated_ids, OperatedIds};
 
+/// What a service's `network_mode` starts with where it runs inside another's network.
+pub(crate) const INSIDE: &str = "service:";
+
 /// Where the library is kept while the operator's environment file names nowhere.
 pub(crate) const LIBRARY: &str = "./data";
 
@@ -149,6 +152,8 @@ pub struct Unit<'a> {
     pub secrets_file: Option<PathBuf>,
     /// The arguments its image's program is run with, where not the image's own.
     pub command: Vec<String>,
+    /// The DNS search domains it is written with, where not the engine's host's.
+    pub dns_search: &'static [&'static str],
     /// The name its container knows itself by, where not the engine's own.
     pub hostname: Option<&'a str>,
     /// The capabilities it alone is given back, whatever its posture: a fence's, and none
@@ -203,6 +208,9 @@ pub struct Entry {
     /// The arguments its image's program is run with, where not the image's own.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     command: Vec<String>,
+    /// The DNS search domains it is written with, where not the engine's host's.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    dns_search: Vec<String>,
     /// Its environment.
     environment: BTreeMap<String, String>,
     /// Its own secrets file, where it names a secret.
@@ -225,6 +233,9 @@ pub struct Entry {
     /// The service it waits on, where it runs inside one.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     depends_on: BTreeMap<String, Waiting>,
+    /// Its labels.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    labels: BTreeMap<String, String>,
     /// What it may not gain once started.
     security_opt: [&'static str; 1],
     /// The capabilities it starts without.
@@ -290,7 +301,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         Placed::On(on) => (on.clone(), None, BTreeMap::new()),
         Placed::Inside(host) => (
             BTreeMap::new(),
-            Some(format!("service:{}", literal(host))),
+            Some(format!("{INSIDE}{}", literal(host))),
             std::iter::once((
                 literal(host),
                 Waiting {
@@ -326,6 +337,11 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
             .into_iter()
             .collect(),
         command: unit.command.iter().map(|word| literal(word)).collect(),
+        dns_search: unit
+            .dns_search
+            .iter()
+            .map(|domain| literal(domain))
+            .collect(),
         environment: environment(unit, values),
         env_file: unit
             .secrets_file
@@ -344,6 +360,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         networks: Joined::on(networks),
         network_mode,
         depends_on,
+        labels: BTreeMap::new(),
         security_opt: SECURITY,
         cap_drop: DROPPED,
         cap_add: if confined {

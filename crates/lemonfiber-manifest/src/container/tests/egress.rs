@@ -13,6 +13,7 @@ fn an_egress_service_holds_nothing_and_never_carries_itself() {
     let egress = Network {
         via: None,
         fenced: true,
+        internal: false,
         egress_for: Some("plex".to_owned()),
     };
     let carried = |container: &Container<'_>| -> Vec<String> {
@@ -50,6 +51,7 @@ fn an_egress_service_holds_nothing_and_never_carries_itself() {
     empty.takes_data = false;
     assert!(carried(&empty).is_empty(), "{:?}", carried(&empty));
     let itself = Network {
+        internal: false,
         egress_for: Some(empty.id.to_owned()),
         ..bare.clone()
     };

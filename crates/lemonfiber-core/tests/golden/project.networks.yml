@@ -1,130 +1,88 @@
 networks:
   ask__bindery__indexer.search__prowlarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.111.216/29
+    external: true
+    name: lemonfiber_ask__bindery__indexer.search__prowlarr
   ask__door__media.serve__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.96.16/28
-        ip_range: 10.80.96.24/29
+    external: true
+    name: lemonfiber_ask__door__media.serve__jellyfin
   link__decline__jellyfin:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.94.96/29
+    external: true
+    name: lemonfiber_link__decline__jellyfin
   link__recyclarr__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.122.96/29
+    external: true
+    name: lemonfiber_link__recyclarr__radarr
   link__recyclarr__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.23.72/29
+    external: true
+    name: lemonfiber_link__recyclarr__sonarr
   link__unpackerr__lidarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.218.80/29
+    external: true
+    name: lemonfiber_link__unpackerr__lidarr
   link__unpackerr__radarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.144.160/29
+    external: true
+    name: lemonfiber_link__unpackerr__radarr
   link__unpackerr__sonarr:
-    internal: true
-    ipam:
-      config:
-      - subnet: 10.80.79.136/29
+    external: true
+    name: lemonfiber_link__unpackerr__sonarr
   own__audiobookshelf:
-    ipam:
-      config:
-      - subnet: 10.80.183.64/29
+    external: true
+    name: lemonfiber_own__audiobookshelf
   own__bazarr:
-    ipam:
-      config:
-      - subnet: 10.80.6.136/29
+    external: true
+    name: lemonfiber_own__bazarr
   own__bindery:
-    ipam:
-      config:
-      - subnet: 10.80.138.64/29
+    external: true
+    name: lemonfiber_own__bindery
   own__caddy:
-    ipam:
-      config:
-      - subnet: 10.80.28.192/29
+    external: true
+    name: lemonfiber_own__caddy
   own__calibre-web-automated:
-    ipam:
-      config:
-      - subnet: 10.80.252.40/29
+    external: true
+    name: lemonfiber_own__calibre-web-automated
   own__decline:
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: 'false'
-    ipam:
-      config:
-      - subnet: 10.80.240.8/29
+    external: true
+    name: lemonfiber_own__decline
   own__door:
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: 'false'
-    ipam:
-      config:
-      - subnet: 10.80.25.136/29
+    external: true
+    name: lemonfiber_own__door
   own__flaresolverr-fence:
-    ipam:
-      config:
-      - subnet: 10.80.193.80/29
+    external: true
+    name: lemonfiber_own__flaresolverr-fence
   own__gluetun:
-    ipam:
-      config:
-      - subnet: 10.80.82.152/29
+    external: true
+    name: lemonfiber_own__gluetun
   own__homepage:
-    ipam:
-      config:
-      - subnet: 10.80.205.104/29
+    external: true
+    name: lemonfiber_own__homepage
   own__jellyfin:
-    ipam:
-      config:
-      - subnet: 10.80.157.160/29
+    external: true
+    name: lemonfiber_own__jellyfin
   own__lidarr:
-    ipam:
-      config:
-      - subnet: 10.80.251.104/29
+    external: true
+    name: lemonfiber_own__lidarr
   own__navidrome:
-    ipam:
-      config:
-      - subnet: 10.80.227.48/29
+    external: true
+    name: lemonfiber_own__navidrome
   own__nzbhydra2:
-    ipam:
-      config:
-      - subnet: 10.80.32.248/29
+    external: true
+    name: lemonfiber_own__nzbhydra2
   own__prowlarr:
-    ipam:
-      config:
-      - subnet: 10.80.153.144/29
+    external: true
+    name: lemonfiber_own__prowlarr
   own__radarr:
-    ipam:
-      config:
-      - subnet: 10.80.206.152/29
+    external: true
+    name: lemonfiber_own__radarr
   own__recyclarr:
-    ipam:
-      config:
-      - subnet: 10.80.60.176/29
+    external: true
+    name: lemonfiber_own__recyclarr
   own__sabnzbd:
-    ipam:
-      config:
-      - subnet: 10.80.220.88/29
+    external: true
+    name: lemonfiber_own__sabnzbd
   own__seerr:
-    ipam:
-      config:
-      - subnet: 10.80.143.32/29
+    external: true
+    name: lemonfiber_own__seerr
   own__sonarr:
-    ipam:
-      config:
-      - subnet: 10.80.211.208/29
+    external: true
+    name: lemonfiber_own__sonarr
   own__unpackerr:
-    ipam:
-      config:
-      - subnet: 10.80.245.240/29
+    external: true
+    name: lemonfiber_own__unpackerr

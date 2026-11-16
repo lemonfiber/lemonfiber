@@ -49,7 +49,8 @@ fn a_run_aimed_elsewhere_names_the_machine_ahead_of_the_subcommand() {
             "--project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
             "--file /opt/lemonfiber/stack/compose.generated.yml ",
-            "--profile media --profile notify up --detach"
+            "--file /opt/lemonfiber/stack/compose.labels.yml ",
+            "--profile media --profile notify up --detach --no-recreate"
         ))
     );
 }
@@ -62,7 +63,8 @@ fn starts_a_form_detached_with_its_profiles() {
             "docker compose --project-name lemonfiber ",
             "--project-directory /opt/lemonfiber/stack ",
             "--file /opt/lemonfiber/stack/compose.generated.yml ",
-            "--profile media --profile notify up --detach"
+            "--file /opt/lemonfiber/stack/compose.labels.yml ",
+            "--profile media --profile notify up --detach --no-recreate"
         ))
     );
 }
@@ -80,7 +82,7 @@ fn a_start_is_told_never_to_pull_where_fetching_is_switched_off() {
     let said = line(&["library"], &Action::Up, &refusing);
     assert_eq!(
         said.as_deref()
-            .map(|command| command.ends_with("up --detach --pull never")),
+            .map(|command| command.ends_with("up --detach --no-recreate --pull never")),
         Some(true),
         "{said:?}"
     );
@@ -92,7 +94,7 @@ fn a_start_is_told_never_to_pull_where_fetching_is_switched_off() {
     assert_eq!(
         narrowed
             .as_deref()
-            .map(|command| command.ends_with("up --detach --pull never -- jellyfin")),
+            .map(|command| command.ends_with("up --detach --no-recreate --pull never -- jellyfin")),
         Some(true),
         "{narrowed:?}"
     );
@@ -162,6 +164,7 @@ fn the_operators_overlay_is_layered_after_the_generated_project() {
             .as_deref()
             .map(|command| command.contains(concat!(
                 "--file /opt/lemonfiber/stack/compose.generated.yml ",
+                "--file /opt/lemonfiber/stack/compose.labels.yml ",
                 "--file /home/op/.config/lemonfiber/overlay.yml"
             ))),
         Some(true)
@@ -192,12 +195,14 @@ fn the_project_is_read_from_the_root_the_invocation_names() {
     );
 }
 
-/// One project, and the overlay where there is one: no file of the stack's own and no
-/// document per plugin is ever handed to Compose.
+/// One project, its labels where it starts and the overlay where there is one: no file of
+/// the stack's own and no document per plugin is ever handed to Compose.
 #[test]
 fn no_static_compose_file_is_handed_to_compose() {
     let said = line(&["library"], &Action::Up, &Settings::default()).unwrap_or_default();
-    assert_eq!(said.matches("--file ").count(), 1, "{said}");
+    let stopping = line(&["library"], &Action::Down, &Settings::default()).unwrap_or_default();
+    assert_eq!(said.matches("--file ").count(), 2, "{said}");
+    assert_eq!(stopping.matches("--file ").count(), 1, "{stopping}");
     assert!(!said.contains("compose.yml"), "{said}");
     assert!(!said.contains("compose/"), "{said}");
 }
@@ -228,7 +233,10 @@ fn each_action_becomes_its_own_subcommand() {
         })
     };
 
-    assert_eq!(ending(&Action::Up).as_deref(), Some("up --detach"));
+    assert_eq!(
+        ending(&Action::Up).as_deref(),
+        Some("up --detach --no-recreate")
+    );
     assert_eq!(ending(&Action::Down).as_deref(), Some("down"));
     assert_eq!(ending(&Action::Stop(Vec::new())).as_deref(), Some("stop"));
     assert_eq!(
@@ -261,7 +269,7 @@ fn each_action_becomes_its_own_subcommand() {
     );
     assert_eq!(
         ending(&Action::Start(vec!["sonarr".to_owned()])).as_deref(),
-        Some("up --detach -- sonarr"),
+        Some("up --detach --no-recreate -- sonarr"),
         "a start aimed at services keeps the detach and fences the names after it"
     );
 }

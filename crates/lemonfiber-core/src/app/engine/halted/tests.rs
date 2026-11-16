@@ -33,6 +33,9 @@ fn exited(service: &str) -> Container {
         published: Vec::new(),
         mounts: Vec::new(),
         exit: Some(1),
+        entry: None,
+        networks: Vec::new(),
+        image_id: String::new(),
     }
 }
 

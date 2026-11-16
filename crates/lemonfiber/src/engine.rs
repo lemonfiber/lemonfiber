@@ -15,7 +15,7 @@ use std::process::ExitCode;
 
 use lemonfiber_core::app::{
     claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
-    Ctx, Outcome, Teardown, Waiting,
+    Containers, Ctx, Outcome, Teardown, Waiting,
 };
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{self, Kind};
@@ -260,11 +260,11 @@ pub(crate) async fn start(
     // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
     // separate path, because the report it wants is the one built from the same plan
     // without the single irreversible step, which is what a status of nothing gets.
-    let status = if ctx.dry_run {
-        None
+    let (status, before) = if ctx.dry_run {
+        (None, Containers::default())
     } else {
         match narrated(ctx, (forms, services), offer, json).await {
-            Ok(status) => status,
+            Ok(ran) => ran,
             Err(code) => {
                 released(claim).await;
                 return code;
@@ -275,7 +275,7 @@ pub(crate) async fn start(
     // The report is asked for whatever the status was: a start that failed part way
     // has still started something, and which services came up is the first thing an
     // operator needs in order to do anything about the ones that did not.
-    let outcome = started(ctx, forms, services, status).await;
+    let outcome = started(ctx, forms, services, (status, &before)).await;
     released(claim).await;
     match outcome {
         Ok(report) => {
@@ -289,15 +289,16 @@ pub(crate) async fn start(
 
 /// Spawn the start and put Compose's narration on the screen as it arrives.
 ///
-/// Gives back the exit status Compose ended on, or the code a surface should exit
-/// with where the command could not be spawned at all.
+/// Gives back the exit status Compose ended on, with each service's container as it
+/// stood before, or the code a surface should exit with where the command could not be
+/// spawned at all.
 async fn narrated(
     ctx: &Ctx,
     (forms, services): (&[String], &[String]),
     offer: Option<&str>,
     json: bool,
-) -> Result<Option<i32>, ExitCode> {
-    let mut progress = start_progress(ctx, forms, services, offer)
+) -> Result<(Option<i32>, Containers), ExitCode> {
+    let (mut progress, before) = start_progress(ctx, forms, services, offer)
         .await
         .map_err(|problem| complain(&problem))?;
     let mut status = None;
@@ -307,7 +308,7 @@ async fn narrated(
             PullEvent::Ended(code) => status = code,
         }
     }
-    Ok(status)
+    Ok((status, before))
 }
 
 /// Announce what starting will affect, then start it, narrated as it goes.

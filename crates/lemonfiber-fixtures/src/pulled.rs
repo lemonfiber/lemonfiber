@@ -13,6 +13,7 @@ use lemonfiber_ports::docker::{Failure, Image, Images};
 pub struct Pulled {
     held: Vec<Image>,
     unreachable: Option<String>,
+    identified: Vec<(String, String)>,
 }
 
 impl Pulled {
@@ -22,6 +23,21 @@ impl Pulled {
         Arc::new(Self {
             held,
             unreachable: None,
+            identified: Vec::new(),
+        })
+    }
+
+    /// An engine on which each reference of `identified` names the image of the id beside it,
+    /// and no other reference names any.
+    #[must_use]
+    pub fn identifying(identified: &[(&str, &str)]) -> Arc<Self> {
+        Arc::new(Self {
+            held: Vec::new(),
+            unreachable: None,
+            identified: identified
+                .iter()
+                .map(|(reference, id)| ((*reference).to_owned(), (*id).to_owned()))
+                .collect(),
         })
     }
 
@@ -31,6 +47,7 @@ impl Pulled {
         Arc::new(Self {
             held: Vec::new(),
             unreachable: Some(reason.to_owned()),
+            identified: Vec::new(),
         })
     }
 
@@ -49,6 +66,15 @@ impl Pulled {
 impl Images for Pulled {
     async fn images(&self) -> Result<Vec<Image>, Failure> {
         listed(self)
+    }
+
+    async fn identified(&self, reference: &str) -> Result<Option<String>, Failure> {
+        listed(self).map(|_| {
+            self.identified
+                .iter()
+                .find(|(named, _)| named == reference)
+                .map(|(_, id)| id.clone())
+        })
     }
 }
 

@@ -45,6 +45,7 @@ fn solver(fenced: bool) -> Placed {
     placed.fields.network = fenced.then_some(Network {
         via: None,
         fenced: true,
+        internal: false,
         egress_for: None,
     });
     placed

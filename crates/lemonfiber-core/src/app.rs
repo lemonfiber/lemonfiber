@@ -117,7 +117,7 @@ pub use setup::SetupAction;
 // engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{
     claimed, diagnose, in_flight, logs, offline, pull_progress, released, start_progress, started,
-    unstarted, Claim, InstallOffered, Interrupted, Offline, Waiting, INSTALL_REFUSALS,
+    unstarted, Claim, Containers, InstallOffered, Interrupted, Offline, Waiting, INSTALL_REFUSALS,
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};

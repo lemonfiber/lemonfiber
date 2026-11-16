@@ -10,11 +10,13 @@ use std::path::PathBuf;
 
 use bollard::models::{
     ContainerStatsResponse, ContainerSummary, ContainerSummaryHealthStatusEnum,
-    ContainerSummaryStateEnum, MountPoint, PortSummary,
+    ContainerSummaryNetworkSettings, ContainerSummaryStateEnum, MountPoint, PortSummary,
 };
 
 use super::{PROJECT_LABEL, SERVICE_LABEL};
-use lemonfiber_ports::docker::{Container, Health, Lifecycle, Mounted, Published, Stats};
+use lemonfiber_ports::docker::{
+    Container, Health, Lifecycle, Mounted, Published, Stats, ENTRY_LABEL,
+};
 
 /// What the engine calls a container's state, in the port's vocabulary.
 ///
@@ -65,6 +67,17 @@ pub(super) fn exit_code(status: Option<&str>) -> Option<i32> {
     inside.trim_start_matches("signal: ").parse().ok()
 }
 
+/// The engine's name for each network a container is on, in order.
+pub(super) fn joined(settings: Option<ContainerSummaryNetworkSettings>) -> Vec<String> {
+    let mut names: Vec<String> = settings
+        .and_then(|settings| settings.networks)
+        .unwrap_or_default()
+        .into_keys()
+        .collect();
+    names.sort();
+    names
+}
+
 /// One container as the port describes them.
 pub(super) fn describe(summary: ContainerSummary) -> Container {
     let labels = summary.labels.unwrap_or_default();
@@ -77,6 +90,9 @@ pub(super) fn describe(summary: ContainerSummary) -> Container {
         published: published(summary.ports.unwrap_or_default()),
         mounts: mounted(summary.mounts.unwrap_or_default()),
         exit: exit_code(summary.status.as_deref()),
+        entry: labels.get(ENTRY_LABEL).cloned(),
+        networks: joined(summary.network_settings),
+        image_id: summary.image_id.unwrap_or_default(),
     }
 }
 

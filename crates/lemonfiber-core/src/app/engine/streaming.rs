@@ -13,6 +13,7 @@
 
 use tokio::sync::mpsc::Receiver;
 
+use super::recreated::Containers;
 use super::{compose, fell_short_into, readied, settled_into, Ctx};
 use crate::error::{Diagnose, Problem};
 use crate::model::LifecycleReport;
@@ -123,7 +124,9 @@ pub async fn pull_progress(
     ctx: &Ctx,
     forms: &[String],
 ) -> Result<Receiver<Progress>, Box<Problem>> {
-    let command = compose(ctx, forms, &Action::Pull(Vec::new()))?.command;
+    let command = Box::pin(compose(ctx, forms, &Action::Pull(Vec::new())))
+        .await?
+        .command;
     ctx.seams
         .runner
         .stream(&command)
@@ -145,6 +148,9 @@ pub async fn pull_progress(
 /// A start of whole forms answers what it offers to install with `offer` first, as the
 /// waited-on path does, and writes and starts nothing where it answers none.
 ///
+/// Answers the stream with each service's container as it stood before the start ran,
+/// which [`started`] is handed to wait for every one created again.
+///
 /// # Errors
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be resolved,
@@ -155,7 +161,7 @@ pub async fn start_progress(
     forms: &[String],
     services: &[String],
     offer: Option<&str>,
-) -> Result<Receiver<Progress>, Box<Problem>> {
+) -> Result<(Receiver<Progress>, Containers), Box<Problem>> {
     let action = aimed(services);
     if matches!(action, Action::Up) && !ctx.dry_run {
         if let Some(offline) = Box::pin(super::installing::pending(ctx, forms)).await {
@@ -171,6 +177,7 @@ pub async fn start_progress(
         report,
         sweep,
         copies,
+        renewal,
     } = readied(ctx, forms, &action).await?;
     // Refused where the data location is not there, after waiting for it. The
     // waited-on path asks the same thing at the same point, for the reason the
@@ -185,11 +192,14 @@ pub async fn start_progress(
     // Let go of what this start addresses, as the waited-on path does: a service that
     // falls over on the way up fell over, whoever stopped it last.
     super::before(ctx, &action, &super::addressed(&action, &report.plan))?;
-    ctx.seams
+    let held = renewal.carried_out(ctx).await?;
+    let progress = ctx
+        .seams
         .runner
         .stream(&command)
         .await
-        .map_err(|err| Box::new(err.problem()))
+        .map_err(|err| Box::new(err.problem()))?;
+    Ok((progress, held))
 }
 
 /// What a start came to, once its command has run and its services have settled.
@@ -200,7 +210,8 @@ pub async fn start_progress(
 /// waited-on path builds rather than a second assembly of the same fields.
 ///
 /// Waits for the services to become usable, because "started" that means "a process
-/// exists" is a claim the operator will disprove by opening a browser.
+/// exists" is a claim the operator will disprove by opening a browser, and then for each
+/// whose container is another than `before` held to answer.
 ///
 /// # Errors
 ///
@@ -210,7 +221,7 @@ pub async fn started(
     ctx: &Ctx,
     forms: &[String],
     services: &[String],
-    status: Option<i32>,
+    (status, before): (Option<i32>, &Containers),
 ) -> Result<LifecycleReport, Box<Problem>> {
     let action = aimed(services);
     let super::Readied {
@@ -226,7 +237,7 @@ pub async fn started(
     super::super::scheduled::started(ctx, &action, &report);
     if status == Some(0) {
         let addressed = super::addressed(&action, &report.plan);
-        settled_into(ctx, &manifest, &mut report, &addressed).await?;
+        settled_into(ctx, &manifest, &mut report, (&addressed, before)).await?;
     } else {
         fell_short_into(ctx, &manifest, &mut report).await;
     }

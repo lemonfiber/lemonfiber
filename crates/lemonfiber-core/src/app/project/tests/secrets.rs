@@ -111,7 +111,7 @@ fn the_operators_values_are_written_in_and_no_secret_reaches_the_project_or_its_
     );
     assert_eq!(
         beside,
-        "COMPOSE_PROFILES=media\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=media\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
     assert!(
         !on_disk.contains(KEY) && !beside.contains(KEY),

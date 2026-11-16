@@ -28,7 +28,7 @@ fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins(
     assert!(super::super::kept(&ctx, HOLDING).is_ok());
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 
     let started = super::super::materialised_with(
@@ -44,14 +44,14 @@ fn a_start_names_its_profiles_and_a_later_write_keeps_them_beside_every_plugins(
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 
     let without = "services:\n  sonarr:\n    profiles:\n    - dl\n";
     assert!(super::super::kept(&ctx, without).is_ok());
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=media\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=media\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 }
 
@@ -68,7 +68,7 @@ fn a_service_in_a_stack_profile_is_started_with_that_profile_alone() {
     assert!(super::super::kept(&ctx, MOVED).is_ok());
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 
     let started = super::super::materialised_with(
@@ -84,7 +84,7 @@ fn a_service_in_a_stack_profile_is_started_with_that_profile_alone() {
     assert!(started.is_ok(), "{started:?}");
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=media,plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 }
 
@@ -99,7 +99,7 @@ fn a_plugin_record_that_cannot_be_read_leaves_the_stacks_profiles_alone() {
 
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
 }
 
@@ -133,7 +133,7 @@ fn the_operators_overlay_is_read_after_the_project() {
     assert_eq!(
         beside(&project),
         format!(
-            "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml:{}\n",
+            "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml:{}\n",
             overlay.display()
         )
     );
@@ -177,8 +177,16 @@ fn an_overlay_whose_path_cannot_be_listed_leaves_plain_compose_reading_the_proje
 
     assert_eq!(
         beside(&project),
-        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml\n"
+        "COMPOSE_PROFILES=plugin-komga\nCOMPOSE_FILE=compose.generated.yml:compose.labels.yml\n"
     );
+}
+
+#[test]
+fn labels_that_cannot_be_written_beside_the_project_refuse_the_write() {
+    let (ctx, project) = machine("profiled-unlabelled");
+    assert!(std::fs::create_dir_all(project.join(crate::project::LABELS)).is_ok());
+
+    assert!(super::super::kept(&ctx, HOLDING).is_err());
 }
 
 #[test]

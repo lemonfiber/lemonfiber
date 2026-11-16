@@ -16,11 +16,32 @@ async fn lists_what_the_engine_says_is_there_and_what_it_left_behind() {
     );
 
     let listed = Daemon::at(&engine.socket).list("lemonfiber").await;
+    let listed = listed.unwrap_or_default();
     assert_eq!(
-        listed.ok().map(|containers| containers
-            .into_iter()
-            .map(|found| (found.service, found.lifecycle, found.health, found.exit))
-            .collect::<Vec<_>>()),
+        listed
+            .iter()
+            .map(|found| (
+                found.entry.clone(),
+                found.networks.clone(),
+                found.image_id.clone()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (
+                Some("digest-sonarr".to_owned()),
+                vec!["lemonfiber_a".to_owned(), "lemonfiber_b".to_owned()],
+                "sha256:sonarr".to_owned()
+            ),
+            (None, Vec::new(), String::new()),
+        ]
+    );
+    assert_eq!(
+        Some(
+            listed
+                .into_iter()
+                .map(|found| (found.service, found.lifecycle, found.health, found.exit))
+                .collect::<Vec<_>>()
+        ),
         Some(vec![
             (
                 "sonarr".to_owned(),

@@ -60,6 +60,18 @@
       ],
       "required": false
     },
+    "networks_created": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
+    "networks_recreated": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "offer": {
       "type": [
         "null|string"

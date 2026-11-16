@@ -1,5 +1,6 @@
 //! What installing a plugin writes: its own directories, keys, secrets and starting files,
-//! and the project generated with it beside everything else installed here.
+//! the networks of the project with it beside everything else installed here, and that
+//! project.
 
 use std::path::Path;
 
@@ -94,6 +95,30 @@ fn generated(
         &crate::app::targets::chosen_fillers(ctx),
         resolved,
     )
+}
+
+/// Every network of the project with `installed` beside everything else installed here,
+/// made through the engine where it does not hold it as the project gives it: before the
+/// document naming them is written, so a fence on a network `installed` brings reads that
+/// network's subnet, and before its services start on them; what was created, created
+/// again and displaced.
+///
+/// # Errors
+///
+/// Where the register cannot be read, or a network cannot be made.
+pub(crate) async fn networked(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    installed: &Installed,
+) -> Result<super::super::project::Networking, Box<Problem>> {
+    let register = super::read(ctx)?;
+    let topology = crate::project::topology(
+        manifest,
+        &beside(&register, installed),
+        &super::super::targets::chosen_fillers(ctx),
+        super::super::project::pinned(ctx).is_some(),
+    );
+    super::super::project::networks_ensured(ctx, &topology).await
 }
 
 /// What `register` holds with `installed` in place of any version of it.

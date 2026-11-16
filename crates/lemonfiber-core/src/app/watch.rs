@@ -140,7 +140,7 @@ pub async fn supervise(
     // went — and both gates above still apply, because a location that is not there
     // is not one a watch would have held either.
     if ctx.dry_run {
-        return would_watch(ctx, root, forms, interval);
+        return would_watch(ctx, root, forms, interval).await;
     }
 
     let loss = watch_until_lost(ctx, volume, root, baseline, interval).await;
@@ -173,13 +173,15 @@ pub async fn supervise(
 ///
 /// Returns the [`Problem`] the stop itself would give where the stack cannot be read,
 /// resolved or written — met here, before the wait, rather than at the end of one.
-fn would_watch(
+async fn would_watch(
     ctx: &Ctx,
     root: &Path,
     forms: &[String],
     interval: Duration,
 ) -> Result<SupervisionReport, Box<Problem>> {
-    let command = invocation(ctx, forms, &Action::Stop(Vec::new()))?.command;
+    let command = invocation(ctx, forms, &Action::Stop(Vec::new()))
+        .await?
+        .command;
     Ok(SupervisionReport {
         rehearsed: false,
         forms: forms.to_vec(),

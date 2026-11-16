@@ -622,6 +622,8 @@ that it is a fault of the stack.
 | `STACK-13` | `RESET_MOVED` | error | 1 | 400 | 0.18.0 | Raised where the offer a reset answers is not the one a reading of it makes now. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `STACK-14` | `CERTIFICATE_NOT_MADE` | error | 1 | 500 | 0.18.0 | Raised where the certificate a service declares could not be made or read before it starts. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `STACK-15` | `SERVICE_UNFENCED` | error | 1 | 409 | 0.18.0 | Raised where a start names a fenced service no fence can be written for. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `STACK-16` | `NETWORK_NOT_MADE` | error | 1 | 500 | 0.18.0 | Raised where a network of the project could not be listed, created or taken away before a start. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `STACK-17` | `CONTAINER_NOT_RENEWED` | error | 1 | 500 | 0.18.0 | Raised where a container a start creates again could not be taken away first. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `STORAGE` — the data location
 

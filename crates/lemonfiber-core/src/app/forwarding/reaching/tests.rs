@@ -16,6 +16,7 @@ fn torrent(service: &str, via: bool) -> crate::plugin::Placed {
     placed.fields.network = via.then(|| Network {
         via: Some(GUARD.to_owned()),
         fenced: false,
+        internal: false,
         egress_for: None,
     });
     placed
@@ -68,6 +69,7 @@ async fn a_torrent_adapter_is_inside_the_guard_its_upstream_takes() {
     upstream.fields.network = Some(Network {
         via: Some(GUARD.to_owned()),
         fenced: false,
+        internal: false,
         egress_for: None,
     });
     let installed = [an_installed("fronted", vec![adapter, upstream])];
