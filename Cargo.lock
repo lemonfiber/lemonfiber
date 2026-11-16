@@ -1617,6 +1617,7 @@ dependencies = [
  "lemonfiber-api",
  "lemonfiber-bundle",
  "lemonfiber-bundled",
+ "lemonfiber-contract",
  "lemonfiber-core",
  "lemonfiber-error",
  "lemonfiber-fixtures",

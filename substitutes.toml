@@ -1,7 +1,8 @@
-# The substitute each capability `F14-R14` names is proved by, end to end against its
-# pinned upstream, standing in for the bundle's choice of that capability for one media
-# type: installed, its first run, conformance, substitution, the capability's features
-# and undo. The substitutes job reads this file, one job for each arm.
+# The substitute each capability `F14-R14` names, and each further one `F14-R31` asks for
+# that an arm proves, is proved by, end to end against its pinned upstream, standing in
+# for the bundle's choice of that capability, for one media type where it files media:
+# installed, its first run, conformance, substitution, the capability's features and
+# undo. The substitutes job reads this file, one job for each arm.
 #
 # One [[substitute]] table per arm:
 #
@@ -12,7 +13,8 @@
 #   revision       the full 40-hex commit it is proved at, on the origin's default
 #                  branch. The train moves it on its rolling pin pull request.
 #   stands_in_for  the plugin the bundle fills the capability with, which it replaces.
-#   media_type     the media type the arm exercises the capability for.
+#   media_type     the media type the arm exercises the capability for, where the
+#                  capability files media. A challenge solver files none and names none.
 #   claimed        `false` where the substitute's upstream is claimed against an account
 #                  outside the house and runs unclaimed, so its arm proves install and the
 #                  reading that names it `Open` alone.
@@ -22,6 +24,14 @@
 # once the stack is first seeded. Medusa looks a series up under the operator's TheTVDB
 # key, the job's secret SUBSTITUTES_THETVDB_KEY (and SUBSTITUTES_THETVDB_PIN for a key
 # that needs one); its arm is skipped, saying so, where the key is not set.
+#
+# A challenge solver standing in is run live: the stack's indexer told the solver by its
+# seed alone and testing it, and the solver's adapter asked for a page out on the internet,
+# which it fetches, and for one inside the stack, which it refuses before the solver is
+# handed it. Where the job's variable SUBSTITUTES_CHALLENGE_SITE names the challenged
+# site (crates/lemonfiber/tests/substitutes/challenge), the indexer is also given that
+# site under the solver's tag and must find the release it holds, which the site answers
+# only to a request carrying the cookie it hands a browser that ran its challenge.
 #
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
@@ -96,6 +106,15 @@ origin        = "https://github.com/lemonfiber/plugin-medusa"
 revision      = "e808def342583c1dfcda7e735b5f23553042ac2d"
 stands_in_for = "sonarr"
 media_type    = "tv"
+claimed       = true
+
+[[substitute]]
+arm           = "indexer-proxy"
+capability    = "indexer.proxy"
+plugin        = "byparr"
+origin        = "https://github.com/lemonfiber/plugin-byparr"
+revision      = "09622f962f3a4a8f17605570a28491096dcf5c8b"
+stands_in_for = "flaresolverr"
 claimed       = true
 
 [[curator]]

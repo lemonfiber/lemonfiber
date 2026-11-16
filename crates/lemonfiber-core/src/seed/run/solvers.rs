@@ -5,14 +5,16 @@
 //! sends an indexer site through the solver only where the site carries that tag, and
 //! which sites stand behind bot protection is the operator's to say, so no site is given
 //! it here. The indexer is asked over `indexer.search`, and one that answers it cannot
-//! fetch through a solver of that API is left unpaired.
+//! fetch through a solver of that API is left unpaired. The indexer tries a solver it is
+//! told about at once, so a solver asked over `indexer.proxy` is given until it answers,
+//! as a service coming up from its first start is, before the indexer is told about it.
 
-use lemonfiber_contract::capabilities::indexer::{search, SOLVER_TAG};
+use lemonfiber_contract::capabilities::indexer::{proxy, search, SOLVER_TAG};
 
 use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::service::{Failure, Protocol, SolverAt, Solvers as _};
+use crate::ports::service::{Failure, Protocol, SolverAt, Solvers as _, Solving as _};
 use crate::wiring::{Filler, Fillers};
 
 /// What this connection is called where it is reported.
@@ -42,12 +44,42 @@ pub(super) async fn seed_solvers(ctx: &Ctx, fillers: &Fillers) -> Vec<crate::see
             protocol: Protocol(native.name().to_owned()),
             tag: SOLVER_TAG.to_owned(),
         };
+        let state = if ctx.dry_run || answering(ctx, fillers, pairing.filler).await {
+            told(&indexer, &asker.name, &solver, ctx.dry_run).await
+        } else {
+            crate::seed::State::Failed {
+                detail: format!(
+                    "{} did not answer within {} seconds of being asked, so {} was not told \
+                     about it",
+                    solver.name,
+                    crate::patience::STARTING.longest().as_secs(),
+                    asker.name
+                ),
+            }
+        };
         wirings.push(crate::seed::Wiring::settled(
             connection(&solver.name, &asker.name),
-            told(&indexer, &asker.name, &solver, ctx.dry_run).await,
+            state,
         ));
     }
     wirings
+}
+
+/// Whether `solver` answers, asked through the adapter fronting it as a service coming up
+/// from its first start is; one asked over no contract is not asked.
+async fn answering(ctx: &Ctx, fillers: &Fillers, solver: &Filler) -> bool {
+    let speaker = fillers.fronting(solver).unwrap_or(solver);
+    let Spoken::Over(adapter) = spoken(ctx, speaker, proxy::CAPABILITY, proxy::MAJOR).await else {
+        return true;
+    };
+    let adapter = proxy::Adapter(adapter);
+    let answers = |answered: &Result<bool, Failure>| matches!(answered, Ok(true));
+    answers(&adapter.answers().await)
+        || answers(
+            &crate::patience::STARTING
+                .until(|| adapter.answers(), answers)
+                .await,
+        )
 }
 
 /// The indexer as this pass tells it, over `indexer.search`: nothing where it does not

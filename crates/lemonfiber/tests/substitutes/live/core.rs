@@ -109,6 +109,12 @@ impl Core {
         ]
     }
 
+    /// Where it keeps everything, laid out as it lays it out.
+    #[must_use]
+    pub fn paths(&self) -> lemonfiber_core::config::paths::Paths {
+        lemonfiber_core::config::paths::Paths::rooted(&self.config, &self.data)
+    }
+
     /// Run `args`, and where it names an offer, run it again answering that offer.
     #[must_use]
     pub fn agreed(&self, args: &[&str]) -> Ran {

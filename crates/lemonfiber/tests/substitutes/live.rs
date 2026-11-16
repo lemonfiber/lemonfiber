@@ -10,6 +10,7 @@ mod core;
 mod http;
 mod member;
 mod site;
+pub mod solving;
 mod substitute;
 
 pub use self::substitute::Substitution;
@@ -208,14 +209,25 @@ fn services_of(plugin: &str) -> Vec<toml::Value> {
         .unwrap_or_default()
 }
 
-/// The port the bundle's `service` of `plugin` publishes, as its copy declares it.
-fn published(plugin: &str, service: &str) -> Option<u16> {
+/// What the bundle's copy of `plugin` declares for its `service` under `field`.
+fn declared(plugin: &str, service: &str, field: &str) -> Option<toml::Value> {
     services_of(plugin)
         .iter()
         .find(|one| one.get("id").and_then(toml::Value::as_str) == Some(service))?
-        .get("port")?
+        .get(field)
+        .cloned()
+}
+
+/// The port `field` of the bundle's `service` of `plugin` names, as its copy declares it.
+fn port_of(plugin: &str, service: &str, field: &str) -> Option<u16> {
+    declared(plugin, service, field)?
         .as_integer()
         .and_then(|port| u16::try_from(port).ok())
+}
+
+/// The port the bundle's `service` of `plugin` publishes, as its copy declares it.
+fn published(plugin: &str, service: &str) -> Option<u16> {
+    port_of(plugin, service, "port")
 }
 
 /// The service of the bundle's copy of `plugin` that provides `capability`.
@@ -240,6 +252,11 @@ fn docker_address(args: &[&str]) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The container the engine runs `service` in.
+fn container(service: &str) -> String {
+    format!("lemonfiber-{service}-1")
+}
+
 /// The gateway of the network the indexer's container sits on, which reaches this machine.
 fn gateway() -> Option<String> {
     let output = std::process::Command::new("docker")
@@ -247,7 +264,7 @@ fn gateway() -> Option<String> {
             "inspect",
             "--format",
             "{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}",
-            &format!("lemonfiber-{INDEXER}-1"),
+            &container(INDEXER),
         ])
         .output()
         .ok()?;
@@ -276,8 +293,9 @@ fn bridged() -> Option<String> {
 }
 
 /// The site added to the indexer as the operator adds one: its own Newznab definition
-/// from the indexer's schema, pointed at the site, under the key the core minted for it.
-fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
+/// from the indexer's schema, pointed at the site and under `tags`, asked under the key
+/// the core minted for it. The id the indexer gave it.
+fn site_added(key: &str, port: u16, site: &str, tags: &[i64]) -> Result<i64, String> {
     let schema = http::call("GET", port, "/api/v1/indexer/schema", key, None)?;
     let schemas: serde_json::Value =
         serde_json::from_str(&schema.body).map_err(|why| format!("{why}: {}", schema.body))?;
@@ -325,6 +343,7 @@ fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
         fields.insert("name".to_owned(), "lemonfiber arm".into());
         fields.insert("enable".to_owned(), true.into());
         fields.insert("appProfileId".to_owned(), 1.into());
+        fields.insert("tags".to_owned(), tags.into());
     }
     let added = http::call(
         "POST",
@@ -333,11 +352,13 @@ fn site_added(key: &str, port: u16, site: &str) -> Result<(), String> {
         key,
         Some(&definition.to_string()),
     )?;
-    if added.status / 100 == 2 {
-        Ok(())
-    } else {
-        Err(format!("{}: {}", added.status, added.body))
+    if added.status / 100 != 2 {
+        return Err(format!("{}: {}", added.status, added.body));
     }
+    serde_json::from_str::<serde_json::Value>(&added.body)
+        .ok()
+        .and_then(|made| made.get("id").and_then(serde_json::Value::as_i64))
+        .ok_or_else(|| format!("no id in {}", added.body))
 }
 
 /// The member invited, let ask under [`TRUSTED`], and asking for `asked` through the web
@@ -364,23 +385,19 @@ fn member_asked(core: &Core, asked: &Asked) {
     assert!(ask.is_ok(), "the member's ask: {ask:?}");
 }
 
-/// Run `asked` live through a stack this build sets up beneath `root`, with the usenet
-/// login `usenet` gives setup, and `substitution` put in place once it is first seeded.
+/// A stack this build sets up beneath `root` and starts with `forms`, with the usenet login
+/// `usenet` gives setup, seeded, and `substitution` put in place once it is first seeded.
+/// Nothing where the household has no address to reach it at.
 ///
 /// # Panics
 ///
 /// At the first step that does not come to what it should, naming it and what was said.
-pub fn run(
+fn started(
     root: &std::path::Path,
-    asked: &Asked,
+    forms: &[&str],
     usenet: &[&str],
     substitution: Option<&Substitution>,
-) {
-    let site = Site::serving(Release {
-        title: asked.release.to_owned(),
-        category: asked.category,
-        size: asked.size,
-    });
+) -> Option<Core> {
     let core = Core::beneath(root);
     let media = root.join("media");
     let media = media.to_string_lossy();
@@ -411,16 +428,14 @@ pub fn run(
     );
     let household = bridged();
     assert!(household.is_some(), "no address the household reaches");
-    let Some(household) = household else {
-        return;
-    };
+    let household = household?;
     let addressed = format!("{}={household}", lemonfiber_manifest::container::LAN_HOST);
     step(
         &core.agreed(&["settings", "set", &addressed]),
         "the household's address",
     );
     let mut up = vec!["up"];
-    up.extend(asked.forms);
+    up.extend(forms);
     step(&core.agreed(&up), "up");
     step(&core.run(&["seed"], ""), "seed");
     if let Some(substitution) = substitution {
@@ -428,18 +443,75 @@ pub fn run(
         assert!(made.is_ok(), "{made:?}");
         step(&core.run(&["seed"], ""), "seed after the substitution");
     }
+    Some(core)
+}
 
+/// The key the core minted for the indexer, and the port it is published on, or nothing
+/// where either cannot be read.
+///
+/// # Panics
+///
+/// Where the key is not revealed, or the bundle names no port for the indexer.
+fn indexer(core: &Core) -> Option<(String, u16)> {
     let revealed = core.run(&["credentials", "--reveal", INDEXER_KEY, "--confirm"], "");
     step(&revealed, "the indexer's key");
     let key = strings_under(&revealed.said, "value").into_iter().next();
     assert!(key.is_some(), "no key revealed:\n{}", revealed.printed);
     let port = published(INDEXER, INDEXER);
-    let gateway = gateway();
-    assert!(port.is_some() && gateway.is_some(), "{port:?} {gateway:?}");
-    let (Some(key), Some(port), Some(gateway)) = (key, port, gateway) else {
+    assert!(port.is_some(), "the bundle names no port for {INDEXER}");
+    Some((key?, port?))
+}
+
+/// The newest change the run made, undone.
+///
+/// # Panics
+///
+/// Where there is nothing to undo, or undoing it fails.
+fn undone(core: &Core) {
+    let history = core.run(&["history"], "");
+    step(&history, "history");
+    let stamp = history
+        .said
+        .pointer("/data/changes/0/at")
+        .and_then(serde_json::Value::as_u64);
+    assert!(stamp.is_some(), "nothing to undo:\n{}", history.printed);
+    if let Some(stamp) = stamp {
+        step(&core.agreed(&["undo", &stamp.to_string()]), "undo");
+    }
+}
+
+/// Run `asked` live through a stack this build sets up beneath `root`, with the usenet
+/// login `usenet` gives setup, and `substitution` put in place once it is first seeded.
+///
+/// # Panics
+///
+/// At the first step that does not come to what it should, naming it and what was said.
+pub fn run(
+    root: &std::path::Path,
+    asked: &Asked,
+    usenet: &[&str],
+    substitution: Option<&Substitution>,
+) {
+    let site = Site::serving(Release {
+        title: asked.release.to_owned(),
+        category: asked.category,
+        size: asked.size,
+    });
+    let Some(core) = started(root, asked.forms, usenet, substitution) else {
         return;
     };
-    let added = site_added(&key, port, &format!("http://{gateway}:{}", site.port));
+    let Some((key, port)) = indexer(&core) else {
+        return;
+    };
+    let gateway = gateway();
+    assert!(
+        gateway.is_some(),
+        "no gateway reaches this machine from {INDEXER}"
+    );
+    let Some(gateway) = gateway else {
+        return;
+    };
+    let added = site_added(&key, port, &format!("http://{gateway}:{}", site.port), &[]);
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 
@@ -459,14 +531,5 @@ pub fn run(
         asked.traced
     );
 
-    let history = core.run(&["history"], "");
-    step(&history, "history");
-    let stamp = history
-        .said
-        .pointer("/data/changes/0/at")
-        .and_then(serde_json::Value::as_u64);
-    assert!(stamp.is_some(), "nothing to undo:\n{}", history.printed);
-    if let Some(stamp) = stamp {
-        step(&core.agreed(&["undo", &stamp.to_string()]), "undo");
-    }
+    undone(&core);
 }

@@ -11,7 +11,7 @@ pub(crate) mod readers;
 mod recorded;
 mod renaming;
 mod resolved;
-mod restarting;
+pub(crate) mod restarting;
 pub(crate) mod run;
 mod secrets;
 pub(crate) mod store;
