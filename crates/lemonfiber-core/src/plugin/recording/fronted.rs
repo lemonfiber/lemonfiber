@@ -311,7 +311,8 @@ impl Asking<'_> {
     }
 
     /// The upstream healthy and the adapter ready, and where each is asked; or the step
-    /// that failed and why.
+    /// that failed and why. An upstream that runs only at the times its schedule names is
+    /// not running, so its health is not waited on.
     async fn ready(&self) -> Result<Reached, (&'static str, String)> {
         let upstream = Addressed::to(
             self.recorder.transport.opened(),
@@ -319,15 +320,17 @@ impl Asking<'_> {
             super::served::inside(self.upstream),
         );
         let serving = self.recorder.serving;
-        healthy(
-            serving,
-            upstream.as_ref(),
-            self.health,
-            self.served,
-            self.recorder.patience,
-        )
-        .await
-        .map_err(|why| ("health", why))?;
+        if self.upstream.fields.schedule.is_none() {
+            healthy(
+                serving,
+                upstream.as_ref(),
+                self.health,
+                self.served,
+                self.recorder.patience,
+            )
+            .await
+            .map_err(|why| ("health", why))?;
+        }
         let adapter = self.recorder.transport.opened();
         let base = self
             .fronting
