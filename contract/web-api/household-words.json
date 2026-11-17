@@ -1,4 +1,8 @@
 {
+  "declared": {
+    "form": "names a combination of profiles a stack declares, and an argument to the verbs that act on one",
+    "stack": "names the machine in every command, every path and every page of the documentation"
+  },
   "examples": [
     {
       "names": "4",
@@ -36,6 +40,13 @@
       "names": "v1.4.2",
       "text": "Now on v1.4.2"
     }
+  ],
+  "marks": [
+    "://",
+    "localhost",
+    "www.",
+    "/s",
+    "per second"
   ],
   "names": [
     "apprise",
