@@ -139,12 +139,10 @@ async fn a_bundle_holds_what_could_be_read_and_says_where_it_came_from() {
 
 /// A settings file for the named case, with `register` kept beside it as the record of
 /// what is installed.
-fn beside(name: &str, register: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("bundle-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    assert!(std::fs::create_dir_all(&dir).is_ok());
+fn beside(name: &str, register: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("bundle-{name}"));
     assert!(std::fs::write(dir.join("plugins.json"), register).is_ok());
-    dir.join(".env")
+    dir.within(".env")
 }
 
 #[tokio::test]
@@ -162,11 +160,12 @@ async fn a_bundle_names_each_installed_plugin_and_withholds_its_own_configuratio
             "takes_data": true
         }]
     }]}"#;
+    let env = beside("plugins", register);
     let context = ctx_at(
         Source::External(project()),
         true,
         Some("PUID=1000\nPLUGIN_KOMGA_KOMGA_API_KEY=held-by-the-plugin"),
-        beside("plugins", register),
+        env.to_path_buf(),
     );
 
     let files = collect(&context, LEMONFIBER, &Wanted::default())
@@ -197,12 +196,8 @@ async fn a_bundle_names_each_installed_plugin_and_withholds_its_own_configuratio
 
 #[tokio::test]
 async fn a_bundle_whose_plugin_record_will_not_read_says_so() {
-    let context = ctx_at(
-        Source::External(project()),
-        true,
-        None,
-        beside("plugins-unread", "{ not json"),
-    );
+    let env = beside("plugins-unread", "{ not json");
+    let context = ctx_at(Source::External(project()), true, None, env.to_path_buf());
 
     let contents = collect(&context, LEMONFIBER, &Wanted::default())
         .await

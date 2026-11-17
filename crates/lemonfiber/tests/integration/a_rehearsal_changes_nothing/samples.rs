@@ -363,14 +363,14 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         (
             "plugin",
             Command::Plugins(plugins::Asked::Install {
-                source: lemonfiber_core::plugin::Source::Path(a_plugin_source()),
+                source: lemonfiber_core::plugin::Source::Path(a_plugin_source().to_path_buf()),
                 consent: plugins::Consent::default(),
             }),
         ),
         (
             "plugin",
             Command::Authoring(lemonfiber_core::app::authoring::Asked::Record {
-                path: a_plugin_source(),
+                path: a_plugin_source().to_path_buf(),
                 taking: lemonfiber_core::plugin::Retaking::default(),
             }),
         ),

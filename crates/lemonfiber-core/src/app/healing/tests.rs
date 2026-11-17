@@ -93,7 +93,8 @@ fn ctx(name: &str, settings: &[(&str, &str)], http: &Arc<Fake>) -> Ctx {
 
 /// As [`ctx`], reaching each of `adapted` through `http`.
 fn reaching(name: &str, settings: &[(&str, &str)], http: &Arc<Fake>, adapted: &[Adapted]) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
@@ -102,7 +103,10 @@ fn reaching(name: &str, settings: &[(&str, &str)], http: &Arc<Fake>, adapted: &[
         .map(|(key, value)| format!("{key}={value}\n"))
         .collect();
     let _ = std::fs::write(&env, lines.concat());
-    let mut ctx = a_context().build().with_http(http.clone());
+    let mut ctx = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(http.clone());
     ctx.settings.env_file = Some(env);
     ctx.settings.stack_dir = Some(dir.join("data").join("stack"));
     curators::reaching(ctx, adapted)

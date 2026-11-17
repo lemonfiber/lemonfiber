@@ -252,7 +252,8 @@ async fn a_dispatched_offer_serialises_under_its_own_kind() {
 
 #[tokio::test]
 async fn a_dispatched_reversal_serialises_under_its_own_kind() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("dispatched-undo").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("dispatched-undo");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let _ = std::fs::create_dir_all(dir.join("data"));
@@ -263,7 +264,7 @@ async fn a_dispatched_reversal_serialises_under_its_own_kind() {
     };
     let json = dispatch(
         Command::Undo { run: None },
-        &a_context().settings(settings).build(),
+        &a_context().holding(dir_scratch).settings(settings).build(),
     )
     .await
     .ok()

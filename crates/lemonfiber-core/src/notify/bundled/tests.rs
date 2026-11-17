@@ -17,10 +17,12 @@ const PASSWORD: &str = "minted-for-the-household-ntfy";
 /// A machine running the ntfy plugin's service on [`PUBLISHED`], its password kept where
 /// `kept`.
 fn a_machine(named: &str, kept: bool) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("bundled-{named}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("bundled-{named}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     lemonfiber_fixtures::stack::manifest_without(&dir, "seerr");
     let mut ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .over(crate::stack::Source::External(Box::leak(
             dir.clone().into_boxed_path(),
         )))
@@ -143,10 +145,12 @@ fn with_no_password_kept_nothing_is_signed_in_with() {
 
 #[test]
 fn a_stack_that_cannot_be_read_hands_the_account_to_nobody() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("bundled-unread").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("bundled-unread");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .over(crate::stack::Source::External(Box::leak(
             dir.into_boxed_path(),
         )))

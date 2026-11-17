@@ -88,10 +88,11 @@ fn unmoved(name: &str) -> Ctx {
     a_context()
         .engine(Arc::new(running(&[GATE, DECLINE])))
         .settings(crate::config::Settings {
-            env_file: Some(env_file),
+            env_file: Some(env_file.to_path_buf()),
             stack_dir: Some(stack),
             ..crate::config::Settings::default()
         })
+        .holding(env_file)
         .build()
         .with_http(answering(true))
         .with_program(Proving::exiting(0, "request-gate 0.17.0\n"))

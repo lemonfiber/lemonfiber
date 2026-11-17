@@ -75,7 +75,7 @@ fn beside_contracted_requests(
     Vec<lemonfiber_manifest::Service>,
     crate::wiring::Fillers,
 ) {
-    let (_, at, gate) = scene(name, true, accepting(&["held"], &[]), http.clone(), true);
+    let (written, at, gate) = scene(name, true, accepting(&["held"], &[]), http.clone(), true);
     let ctx = crate::test_support::contracted_context(
         &at,
         crate::test_support::CONTRACTED_REQUESTS,
@@ -90,7 +90,10 @@ fn beside_contracted_requests(
     .with_random(Arc::new(lemonfiber_fixtures::support::FixedRandom(Some(
         vec![0xab; crate::secret::SECRET_BYTES],
     ))));
-    let ctx = crate::test_support::gated(ctx, &at, &gate);
+    let ctx = crate::test_support::Holds::holding_what(
+        crate::test_support::gated(ctx, &at, &gate),
+        &written,
+    );
     let services: Vec<_> = stack(true)
         .into_iter()
         .filter(|service| service.id != "seerr")
@@ -500,9 +503,7 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_no_token() {
     for (tag, trusted, keyed) in crate::test_support::unaskable_gates() {
         let http = Fake::always(Answer::reply(200, "[]"));
         let name = format!("tokens-rotate-unasked-{tag}");
-        let at = lemonfiber_fixtures::scratch::Scratch::named(&name).kept();
-        let _ = std::fs::remove_dir_all(&at);
-        let _ = std::fs::create_dir_all(&at);
+        let at = lemonfiber_fixtures::scratch::Scratch::new(&name);
         let ctx = crate::test_support::contracted_context(&at, crate::app::gating::SERVICE, keyed)
             .settings(Settings {
                 env_file: Some(at.join(".env")),
@@ -516,7 +517,7 @@ async fn a_gate_that_cannot_be_asked_over_its_contract_is_handed_no_token() {
         let fillers = crate::test_support::stack_fillers(
             stack(false),
             &[crate::test_support::a_contracted_gate()],
-            Some(&at),
+            Some(at.path()),
             trusted,
         );
 

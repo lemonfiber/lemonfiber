@@ -8,6 +8,7 @@ use lemonfiber_fixtures::ports::STAMPED;
 use super::{carry_out, missing_from};
 use crate::app::Ctx;
 use crate::plugin::{Lands, Write};
+use crate::test_support::Holds as _;
 
 /// A machine whose configuration and stack directories are both known; answers where its
 /// journal is.
@@ -15,7 +16,8 @@ fn machine(name: &str) -> (Ctx, PathBuf) {
     let mut ctx = crate::test_support::a_context().build();
     let env = crate::test_support::env_without_password(name);
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let journal = crate::app::targets::layout(&ctx)
         .map(|paths| paths.journal())
         .unwrap_or_default();
@@ -127,7 +129,8 @@ fn a_key_whose_directory_is_a_planted_link_is_refused_and_nothing_lands_outside(
 #[test]
 fn a_hand_over_the_machine_refuses_names_what_was_not_handed_over() {
     use std::os::unix::fs::MetadataExt as _;
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("writing-handed").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("writing-handed");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(std::fs::create_dir_all(&dir).is_ok());
     let key = dir.join("lemonfiber.key");

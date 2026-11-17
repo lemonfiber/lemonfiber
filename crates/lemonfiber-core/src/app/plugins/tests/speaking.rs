@@ -602,7 +602,8 @@ async fn an_adapter_handed_a_captured_secret_is_given_it_once_the_recipe_capture
             lemonfiber_fixtures::http::Answer::reply(200, r#"{"token":"t0k3n"}"#),
         ),
     ]));
-    let source = crate::plugin::Source::Path(source("adapter-captured", &manifest));
+    let plugin = source("adapter-captured", &manifest);
+    let source = crate::plugin::Source::Path(plugin.to_path_buf());
     let reading = plugins(
         &ctx,
         &Asked::Install {

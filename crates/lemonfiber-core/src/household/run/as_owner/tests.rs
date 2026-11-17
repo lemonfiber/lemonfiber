@@ -11,11 +11,8 @@ fn at(seconds: u64) -> Instant {
     Instant::from_seconds(seconds)
 }
 
-fn path(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join(crate::config::paths::ASKED_AS_OWNER)
+fn path(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::new(name).within(crate::config::paths::ASKED_AS_OWNER)
 }
 
 fn member(id: &str, name: &str) -> Member {

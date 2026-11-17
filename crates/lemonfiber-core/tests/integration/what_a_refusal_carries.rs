@@ -83,10 +83,11 @@ async fn an_agent_the_member_switched_off_is_left_alone() {
 /// The words are written down as carried, so nothing can carry them a second time.
 #[tokio::test]
 async fn what_was_carried_is_written_down_beside_the_reason() {
-    let carried = decided(&answering("told-once")).await;
+    let ctx = answering("told-once");
+    let carried = decided(&ctx).await;
     assert!(carried.contains("told why"), "{carried}");
 
-    let read = dispatch(Command::Household { member: None }, &answering("told-once"))
+    let read = dispatch(Command::Household { member: None }, &ctx)
         .await
         .ok()
         .map(Outcome::envelope)

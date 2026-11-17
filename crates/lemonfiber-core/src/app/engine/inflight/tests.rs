@@ -51,10 +51,8 @@ async fn a_form_holding_no_client_asks_nothing_at_all() {
 #[tokio::test]
 async fn both_clients_say_what_they_are_working_on() {
     let fake = usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
-    let ctx = reaching(
-        Arc::clone(&fake) as Arc<dyn Http>,
-        Some(env_without_password("in-flight")),
-    );
+    let env = env_without_password("in-flight");
+    let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
 
     let found = in_flight(&ctx, &named(&["dl"])).await;
 
@@ -70,10 +68,8 @@ async fn both_clients_say_what_they_are_working_on() {
 #[tokio::test]
 async fn a_download_that_has_finished_is_not_in_flight() {
     let fake = usenet::beside_torrents(&[torrent::finished()], &[]);
-    let ctx = reaching(
-        Arc::clone(&fake) as Arc<dyn Http>,
-        Some(env_without_password("finished")),
-    );
+    let env = env_without_password("finished");
+    let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
 
     assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
 }
@@ -115,7 +111,8 @@ async fn a_form_the_stack_does_not_declare_finds_nothing() {
 #[test]
 fn a_moved_plugin_is_stopped_with_the_profile_its_bundle_entry_names() {
     let mut ctx = a_context().build();
-    ctx.settings.env_file = Some(crate::test_support::env_without_password("in-flight-moved"));
+    let env = crate::test_support::env_without_password("in-flight-moved");
+    ctx.settings.env_file = Some(env.to_path_buf());
     crate::test_support::media::moved_in(&ctx);
     let named: Vec<String> = crate::test_support::media::moved()
         .map(|installed| crate::plugin::profile_of(&installed))

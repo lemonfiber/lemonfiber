@@ -185,17 +185,15 @@ fn taking_with(
     http: &Arc<Fake>,
     rehearsing: bool,
     random: bool,
-) -> (Ctx, std::path::PathBuf) {
-    let project = lemonfiber_fixtures::scratch::Scratch::named(&format!("taken-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&project);
-    let _ = std::fs::create_dir_all(&project);
-    let mut ctx = seed_ctx(true, None, Some(recorded_admin(name)))
+) -> (Ctx, lemonfiber_fixtures::scratch::Scratch) {
+    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("taken-{name}"));
+    let mut ctx = recorded_ctx(true, None, name)
         .with_http(http.clone())
         .with_filesystem(Files::empty())
         .with_random(Arc::new(FixedRandom(
             random.then(|| vec![RANDOM; crate::secret::SECRET_BYTES]),
         )));
-    ctx.settings.stack_dir = Some(project.clone());
+    ctx.settings.stack_dir = Some(project.to_path_buf());
     for curator in [TELEVISION, MUSIC, REQUESTS] {
         curator.recorded(&ctx);
     }
@@ -208,7 +206,11 @@ fn taking_with(
 }
 
 /// [`taking_with`], with randomness to replace a key.
-fn taking(name: &str, http: &Arc<Fake>, rehearsing: bool) -> (Ctx, std::path::PathBuf) {
+fn taking(
+    name: &str,
+    http: &Arc<Fake>,
+    rehearsing: bool,
+) -> (Ctx, lemonfiber_fixtures::scratch::Scratch) {
     taking_with(name, http, rehearsing, true)
 }
 

@@ -12,17 +12,15 @@ const PORT: u16 = 8471;
 /// A machine on `environment`, keeping its configuration under a directory of its own,
 /// with the operator's address where `written` names one.
 fn machine(named: &str, environment: Environment, written: Option<&str>) -> Ctx {
-    let dir =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("events-reached-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("events-reached-{named}"));
     crate::test_support::a_context()
         .environment(environment)
         .settings(Settings {
-            companion: Some(dir),
+            companion: Some(dir.to_path_buf()),
             events_address: written.map(str::to_owned),
             ..Settings::default()
         })
+        .holding(dir)
         .build()
 }
 

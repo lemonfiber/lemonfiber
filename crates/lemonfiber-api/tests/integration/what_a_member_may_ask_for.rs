@@ -11,8 +11,6 @@
 //! nothing consults is the failure mode these exist against, and it is one a unit
 //! test cannot see.
 
-use std::fs;
-
 use lemonfiber_core::error::codes::admit::NOT_YOURS;
 use lemonfiber_core::error::household::Words;
 
@@ -26,17 +24,20 @@ pub(crate) const MEMBER: &str = "a7f3";
 /// written, in `door`, for the reason every other one here is.
 pub(crate) const WHO: &str = "ana";
 
-/// A surface with a household in it, and the headers a member's own session travels
-/// on.
-pub(crate) async fn as_a_member(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
+/// A surface with a household in it, the headers a member's own session travels on,
+/// and the directory its password is kept in.
+pub(crate) async fn as_a_member(
+    named: &str,
+) -> (axum::Router, Vec<(&'static str, String)>, Scratch) {
+    let kept = keeping(named);
     let (router, _, _) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let mut carried = from_here();
     carried.push((TOKEN_HEADER, signed_in(router.clone()).await));
-    (router, carried)
+    (router, carried, kept)
 }
 
 /// The session a member is handed once they signed in at `router`.
@@ -60,16 +61,18 @@ pub(crate) async fn signed_in(router: axum::Router) -> String {
     opened
 }
 
-/// The same surface, carrying the token printed at the machine instead.
-fn as_the_machine(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
+/// The same surface, carrying the token printed at the machine instead, and the
+/// directory its password is kept in.
+fn as_the_machine(named: &str) -> (axum::Router, Vec<(&'static str, String)>, Scratch) {
+    let kept = keeping(named);
     let (router, token, _) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         not_the_token(),
     );
     let mut carried = from_here();
     carried.push((TOKEN_HEADER, token.as_str().to_owned()));
-    (router, carried)
+    (router, carried, kept)
 }
 
 /// Refused, and not emptied.
@@ -80,7 +83,7 @@ fn as_the_machine(named: &str) -> (axum::Router, Vec<(&'static str, String)>) {
 /// status has to say so.
 #[tokio::test]
 async fn a_member_is_refused_a_read_that_is_not_theirs() {
-    let (router, carried) = as_a_member("member-refused-read").await;
+    let (router, carried, _kept) = as_a_member("member-refused-read").await;
     let answer = asked(router, "GET", "/api/version", &carried, "").await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN);
@@ -91,7 +94,6 @@ async fn a_member_is_refused_a_read_that_is_not_theirs() {
          was not theirs: {}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory("member-refused-read"));
 }
 
 /// Said plainly, where the door's own refusals are deliberately vague.
@@ -101,7 +103,7 @@ async fn a_member_is_refused_a_read_that_is_not_theirs() {
 /// there is nothing left to guess.
 #[tokio::test]
 async fn the_refusal_a_member_gets_is_not_the_one_a_stranger_gets() {
-    let (router, carried) = as_a_member("member-two-refusals").await;
+    let (router, carried, _kept) = as_a_member("member-two-refusals").await;
     let refused = asked(router.clone(), "GET", "/api/version", &carried, "").await;
     let stranger = asked(router, "GET", "/api/version", &from_here(), "").await;
 
@@ -111,7 +113,6 @@ async fn the_refusal_a_member_gets_is_not_the_one_a_stranger_gets() {
         "a member who is not entitled and somebody carrying nothing were told the \
          same thing, so one of them was told something untrue"
     );
-    let _ = fs::remove_dir_all(a_directory("member-two-refusals"));
 }
 
 /// The one read that is theirs is let through rather than caught by the same net.
@@ -120,7 +121,7 @@ async fn the_refusal_a_member_gets_is_not_the_one_a_stranger_gets() {
 /// tested; what matters here is that the gate did not stop it.
 #[tokio::test]
 async fn a_member_reaches_the_one_read_that_is_theirs() {
-    let (router, carried) = as_a_member("member-own-read").await;
+    let (router, carried, _kept) = as_a_member("member-own-read").await;
     let answer = asked(router, "GET", "/api/requests", &carried, "").await;
 
     assert_ne!(
@@ -129,14 +130,13 @@ async fn a_member_reaches_the_one_read_that_is_theirs() {
         "the read a member opens the app to see was refused: {}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory("member-own-read"));
 }
 
 /// What they are playing is theirs too, and naming somebody else does not turn it into
 /// a refusal: the command it reaches is narrowed to them, which `entitled` proves.
 #[tokio::test]
 async fn a_member_reaches_what_they_are_playing_whoever_they_named() {
-    let (router, carried) = as_a_member("member-playing").await;
+    let (router, carried, _kept) = as_a_member("member-playing").await;
     for path in ["/api/playing", "/api/playing?member=bo"] {
         let answer = asked(router.clone(), "GET", path, &carried, "").await;
         assert_ne!(
@@ -146,7 +146,6 @@ async fn a_member_reaches_what_they_are_playing_whoever_they_named() {
             answer.body
         );
     }
-    let _ = fs::remove_dir_all(a_directory("member-playing"));
 }
 
 /// What the stack can do is told to a member as it is theirs, through every layer a
@@ -154,7 +153,7 @@ async fn a_member_reaches_what_they_are_playing_whoever_they_named() {
 /// is not is said to be unpermitted rather than left out.
 #[tokio::test]
 async fn a_member_is_told_what_the_stack_can_do_as_it_is_theirs() {
-    let (router, carried) = as_a_member("member-capabilities").await;
+    let (router, carried, _kept) = as_a_member("member-capabilities").await;
     let answer = asked(router, "GET", "/api/capabilities", &carried, "").await;
 
     assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
@@ -168,7 +167,6 @@ async fn a_member_is_told_what_the_stack_can_do_as_it_is_theirs() {
         "{}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory("member-capabilities"));
 }
 
 /// The actions door reaches the same decision the reads door does.
@@ -178,18 +176,17 @@ async fn a_member_is_told_what_the_stack_can_do_as_it_is_theirs() {
 /// about: the core refuses it, rather than the app having omitted the button.
 #[tokio::test]
 async fn a_member_is_refused_an_action_whatever_the_app_would_have_shown() {
-    let (router, carried) = as_a_member("member-action").await;
+    let (router, carried, _kept) = as_a_member("member-action").await;
     let answer = asked(router, "POST", "/api/actions/up", &carried, "{}").await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
-    let _ = fs::remove_dir_all(a_directory("member-action"));
 }
 
 /// A member's own progress is not refused at the door: it reaches the core, which here
 /// answers that there is no stack to read the media server from.
 #[tokio::test]
 async fn a_members_progress_reaches_the_core_rather_than_a_refusal() {
-    let (router, carried) = as_a_member("member-progress").await;
+    let (router, carried, _kept) = as_a_member("member-progress").await;
     let body = r#"{"id":"0123456789abcdef0123456789abcdef","position":1}"#;
     let answer = asked(router, "POST", "/api/actions/watched", &carried, body).await;
 
@@ -199,17 +196,15 @@ async fn a_members_progress_reaches_the_core_rather_than_a_refusal() {
         "{}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory("member-progress"));
 }
 
 /// And so does setup, which builds its commands by a third route of its own.
 #[tokio::test]
 async fn a_member_is_refused_a_step_of_setup() {
-    let (router, carried) = as_a_member("member-setup").await;
+    let (router, carried, _kept) = as_a_member("member-setup").await;
     let answer = asked(router, "GET", "/api/setup", &carried, "").await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
-    let _ = fs::remove_dir_all(a_directory("member-setup"));
 }
 
 /// Nothing above narrowed what was already answered.
@@ -219,7 +214,7 @@ async fn a_member_is_refused_a_step_of_setup() {
 /// else.
 #[tokio::test]
 async fn the_machine_is_refused_none_of_the_three() {
-    let (router, carried) = as_the_machine("machine-unchanged");
+    let (router, carried, _kept) = as_the_machine("machine-unchanged");
 
     for (method, path, body) in [
         ("GET", "/api/version", ""),
@@ -234,7 +229,6 @@ async fn the_machine_is_refused_none_of_the_three() {
             answer.body
         );
     }
-    let _ = fs::remove_dir_all(a_directory("machine-unchanged"));
 }
 
 /// A member whose household has gone quiet is refused, and told which fact it is.
@@ -247,11 +241,8 @@ async fn the_machine_is_refused_none_of_the_three() {
 async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked() {
     let named = "member-unreachable-read";
     let household = Recognising::knowing(MEMBER);
-    let (router, _, _) = door_with(
-        Some(keeping(named)),
-        Arc::clone(&household),
-        not_the_token(),
-    );
+    let kept = keeping(named);
+    let (router, _, _) = door_with(Some(kept.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router.clone(),
         "POST",
@@ -282,7 +273,6 @@ async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked()
          nothing: {}",
         refused.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// The stream is a request like any other, and refuses the same way.
@@ -294,11 +284,8 @@ async fn a_member_whose_household_went_quiet_is_told_what_could_not_be_checked()
 async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
     let named = "member-unreachable-stream";
     let household = Recognising::knowing(MEMBER);
-    let (router, _, _) = door_with(
-        Some(keeping(named)),
-        Arc::clone(&household),
-        not_the_token(),
-    );
+    let kept = keeping(named);
+    let (router, _, _) = door_with(Some(kept.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router.clone(),
         "POST",
@@ -323,7 +310,6 @@ async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
         "a member was not told in the household's words: {}",
         refused.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// The sign-in door stays open to somebody the household could not be asked about.
@@ -335,11 +321,8 @@ async fn a_member_whose_household_went_quiet_is_refused_the_stream_too() {
 async fn the_door_is_still_open_to_somebody_who_could_not_be_checked() {
     let named = "member-unreachable-door";
     let household = Recognising::knowing(MEMBER);
-    let (router, _, _) = door_with(
-        Some(keeping(named)),
-        Arc::clone(&household),
-        not_the_token(),
-    );
+    let kept = keeping(named);
+    let (router, _, _) = door_with(Some(kept.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router.clone(),
         "POST",
@@ -370,7 +353,6 @@ async fn the_door_is_still_open_to_somebody_who_could_not_be_checked() {
         "the sign-in door refused somebody it had not been able to ask about: {}",
         again.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// A member session on a build that has no household is one nothing can vouch for.
@@ -382,7 +364,8 @@ async fn the_door_is_still_open_to_somebody_who_could_not_be_checked() {
 #[tokio::test]
 async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
     let named = "member-no-household";
-    let (router, _, admitting) = door(Some(keeping(named)), not_the_token());
+    let kept = keeping(named);
+    let (router, _, admitting) = door(Some(kept.path()), not_the_token());
     let Some(opened) = admitting
         .sessions
         .opened(
@@ -412,7 +395,6 @@ async fn a_member_session_with_no_household_behind_it_is_unconfirmed() {
         "a member was not told in the household's words: {}",
         refused.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// A handler reached without the guard having named anybody says so.
@@ -466,11 +448,9 @@ async fn a_request_that_reached_a_handler_unnamed_is_not_served() {
 async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
     let named = "stream-alone";
     let household = Recognising::knowing(MEMBER);
-    let (router, _, admitting) = door_with(
-        Some(keeping(named)),
-        Arc::clone(&household),
-        not_the_token(),
-    );
+    let kept = keeping(named);
+    let (router, _, admitting) =
+        door_with(Some(kept.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router,
         "POST",
@@ -496,7 +476,6 @@ async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
         "a member was not told in the household's words: {}",
         refused.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// A member the household vouches for is let on to the stream and hears only what is
@@ -509,8 +488,9 @@ async fn the_stream_refuses_a_session_it_could_not_check_even_unguarded() {
 #[tokio::test]
 async fn the_stream_tells_a_member_only_what_is_theirs() {
     let named = "stream-alone-open";
+    let kept = keeping(named);
     let (router, token, admitting) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         not_the_token(),
     );
@@ -545,7 +525,6 @@ async fn the_stream_tells_a_member_only_what_is_theirs() {
         StatusCode::OK,
         "the machine was not let on to the stream"
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// Every route this surface serves, walked as a member.
@@ -558,7 +537,7 @@ async fn a_member_is_refused_every_route_that_is_not_theirs() {
     use lemonfiber_api::read::table::{BUNDLE, HELD, LOGS, OFFERED, REQUESTS};
 
     let named = "member-every-route";
-    let (router, carried) = as_a_member(named).await;
+    let (router, carried, _kept) = as_a_member(named).await;
     let operator_only: Vec<(&str, String)> = vec![
         ("GET", LOGS.to_owned()),
         (
@@ -601,7 +580,6 @@ async fn a_member_is_refused_every_route_that_is_not_theirs() {
             answer.body
         );
     }
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// The envelope names the member it was bought by.
@@ -613,8 +591,9 @@ async fn a_member_is_refused_every_route_that_is_not_theirs() {
 #[tokio::test]
 async fn the_session_a_member_buys_says_which_member() {
     let named = "member-named-on-the-wire";
+    let kept = keeping(named);
     let (router, _, _) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         not_the_token(),
     );
@@ -634,7 +613,6 @@ async fn the_session_a_member_buys_says_which_member() {
         "a member signed in and the envelope did not say who they are: {}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// The operator's envelope names nobody, which is what says they are the operator.
@@ -645,7 +623,8 @@ async fn the_session_a_member_buys_says_which_member() {
 #[tokio::test]
 async fn the_session_the_operator_buys_names_nobody() {
     let named = "operator-named-on-the-wire";
-    let (router, _, _) = door(Some(keeping(named)), not_the_token());
+    let kept = keeping(named);
+    let (router, _, _) = door(Some(kept.path()), not_the_token());
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
     assert_eq!(answer.status, StatusCode::OK);
@@ -655,7 +634,6 @@ async fn the_session_the_operator_buys_names_nobody() {
         "the operator's session named somebody: {}",
         answer.body
     );
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// An account nobody has claimed has no password, and signing in to it with an empty
@@ -663,8 +641,9 @@ async fn the_session_the_operator_buys_names_nobody() {
 #[tokio::test]
 async fn an_empty_password_opens_no_session() {
     let named = "member-empty-password";
+    let kept = keeping(named);
     let (router, _, _) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         not_the_token(),
     );
@@ -677,7 +656,6 @@ async fn an_empty_password_opens_no_session() {
     )
     .await;
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
-    let _ = fs::remove_dir_all(a_directory(named));
 }
 
 /// A member's grant and progress are answered in the reply to their own request: a

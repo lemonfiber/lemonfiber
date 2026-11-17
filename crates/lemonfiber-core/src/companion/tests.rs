@@ -36,8 +36,8 @@ fn machine(directory: Option<PathBuf>, name: Option<&str>, recorded: Option<&str
 }
 
 /// A directory the surface was served from encrypted, on the network, on `port`.
-fn served_from(named: &str, port: u16) -> PathBuf {
-    let at = Scratch::new(named).kept();
+fn served_from(named: &str, port: u16) -> Scratch {
+    let at = Scratch::new(named);
     let _ = certificate::kept_or_made(&lemonfiber_adapters::Disk, &at);
     let _ = served::record(
         &at,
@@ -61,7 +61,7 @@ async fn refused(ctx: &Ctx) -> Option<crate::error::Code> {
 #[tokio::test]
 async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
     let at = served_from("companion-paired", 8443);
-    let pairing = paired(&machine(Some(at.clone()), Some("den"), None)).await;
+    let pairing = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
     let fingerprint = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
@@ -100,7 +100,7 @@ async fn material_names_where_the_stack_is_and_the_certificate_it_presents() {
 #[tokio::test]
 async fn material_carries_no_credential_and_the_identifier_names_nobody() {
     let at = served_from("companion-no-credential", 8443);
-    let pairing = paired(&machine(Some(at), Some("den"), None)).await;
+    let pairing = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
     let written = pairing
         .as_ref()
         .map(|made| made.written.to_lowercase())
@@ -124,14 +124,14 @@ async fn material_carries_no_credential_and_the_identifier_names_nobody() {
 #[tokio::test]
 async fn the_identifier_survives_a_reissue_a_new_address_and_a_new_certificate() {
     let at = served_from("companion-stable", 8443);
-    let first = paired(&machine(Some(at.clone()), Some("den"), None)).await;
+    let first = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
 
-    let reissued = paired(&machine(Some(at.clone()), Some("den"), None)).await;
+    let reissued = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
 
-    let moved = paired(&machine(Some(at.clone()), None, Some("192.168.1.9"))).await;
+    let moved = paired(&machine(Some(at.to_path_buf()), None, Some("192.168.1.9"))).await;
 
     let _ = certificate::replaced(&lemonfiber_adapters::Disk, &at);
-    let recertified = paired(&machine(Some(at.clone()), Some("den"), None)).await;
+    let recertified = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
 
     let stack = |made: &Result<super::Pairing, _>| {
         made.as_ref().map(|made| made.material.stack.clone()).ok()
@@ -171,7 +171,8 @@ async fn what_pairing_rests_on_is_refused_by_name_when_missing() {
         Some(NOWHERE)
     );
 
-    let never = Scratch::new("companion-never-served").kept();
+    let never_scratch = Scratch::new("companion-never-served");
+    let never = never_scratch.to_path_buf();
     assert_eq!(
         refused(&machine(Some(never.clone()), Some("den"), None)).await,
         Some(NOT_SERVED)
@@ -197,24 +198,24 @@ async fn what_pairing_rests_on_is_refused_by_name_when_missing() {
     let _ = std::fs::remove_file(uncertified.join("certificate.pem"));
     let _ = std::fs::remove_file(uncertified.join("key.pem"));
     assert_eq!(
-        refused(&machine(Some(uncertified.clone()), Some("den"), None)).await,
+        refused(&machine(Some(uncertified.to_path_buf()), Some("den"), None)).await,
         Some(NO_CERTIFICATE)
     );
     let _ = std::fs::write(uncertified.join("key.pem"), "half");
     assert_eq!(
-        refused(&machine(Some(uncertified), Some("den"), None)).await,
+        refused(&machine(Some(uncertified.to_path_buf()), Some("den"), None)).await,
         Some(NO_CERTIFICATE)
     );
 
     let nameless = served_from("companion-nameless", 8443);
     assert_eq!(
-        refused(&machine(Some(nameless.clone()), None, None)).await,
+        refused(&machine(Some(nameless.to_path_buf()), None, None)).await,
         Some(NO_ADDRESS)
     );
 
     let _ = std::fs::write(nameless.join("stack"), "not one");
     assert_eq!(
-        refused(&machine(Some(nameless), Some("den"), None)).await,
+        refused(&machine(Some(nameless.to_path_buf()), Some("den"), None)).await,
         Some(UNNAMED)
     );
 }
@@ -224,7 +225,7 @@ async fn what_pairing_rests_on_is_refused_by_name_when_missing() {
 #[test]
 fn replacing_is_said_before_it_is_done() {
     let at = served_from("companion-replacing", 8443);
-    let ctx = machine(Some(at.clone()), Some("den"), None);
+    let ctx = machine(Some(at.to_path_buf()), Some("den"), None);
     let before = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()
@@ -253,7 +254,8 @@ fn replacing_is_said_before_it_is_done() {
 /// With nothing made yet, the cost is still said and there is nothing to name.
 #[test]
 fn replacing_where_none_was_made_names_none() {
-    let at = Scratch::new("companion-replacing-nothing").kept();
+    let at_scratch = Scratch::new("companion-replacing-nothing");
+    let at = at_scratch.to_path_buf();
     let said = replacing(&machine(Some(at), None, None), false);
     assert!(
         said.is_ok_and(|report| !report.replaced && report.fingerprint.is_none()),
@@ -271,7 +273,8 @@ fn replacing_refuses_what_it_cannot_reach() {
             .map(|problem| problem.code),
         Some(NOWHERE)
     );
-    let at = Scratch::new("companion-replacing-unreadable").kept();
+    let at_scratch = Scratch::new("companion-replacing-unreadable");
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::write(at.join("key.pem"), "half");
     assert_eq!(
         replacing(&machine(Some(at), None, None), false)
@@ -299,7 +302,7 @@ async fn both_halves_are_reached_through_the_one_command() {
     use crate::companion::Asked;
 
     let at = served_from("companion-dispatched", 8443);
-    let ctx = machine(Some(at.clone()), Some("den"), None);
+    let ctx = machine(Some(at.to_path_buf()), Some("den"), None);
     let paired = dispatch(Command::Companion(Asked::Pair), &ctx).await;
     assert!(matches!(paired, Ok(Outcome::Pairing(_))), "{paired:?}");
 
@@ -309,7 +312,7 @@ async fn both_halves_are_reached_through_the_one_command() {
         .map(|held| held.fingerprint);
     let rehearsed = dispatch(
         Command::Companion(Asked::Certificate { confirm: true }),
-        &machine(Some(at.clone()), Some("den"), None).rehearsing(),
+        &machine(Some(at.to_path_buf()), Some("den"), None).rehearsing(),
     )
     .await;
     assert!(
@@ -347,7 +350,7 @@ async fn a_run_answers_to_the_name_pairing_hands_out() {
 #[tokio::test]
 async fn the_report_carries_the_form_a_person_compares() {
     let at = served_from("companion-compared", 8443);
-    let pairing = paired(&machine(Some(at), Some("den"), None)).await;
+    let pairing = paired(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
     let written = pairing
         .as_ref()
         .ok()
@@ -410,7 +413,7 @@ fn a_refusal_of_pairing_names_no_command() {
 #[tokio::test]
 async fn reaching_a_served_machine_names_its_address_and_pin() {
     let at = served_from("companion-reaching", 8443);
-    let reaching = super::reaching(&machine(Some(at.clone()), Some("den"), None)).await;
+    let reaching = super::reaching(&machine(Some(at.to_path_buf()), Some("den"), None)).await;
     let pin = certificate::kept(&lemonfiber_adapters::Disk, &at)
         .ok()
         .flatten()

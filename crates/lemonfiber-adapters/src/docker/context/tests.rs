@@ -1,4 +1,5 @@
 use super::{beneath, endpoint_of, named_context, resolved, unverifiable, BENEATH_HOME};
+use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_ports::docker::{Origin, Reach, Target};
 use std::path::{Path, PathBuf};
 
@@ -7,12 +8,11 @@ use std::path::{Path, PathBuf};
 /// A real directory rather than a fake, because what is being exercised is the
 /// reading of somebody else's layout — a fake here would be asserting that this
 /// file agrees with itself about a format neither of them owns.
-struct Recorded(PathBuf);
+struct Recorded(Scratch);
 
 impl Recorded {
     fn new(label: &str) -> Self {
-        let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("context-{label}")).kept();
-        let _ = std::fs::remove_dir_all(&root);
+        let root = Scratch::unmade(&format!("context-{label}"));
         let _ = std::fs::create_dir_all(root.join("contexts").join("meta"));
         Self(root)
     }
@@ -45,12 +45,6 @@ impl Recorded {
             format!(r#"{{"currentContext":"{name}"}}"#),
         );
         self
-    }
-}
-
-impl Drop for Recorded {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

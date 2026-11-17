@@ -136,6 +136,9 @@ pub struct Ctx {
     /// A field rather than a constant read in place, so a test can sign an index with a
     /// key it made.
     pub catalogue_key: Option<Box<crate::plugin::Key>>,
+    /// What lives exactly as long as this context and its clones: the directories a
+    /// test's context reads and writes, removed when the last clone drops.
+    pub held: Arc<dyn std::any::Any + Send + Sync>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -208,6 +211,7 @@ impl Ctx {
             // half of this and not something a default could stand in for.
             archives: None,
             catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
+            held: Arc::new(()),
         }
     }
 

@@ -28,7 +28,7 @@ async fn a_removal_dispatches_and_says_what_it_would_cost() {
     let ctx = media::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 ..Settings::default()
             })
             .build()
@@ -166,7 +166,7 @@ async fn a_machine_with_no_address_makes_no_account_and_says_so() {
     let ctx = media::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 ..Settings::default()
             })
             .build()
@@ -207,7 +207,7 @@ async fn a_server_that_cannot_be_asked_makes_no_account_and_says_so() {
     let ctx = media::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
@@ -512,7 +512,8 @@ async fn offered_without_writing(named: &str, dry_run: bool, confirm: bool) {
 #[tokio::test]
 async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_address() {
     let env = recorded_admin("offers-declinable");
-    let stack = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack").kept();
+    let stack_scratch = lemonfiber_fixtures::scratch::Scratch::named("offers-declinable-stack");
+    let stack = stack_scratch.to_path_buf();
     lemonfiber_fixtures::stack::manifest_into(&stack);
     let stack: &'static std::path::Path = Box::leak(stack.into_boxed_path());
     let decline = Arc::new(
@@ -521,9 +522,10 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
     let ctx = crate::test_support::guards::with_decline(
         media::reaching(
             a_context()
+                .holding(stack_scratch)
                 .over(crate::stack::Source::External(stack))
                 .settings(Settings {
-                    env_file: Some(env.clone()),
+                    env_file: Some(env.to_path_buf()),
                     household_host: Some("192.168.1.20".to_owned()),
                     ..Settings::default()
                 })
@@ -559,8 +561,7 @@ async fn an_offer_on_a_stack_running_the_decline_service_carries_its_decline_add
 #[tokio::test]
 async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
     let env = recorded_admin("offers-joinable");
-    let companion =
-        lemonfiber_fixtures::scratch::Scratch::named("offers-joinable-companion").kept();
+    let companion = lemonfiber_fixtures::scratch::Scratch::named("offers-joinable-companion");
     let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
     let _ = crate::companion::served::record(
         &companion,
@@ -573,8 +574,8 @@ async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
     let ctx = media::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env.clone()),
-                companion: Some(companion.clone()),
+                env_file: Some(env.to_path_buf()),
+                companion: Some(companion.to_path_buf()),
                 household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })
@@ -593,8 +594,6 @@ async fn an_offer_on_a_machine_served_encrypted_carries_a_join_link() {
     .await;
     let record =
         std::fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
-    let _ = std::fs::remove_dir_all(companion);
 
     let join = invited(&made)
         .and_then(|report| report.join.clone())

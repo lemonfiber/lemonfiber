@@ -23,7 +23,7 @@ async fn a_move_the_library_survives_says_where_each_folder_lands_and_is_made_on
     // A record kept for some other setting: lemonfiber has written here before and
     // still has nothing recorded about the one this change names.
     remembering(&env, TORRENT, "on");
-    let ctx = reaching(env.clone(), &from, Protocols::none(), Vec::new());
+    let ctx = reaching(env.to_path_buf(), &from, Protocols::none(), Vec::new());
 
     let staged = changing(&ctx, DATA_ROOT, "/srv/new", UNSAID).await;
     let landing: Vec<String> = staged
@@ -56,7 +56,7 @@ async fn a_move_that_would_leave_the_library_pointing_at_nothing_cannot_be_force
     let from = PathBuf::from("/srv/old");
     let env = env_at("refused", &from);
     let ctx = reaching(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         vec!["/srv/new/media/movies"],
@@ -94,7 +94,7 @@ async fn a_move_is_refused_where_the_services_have_not_written_their_keys_yet() 
     let env = env_at("keyless", &from);
     let ctx = unkeyed(
         Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             data_root: Some(from),
             ..Settings::default()
         },
@@ -117,7 +117,7 @@ async fn a_move_no_service_will_answer_about_is_refused_where_there_is_a_library
     let from = PathBuf::from("/srv/old");
     let env = env_at("silent", &from);
     let ctx = over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Fake::by_path(vec![("", unavailable())]),
@@ -153,7 +153,7 @@ async fn a_folder_no_move_can_repoint_is_refused_by_name() {
     )];
     routes.extend(library());
     let ctx = over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Fake::by_path(routes),
@@ -181,7 +181,7 @@ async fn one_curator_that_will_not_list_is_passed_over_rather_than_read_as_a_bre
     let mut routes = vec![(curating(FILM, "root_folders"), unavailable())];
     routes.extend(library());
     let ctx = over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Fake::by_path(routes),
@@ -212,7 +212,7 @@ async fn a_move_with_no_library_behind_the_old_location_is_simply_made() {
     // since, so there is no edit under the change however hard it is looked for.
     remembering(&env, DATA_ROOT, "/srv/old");
     let ctx = over(
-        env.clone(),
+        env.to_path_buf(),
         &from,
         Protocols::none(),
         Fake::by_path(vec![("", unavailable())]),
@@ -232,7 +232,13 @@ async fn setting_the_data_location_to_where_it_already_is_asks_no_service_anythi
     let from = PathBuf::from("/srv/media");
     let env = env_at("unmoved", &from);
     let fake = Fake::by_path(library());
-    let ctx = over(env, &from, Protocols::none(), Arc::clone(&fake), Vec::new());
+    let ctx = over(
+        env.to_path_buf(),
+        &from,
+        Protocols::none(),
+        Arc::clone(&fake),
+        Vec::new(),
+    );
 
     let review = changing(&ctx, DATA_ROOT, "/srv/media", AGREED).await;
 
@@ -273,7 +279,7 @@ async fn a_stack_that_cannot_be_read_names_no_service_and_still_refuses_a_blind_
     let env = env_at("no-stack", &from);
     let ctx = stood_up(
         Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             data_root: Some(from),
             protocols: Protocols::both(),
             ..Settings::default()

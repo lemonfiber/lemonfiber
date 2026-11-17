@@ -21,6 +21,7 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_testing::media;
 use lemonfiber_testing::requests::{self, REQUESTS};
+use lemonfiber_testing::Holds as _;
 
 /// A media server that signs in and takes the account it is given, beside a request
 /// service that takes lemonfiber's key and whose adapter answers being told about the
@@ -64,7 +65,15 @@ fn context(env: &std::path::Path) -> Ctx {
 /// The same, over a transport the caller chose.
 fn context_over(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
     let stack = crate::common::household::stack_beside(env);
-    REQUESTS.keyed_in(context_on(env, http, stack, REQUESTS.running()))
+    REQUESTS.keyed_in(
+        context_on(
+            env,
+            http,
+            Source::External(stack.leaked()),
+            REQUESTS.running(),
+        )
+        .holding(stack),
+    )
 }
 
 /// The same again, over a stack the caller chose and with the engine also holding what
@@ -230,9 +239,10 @@ async fn somebody_already_here_is_named_once() {
 /// without the in-crate test would otherwise never run it.
 #[tokio::test]
 async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
-    static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    static WITHOUT: std::sync::OnceLock<lemonfiber_fixtures::scratch::Scratch> =
+        std::sync::OnceLock::new();
     let dir = WITHOUT.get_or_init(|| {
-        let to = lemonfiber_fixtures::scratch::Scratch::named("no-asking").kept();
+        let to = lemonfiber_fixtures::scratch::Scratch::named("no-asking");
         lemonfiber_fixtures::stack::manifest_without(&to, "seerr");
         to
     });
@@ -242,7 +252,7 @@ async fn a_stack_with_no_request_service_calls_it_nothing_tried() {
     let ctx = context_on(
         &env,
         http.clone(),
-        Source::External(Box::leak(dir.clone().into_boxed_path())),
+        Source::External(dir.path()),
         Reporting::default(),
     );
 

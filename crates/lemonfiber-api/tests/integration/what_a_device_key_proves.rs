@@ -72,13 +72,13 @@ fn built(
     keys: Keyring,
 ) -> (axum::Router, String, PathBuf, PathBuf) {
     let admission = keeping(&format!("device-{named}"));
-    let mut ctx = world(Some(admission.clone()), random);
+    let mut ctx = world(Some(admission.to_path_buf()), random);
     ctx.seams.clock = Stopped::at(ANDROID_RSA_ROOT.at);
-    let env = a_directory(&format!("device-env-{named}")).join(".env");
+    let env = a_directory(&format!("device-env-{named}")).within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     if let Some(phone) = phone {
         let under = credential::at(&admission)
@@ -110,12 +110,13 @@ fn built(
         );
     }
     let admitting = Arc::new(Admitting {
-        kept: Some(admission.clone()),
+        kept: Some(admission.to_path_buf()),
         keys,
         ..Admitting::default()
     });
-    let (router, token) = surface(ctx, &admitting);
-    (router, token.as_str().to_owned(), env, admission)
+    let (env_at, admission_at) = (env.to_path_buf(), admission.to_path_buf());
+    let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
+    (router, token.as_str().to_owned(), env_at, admission_at)
 }
 
 /// The value at `pointer` in an answer's body.

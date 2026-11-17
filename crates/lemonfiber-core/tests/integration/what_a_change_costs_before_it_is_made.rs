@@ -26,12 +26,12 @@ use lemonfiber_fixtures::http::{Answer, Fake};
 const ANSWERED: &str = "<rss><channel><item/></channel></rss>";
 
 /// A settings file at a scratch path of this test's own, holding `contents`.
-fn env_at(name: &str, contents: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("review-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
-    let written = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, contents));
-    assert!(written.is_ok(), "the scratch settings file is written");
+fn env_at(name: &str, contents: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let path = lemonfiber_fixtures::scratch::Scratch::new(&format!("review-{name}")).within(".env");
+    assert!(
+        std::fs::write(&path, contents).is_ok(),
+        "the scratch settings file is written"
+    );
     path
 }
 
@@ -72,7 +72,7 @@ fn on_disk(path: &Path, key: &str) -> Option<String> {
 #[tokio::test]
 async fn a_consequential_change_is_staged_with_its_difference_and_its_cost() {
     let path = env_at("staged", "DATA_ROOT=/srv/old\n");
-    let staged = changing(&ctx(path.clone()), DATA_ROOT_KEY, "/srv/new", false).await;
+    let staged = changing(&ctx(path.to_path_buf()), DATA_ROOT_KEY, "/srv/new", false).await;
 
     let review = staged.as_ref().and_then(|report| report.review.clone());
     assert_eq!(
@@ -103,7 +103,7 @@ async fn a_consequential_change_is_staged_with_its_difference_and_its_cost() {
 #[tokio::test]
 async fn the_same_change_confirmed_is_the_one_that_lands() {
     let path = env_at("confirmed", "DATA_ROOT=/srv/old\n");
-    let applied = changing(&ctx(path.clone()), DATA_ROOT_KEY, "/srv/new", true).await;
+    let applied = changing(&ctx(path.to_path_buf()), DATA_ROOT_KEY, "/srv/new", true).await;
 
     assert_eq!(
         applied.and_then(|report| report.review).map(|r| r.stance),
@@ -118,7 +118,7 @@ async fn the_same_change_confirmed_is_the_one_that_lands() {
 async fn a_staged_change_serialises_with_its_difference_and_where_it_stands() {
     let path = env_at("envelope", "DATA_ROOT=/srv/old\n");
     let asked = Command::ConfigSet(Setting::to(DATA_ROOT_KEY, "/srv/new"));
-    let json = dispatch(asked, &ctx(path))
+    let json = dispatch(asked, &ctx(path.to_path_buf()))
         .await
         .ok()
         .map(Outcome::envelope)
@@ -138,7 +138,7 @@ async fn a_replacement_key_the_indexer_refuses_leaves_the_working_one_in_place()
         "refused",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path.clone(), Answer::reply(401, ""));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(401, ""));
     let outcome = changing(&ctx, INDEXER_APIKEY_KEY, "mistyped", false).await;
 
     let review = outcome.and_then(|report| report.review);
@@ -164,7 +164,7 @@ async fn a_replacement_key_the_indexer_accepts_is_the_one_that_lands() {
         "accepted",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path.clone(), Answer::reply(200, ANSWERED));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(200, ANSWERED));
     let outcome = changing(&ctx, INDEXER_APIKEY_KEY, "new-key", false).await;
 
     assert_eq!(
@@ -186,7 +186,13 @@ async fn a_value_that_cannot_be_read_leaves_the_file_alone_and_says_why() {
         "USENET_HOST=news.example.net\nUSENET_PORT=563\nUSENET_USER=someone\n\
          USENET_PASS=old-pass\nUSENET_TLS=on\n",
     );
-    let outcome = changing(&ctx(path.clone()), PROVIDER_PORT_KEY, "not-a-port", true).await;
+    let outcome = changing(
+        &ctx(path.to_path_buf()),
+        PROVIDER_PORT_KEY,
+        "not-a-port",
+        true,
+    )
+    .await;
 
     let review = outcome.and_then(|report| report.review);
     assert_eq!(
@@ -205,7 +211,7 @@ async fn a_value_that_cannot_be_read_leaves_the_file_alone_and_says_why() {
 #[tokio::test]
 async fn how_long_and_how_many_resent_actions_are_remembered_is_refused_outside_its_range() {
     let path = env_at("resending", "");
-    let machine = ctx(path.clone());
+    let machine = ctx(path.to_path_buf());
     for (key, value) in [
         (IDEMPOTENCY_MINUTES_KEY, "0"),
         (IDEMPOTENCY_MINUTES_KEY, "an hour"),
@@ -225,7 +231,7 @@ async fn how_long_and_how_many_resent_actions_are_remembered_is_refused_outside_
 #[tokio::test]
 async fn how_long_and_how_many_resent_actions_are_remembered_is_written_and_read_back() {
     let path = env_at("resending-kept", "");
-    let machine = ctx(path.clone());
+    let machine = ctx(path.to_path_buf());
     changing(&machine, IDEMPOTENCY_MINUTES_KEY, "45", true).await;
     changing(&machine, IDEMPOTENCY_KEYS_KEY, "64", true).await;
     let read = store::read(&path)

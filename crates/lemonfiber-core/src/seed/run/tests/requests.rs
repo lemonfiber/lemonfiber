@@ -38,7 +38,7 @@ fn curators(
 /// A context over `http` asking `adapted`, the television curator's minted key kept, with
 /// an env file of its own under `name`.
 fn asking(name: &str, http: Arc<Fake>, adapted: &[crate::test_support::adapted::Adapted]) -> Ctx {
-    let ctx = seed_ctx(true, None, Some(recorded_admin(name))).with_http(http);
+    let ctx = recorded_ctx(true, None, name).with_http(http);
     TELEVISION.minted(&ctx, MINTED_CURATOR_KEY);
     crate::test_support::adapted::asking(ctx, adapted)
 }

@@ -9,11 +9,13 @@ use crate::ports::service::{BookUnit, Left, MusicUnit};
 use crate::test_support::{a_context, a_password, env_at};
 
 fn ctx(name: &str) -> crate::app::Ctx {
+    let env = env_at(name, &a_password());
     a_context()
         .settings(Settings {
-            env_file: Some(env_at(name, &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
+        .holding(env)
         .build()
 }
 
@@ -183,7 +185,8 @@ fn asks_that_cannot_be_read_are_not_closed_and_say_why() {
 #[tokio::test]
 async fn a_stack_that_cannot_be_read_settles_no_curator() {
     let mut ctx = ctx("collected-no-stack");
-    let missing = lemonfiber_fixtures::scratch::Scratch::named("collected-missing-stack").kept();
+    let missing_scratch = lemonfiber_fixtures::scratch::Scratch::named("collected-missing-stack");
+    let missing = missing_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&missing);
     ctx.stack = crate::stack::Source::External(Box::leak(missing.into_boxed_path()));
 

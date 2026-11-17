@@ -12,7 +12,7 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
@@ -63,17 +63,29 @@ pub fn unguarded_embedded() -> Source {
     Source::Embedded(&CARRIED)
 }
 
-/// A stack directory of its own for one test, as `written` writes it.
+/// A stack directory of its own for one test, as `written` writes it, held until the
+/// process ends: a stack source is read wherever it is handed, and nothing it is handed to
+/// holds it.
 pub fn stack_apart(written: impl FnOnce(&Path)) -> Source {
+    static HELD: Mutex<Vec<Scratch>> = Mutex::new(Vec::new());
+    let (stack, scratch) = written_apart(written);
+    HELD.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .push(scratch);
+    stack
+}
+
+/// A stack directory of its own for one test, as `written` writes it, and the scratch it
+/// lies in, which removes it when dropped.
+fn written_apart(written: impl FnOnce(&Path)) -> (Source, Scratch) {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let copy = Scratch::new(&format!(
+    let scratch = Scratch::new(&format!(
         "repository-stack-{}",
         NEXT.fetch_add(1, Ordering::Relaxed)
-    ))
-    .kept()
-    .join("stack");
+    ));
+    let copy = scratch.join("stack");
     written(&copy);
-    Source::External(Box::leak(copy.into_boxed_path()))
+    (Source::External(Box::leak(copy.into_boxed_path())), scratch)
 }
 
 /// What the engine a test leaves unnamed says when asked for its images.
@@ -98,6 +110,7 @@ pub struct Context {
     stack: Source,
     settings: Settings,
     environment: Environment,
+    held: Vec<Scratch>,
 }
 
 /// A world that answers from scripts: programs succeed and say nothing, no containers
@@ -106,6 +119,7 @@ pub struct Context {
 /// wedged on the machine running the tests changes nothing.
 #[must_use]
 pub fn a_context() -> Context {
+    let (stack, scratch) = written_apart(lemonfiber_fixtures::stack::directory_into);
     Context {
         runner: Arc::new(Scripted(Ok(spoke("")))),
         engine: Arc::new(Reporting::absent()),
@@ -115,9 +129,10 @@ pub fn a_context() -> Context {
         networks: None,
         engine_volumes: None,
         http: None,
-        stack: repository_stack(),
+        stack,
         settings: Settings::default(),
         environment: Environment::MacOs,
+        held: vec![scratch],
     }
 }
 
@@ -213,6 +228,23 @@ impl Context {
         self
     }
 
+    /// The context over the stack directory `dir`, holding it so it goes when the built
+    /// context's last clone drops.
+    #[must_use]
+    pub fn stack_in(mut self, dir: Scratch) -> Self {
+        self.stack = Source::External(dir.leaked());
+        self.held.push(dir);
+        self
+    }
+
+    /// The context holding `scratch`, so its directory goes when the built context's last
+    /// clone drops.
+    #[must_use]
+    pub fn holding(mut self, scratch: Scratch) -> Self {
+        self.held.push(scratch);
+        self
+    }
+
     /// The context itself, ready for `Ctx`'s own `with_*` chain.
     #[must_use]
     pub fn build(self) -> Ctx {
@@ -240,6 +272,45 @@ impl Context {
             serving: lemonfiber_fixtures::serving::Serves::unreachable(),
             ..live
         };
-        Ctx::new(seams, self.stack, self.settings, self.environment)
+        Ctx {
+            held: Arc::new(self.held),
+            ..Ctx::new(seams, self.stack, self.settings, self.environment)
+        }
     }
 }
+
+/// A built context taking on more to hold: one more scratch directory, or everything
+/// another context holds.
+pub trait Holds {
+    /// The same context also holding `scratch`, so its directory goes when the last clone
+    /// drops.
+    #[must_use]
+    fn holding(self, scratch: Scratch) -> Self;
+
+    /// The same context also holding everything `other` holds, so what `other` was built
+    /// over stays for as long as this one lasts.
+    #[must_use]
+    fn holding_what(self, other: &Ctx) -> Self;
+}
+
+impl Holds for Ctx {
+    fn holding_what(self, other: &Ctx) -> Self {
+        let before = Arc::clone(&self.held);
+        Self {
+            held: Arc::new((before, Arc::clone(&other.held))),
+            ..self
+        }
+    }
+
+    fn holding(self, scratch: Scratch) -> Self {
+        let before = Arc::clone(&self.held);
+        Self {
+            held: Arc::new((before, scratch)),
+            ..self
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "context/tests.rs"]
+mod tests;

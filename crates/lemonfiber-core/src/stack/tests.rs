@@ -327,13 +327,10 @@ fn headline(source: Source) -> String {
 
 /// A stack directory holding the manifest `toml` describes, laid out as a stack is
 /// written, for a single test.
-fn written(named: &str, toml: &str) -> &'static Path {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(named).kept();
-    let _ = std::fs::remove_dir_all(&dir);
+fn written(named: &str, toml: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(named);
     lemonfiber_fixtures::stack::manifest_written(&dir, toml);
-    // Leaked deliberately, as the split-mount fixture above is and for the same
-    // reason: `Source::External` holds a `&'static Path`.
-    Box::leak(dir.into_boxed_path())
+    dir
 }
 
 /// A typo is a typo, and is not reported as a version the operator does not have.
@@ -344,7 +341,8 @@ fn written(named: &str, toml: &str) -> &'static Path {
 /// they need is on their own disk.
 #[test]
 fn a_stack_that_is_not_toml_is_not_blamed_on_the_version() {
-    let said = headline(Source::External(written("typo", "version = \n")));
+    let dir = written("typo", "version = \n");
+    let said = headline(Source::External(dir.leaked()));
     assert!(
         !said.contains("different version"),
         "a plain syntax error was reported as a version mismatch: {said}"
@@ -367,7 +365,8 @@ schema_version = 1
 id = \"jellyfin\"
 health = { kind = \"plex\" }
 ";
-    let problem = Source::External(written("unknown-name", stack))
+    let dir = written("unknown-name", stack);
+    let problem = Source::External(dir.leaked())
         .checked_manifest(today())
         .err()
         .map(|failure| failure.problem());
@@ -396,7 +395,7 @@ health = { kind = \"plex\" }
 fn a_stack_whose_files_break_the_layout_names_each_one() {
     let dir = written("unassembled", "schema_version = 1\n");
     let _ = std::fs::write(dir.join("services").join("stray.toml"), "");
-    let source = Source::External(dir);
+    let source = Source::External(dir.leaked());
     assert!(
         headline(source).contains("manifest files break the contract"),
         "{}",

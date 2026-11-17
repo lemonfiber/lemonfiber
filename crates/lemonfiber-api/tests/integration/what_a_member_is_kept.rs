@@ -22,9 +22,10 @@ fn a_household(named: &str) -> (Ctx, Arc<Fake>) {
             .build()
             .with_http(transport.clone()),
     );
-    ctx.settings.env_file = Some(a_directory(named).join(".env"));
+    let dir = a_directory(named);
+    ctx.settings.env_file = Some(dir.join(".env"));
     seeded(&ctx);
-    (ctx, transport)
+    (ctx.holding(dir), transport)
 }
 
 /// What a member's household read answers, as text.
@@ -67,7 +68,6 @@ async fn a_members_household_is_read_once_and_handed_back_until_it_runs_out() {
         transport.requests().len() > reached,
         "a read that had run out was handed back"
     );
-    let _ = fs::remove_dir_all(a_directory("kept-member"));
 }
 
 #[tokio::test(start_paused = true)]
@@ -83,7 +83,6 @@ async fn what_one_member_read_is_never_handed_to_another() {
         transport.requests().len() > reached,
         "a second member was handed the first member's read"
     );
-    let _ = fs::remove_dir_all(a_directory("kept-apart"));
 }
 
 /// Keeping a member's read keeps nothing about whether they may ask: removed at the
@@ -91,11 +90,8 @@ async fn what_one_member_read_is_never_handed_to_another() {
 #[tokio::test]
 async fn a_member_removed_is_refused_at_their_next_call_whatever_was_kept() {
     let household = Recognising::knowing("a7f3");
-    let (router, _, _) = door_with(
-        Some(keeping("kept-removed")),
-        Arc::clone(&household),
-        not_the_token(),
-    );
+    let kept = keeping("kept-removed");
+    let (router, _, _) = door_with(Some(kept.path()), Arc::clone(&household), not_the_token());
     let opened = asked(
         router.clone(),
         "POST",
@@ -113,7 +109,6 @@ async fn a_member_removed_is_refused_at_their_next_call_whatever_was_kept() {
 
     assert_ne!(before.status, StatusCode::FORBIDDEN, "{}", before.body);
     assert_eq!(after.status, StatusCode::FORBIDDEN, "{}", after.body);
-    let _ = fs::remove_dir_all(a_directory("kept-removed"));
 }
 
 /// A household that counts how often it is opened, and opens nothing until told to.

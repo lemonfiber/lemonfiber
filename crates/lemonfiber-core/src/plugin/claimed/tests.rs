@@ -68,9 +68,12 @@ fn recording(from: &str, method: &str, path: &str, response: &str) -> String {
 }
 
 /// A plugin source written to a scratch directory, with whatever recordings.
-fn source(named: &str, manifest: &str, fixtures: &[(&str, String)]) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("claimed-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn source(
+    named: &str,
+    manifest: &str,
+    fixtures: &[(&str, String)],
+) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("claimed-{named}"));
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
     for (name, body) in fixtures {
@@ -80,7 +83,7 @@ fn source(named: &str, manifest: &str, fixtures: &[(&str, String)]) -> PathBuf {
 }
 
 /// A whole plugin, with both recordings answering what the claim declares.
-fn whole(named: &str) -> PathBuf {
+fn whole(named: &str) -> lemonfiber_fixtures::scratch::Scratch {
     source(
         named,
         MANIFEST,
@@ -253,7 +256,7 @@ why     = "A reader nothing can reach is one nobody can open."
 "#;
 
 /// A plugin carrying that condition, with whatever its recording answered.
-fn proving(named: &str, status: u16) -> PathBuf {
+fn proving(named: &str, status: u16) -> lemonfiber_fixtures::scratch::Scratch {
     source(
         named,
         &format!("{MANIFEST}{PROVING}"),

@@ -1,7 +1,6 @@
 //! The doctor reads what the request gate refused and removed, on a stack that runs the
 //! gate, and reports each entry once.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_core::app::diagnose;
@@ -15,8 +14,8 @@ use lemonfiber_testing::guards::{with_gate, Gate};
 
 #[tokio::test]
 async fn a_refusal_is_reported_once_through_the_whole_diagnosis() {
-    let stack: &'static Path =
-        Box::leak(crate::common::stack::with_the_gate("record-read").into_boxed_path());
+    let stack_dir = crate::common::stack::with_the_gate("record-read");
+    let stack = stack_dir.leaked();
     let gate = Arc::new(Gate::default().recording(vec![GateEntry {
         seq: 1,
         at: 60,
@@ -25,11 +24,13 @@ async fn a_refusal_is_reported_once_through_the_whole_diagnosis() {
         path: "/sonarr/api/v3/command".to_owned(),
         outcome: GateOutcome::Refused,
     }]));
-    let config = lemonfiber_fixtures::scratch::Scratch::named("gated-record-config").kept();
+    let config_scratch = lemonfiber_fixtures::scratch::Scratch::named("gated-record-config");
+    let config = config_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&config);
     let env = config.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     let ctx = lemonfiber_testing::a_context()
+        .holding(config_scratch)
         .over(Source::External(stack))
         .runner(Arc::new(lemonfiber_fixtures::ports::Idle))
         .engine(Arc::new(Reporting::holding(

@@ -36,7 +36,7 @@ why     = "It has no port, so the live question is whether its own program start
 "#;
 
 /// The plugin's source, with one starting file for its service.
-fn starting(name: &str) -> PathBuf {
+fn starting(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     let at = source(name, RUNNING);
     let _ = std::fs::create_dir_all(at.join("config/qualitysync"));
     let _ = std::fs::write(at.join("config/qualitysync/recyclarr.yml"), "sonarr: {}\n");

@@ -24,12 +24,14 @@ fn ana() -> String {
 /// A machine keeping its configuration in a directory of this case's own, its media server
 /// moved into its plugin and answering with `household` where there is one.
 fn a_machine(named: &str, household: Option<String>) -> (Ctx, Arc<Heard>) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("keys-{named}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("keys-{named}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let heard = Arc::new(Heard::default());
     let ctx = a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(env),
             stack_dir: Some(dir.join("stack")),

@@ -124,7 +124,7 @@ async fn an_unreadable_register_leaves_the_stacks_own_door() {
             Health::Healthy,
         )))
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build()

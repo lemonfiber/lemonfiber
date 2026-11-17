@@ -21,10 +21,10 @@ use lemonfiber_core::config::Settings;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 
 /// A run over the stack this repository carries, its guards moved onto their plugins,
-/// keeping its settings in `named`.
-fn world(named: &str) -> (Ctx, std::path::PathBuf) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("filler-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+/// keeping its settings in `named`, which the test holds so what a run wrote there is read
+/// after the run is gone.
+fn world(named: &str) -> (Ctx, lemonfiber_fixtures::scratch::Scratch) {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("filler-{named}"));
     let _ = std::fs::create_dir_all(at.join("config"));
     let ctx = lemonfiber_testing::guards::moved(
         lemonfiber_testing::a_context()

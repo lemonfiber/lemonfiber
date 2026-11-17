@@ -170,7 +170,8 @@ async fn a_moved_media_servers_adapter_is_a_service_of_its_form_and_not_a_strang
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
         .alongside(media::running());
     let mut ctx = watching(engine);
-    ctx.settings.env_file = Some(crate::test_support::env_without_password("status-moved"));
+    let env = crate::test_support::env_without_password("status-moved");
+    ctx.settings.env_file = Some(env.to_path_buf());
     media::moved_in(&ctx);
 
     let answered = dispatch(

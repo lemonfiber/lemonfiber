@@ -5,8 +5,10 @@ use crate::test_support::curators::TELEVISION;
 /// under a scratch directory named `name`, the television curator moved into its plugin
 /// and its key minted.
 fn moved(name: &str) -> (crate::app::Ctx, std::path::PathBuf) {
-    let env = lemonfiber_fixtures::scratch::Scratch::new(name).join(".env");
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new(name);
+    let env = scratch.join(".env");
     let ctx = crate::test_support::a_context()
+        .holding(scratch)
         .settings(crate::config::Settings {
             env_file: Some(env.clone()),
             ..crate::config::Settings::default()

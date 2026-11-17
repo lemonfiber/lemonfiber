@@ -8,7 +8,7 @@
 /// key reads to a secret scanner as a hard-coded credential, and a fixture that has to
 /// be argued about every time it is scanned is worse than one that says what it means.
 #[track_caller]
-pub(crate) fn env_without_password(name: &str) -> std::path::PathBuf {
+pub(crate) fn env_without_password(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     recorded(name, None)
 }
 
@@ -17,7 +17,7 @@ pub(crate) fn env_without_password(name: &str) -> std::path::PathBuf {
 ///
 /// It names `config::store`, which is why it is on this side of the fixtures boundary.
 #[track_caller]
-pub(crate) fn env_at(name: &str, password: &str) -> std::path::PathBuf {
+pub(crate) fn env_at(name: &str, password: &str) -> lemonfiber_fixtures::scratch::Scratch {
     recorded(name, Some(password))
 }
 
@@ -27,10 +27,8 @@ pub(crate) fn env_at(name: &str, password: &str) -> std::path::PathBuf {
 /// says so instead of writing a blank one — which reads to a secret scanner as a
 /// hard-coded credential and to a reader as a password that happens to be empty.
 #[track_caller]
-fn recorded(name: &str, password: Option<&str>) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("env-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
+fn recorded(name: &str, password: Option<&str>) -> lemonfiber_fixtures::scratch::Scratch {
+    let path = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("env-{name}")).within(".env");
     assert!(
         crate::config::store::write(&path, "").is_ok(),
         "the scratch env file is written"

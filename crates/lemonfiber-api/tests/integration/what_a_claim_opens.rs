@@ -116,7 +116,6 @@ async fn a_claim_on_an_open_invitation_sets_the_password_and_opens_a_session() {
         !record.contains(CLAIM_HASHED),
         "the claim was not spent: {record}"
     );
-    let _ = fs::remove_dir_all(a_directory("claim-opens"));
 }
 
 #[tokio::test]
@@ -131,7 +130,6 @@ async fn a_token_the_invitation_does_not_carry_is_refused_and_sets_nothing() {
     assert_eq!(the_code(&answer.body), "ADMIT-13");
     assert!(session(&answer.body).is_empty());
     assert!(!set_a_password(&transport));
-    let _ = fs::remove_dir_all(a_directory("claim-opening-guessed"));
 }
 
 /// A password shorter than the least the core takes is refused before anything is
@@ -154,7 +152,6 @@ async fn a_short_password_is_refused_before_the_media_server_is_asked() {
         answer.body
     );
     assert!(transport.requests().is_empty());
-    let _ = fs::remove_dir_all(a_directory("claim-short"));
 }
 
 #[tokio::test]
@@ -168,7 +165,6 @@ async fn an_account_somebody_already_claimed_is_not_claimed_again() {
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED, "{}", answer.body);
     assert_eq!(the_code(&answer.body), "ADMIT-13");
     assert!(!set_a_password(&transport));
-    let _ = fs::remove_dir_all(a_directory("claim-taken"));
 }
 
 /// The media server setting no password is an account that is claimed or switched off by
@@ -188,7 +184,6 @@ async fn an_account_the_media_server_will_not_sign_in_empty_is_refused() {
     };
     let record = fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
     assert!(record.contains(CLAIM_HASHED), "{record}");
-    let _ = fs::remove_dir_all(a_directory("claim-closed"));
 }
 
 /// A media server that cannot be asked is said as that, not as an invitation that is
@@ -204,7 +199,6 @@ async fn a_household_that_cannot_be_read_claims_nothing() {
     assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
     assert_eq!(the_code(&answer.body), "ADMIT-7");
     assert!(!set_a_password(&transport));
-    let _ = fs::remove_dir_all(a_directory("claim-unread"));
 }
 
 /// A password the media server will not take is said as the media server not
@@ -224,7 +218,6 @@ async fn a_password_the_media_server_will_not_take_keeps_the_claim() {
     };
     let record = fs::read_to_string(env.with_file_name("invitations.json")).unwrap_or_default();
     assert!(record.contains(CLAIM_HASHED), "{record}");
-    let _ = fs::remove_dir_all(a_directory("claim-refused"));
 }
 
 /// A household handed to the door keeps no record of what it offered, so nothing it
@@ -249,5 +242,4 @@ async fn a_household_kept_for_a_while_asks_the_record_about_a_claim() {
     assert!(kept.offers_claim("a7f3", CLAIM).await);
     kept.claim_spent("a7f3");
     assert!(!kept.offers_claim("a7f3", CLAIM).await);
-    let _ = fs::remove_dir_all(a_directory("claim-remembered"));
 }

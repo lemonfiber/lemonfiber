@@ -14,7 +14,7 @@ pub(crate) use lemonfiber_fixtures::support::*;
 pub mod context;
 
 pub(crate) use context::{
-    a_context, nowhere, repository_stack as stack, unguarded_embedded, unguarded_stack,
+    a_context, nowhere, repository_stack as stack, unguarded_embedded, unguarded_stack, Holds,
 };
 
 mod blocking;
@@ -183,7 +183,8 @@ pub(crate) fn beside_contracted_requests(
     keyed: bool,
     http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
 ) -> crate::app::Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("contracted-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("contracted-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     lemonfiber_fixtures::stack::manifest_without(&dir, "seerr");
     if keyed {
@@ -199,6 +200,7 @@ pub(crate) fn beside_contracted_requests(
     .publishing(&[(CONTRACTED_REQUESTS, "127.0.0.1", 8080)])
     .alongside(media::running());
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .over(crate::stack::Source::External(Box::leak(
             dir.clone().into_boxed_path(),
         )))
@@ -226,7 +228,9 @@ pub(crate) fn beside_contracted_requests(
 /// `ctx` with every part the bundle installs recorded beside an env file of its own under
 /// `name`.
 pub(crate) fn parts_recorded(mut ctx: crate::app::Ctx, name: &str) -> crate::app::Ctx {
-    ctx.settings.env_file = Some(env_without_password(name));
+    let env = env_without_password(name);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     adapted::parts_recorded(&ctx);
     ctx
 }
@@ -241,10 +245,12 @@ pub(crate) fn moved_household(
     name: &str,
     http: std::sync::Arc<lemonfiber_fixtures::http::Fake>,
 ) -> crate::app::Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("moved-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("moved-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .engine(std::sync::Arc::new(media::running()))
         .build()
         .with_filesystem(std::sync::Arc::new(SeedFs::keyed(Some(KEYED_CURATOR))))

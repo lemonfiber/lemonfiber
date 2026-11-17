@@ -84,13 +84,13 @@ fn subcommands() -> BTreeSet<String> {
 /// Whole rather than minimal, because a manifest the reader refuses is turned back
 /// before it reaches the write — which would be a pass saying nothing about the
 /// thing this drives it for.
-fn a_plugin_source() -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named("rehearsed-plugin").kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
-    let _ = std::fs::write(
-        at.join("plugin.toml"),
-        r#"
+fn a_plugin_source() -> &'static Path {
+    static WRITTEN: std::sync::LazyLock<lemonfiber_fixtures::scratch::Scratch> =
+        std::sync::LazyLock::new(|| {
+            let at = lemonfiber_fixtures::scratch::Scratch::new("rehearsed-plugin");
+            let _ = std::fs::write(
+                at.join("plugin.toml"),
+                r#"
 schema_version = 1
 
 [plugin]
@@ -115,8 +115,10 @@ criticality = "important"
 takes_data  = true
 config_path = "/config"
 "#,
-    );
-    at
+            );
+            at
+        });
+    WRITTEN.path()
 }
 
 /// Every file under `root`, with its bytes, so two readings can be compared.
@@ -345,7 +347,7 @@ const CHANGES: [&str; 9] = [
 
 /// Drive one command as a rehearsal and say nothing changed, or why that is wrong.
 async fn unchanged(named: &str, command: Command) -> Result<(), String> {
-    let dir = scratch(named, !before_configuration(&command)).kept();
+    let dir = scratch(named, !before_configuration(&command));
     let kept = keeps_its_own_record(&command);
     let own = |path: &PathBuf| kept.is_some_and(|kept| path.file_name() == Some(kept.as_ref()));
     let mut before = tree(&dir);

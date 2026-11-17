@@ -43,6 +43,8 @@ pub(crate) struct Keys {
     pub(crate) revoked: Secret,
     /// A key scoped to the member the test household holds.
     pub(crate) member: Secret,
+    /// The directory they lie in, removed with these.
+    _dir: Scratch,
 }
 
 /// A machine keeping one key of each kind, and its password.
@@ -66,6 +68,7 @@ pub(crate) fn keeping_keys(named: &str) -> Keys {
         act: a_secret(2),
         revoked: a_secret(3),
         member: a_secret(4),
+        _dir: dir,
     };
     let mut gone = record("gone", Scope::Read, &keys.revoked);
     gone.revoked = Some(Instant::from_seconds(1_791_183_600));

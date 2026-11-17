@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use super::Pass;
 use crate::app::Ctx;
 use crate::journal::{Change, Kind};
+use crate::test_support::Holds as _;
 
 #[test]
 fn a_preview_is_not_a_write() {
@@ -18,7 +19,8 @@ fn machine(name: &str) -> (Ctx, PathBuf) {
         .build();
     let env = crate::test_support::env_without_password(name);
     ctx.settings.stack_dir = Some(env.with_file_name("data").join("stack"));
-    ctx.settings.env_file = Some(env);
+    ctx.settings.env_file = Some(env.to_path_buf());
+    ctx = ctx.holding(env);
     let project = super::directory(&ctx).unwrap_or_default();
     let (from, _) = cache(&project);
     let _ = std::fs::create_dir_all(&from);

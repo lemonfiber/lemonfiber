@@ -143,9 +143,13 @@ fn queued(stage: Stage, stuck: bool) -> Vec<QueueItem> {
 fn unmoved(fake: &Fake) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{nth}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("trace-{nth}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
-    let mut ctx = a_context().build().with_http(fake.transport());
+    let mut ctx = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(fake.transport());
     ctx.settings.env_file = Some(dir.join(".env"));
     ctx
 }

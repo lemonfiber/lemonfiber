@@ -3,7 +3,7 @@
 //! it removed is still listed, as expired, rather than vanishing as if nobody had been
 //! invited. An account that vanished with no lapse recorded for it is not reported.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::household::recorded_admin;
@@ -21,8 +21,8 @@ use lemonfiber_testing::media;
 
 /// The shipped stack, which runs the decline service, under a scratch directory of its
 /// own.
-fn stack_with_decline(tag: &str) -> PathBuf {
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("lapsed-{tag}")).kept();
+fn stack_with_decline(tag: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("lapsed-{tag}"));
     lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }
@@ -90,7 +90,8 @@ struct Read {
 
 async fn read(tag: &str, others: &[Member], lapsed: Option<TakenBack>) -> Read {
     let env = recorded_admin(&format!("lapsed-{tag}"));
-    let stack: &'static Path = Box::leak(stack_with_decline(tag).into_boxed_path());
+    let stack_dir = stack_with_decline(tag);
+    let stack = stack_dir.leaked();
     let decline = offered_and_lapsed(&env, lapsed);
     let http = holding(others);
     let ctx = media::keyed_in(
@@ -99,7 +100,7 @@ async fn read(tag: &str, others: &[Member], lapsed: Option<TakenBack>) -> Read {
             .engine(Arc::new(media::running()))
             .clock(Arc::new(lemonfiber_adapters::System))
             .settings(Settings {
-                env_file: Some(env.clone()),
+                env_file: Some(env.to_path_buf()),
                 household_host: Some("192.168.1.20".to_owned()),
                 ..Settings::default()
             })

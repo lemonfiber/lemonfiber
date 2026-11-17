@@ -19,10 +19,12 @@ const TOKEN: &str = "tk_kept_apart";
 
 /// A machine keeping its files beneath a directory named for `name`, reaching `http`.
 fn machine(name: &str, http: Arc<Fake>) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
             stack_dir: Some(dir.join("data").join("stack")),

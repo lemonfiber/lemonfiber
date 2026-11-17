@@ -20,8 +20,8 @@ use lemonfiber_core::ports::service::{HouseholdRequest, MediaStatus, Member, Req
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::media::Kind;
-use lemonfiber_testing::media;
 use lemonfiber_testing::requests::{self, REQUESTS};
+use lemonfiber_testing::{media, Holds as _};
 
 /// The household: the owner, who administers the server, and one ordinary member.
 fn household() -> Vec<Member> {
@@ -135,7 +135,8 @@ fn answering() -> Arc<Fake> {
 /// A context over the shipped stack, with the media server and the request service moved
 /// into their plugins and up, and a password recorded.
 fn context(env: &std::path::Path, http: Arc<Fake>) -> Ctx {
-    let mut ctx = context_on(env, http, crate::common::household::stack_beside(env));
+    let stack = crate::common::household::stack_beside(env);
+    let mut ctx = context_on(env, http, Source::External(stack.leaked())).holding(stack);
     ctx.seams.engine = Arc::new(media::running().alongside(REQUESTS.running()));
     REQUESTS.keyed_in(media::keyed_in(ctx))
 }
@@ -469,7 +470,8 @@ async fn a_stack_that_cannot_be_read_removes_nobody() {
 #[tokio::test]
 async fn a_stack_with_no_media_server_has_nobody_to_remove() {
     let env = recorded_admin("no-server");
-    let ctx = context_on(&env, answering(), stack_without("jellyfin", "server"));
+    let stack = stack_without("jellyfin", "server");
+    let ctx = context_on(&env, answering(), Source::External(stack.leaked()));
 
     let refused = confirmed(&ctx, "ana").await;
 
@@ -485,10 +487,11 @@ async fn a_stack_with_no_media_server_has_nobody_to_remove() {
 async fn a_stack_with_no_request_service_counts_nothing_and_asks_nothing() {
     let env = recorded_admin("no-asking");
     let http = answering();
+    let stack = stack_without("seerr", "asking");
     let ctx = media::keyed_in(context_on(
         &env,
         http.clone(),
-        stack_without("seerr", "asking"),
+        Source::External(stack.leaked()),
     ));
 
     let said = confirmed(&ctx, "ana").await;

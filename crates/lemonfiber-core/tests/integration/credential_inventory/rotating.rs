@@ -16,7 +16,7 @@ use std::sync::Arc;
 async fn a_credential_the_operators_provider_issued_is_not_replaced_here_and_says_where() {
     let key = format!("{}{}", "1111aaaa", "2222bbbb3333");
     let env = env_at("elsewhere", &[("INDEXER_APIKEY", &key)]);
-    let ctx = ctx(env.clone(), Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -40,7 +40,7 @@ async fn a_name_nothing_answers_to_changes_nothing_and_says_what_would_have() {
         "unknown",
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
-    let ctx = ctx(env.clone(), Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
     lemonfiber_testing::adapted::parts_recorded(&ctx);
 
     let inventory = asked(
@@ -73,7 +73,7 @@ async fn asking_to_see_a_credential_once_prints_the_warning_and_not_the_value() 
         "unconfirmed",
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -98,7 +98,7 @@ async fn asking_again_prints_the_value_and_the_warning_stays_beside_it() {
         "confirmed",
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
 
     let inventory = asked(
         &ctx,
@@ -146,7 +146,7 @@ async fn administrator_rotated(
 ) -> (String, Option<String>, Arc<Fake>) {
     let password = the_administrator_password();
     let env = env_at(name, &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)]);
-    let mut ctx = moved(env.clone(), http.clone());
+    let mut ctx = moved(env.to_path_buf(), http.clone());
     ctx.dry_run = rehearsing;
     let inventory = asked(
         &ctx,
@@ -238,7 +238,7 @@ async fn an_unproven_replacement_is_kept_beside_the_password_and_a_refused_one_i
         let password = the_administrator_password();
         let env = env_at(name, &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)]);
         let _ = asked(
-            &moved(env.clone(), http),
+            &moved(env.to_path_buf(), http),
             Asking::Rotate {
                 credential: "media server administrator".to_owned(),
                 agreement: None,
@@ -276,7 +276,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
     let http = administered(media::taken());
     let env = env_at("admin-unrecorded", &[]);
     let unrecorded = asked(
-        &moved(env, http.clone()),
+        &moved(env.to_path_buf(), http.clone()),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
             agreement: None,
@@ -292,7 +292,7 @@ async fn without_a_password_or_randomness_the_administrator_is_left_alone() {
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let unrandom = asked(
-        &moved(env.clone(), http.clone()).with_random(Arc::new(FixedRandom(None))),
+        &moved(env.to_path_buf(), http.clone()).with_random(Arc::new(FixedRandom(None))),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
             agreement: None,
@@ -317,7 +317,7 @@ async fn an_administrator_replacement_that_cannot_be_recorded_is_never_set() {
         &[(IDENTITY_SOURCE_ADMIN_PASSWORD_KEY, &password)],
     );
     let http = administered(media::taken());
-    lemonfiber_core::filed(&moved(env.clone(), http.clone())).await;
+    lemonfiber_core::filed(&moved(env.to_path_buf(), http.clone())).await;
     sealed(&env);
 
     let (said, _, _) = rotated_over(&env, "media server administrator", http.clone()).await;
@@ -345,12 +345,12 @@ async fn a_replacement_taken_and_not_moved_into_place_stays_pending() {
     );
     let http = sealing(
         administered(media::taken()),
-        env.clone(),
+        env.to_path_buf(),
         media::identity("replace_admin_password"),
     );
 
     let inventory = asked(
-        &moved(env.clone(), http),
+        &moved(env.to_path_buf(), http),
         Asking::Rotate {
             credential: "media server administrator".to_owned(),
             agreement: None,
@@ -404,12 +404,12 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
     );
     let http = administered(media::taken());
     let ctx = lemonfiber_testing::a_context()
-        .over(crate::common::household::stack_without(
+        .stack_in(crate::common::household::stack_without(
             "jellyfin",
             "rotate-admin",
         ))
         .settings(lemonfiber_core::config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..lemonfiber_core::config::Settings::default()
         })
         .build()
@@ -435,7 +435,7 @@ async fn with_no_media_server_the_administrator_password_is_left_alone() {
 #[tokio::test]
 async fn the_internal_certificate_is_offered_for_replacement_before_anything_moves() {
     let env = env_at("certificate", &[]);
-    let ctx = ctx(env, Files::empty(), silent());
+    let ctx = ctx(env.to_path_buf(), Files::empty(), silent());
     lemonfiber_testing::adapted::parts_recorded(&ctx);
 
     let inventory = asked(

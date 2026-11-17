@@ -12,10 +12,12 @@ use lemonfiber::cli::Fixing;
 
 /// Where a test's records live, in a scratch directory of its own — named, because a
 /// test that undoes a journal must not be reading one another test wrote.
-fn paths(name: &str) -> Paths {
-    let root = lemonfiber_fixtures::scratch::Scratch::named(&format!("repair-cli-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&root);
-    Paths::rooted(&root.join("config"), &root.join("data"))
+fn paths(name: &str) -> (Paths, lemonfiber_fixtures::scratch::Scratch) {
+    let root = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("repair-cli-{name}"));
+    (
+        Paths::rooted(&root.join("config"), &root.join("data")),
+        root,
+    )
 }
 
 /// A context over the stack this binary ships, with nothing configured — so nothing is
@@ -115,9 +117,10 @@ fn nothing_but_yes_agrees_to_a_repair() {
 /// wrote as well.
 #[tokio::test]
 async fn an_undo_with_nothing_repaired_puts_nothing_back() {
+    let (at, _root) = paths("nothing-undone");
     let code = run(
         &ctx(),
-        paths("nothing-undone"),
+        at,
         Mending {
             fixing: Fixing {
                 fix: false,
@@ -140,7 +143,7 @@ async fn an_undo_with_nothing_repaired_puts_nothing_back() {
 async fn an_undo_puts_back_what_the_last_repair_set() {
     use lemonfiber_core::journal::{Change, Kind};
 
-    let paths = paths("undone");
+    let (paths, _root) = paths("undone");
     let journal = paths.journal();
     if let Some(dir) = journal.parent() {
         std::fs::create_dir_all(dir).ok();
@@ -193,7 +196,7 @@ async fn an_undo_puts_back_what_the_last_repair_set() {
 async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
     use lemonfiber_core::journal::{Change, Kind};
 
-    let paths = paths("beyond-reach");
+    let (paths, _root) = paths("beyond-reach");
     let journal = paths.journal();
     if let Some(dir) = journal.parent() {
         std::fs::create_dir_all(dir).ok();
@@ -241,9 +244,10 @@ async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
         .over(Source::External(std::path::Path::new("/no/such/stack")))
         .build();
 
+    let (at, _root) = paths("unreadable");
     let code = run(
         &nowhere,
-        paths("unreadable"),
+        at,
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -286,9 +290,10 @@ async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
     // hang. `Nobody` refuses to be asked at all, so this fails rather than waits if
     // the question is ever put again.
     let nobody = Nobody::default();
+    let (at, _root) = paths("nobody");
     let code = run(
         &ctx(),
-        paths("nobody"),
+        at,
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -327,9 +332,10 @@ async fn a_rehearsal_asks_nobody_and_needs_no_terminal() {
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
     let nobody = Nobody::default();
+    let (at, _root) = paths("rehearsed-unattended");
     let code = run(
         &rehearsing,
-        paths("rehearsed-unattended"),
+        at,
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -369,10 +375,11 @@ async fn a_rehearsal_told_to_go_ahead_carries_nothing_out() {
 }
 
 async fn asked_for(yes: bool, json: bool) -> String {
+    let (at, _root) = paths("offers");
     shown(
         run(
             &ctx(),
-            paths("offers"),
+            at,
             Mending {
                 fixing: Fixing {
                     fix: true,

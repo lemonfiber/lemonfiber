@@ -71,7 +71,7 @@ async fn the_embedded_stack_declares_what_it_reads_and_one_on_disk_its_own_file(
 
     let dir = lemonfiber_fixtures::scratch::Scratch::new("declared-external");
     let _ = std::fs::write(dir.join(".env.example"), "# ours\nOURS=1\n");
-    let external: &'static Path = Box::leak(dir.to_path_buf().into_boxed_path());
+    let external = dir.leaked();
     assert_eq!(
         declared(crate::stack::Source::External(external)).await,
         vec!["OURS"]
@@ -155,7 +155,7 @@ async fn what_reaches_the_host_is_checked_by_name() {
 async fn a_name_only_the_stack_on_disk_declares_is_weighed() {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("declared-on-disk");
     let _ = std::fs::write(dir.join(".env.example"), "STACK_ONLY=1\n");
-    let external: &'static Path = Box::leak(dir.to_path_buf().into_boxed_path());
+    let external = dir.leaked();
     let ctx = a_context()
         .over(crate::stack::Source::External(external))
         .build();

@@ -39,10 +39,12 @@ fn an_alert_with_nothing_naming_it_is_said_as_nothing() {
 
 #[test]
 fn a_registration_the_journal_has_nowhere_to_go_is_refused_and_kept_nowhere() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("push-unjournalled-register").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("push-unjournalled-register");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(dir.join("config"));
     let ctx = crate::test_support::a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join("config").join(".env")),
             ..Settings::default()

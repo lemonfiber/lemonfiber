@@ -27,9 +27,10 @@ fn asking(unit: Unit, member: &str, name: &str, standing: Standing) -> Asking {
 
 #[tokio::test]
 async fn a_kept_ask_is_listed_under_whoever_made_it_after_their_other_requests_newest_first() {
+    let env = env_at("household-kept", &a_password());
     let ctx = a_context()
         .settings(Settings {
-            env_file: Some(env_at("household-kept", &a_password())),
+            env_file: Some(env.to_path_buf()),
             ..Settings::default()
         })
         .build();

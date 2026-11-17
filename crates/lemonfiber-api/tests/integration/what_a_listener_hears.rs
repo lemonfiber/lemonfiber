@@ -702,7 +702,7 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     let named = "listener-session-voided";
     let kept = crate::door::keeping(named);
     let admitting = Arc::new(lemonfiber_api::admission::Admitting {
-        kept: Some(kept.clone()),
+        kept: Some(kept.to_path_buf()),
         ..lemonfiber_api::admission::Admitting::default()
     });
     let clock = Stopped::at(0);
@@ -744,7 +744,6 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     tokio::time::advance(lemonfiber_api::events::RECHECKED_EVERY).await;
     say(&live, "after it went").await;
     let after = body.next().await;
-    let _ = std::fs::remove_dir_all(crate::door::a_directory(named));
 
     assert!(heard.is_some_and(|said| String::from_utf8_lossy(&said).contains("while it stood")));
     assert!(

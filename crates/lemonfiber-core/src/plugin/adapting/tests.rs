@@ -11,7 +11,8 @@ fn an_adapter_runs_as_the_owner_of_what_lemonfiber_writes_and_never_as_root() {
 
 #[test]
 fn a_stack_written_by_its_operator_runs_its_adapters_as_them_and_hands_nothing_over() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-owner").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("adapting-owner");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(std::fs::create_dir_all(dir.join("config/one-adapter")).is_ok());
     let key = dir.join("config/one-adapter/lemonfiber.key");
@@ -28,7 +29,8 @@ fn a_stack_written_by_its_operator_runs_its_adapters_as_them_and_hands_nothing_o
 
 #[test]
 fn a_whole_tree_is_handed_over_without_following_a_link_out_of_it() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-whole").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("adapting-whole");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let lent = dir.join("lent");
     assert!(std::fs::create_dir_all(lent.join("deeper")).is_ok());
@@ -61,7 +63,8 @@ fn a_whole_tree_is_handed_over_without_following_a_link_out_of_it() {
 /// for them is handed to that user, where whoever runs this may hand it over.
 #[test]
 fn what_is_written_beneath_a_stack_root_owns_is_handed_to_the_fallback_user() {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-root").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("adapting-root");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(std::fs::create_dir_all(&dir).is_ok());
     let key = dir.join("lemonfiber.key");
@@ -90,7 +93,8 @@ fn what_is_written_beneath_a_stack_root_owns_is_handed_to_the_fallback_user() {
 #[test]
 fn a_tree_that_cannot_be_read_says_where() {
     use std::os::unix::fs::PermissionsExt as _;
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("adapting-unread").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("adapting-unread");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let closed = dir.join("closed");
     assert!(std::fs::create_dir_all(closed.join("inside")).is_ok());

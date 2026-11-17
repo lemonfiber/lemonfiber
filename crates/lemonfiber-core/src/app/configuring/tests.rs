@@ -11,18 +11,23 @@ use crate::instant::Instant;
 use crate::model::ConfigReport;
 use crate::reconfigure::{Review, Stance};
 use crate::test_support::a_context;
+use crate::test_support::Holds as _;
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_fixtures::scratch::Scratch;
 
 /// A search a Torznab indexer answers with, which proves a key.
 const ANSWERED: &str = "<rss><channel><item/></channel></rss>";
 
 /// A scratch environment file holding the given settings.
-fn env_at(name: &str, contents: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("configuring-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
+fn env_at(name: &str, contents: &str) -> Scratch {
+    let path = Scratch::unmade(&format!("configuring-{name}")).within(".env");
     let _ = crate::config::store::write(&path, contents);
     path
+}
+
+/// [`ctx`] over the env file `env` stands for, holding the directory it lies in.
+fn ctx_holding(env: Scratch) -> Ctx {
+    ctx(env.to_path_buf()).holding(env)
 }
 
 /// A context over that file, for a stack that torrents.
@@ -91,7 +96,7 @@ async fn a_setting_declared_unmanaged_is_refused_with_the_reason_they_gave() {
     let path = env_at("unmanaged", "PUID=1000\n");
     let context = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(path.clone()),
+            env_file: Some(path.to_path_buf()),
             unmanaged: vec![(
                 "PUID".to_owned(),
                 "I set the ids here by hand to match my NAS".to_owned(),
@@ -123,7 +128,7 @@ async fn a_declared_setting_already_holding_what_was_asked_for_is_not_a_refusal(
     let path = env_at("unmanaged-same", "PUID=1000\n");
     let context = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(path),
+            env_file: Some(path.to_path_buf()),
             unmanaged: vec![(
                 "PUID".to_owned(),
                 "I set the ids here by hand to match my NAS".to_owned(),
@@ -140,7 +145,7 @@ async fn a_declared_setting_already_holding_what_was_asked_for_is_not_a_refusal(
 #[tokio::test]
 async fn a_name_the_settings_command_takes_is_refused_naming_it() {
     let path = env_at("fenced", "VPN_PORT_FORWARDING=on\n");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let refused = set(&ctx, Setting::to(VPN_PORT_FORWARDING_KEY, "off"))
         .await
         .err();
@@ -167,7 +172,7 @@ async fn an_unrelated_setting_says_nothing_about_seeding() {
     // Every setting a stack has passes through here. A sentence about seeding
     // attached to a change that did not touch it reads as a warning nobody
     // caused, which is how operators learn to ignore them.
-    let ctx = ctx(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
+    let ctx = ctx_holding(env_at("unrelated", "VPN_PORT_FORWARDING=off\n"));
     let said =
         consequence(&set(&ctx, Setting::to("LEMONFIBER_USENET", "on")).await).unwrap_or_default();
     // Turning Usenet on has a consequence of its own — what it opens and what it
@@ -184,7 +189,7 @@ async fn moving_the_data_location_says_what_it_affects_before_anything_moves() {
     // library the telling was for. So the sentence arrives while the old location
     // is still the one on disk.
     let path = env_at("moved", "DATA_ROOT=/srv/old\n");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let staged = set(&ctx, Setting::to(crate::config::DATA_ROOT_KEY, "/srv/new")).await;
 
     let said = consequence(&staged).unwrap_or_default();
@@ -200,7 +205,7 @@ async fn moving_the_data_location_says_what_it_affects_before_anything_moves() {
 #[tokio::test]
 async fn the_same_move_confirmed_is_the_one_that_lands() {
     let path = env_at("moved-agreed", "DATA_ROOT=/srv/old\n");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let applied = set(
         &ctx,
         Setting::to(crate::config::DATA_ROOT_KEY, "/srv/new").agreed(true),
@@ -221,7 +226,7 @@ async fn a_change_asked_to_wait_lets_what_is_coming_down_finish_before_it_weighs
     // rather than around it — a fixture that never drained would only prove that a
     // test can hang.
     let path = env_at("waited", "LEMONFIBER_TORRENT=on\n");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let outcome = set(
         &ctx,
         Setting::to(crate::config::TORRENT_KEY, "off")
@@ -242,7 +247,7 @@ async fn a_setting_already_holding_what_was_asked_for_has_nothing_to_do() {
     // Writing it again would move the file's own timestamp, which afterwards
     // reads as an edit somebody made outside lemonfiber.
     let path = env_at("same", "DATA_ROOT=/srv/media\n");
-    let ctx = ctx(path);
+    let ctx = ctx(path.to_path_buf());
     let outcome = set(
         &ctx,
         Setting::to(crate::config::DATA_ROOT_KEY, "/srv/media"),
@@ -261,7 +266,7 @@ async fn a_setting_already_holding_what_was_asked_for_has_nothing_to_do() {
 async fn a_setting_setup_never_asked_about_says_nothing_it_cannot_stand_behind() {
     // A cost invented for a setting whose consequences nobody worked out is worse
     // than silence: it teaches the operator to dismiss the ones that mean something.
-    let ctx = ctx(env_at("unasked", ""));
+    let ctx = ctx_holding(env_at("unasked", ""));
     assert_eq!(
         consequence(&set(&ctx, Setting::to("LEMONFIBER_EXPLANATIONS", "on")).await),
         None
@@ -274,7 +279,7 @@ async fn a_key_pasted_with_a_newline_on_it_is_stored_as_the_key() {
     // here with a newline still on it authenticates nowhere, while reading back
     // as though it were fine — which is the silent failure, not the loud one.
     let env = env_at("pasted", "");
-    let ctx = ctx(env.clone());
+    let ctx = ctx(env.to_path_buf());
     let written = set(&ctx, Setting::to(INDEXER_APIKEY_KEY, "  the-key\n")).await;
     assert!(written.is_ok());
     assert_eq!(
@@ -287,7 +292,7 @@ async fn a_key_pasted_with_a_newline_on_it_is_stored_as_the_key() {
 async fn naming_a_front_door_says_what_naming_one_costs() {
     // The operator is choosing to stop lemonfiber keeping this answer right, and
     // the moment they choose it is the only moment they are weighing it.
-    let ctx = ctx(env_at("door", ""));
+    let ctx = ctx_holding(env_at("door", ""));
     let said = consequence(&set(&ctx, Setting::to(FRONT_DOOR_KEY, "jellyfin")).await);
     assert_eq!(said.as_deref(), Some(crate::door::KEPT));
 }
@@ -310,7 +315,7 @@ fn origin_of(
 #[tokio::test]
 async fn a_setting_written_through_lemonfiber_is_read_back_as_the_operators() {
     let env = env_at("origin-written", "");
-    let ctx = ctx(env.clone());
+    let ctx = ctx(env.to_path_buf());
     let written = set(&ctx, Setting::to(EXPLANATIONS_KEY, "on")).await;
     assert!(written.is_ok());
     assert_eq!(on_disk(&env, EXPLANATIONS_KEY).as_deref(), Some("on"));
@@ -327,7 +332,7 @@ async fn a_setting_lemonfiber_never_wrote_says_unknown_rather_than_bundled() {
     // The state a machine is in before its first change through lemonfiber, and
     // the one where a guess would be wrong most usefully: what the file holds
     // cannot be told from what setup left, so the read says so.
-    let ctx = ctx(env_at("origin-unrecorded", "LEMONFIBER_EXPLANATIONS=on\n"));
+    let ctx = ctx_holding(env_at("origin-unrecorded", "LEMONFIBER_EXPLANATIONS=on\n"));
     let held = origin_of(&get(&ctx, Some(EXPLANATIONS_KEY)).await, EXPLANATIONS_KEY);
     assert_ne!(held, Some(crate::origin::Origin::Bundled));
     assert!(
@@ -343,7 +348,7 @@ async fn a_credential_says_it_is_unknown_because_it_is_never_recorded() {
     // Not the same silence as the setting above. Keeping a record of a credential
     // would mean holding the value twice, so this one is unknown because a rule
     // is working rather than because something was lost — and it says which.
-    let ctx = ctx(env_at("origin-credential", "INDEXER_APIKEY=abc123\n"));
+    let ctx = ctx_holding(env_at("origin-credential", "INDEXER_APIKEY=abc123\n"));
     let held = origin_of(
         &get(&ctx, Some(INDEXER_APIKEY_KEY)).await,
         INDEXER_APIKEY_KEY,
@@ -358,7 +363,7 @@ async fn a_credential_says_it_is_unknown_because_it_is_never_recorded() {
 
 #[tokio::test]
 async fn reading_a_setting_is_never_a_decision() {
-    let ctx = ctx(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
+    let ctx = ctx_holding(env_at("reading", "VPN_PORT_FORWARDING=off\n"));
     let read = get(&ctx, Some(VPN_PORT_FORWARDING_KEY)).await;
     assert_eq!(consequence(&read), None);
     assert_eq!(reviewed(&read), None);
@@ -369,7 +374,7 @@ async fn a_rehearsal_says_what_it_would_cost_and_writes_nothing() {
     // The review step and the rehearsal are the same thing said two ways, so the
     // one that changes nothing is the one most owed an account of what it would.
     let path = env_at("rehearsal", "LEMONFIBER_USENET=off\n");
-    let mut rehearsing = ctx(path.clone());
+    let mut rehearsing = ctx(path.to_path_buf());
     rehearsing.dry_run = true;
     let said = set(&rehearsing, Setting::to(crate::config::USENET_KEY, "on")).await;
 
@@ -400,7 +405,7 @@ async fn a_replacement_key_the_indexer_accepts_is_the_one_that_lands() {
         "key-good",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path.clone(), Answer::reply(200, ANSWERED));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(200, ANSWERED));
     let outcome = set(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
     assert_eq!(stance(&outcome), Some(Stance::Applied));
@@ -424,7 +429,7 @@ async fn a_replacement_key_the_indexer_refuses_never_reaches_the_file() {
         "key-bad",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path.clone(), Answer::reply(401, ""));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(401, ""));
     let outcome = set(&ctx, Setting::to(INDEXER_APIKEY_KEY, "mistyped")).await;
 
     assert_eq!(stance(&outcome), Some(Stance::Blocked));
@@ -447,7 +452,7 @@ async fn a_refusal_is_not_something_a_confirmation_gets_past() {
         "key-bad-confirmed",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path.clone(), Answer::reply(401, ""));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(401, ""));
     let outcome = set(
         &ctx,
         Setting::to(INDEXER_APIKEY_KEY, "mistyped").agreed(true),
@@ -470,7 +475,7 @@ async fn a_key_that_authenticated_but_is_limited_is_still_the_right_key() {
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
     let limited = r#"<error code="500" description="Request limit reached"/>"#;
-    let ctx = reaching(path.clone(), Answer::reply(200, limited));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(200, limited));
     let outcome = set(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
     assert_eq!(stance(&outcome), Some(Stance::Applied));
@@ -485,7 +490,7 @@ async fn an_address_given_before_a_key_is_not_put_to_a_service_at_all() {
     // Half a credential proven against an indexer would be refused on the half
     // nobody has given yet, which would make the first of two changes impossible.
     let path = env_at("half", "");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let outcome = set(
         &ctx,
         Setting::to(INDEXER_URL_KEY, "https://indexer.example/api"),
@@ -502,7 +507,7 @@ async fn an_address_given_before_a_key_is_not_put_to_a_service_at_all() {
 #[tokio::test]
 async fn a_replacement_nothing_could_prove_is_held_until_it_is_confirmed() {
     let path = env_at("tls-off", A_LOGIN);
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let held = set(&ctx, Setting::to(PROVIDER_TLS_KEY, "off")).await;
 
     assert_eq!(stance(&held), Some(Stance::Blocked));
@@ -523,7 +528,7 @@ async fn a_replacement_nothing_could_prove_is_held_until_it_is_confirmed() {
 #[tokio::test]
 async fn a_replacement_the_product_cannot_read_leaves_the_file_alone() {
     let path = env_at("port-bad", A_LOGIN);
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
     let outcome = set(
         &ctx,
         Setting::to(PROVIDER_PORT_KEY, "five-six-three").agreed(true),
@@ -545,7 +550,7 @@ async fn a_change_to_a_credential_is_withheld_on_both_sides_of_the_difference() 
         "withheld",
         "INDEXER_URL=https://indexer.example/api\nINDEXER_APIKEY=old-key\n",
     );
-    let ctx = reaching(path, Answer::reply(200, ANSWERED));
+    let ctx = reaching(path.to_path_buf(), Answer::reply(200, ANSWERED));
     let outcome = set(&ctx, Setting::to(INDEXER_APIKEY_KEY, "new-key")).await;
 
     let change = reviewed(&outcome).map(|review| review.change);
@@ -686,7 +691,7 @@ async fn a_credential_a_plugin_replaced_is_never_shown() {
 #[tokio::test]
 async fn a_setting_nothing_reads_is_refused_and_not_written() {
     let path = env_at("unknown-key", "TZ=Europe/Amsterdam\n");
-    let ctx = ctx(path.clone());
+    let ctx = ctx(path.to_path_buf());
 
     let report = set(
         &ctx,

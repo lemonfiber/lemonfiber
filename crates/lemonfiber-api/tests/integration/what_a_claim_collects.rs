@@ -17,12 +17,12 @@ use crate::what_a_key_admits::{code, presented, sent, NEXT_DOOR};
 /// clock, and nothing served on the network.
 fn waiting_machine(named: &str, claim: &Claim) -> (axum::Router, String, PathBuf) {
     let admission = keeping(&format!("claim-{named}"));
-    let mut ctx = world(Some(admission.clone()), not_the_token());
-    let env = a_directory(&format!("claim-env-{named}")).join(".env");
+    let mut ctx = world(Some(admission.to_path_buf()), not_the_token());
+    let env = a_directory(&format!("claim-env-{named}")).within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     let kept_at = lemonfiber_core::keys::run::at(&ctx).unwrap_or_default();
     let waiting = Record::claimed(
@@ -40,12 +40,13 @@ fn waiting_machine(named: &str, claim: &Claim) -> (axum::Router, String, PathBuf
     .keep(&kept_at)
     .is_ok());
     let admitting = Arc::new(Admitting {
-        kept: Some(admission),
+        kept: Some(admission.to_path_buf()),
         keys: Keyring::at(Some(kept_at), lemonfiber_core::keys::run::used_at(&ctx)),
         ..Admitting::default()
     });
-    let (router, token) = surface(ctx, &admitting);
-    (router, token.as_str().to_owned(), env)
+    let env_at = env.to_path_buf();
+    let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
+    (router, token.as_str().to_owned(), env_at)
 }
 
 /// A claim minted from a source answering with `byte`.

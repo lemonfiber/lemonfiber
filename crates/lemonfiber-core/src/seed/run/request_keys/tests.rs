@@ -9,13 +9,18 @@ use crate::test_support::{a_context, a_minting_curator, first_party, stack_fille
 use crate::wiring::Filler;
 
 /// The curator's adapter, written in a stack of its own named `name`, and that stack.
-fn an_adapter(name: &str) -> (Filler, std::path::PathBuf) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn an_adapter(
+    name: &str,
+) -> (
+    Filler,
+    std::path::PathBuf,
+    lemonfiber_fixtures::scratch::Scratch,
+) {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(name);
     let fillers = stack_fillers(
         Vec::new(),
         &[a_minting_curator()],
-        Some(&at),
+        Some(at.path()),
         &first_party("series"),
     );
     let adapter = fillers.service("series").cloned();
@@ -25,7 +30,7 @@ fn an_adapter(name: &str) -> (Filler, std::path::PathBuf) {
     };
     let held = adapter.confined_to.clone().unwrap_or_default();
     let _ = std::fs::create_dir_all(&held);
-    (adapter, held)
+    (adapter, held, at)
 }
 
 /// A context with randomness where `random`.
@@ -44,7 +49,7 @@ fn written(held: &std::path::Path) -> String {
 
 #[test]
 fn keys_are_read_one_to_a_line_and_found_by_what_the_gate_presents() {
-    let (adapter, held) = an_adapter("request-keys-read");
+    let (adapter, held, _at) = an_adapter("request-keys-read");
     let ctx = ctx(true);
 
     let none = Keys::of(&ctx, &adapter);
@@ -62,7 +67,7 @@ fn keys_are_read_one_to_a_line_and_found_by_what_the_gate_presents() {
 
 #[test]
 fn a_new_key_stands_in_place_of_those_held_or_beside_the_one_kept_until_it_alone_is_held() {
-    let (adapter, held) = an_adapter("request-keys-written");
+    let (adapter, held, _at) = an_adapter("request-keys-written");
     let ctx = ctx(true);
     let new = crate::secret::render(&[0xab; crate::secret::SECRET_BYTES]);
     let _ = std::fs::write(held.join(REQUEST_KEY_FILE), "stale\nstaler\n");
@@ -92,7 +97,7 @@ fn a_new_key_stands_in_place_of_those_held_or_beside_the_one_kept_until_it_alone
 
 #[test]
 fn no_key_is_written_without_randomness() {
-    let (adapter, held) = an_adapter("request-keys-unminted");
+    let (adapter, held, _at) = an_adapter("request-keys-unminted");
     let ctx = ctx(false);
     let keys = Keys::of(&ctx, &adapter);
     assert!(keys.is_ok());
@@ -113,7 +118,7 @@ fn no_key_is_written_without_randomness() {
 
 #[test]
 fn what_cannot_be_read_or_written_is_said_and_nothing_is_followed() {
-    let (adapter, held) = an_adapter("request-keys-refused");
+    let (adapter, held, _at) = an_adapter("request-keys-refused");
     let ctx = ctx(true);
 
     let mut homeless = adapter.clone();

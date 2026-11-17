@@ -145,12 +145,14 @@ async fn a_disk_nobody_could_measure_does_not_stop_work_on_a_guess() {
 /// wiping the other's while it was reading it.
 fn holding_one(name: &str, scratch: &str) -> crate::app::Ctx {
     let http = Fake::by_path(vec![seeding(name)]);
+    let env = env_without_password(scratch);
     torrent::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env_without_password(scratch)),
+                env_file: Some(env.to_path_buf()),
                 ..measuring()
             })
+            .holding(env)
             .build()
             .with_http(http)
             .with_filesystem(Arc::new(
@@ -346,10 +348,11 @@ async fn an_import_that_has_stopped_is_named_with_what_is_on_disk_for_it() {
         seeding("Never.Taken"),
         (crate::test_support::curators::curated("queue"), stalled()),
     ]);
+    let env = env_without_password("space-stalled");
     let mut ctx = torrent::reaching(
         a_context()
             .settings(Settings {
-                env_file: Some(env_without_password("space-stalled")),
+                env_file: Some(env.to_path_buf()),
                 ..measuring()
             })
             .build()
@@ -425,10 +428,11 @@ async fn a_stack_with_nowhere_to_read_its_services_files_measures_the_data_alone
 /// asked what it is waiting for.
 #[tokio::test]
 async fn the_services_own_files_are_measured_on_a_line_of_their_own() {
+    let env = env_without_password("space-services");
     let ctx = crate::test_support::guards::moved(
         a_context()
             .settings(Settings {
-                env_file: Some(env_without_password("space-services")),
+                env_file: Some(env.to_path_buf()),
                 ..measuring()
             })
             .build(),

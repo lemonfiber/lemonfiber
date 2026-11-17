@@ -124,7 +124,8 @@ async fn a_stack_that_came_up_reports_how_it_settled() {
     // The far end of a first run: images down, stack up, and how it settled put
     // on screen. It needs somewhere to write the stack Docker reads and an
     // engine that answers, which is what an applied setup leaves behind.
-    let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-started").kept();
+    let stack_dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("boot-started");
+    let stack_dir = stack_dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&stack_dir);
     let mut ctx = working_ctx();
     ctx.seams.engine = std::sync::Arc::new(engine_quiet());
@@ -145,7 +146,8 @@ async fn a_stack_that_came_up_reports_how_it_settled() {
 /// A start refused after the images came down is reported as the refusal it is.
 #[tokio::test(start_paused = true)]
 async fn a_start_refused_after_the_pull_is_reported_rather_than_settled() {
-    let stack_dir = lemonfiber_fixtures::scratch::Scratch::named("boot-refused").kept();
+    let stack_dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("boot-refused");
+    let stack_dir = stack_dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&stack_dir);
     let mut ctx = working_ctx();
     ctx.seams.engine = std::sync::Arc::new(engine_quiet());

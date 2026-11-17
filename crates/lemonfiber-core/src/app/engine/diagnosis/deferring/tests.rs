@@ -65,7 +65,8 @@ async fn the_claimed_check_asks_every_installed_part_claimed_first_over_its_cont
             "/lemonfiber/owner.claim/v1/owner",
             lemonfiber_fixtures::http::Answer::reply(200, "\"ours\""),
         )]));
-    ctx.settings.env_file = Some(crate::test_support::env_without_password("deferring-owned"));
+    let env = crate::test_support::env_without_password("deferring-owned");
+    ctx.settings.env_file = Some(env.to_path_buf());
     let key = crate::plugin::key_file(
         &crate::app::project::directory(&ctx).unwrap_or_default(),
         "claimed-part",
@@ -121,9 +122,10 @@ async fn plex_findings(
     }
     let ctx = a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build()
         .with_http(http);
     let mut register = crate::plugin::Register::empty();

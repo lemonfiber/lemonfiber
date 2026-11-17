@@ -8,7 +8,7 @@
 //! service drops what reached it, and one that kept those links would be refused for
 //! naming a service it no longer declares.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lemonfiber_manifest::assembly::{split, ROOT, SERVICES};
 use toml::{Table, Value};
@@ -57,16 +57,16 @@ pub fn directory_into(into: &Path) {
     copied(Path::new(lemonfiber_bundled::CARRIED_AT), into);
 }
 
-/// The carried stack as a stack directory holds it, written once into a directory kept
+/// The carried stack as a stack directory holds it, written once into a directory held
 /// for the whole run, for the tests that read it and write nothing beside it.
 #[must_use]
 pub fn on_disk() -> &'static Path {
-    static WRITTEN: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
-        let into = crate::scratch::Scratch::new("carried-stack").kept();
+    static WRITTEN: std::sync::LazyLock<crate::scratch::Scratch> = std::sync::LazyLock::new(|| {
+        let into = crate::scratch::Scratch::new("carried-stack");
         directory_into(&into);
         into
     });
-    &WRITTEN
+    WRITTEN.path()
 }
 
 /// Copy the file or the tree at `from` to `to`, links left behind.

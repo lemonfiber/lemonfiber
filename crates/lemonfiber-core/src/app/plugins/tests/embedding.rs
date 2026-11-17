@@ -4,6 +4,7 @@
 use super::fetching::{from_git, served, Serving};
 use super::*;
 use crate::ports::docker::{Health, Lifecycle};
+use crate::test_support::Holds as _;
 use crate::test_support::Reporting;
 
 /// The plugin the bundle installs.
@@ -19,11 +20,10 @@ fn moved(name: &str, serving: &Arc<Serving>) -> Ctx {
     let mut ctx = served(name, serving)
         .with_http(lemonfiber_fixtures::http::Fake::silent())
         .with_patience(std::time::Duration::ZERO);
-    let fork = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-fork")).kept();
-    let _ = std::fs::remove_dir_all(&fork);
+    let fork = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("{name}-fork"));
     lemonfiber_fixtures::stack::manifest_without(&fork, BUNDLED);
-    ctx.stack = crate::stack::Source::External(Box::leak(fork.into_boxed_path()));
-    ctx
+    ctx.stack = crate::stack::Source::External(fork.leaked());
+    ctx.holding(fork)
 }
 
 #[tokio::test]

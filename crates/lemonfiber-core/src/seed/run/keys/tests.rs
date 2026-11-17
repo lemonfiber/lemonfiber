@@ -8,7 +8,7 @@ fn a_minted_key_is_read_from_the_secret_store_and_absent_until_kept() {
     let env = env_without_password("keys-minted");
     let ctx = crate::test_support::a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();

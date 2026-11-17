@@ -22,6 +22,7 @@ pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Renamed, Stopped};
 pub(crate) use lemonfiber_fixtures::pulled::Pulled;
 pub(crate) use lemonfiber_fixtures::support::Reporting;
+pub(crate) use lemonfiber_testing::Holds as _;
 pub(crate) use std::path::Path;
 pub(crate) use std::sync::Arc;
 pub(crate) use tower::ServiceExt as _;
@@ -92,9 +93,7 @@ pub(crate) fn kept() -> String {
 
 /// A world whose settings are these, written to a scratch file this test owns.
 pub(crate) fn configured(named: &str, contents: &str) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("read-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let _ = std::fs::create_dir_all(&dir);
+    let dir = lemonfiber_fixtures::scratch::Scratch::new(&format!("read-{named}"));
     let path = dir.join(".env");
     let _ = std::fs::write(&path, contents);
     holding(
@@ -105,6 +104,7 @@ pub(crate) fn configured(named: &str, contents: &str) -> Ctx {
             ..Settings::default()
         },
     )
+    .holding(dir)
 }
 
 /// An engine reporting one healthy service.

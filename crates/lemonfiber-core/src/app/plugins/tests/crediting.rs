@@ -45,7 +45,8 @@ async fn told_with(name: &str, prepared: fn(&crate::app::Ctx)) -> Vec<String> {
     let key = crate::config::for_service("sonarr", crate::config::API_KEY_SUFFIX);
     crate::test_support::recorded_as(&env, &key, "k3y");
     prepared(&ctx);
-    let at = crate::plugin::Source::Path(source(name, &format!("{PROVING}{TELLING}")));
+    let plugin = source(name, &format!("{PROVING}{TELLING}"));
+    let at = crate::plugin::Source::Path(plugin.to_path_buf());
     let asked = Asked::Install {
         source: at,
         consent: super::super::Consent::default(),

@@ -188,12 +188,8 @@ async fn a_service_over_a_linked_directory_is_not_started_and_says_why() {
     let machine = Machine::coming(Coming::Answering);
     let archive = Kept::writing(true);
     let mut context = ctx(&machine, behind(&[("sonarr", CURATOR_BEHIND)]), &archive);
-    let project: &'static std::path::Path = Box::leak(
-        lemonfiber_fixtures::scratch::Scratch::new("update-linked")
-            .kept()
-            .join("stack")
-            .into_boxed_path(),
-    );
+    let held = lemonfiber_fixtures::scratch::Scratch::new("update-linked").within("stack");
+    let project = held.leaked();
     lemonfiber_fixtures::stack::directory_into(project);
     context.stack = lemonfiber_core::stack::Source::External(project);
     lemonfiber_fixtures::scratch::linked_away(project, "navidrome");

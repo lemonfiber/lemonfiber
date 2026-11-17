@@ -212,7 +212,8 @@ async fn settings_that_cannot_be_saved_reach_the_operator() {
 #[tokio::test]
 async fn settings_that_cannot_be_read_reach_the_operator() {
     // A file where the directory holding settings should be.
-    let blocker = lemonfiber_fixtures::scratch::Scratch::named("app-blocked").kept();
+    let blocker_scratch = lemonfiber_fixtures::scratch::Scratch::named("app-blocked");
+    let blocker = blocker_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&blocker);
     let _ = std::fs::write(&blocker, "in the way");
 

@@ -232,10 +232,8 @@ fn keeping(admission: Option<PathBuf>) -> Ctx {
 }
 
 /// A directory of this test's own, emptied first so a rerun starts fresh.
-fn a_directory(named: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("ui-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn a_directory(named: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    lemonfiber_fixtures::scratch::Scratch::unmade(&format!("ui-{named}"))
 }
 
 /// Bytes enough to mint a token from.

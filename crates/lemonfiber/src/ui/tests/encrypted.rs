@@ -34,7 +34,7 @@ async fn a_run_asked_to_encrypt_serves_and_writes_down_where() {
     let dir = a_directory("encrypted-served");
     let port = a_free_port().await;
     let ended = started(
-        keeping_pairing(dir.clone()),
+        keeping_pairing(dir.to_path_buf()),
         Asked {
             tls: true,
             port,
@@ -59,7 +59,7 @@ async fn a_run_asked_to_encrypt_serves_and_writes_down_where() {
 async fn a_run_asked_to_encrypt_on_no_port_serves_nothing() {
     let dir = a_directory("encrypted-portless");
     let ended = started(
-        keeping_pairing(dir.clone()),
+        keeping_pairing(dir.to_path_buf()),
         Asked {
             tls: true,
             ..Asked::default()

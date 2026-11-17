@@ -1,7 +1,6 @@
 //! The request gate's tokens are listed and replaced through the dispatcher, and never
 //! printed: lemonfiber keeps no copy of one.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Outcome};
@@ -23,8 +22,8 @@ fn accepting(tokens: &[&str]) -> Vec<String> {
 
 #[tokio::test]
 async fn a_gate_token_is_listed_unprinted_and_replaced() {
-    let stack: &'static Path =
-        Box::leak(crate::common::stack::with_the_gate("tokens-dispatched").into_boxed_path());
+    let stack_dir = crate::common::stack::with_the_gate("tokens-dispatched");
+    let stack = stack_dir.leaked();
     let gate = Arc::new(Gate::admitting(vec![Gated {
         target: Target::Curator {
             media_type: "tv".to_owned(),

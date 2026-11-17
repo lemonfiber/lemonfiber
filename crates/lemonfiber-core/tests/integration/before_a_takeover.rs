@@ -23,6 +23,7 @@ use lemonfiber_core::ports::filesystem::{FsKind, StorageFacts};
 use lemonfiber_core::reconfigure::Stance;
 use lemonfiber_fixtures::pulled::Pulled;
 use lemonfiber_fixtures::support::{Reporting, SeedFs};
+use lemonfiber_testing::Holds as _;
 
 /// A machine whose existing setup holds one service lemonfiber knows.
 fn over(engine: Reporting, images: Arc<Pulled>) -> Ctx {
@@ -162,11 +163,12 @@ fn keeping(ctx: Ctx, vault: &Arc<Captured>) -> Ctx {
 
 /// A machine ready to be taken over, keeping whatever the adoption captures.
 fn machine(lifecycle: Lifecycle, mounts: &[&str], name: &str) -> (Ctx, Arc<Captured>, PathBuf) {
-    let env = scratch(name).kept();
+    let env = scratch(name);
     let mut ctx = over(theirs(lifecycle, mounts), images());
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     let vault = Arc::new(Captured::default());
-    (keeping(ctx, &vault), Arc::clone(&vault), env)
+    let at = env.to_path_buf();
+    (keeping(ctx.holding(env), &vault), Arc::clone(&vault), at)
 }
 
 /// What adopting answered, or nothing where it refused to answer at all.

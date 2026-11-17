@@ -186,12 +186,14 @@ fn came_to(applied: &[Applied], service: &str) -> Option<(Ending, Reversal)> {
 /// did and writes nothing, which is what every case before this one is about. Its stack
 /// has no guard to move, so the run is the update's alone.
 fn recording(machine: &Arc<Machine>, archive: &Arc<Kept>, name: &str) -> (Ctx, PathBuf) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("journal-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("journal-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let stack = dir.join("data").join("stack");
     let _ = std::fs::create_dir_all(&stack);
 
     let context = lemonfiber_testing::a_context()
+        .holding(dir_scratch)
         .over(lemonfiber_testing::context::unguarded_stack())
         .runner(Arc::clone(machine) as Arc<dyn Runner>)
         .engine(Arc::clone(machine) as Arc<dyn Engine>)

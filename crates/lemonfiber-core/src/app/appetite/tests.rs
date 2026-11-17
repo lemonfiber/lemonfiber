@@ -3,6 +3,7 @@ use crate::alert::{Appetite, Wants};
 use crate::app::AlertAction;
 use crate::model::AlertReport;
 use crate::test_support::a_context;
+use crate::test_support::Holds as _;
 
 /// The whole outcome as text, so a test can assert on the words in it without a
 /// branch for the shape it never has.
@@ -76,9 +77,9 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 /// A context whose environment file is in an emptied scratch directory, so the
 /// answer lands beside it and concurrent tests do not share one.
 fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name).kept();
+    let dir = scratch(name);
     let _ = std::fs::remove_dir_all(&dir);
-    ctx_with(Some(dir.join(".env")))
+    ctx_with(Some(dir.join(".env"))).holding(dir)
 }
 
 /// A context with the given environment file, or none at all.

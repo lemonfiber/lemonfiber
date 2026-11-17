@@ -13,9 +13,11 @@ use crate::ports::docker::{Health, Lifecycle};
 use crate::ports::machine::{Power, Started, Supply};
 use crate::ports::process::Output;
 use crate::ports::Narrator;
+use crate::test_support::Holds as _;
 use crate::test_support::{a_context, nowhere, refused, spoke, Reporting, Scripted};
 use lemonfiber_fixtures::heard::Heard;
 use lemonfiber_fixtures::http::Fake;
+use lemonfiber_fixtures::scratch::Scratch;
 
 pub(super) use lemonfiber_fixtures::machine::Booted as Machine;
 
@@ -71,14 +73,15 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     lemonfiber_fixtures::scratch::Scratch::named(name)
 }
 
-/// Settings keeping their records in an emptied scratch directory.
-pub(super) fn settings_at(name: &str) -> Settings {
-    let dir = scratch(name).kept();
+/// Settings keeping their records in an emptied scratch directory, and that directory.
+pub(super) fn settings_at(name: &str) -> (Settings, Scratch) {
+    let dir = scratch(name);
     let _ = std::fs::remove_dir_all(&dir);
-    Settings {
+    let settings = Settings {
         env_file: Some(dir.join(".env")),
         ..Settings::default()
-    }
+    };
+    (settings, dir)
 }
 
 /// A context with the machine, the engine and the Compose answer a test scripted.
@@ -117,7 +120,8 @@ fn ctx_with(settings: Settings, machine: Machine, engine: Arc<Reporting>) -> Ctx
 
 /// A context over an emptied scratch directory, with the machine a test scripted.
 pub(super) fn ctx_at(name: &str, machine: Machine, engine: Arc<Reporting>) -> Ctx {
-    ctx_with(settings_at(name), machine, engine)
+    let (settings, dir) = settings_at(name);
+    ctx_with(settings, machine, engine).holding(dir)
 }
 
 /// A context whose Compose works and whose engine holds the library form, healthy.
@@ -255,17 +259,19 @@ async fn a_laptop_on_its_battery_is_left_alone_unless_it_was_opted_in() {
 async fn a_laptop_whose_operator_opted_in_is_started_on_its_battery() {
     // The other half of the requirement, and the reason the default is not a
     // rule: an operator who wants it has a reason for it.
+    let (settings, dir) = settings_at("opted-in");
     let ctx = ctx_with(
         Settings {
             autostart_on_battery: true,
-            ..settings_at("opted-in")
+            ..settings
         },
         Machine {
             at: Some(1_000),
             power: Some(Power::Battery),
         },
         awake(),
-    );
+    )
+    .holding(dir);
     asked(&ctx, &Returning::default().answering(true));
 
     assert_eq!(held(&run(&ctx).await), None);
@@ -372,7 +378,8 @@ async fn an_engine_that_arrives_late_is_waited_for_rather_than_given_up_on() {
 /// start itself as the only thing under test here.
 #[tokio::test]
 async fn a_stack_that_came_back_is_not_started_twice_and_leaves_nothing_to_report() {
-    let ctx = ctx_coming_back(settings_at("came-back"));
+    let (settings, dir) = settings_at("came-back");
+    let ctx = ctx_coming_back(settings).holding(dir);
     asked_for_the_library(&ctx);
     let (ctx, heard) = listening(ctx);
 
@@ -417,12 +424,13 @@ async fn a_confirmation_that_could_not_run_files_nothing_against_the_boot() {
 /// Settings as [`settings_at`] gives them, with a stack directory beside the records, so
 /// lemonfiber keeps files of its own here and a start can offer to install a part this
 /// machine has never run.
-fn settings_with_a_stack(name: &str) -> Settings {
-    let settings = settings_at(name);
-    Settings {
-        stack_dir: Some(scratch(name).kept().join("stack")),
+fn settings_with_a_stack(name: &str) -> (Settings, Scratch) {
+    let (settings, dir) = settings_at(name);
+    let settings = Settings {
+        stack_dir: Some(dir.join("stack")),
         ..settings
-    }
+    };
+    (settings, dir)
 }
 
 /// What a boot's report says waits for its install.
@@ -437,12 +445,8 @@ fn waiting(outcome: &Result<LifecycleReport, Box<Problem>>) -> Vec<String> {
 /// says for the next interaction which parts wait and that `up` offers them.
 #[tokio::test]
 async fn a_boot_whose_every_service_waits_for_its_install_starts_nothing() {
-    let ctx = ctx_answering(
-        settings_with_a_stack("all-waiting"),
-        plugged_in(1_000),
-        awake(),
-        spoke(""),
-    );
+    let (settings, dir) = settings_with_a_stack("all-waiting");
+    let ctx = ctx_answering(settings, plugged_in(1_000), awake(), spoke("")).holding(dir);
     asked_for_the_library(&ctx);
 
     let outcome = run(&ctx).await;
@@ -484,8 +488,9 @@ async fn a_boot_starts_the_rest_and_says_which_part_waits_for_its_install() {
         .into_iter()
         .filter(|service| *service != "jellyfin")
         .collect();
+    let (settings, dir) = settings_with_a_stack("one-waiting");
     let ctx = ctx_answering(
-        settings_with_a_stack("one-waiting"),
+        settings,
         plugged_in(1_000),
         Arc::new(Reporting::holding(
             &ran,
@@ -493,7 +498,8 @@ async fn a_boot_starts_the_rest_and_says_which_part_waits_for_its_install() {
             Health::Healthy,
         )),
         spoke(""),
-    );
+    )
+    .holding(dir);
     asked_for_the_library(&ctx);
 
     let outcome = run(&ctx).await;
@@ -547,10 +553,12 @@ fn what_waits_says_what_an_up_will_answer() {
 /// than fourteen.
 #[tokio::test]
 async fn a_stack_that_came_back_without_its_tunnel_is_filed_as_a_failed_boot() {
+    let (settings, dir) = settings_at("no-tunnel");
     let ctx = ctx_coming_back(Settings {
         protocols: Protocols::both(),
-        ..settings_at("no-tunnel")
-    });
+        ..settings
+    })
+    .holding(dir);
     asked_for_the_library(&ctx);
 
     let outcome = run(&ctx).await;
@@ -579,12 +587,8 @@ async fn a_stack_that_came_back_without_its_tunnel_is_filed_as_a_failed_boot() {
 /// and filed nothing would be a failure nobody ever hears about.
 #[tokio::test]
 async fn a_start_that_could_not_be_carried_out_is_a_refusal_rather_than_a_report() {
-    let ctx = ctx_answering(
-        settings_at("never-settled"),
-        plugged_in(1_000),
-        awake(),
-        spoke(""),
-    );
+    let (settings, dir) = settings_at("never-settled");
+    let ctx = ctx_answering(settings, plugged_in(1_000), awake(), spoke("")).holding(dir);
     asked_for_the_library(&ctx);
 
     let outcome = run(&ctx).await;

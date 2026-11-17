@@ -51,10 +51,8 @@ fn declared() -> crate::ports::service::Declared {
 
 /// A stack directory named `name`, its env file recording [`RECORDED`] as Emby's
 /// administrator's password.
-fn project(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&at);
-    let _ = std::fs::create_dir_all(&at);
+fn project(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, std::path::PathBuf) {
+    let at = lemonfiber_fixtures::scratch::Scratch::new(name);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     if let Some(server) = server(&at) {

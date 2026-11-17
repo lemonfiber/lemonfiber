@@ -283,11 +283,13 @@ fn exhausted() -> crate::ports::filesystem::StorageFacts {
 
 /// A context over the given transport, with or without room on its disk.
 fn ctx_over(transport: Arc<Transport>, tag: &str, no_room: bool) -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("household-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let disk = SeedFs::keyed(None);
     let mut context = a_context()
+        .holding(dir_scratch)
         .build()
         .with_filesystem(Arc::new(if no_room {
             disk.with_facts(exhausted())

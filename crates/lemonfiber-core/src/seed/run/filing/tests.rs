@@ -70,12 +70,14 @@ fn reaching_the_torrent_client(
     installed: &[crate::plugin::Installed],
     http: Arc<Fake>,
 ) -> (crate::app::Ctx, crate::wiring::Fillers) {
+    let env = crate::test_support::env_without_password(name);
     let ctx = torrent::reaching(
         a_context()
             .settings(crate::config::Settings {
-                env_file: Some(crate::test_support::env_without_password(name)),
+                env_file: Some(env.to_path_buf()),
                 ..crate::config::Settings::default()
             })
+            .holding(env)
             .build()
             .with_http(http),
     );

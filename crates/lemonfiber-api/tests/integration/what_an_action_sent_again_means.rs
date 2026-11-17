@@ -31,6 +31,7 @@ use lemonfiber_core::ports::hosting::{Host, Manager};
 use lemonfiber_fixtures::hosting::Hosting;
 use lemonfiber_fixtures::ports::{Chance, Following, Idle, Stopped};
 use lemonfiber_fixtures::pulled::Pulled;
+use lemonfiber_fixtures::scratch::Scratch;
 
 use crate::idle::ctx;
 
@@ -72,12 +73,12 @@ fn following(host: &Arc<Hosting>, settings: Option<PathBuf>) -> Serving {
 }
 
 /// A settings file of this test's own, holding `contents`.
-fn settings_holding(name: &str, contents: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("again-{name}")).kept();
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join(".env");
-    let written = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, contents));
-    assert!(written.is_ok(), "the scratch settings file is written");
+fn settings_holding(name: &str, contents: &str) -> Scratch {
+    let path = Scratch::new(&format!("again-{name}")).within(".env");
+    assert!(
+        std::fs::write(&path, contents).is_ok(),
+        "the scratch settings file is written"
+    );
     path
 }
 
@@ -257,7 +258,7 @@ async fn how_long_and_how_many_are_what_the_settings_say_at_each_send() {
         "configured",
         &format!("{IDEMPOTENCY_MINUTES_KEY}=2\n{IDEMPOTENCY_KEYS_KEY}=2\n"),
     );
-    let serving = following(&host, Some(path));
+    let serving = following(&host, Some(path.to_path_buf()));
     for one in ["k0", "k1", "k2"] {
         withdrawing(&serving, &[one]).await;
     }

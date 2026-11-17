@@ -2,6 +2,7 @@ use crate::app::Ctx;
 use crate::config::{Protocols, Settings};
 use crate::model::{BootOutcome, BootReport, BootTunnel};
 use crate::test_support::spoke;
+use crate::test_support::Holds as _;
 
 use super::super::tests::{
     asked, asked_for_the_library, awake, ctx_answering, ctx_at, ctx_coming_back, never_there,
@@ -25,7 +26,8 @@ fn restarted(settings: Settings, at: Option<u64>) -> Ctx {
 
 #[tokio::test]
 async fn a_stack_that_came_back_is_read_as_passed_against_the_restart_it_followed() {
-    let ctx = ctx_coming_back(settings_at("kept-came-back"));
+    let (settings, dir) = settings_at("kept-came-back");
+    let ctx = ctx_coming_back(settings).holding(dir);
     asked_for_the_library(&ctx);
     let _ = run(&ctx).await;
 
@@ -52,10 +54,12 @@ async fn a_stack_that_came_back_is_read_as_passed_against_the_restart_it_followe
 
 #[tokio::test]
 async fn a_stack_back_without_its_tunnel_is_read_as_failed_with_the_condition_counted() {
+    let (settings, dir) = settings_at("kept-no-tunnel");
     let ctx = ctx_coming_back(Settings {
         protocols: Protocols::both(),
-        ..settings_at("kept-no-tunnel")
-    });
+        ..settings
+    })
+    .holding(dir);
     asked_for_the_library(&ctx);
     let _ = run(&ctx).await;
 
@@ -121,8 +125,8 @@ async fn a_run_that_started_nothing_is_read_with_why_and_no_verification() {
 
 #[tokio::test]
 async fn a_verification_after_an_earlier_restart_is_never_read_as_the_latest() {
-    let settings = settings_at("kept-earlier");
-    let ctx = ctx_coming_back(settings.clone());
+    let (settings, dir) = settings_at("kept-earlier");
+    let ctx = ctx_coming_back(settings.clone()).holding(dir);
     asked_for_the_library(&ctx);
     let _ = run(&ctx).await;
 
@@ -142,7 +146,8 @@ async fn a_verification_after_an_earlier_restart_is_never_read_as_the_latest() {
 
 #[tokio::test]
 async fn a_rehearsed_boot_keeps_nothing_to_read() {
-    let ctx = ctx_coming_back(settings_at("kept-rehearsed")).rehearsing();
+    let (settings, dir) = settings_at("kept-rehearsed");
+    let ctx = ctx_coming_back(settings).holding(dir).rehearsing();
     asked_for_the_library(&ctx);
     let _ = run(&ctx).await;
 

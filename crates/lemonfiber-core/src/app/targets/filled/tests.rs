@@ -125,10 +125,12 @@ async fn a_filler_speaking_a_major_this_build_does_not_is_never_asked_as_the_bun
 /// A context over the repository's stack with its media server moved into its plugin,
 /// whose adapter's key is written where `keyed`.
 fn moved(tag: &str, keyed: bool) -> Ctx {
-    let dir = Scratch::named(&format!("filled-{tag}")).kept();
+    let dir_scratch = Scratch::named(&format!("filled-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(moved_in::running()))
         .build()
         .with_http(Fake::always(Answer::reply(200, "[]")));

@@ -189,7 +189,8 @@ pub(in crate::app::credentials) fn scene_beside(
     http: Arc<Fake>,
     random: bool,
 ) -> (Ctx, PathBuf, Arc<Gate>) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
@@ -204,6 +205,7 @@ pub(in crate::app::credentials) fn scene_beside(
         let _ = std::fs::write(&keyed, crate::test_support::media::KEY);
     }
     let ctx = a_context()
+        .holding(at_scratch)
         .engine(Arc::new(
             crate::test_support::media::running().alongside(REQUESTS.running()),
         ))

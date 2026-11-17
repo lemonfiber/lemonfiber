@@ -1,5 +1,6 @@
 use super::{link_of, linked, note};
 use crate::storage::Linked;
+use crate::test_support::Holds as _;
 use crate::walkthrough::{Link, Reason, Step};
 
 #[test]
@@ -48,8 +49,7 @@ fn rooted_at(root: &std::path::Path) -> crate::app::Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!(
         "walk-rooted-{}",
         root.display().to_string().len()
-    ))
-    .kept();
+    ));
     let _ = std::fs::create_dir_all(&dir);
     let env = dir.join(".env");
     let _ = std::fs::write(
@@ -59,7 +59,7 @@ fn rooted_at(root: &std::path::Path) -> crate::app::Ctx {
     let mut ctx = super::super::fixtures::ctx_with(&super::super::fixtures::Fake::default());
     ctx.settings.env_file = Some(env);
     ctx.seams.filesystem = std::sync::Arc::new(lemonfiber_adapters::Disk);
-    ctx
+    ctx.holding(dir)
 }
 
 #[test]

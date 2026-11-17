@@ -260,7 +260,8 @@ async fn a_version_change_with_only_some_drift_is_left_as_the_operators_edits() 
     // The version changed, but the curator never recorded this client — so it reads as
     // the operator's own, unmanaged, not as drift. Not every managed value moved,
     // so it is not a schema change: it is left as it is rather than re-baselined.
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("schema-partial").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("schema-partial");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let baseline = r#"{"services":{"Sonarr":{"schema:version":{"value":"4","at":"1"}}}}"#;
     let ctx = schema_ctx(&dir, baseline, versioned("5"));

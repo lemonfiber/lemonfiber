@@ -14,23 +14,24 @@ use lemonfiber_fixtures::http::Answer as Reply;
 /// A machine with a password kept and nothing minted, served by its own token.
 fn minting_machine(named: &str) -> (axum::Router, String, PathBuf) {
     let admission = keeping(&format!("mint-{named}"));
-    let mut ctx = world(Some(admission.clone()), not_the_token());
-    let env = a_directory(&format!("mint-env-{named}")).join(".env");
+    let mut ctx = world(Some(admission.to_path_buf()), not_the_token());
+    let env = a_directory(&format!("mint-env-{named}")).within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     let admitting = Arc::new(Admitting {
-        kept: Some(admission),
+        kept: Some(admission.to_path_buf()),
         keys: Keyring::at(
             lemonfiber_core::keys::run::at(&ctx),
             lemonfiber_core::keys::run::used_at(&ctx),
         ),
         ..Admitting::default()
     });
-    let (router, token) = surface(ctx, &admitting);
-    (router, token.as_str().to_owned(), env)
+    let env_at = env.to_path_buf();
+    let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
+    (router, token.as_str().to_owned(), env_at)
 }
 
 /// What a mint is asked with, under `password`.
@@ -391,11 +392,11 @@ async fn a_password_that_proves_another_account_mints_nothing() {
 #[tokio::test]
 async fn a_machine_keeping_no_password_mints_nothing_over_the_web() {
     let mut ctx = world(None, not_the_token());
-    let env = a_directory("mint-env-no-password").join(".env");
+    let env = a_directory("mint-env-no-password").within(".env");
     if let Some(dir) = env.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    ctx.settings.env_file = Some(env.clone());
+    ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     let admitting = Arc::new(Admitting {
         keys: Keyring::at(

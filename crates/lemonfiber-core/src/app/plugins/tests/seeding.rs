@@ -16,7 +16,7 @@ fn seeded() -> String {
 }
 
 /// The seeded plugin's source, its upstream's starting file naming the key.
-fn shipped(name: &str) -> PathBuf {
+fn shipped(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
     let at = source(name, &seeded());
     let _ = std::fs::create_dir_all(at.join("config/komga"));
     let _ = std::fs::write(

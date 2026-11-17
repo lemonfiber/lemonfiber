@@ -3,8 +3,6 @@
 //! Its own file because a picture answers to two rulings: the one a read of its title
 //! is under, and which shelf the media server is asked for it from.
 
-use std::fs;
-
 use crate::door;
 use crate::what_a_key_admits::sent;
 use crate::what_a_member_may_ask_for::{as_a_member, signed_in, MEMBER, WHO};
@@ -44,7 +42,7 @@ fn the_film() -> ItemDetail {
 /// would not be: a parameter no read takes, and a title named by anything but an id.
 #[tokio::test]
 async fn a_member_reaches_a_titles_pictures_as_they_reach_the_title() {
-    let (router, carried) = as_a_member("member-pictures").await;
+    let (router, carried, _kept) = as_a_member("member-pictures").await;
     for path in [
         format!("/api/held/{FILM}/poster"),
         format!("/api/held/{FILM}/backdrop?member=bo"),
@@ -70,7 +68,6 @@ async fn a_member_reaches_a_titles_pictures_as_they_reach_the_title() {
             answer.body
         );
     }
-    let _ = fs::remove_dir_all(a_directory("member-pictures"));
 }
 
 /// A surface over the stack's own media server, which recognises the member and holds
@@ -94,11 +91,11 @@ fn over_a_picture(named: &str) -> (axum::Router, Arc<Token>, Arc<Fake>) {
     let kept = keeping(&format!("{named}-kept"));
     seeded(&ctx);
     let admitting = Arc::new(Admitting {
-        kept: Some(kept),
+        kept: Some(kept.to_path_buf()),
         household: Some(Arc::new(ctx.clone()) as Arc<dyn HouseholdAtHand>),
         ..Admitting::default()
     });
-    let (router, token) = surface(ctx, &admitting);
+    let (router, token) = surface(ctx.holding(kept), &admitting);
     (router, token, transport)
 }
 
@@ -174,16 +171,13 @@ async fn a_picture_comes_from_the_shelf_the_title_read_is_ruled_to_read() {
     )
     .await;
     assert_eq!(asked_for, [serde_json::Value::Null]);
-
-    let _ = fs::remove_dir_all(a_directory("pictured"));
-    let _ = fs::remove_dir_all(a_directory("pictured-kept"));
 }
 
 /// The poster of a title a search found is the member's own, as the search is: it reaches
 /// the core for them, and a parameter the read does not take is refused before it does.
 #[tokio::test]
 async fn a_member_reaches_a_found_titles_poster_as_they_reach_the_search() {
-    let (router, carried) = as_a_member("member-found-poster").await;
+    let (router, carried, _kept) = as_a_member("member-found-poster").await;
 
     let answer = asked(
         router.clone(),
@@ -206,8 +200,6 @@ async fn a_member_reaches_a_found_titles_poster_as_they_reach_the_search() {
     .await;
     assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
     assert!(!answer.body.contains("WISH-"), "{}", answer.body);
-
-    let _ = fs::remove_dir_all(a_directory("member-found-poster"));
 }
 
 /// The operator's own session names the member the poster is for, and naming nobody is
@@ -235,9 +227,6 @@ async fn a_found_titles_poster_for_nobody_is_refused_as_the_search_is() {
 
     assert_eq!(answer.status, StatusCode::BAD_REQUEST, "{}", answer.body);
     assert!(answer.body.contains("WISH-11"), "{}", answer.body);
-
-    let _ = fs::remove_dir_all(a_directory("found-poster-nobody"));
-    let _ = fs::remove_dir_all(a_directory("found-poster-nobody-kept"));
 }
 
 /// The cover of music a search found, and of an ask the core keeps, are the member's own
@@ -245,7 +234,7 @@ async fn a_found_titles_poster_for_nobody_is_refused_as_the_search_is() {
 /// kind or a parameter the read does not take is refused before it does.
 #[tokio::test]
 async fn a_member_reaches_a_found_or_kept_cover_as_they_reach_the_search() {
-    let (router, carried) = as_a_member("member-covers").await;
+    let (router, carried, _kept) = as_a_member("member-covers").await;
 
     for read in [
         "/api/askable/mbid-1/poster?kind=music&unit=album&member=bo",
@@ -274,8 +263,6 @@ async fn a_member_reaches_a_found_or_kept_cover_as_they_reach_the_search() {
         );
         assert!(!answer.body.contains("WISH-"), "{read}: {}", answer.body);
     }
-
-    let _ = fs::remove_dir_all(a_directory("member-covers"));
 }
 
 /// The operator reads any kept ask's cover, naming nobody, and one no ask goes by is no
@@ -302,7 +289,4 @@ async fn the_operator_reads_a_kept_cover_naming_nobody() {
     .await;
 
     assert!(answer.body.contains("WISH-3"), "{}", answer.body);
-
-    let _ = fs::remove_dir_all(a_directory("kept-cover-operator"));
-    let _ = fs::remove_dir_all(a_directory("kept-cover-operator-kept"));
 }

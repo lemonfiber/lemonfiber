@@ -5,7 +5,7 @@
 //! answer the same question differently the first time one of them was updated.
 pub(crate) use std::fs;
 pub(crate) use std::net::IpAddr;
-pub(crate) use std::path::PathBuf;
+pub(crate) use std::path::{Path, PathBuf};
 pub(crate) use std::sync::atomic::{AtomicBool, Ordering};
 pub(crate) use std::sync::Arc;
 pub(crate) use std::time::{Duration, SystemTime};
@@ -29,8 +29,9 @@ pub(crate) use lemonfiber_core::ports::service::{Household, Member, Signed};
 pub(crate) use lemonfiber_fixtures::household::Recognising;
 pub(crate) use lemonfiber_fixtures::http::Fake;
 pub(crate) use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
+pub(crate) use lemonfiber_fixtures::scratch::Scratch;
 pub(crate) use lemonfiber_fixtures::support::a_password;
-pub(crate) use lemonfiber_testing::media;
+pub(crate) use lemonfiber_testing::{media, Holds as _};
 use tower::ServiceExt as _;
 
 /// The second the stopped clock reads.
@@ -55,10 +56,8 @@ pub(crate) fn moment() -> SystemTime {
 }
 
 /// A directory of this test's own, emptied first so a rerun starts fresh.
-pub(crate) fn a_directory(named: &str) -> PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("door-{named}")).kept();
-    let _ = fs::remove_dir_all(&dir);
-    dir
+pub(crate) fn a_directory(named: &str) -> Scratch {
+    Scratch::unmade(&format!("door-{named}"))
 }
 
 /// The password the operator chose, built rather than written down.
@@ -75,8 +74,8 @@ pub(crate) fn a_credential(password: &str) -> Credential {
 }
 
 /// A machine keeping that password, and where it keeps it.
-pub(crate) fn keeping(named: &str) -> PathBuf {
-    let path = a_directory(named).join("admission.json");
+pub(crate) fn keeping(named: &str) -> Scratch {
+    let path = a_directory(named).within("admission.json");
     let held = a_credential(&chosen());
     let Ok(()) = credential::keep(&path, &held) else {
         unreachable!("a scratch directory can be written")
@@ -152,16 +151,16 @@ pub(crate) fn stream_reading(admitting: &Arc<Admitting>, reading: Ctx) -> axum::
     }))
 }
 
-/// A surface keeping the password at `path`, sharing one register with the test.
+/// A surface keeping the password at `kept`, sharing one register with the test.
 pub(crate) fn door(
-    path: Option<PathBuf>,
+    kept: Option<&Path>,
     random: Chance,
 ) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
     let admitting = Arc::new(Admitting {
-        kept: path.clone(),
+        kept: kept.map(Path::to_path_buf),
         ..Admitting::default()
     });
-    let (router, token) = surface(world(path, random), &admitting);
+    let (router, token) = surface(world(admitting.kept.clone(), random), &admitting);
     (router, token, admitting)
 }
 
@@ -360,16 +359,16 @@ pub(crate) fn carrying(secret: Option<&str>) -> HeaderMap {
 /// looked at. A test about a member would then be a test about the machine, and it
 /// would pass.
 pub(crate) fn door_with(
-    path: Option<PathBuf>,
+    kept: Option<&Path>,
     household: Arc<Recognising>,
     random: Chance,
 ) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
     let admitting = Arc::new(Admitting {
-        kept: path.clone(),
+        kept: kept.map(Path::to_path_buf),
         household: Some(Arc::new(household as Arc<dyn Household>)),
         ..Admitting::default()
     });
-    let (router, token) = surface(world(path, random), &admitting);
+    let (router, token) = surface(world(admitting.kept.clone(), random), &admitting);
     (router, token, admitting)
 }
 
@@ -407,8 +406,9 @@ pub(crate) fn a_stack(named: &str, transport: Arc<Fake>) -> Ctx {
             .with_http(transport)
             .with_random(Arc::new(not_the_token())),
     );
-    ctx.settings.env_file = Some(a_directory(named).join(".env"));
-    ctx
+    let dir = a_directory(named);
+    ctx.settings.env_file = Some(dir.join(".env"));
+    ctx.holding(dir)
 }
 
 /// The stack seeded: its media server moved into its plugin, recorded where the stack

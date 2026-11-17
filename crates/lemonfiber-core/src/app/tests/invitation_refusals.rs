@@ -204,14 +204,15 @@ async fn a_sweep_that_cannot_run_still_makes_the_invitation() {
 /// manifest that might differ in some other way too.
 #[tokio::test]
 async fn offering_an_account_without_a_media_server_says_there_is_nowhere_to_make_one() {
-    static WITHOUT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    static WITHOUT: std::sync::OnceLock<lemonfiber_fixtures::scratch::Scratch> =
+        std::sync::OnceLock::new();
     let dir = WITHOUT.get_or_init(|| {
-        let to = lemonfiber_fixtures::scratch::Scratch::named("no-server").kept();
+        let to = lemonfiber_fixtures::scratch::Scratch::named("no-server");
         lemonfiber_fixtures::stack::manifest_without(&to, "jellyfin");
         to
     });
     let ctx = a_context()
-        .over(Source::External(Box::leak(dir.clone().into_boxed_path())))
+        .over(Source::External(dir.path()))
         .build()
         .with_http(Fake::silent());
 

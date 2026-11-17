@@ -34,11 +34,10 @@ fn ctx(status: i32, stdout: &'static str) -> Ctx {
     // A scratch directory to materialise the embedded stack into, so a pull has
     // a compose file to be run against rather than failing before it starts.
     let dir =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("engine-{status}{}", stdout.len()))
-            .kept();
+        lemonfiber_fixtures::scratch::Scratch::named(&format!("engine-{status}{}", stdout.len()));
     let _ = std::fs::create_dir_all(&dir);
     let settings = Settings {
-        stack_dir: Some(dir),
+        stack_dir: Some(dir.to_path_buf()),
         ..Settings::default()
     };
     lemonfiber_testing::a_context()
@@ -51,6 +50,7 @@ fn ctx(status: i32, stdout: &'static str) -> Ctx {
         .clock(Arc::new(lemonfiber_adapters::System))
         .over(Source::Embedded(&lemonfiber::carried::STACK))
         .settings(settings)
+        .holding(dir)
         .build()
 }
 
@@ -63,7 +63,8 @@ fn ctx(status: i32, stdout: &'static str) -> Ctx {
 #[tokio::test(start_paused = true)]
 async fn a_pull_waits_for_the_stack_and_is_refused_when_the_wait_runs_out() {
     let mut ctx = ctx(0, "pulled");
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("pull-lock").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("pull-lock");
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
     ctx.settings.env_file = Some(dir.join(".env"));
 

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::test_support::Holds as _;
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
 use super::{claim_spent, household, offers_claim, vouched_for};
@@ -11,7 +12,8 @@ use crate::test_support::{a_context, a_password, json, media, nowhere};
 /// server moved into its plugin where `moved`, and the server answering every sign-in as
 /// the member it knows.
 fn ctx_with(tag: &str, moved: bool) -> (Ctx, Arc<Transport>) {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
     let signed = Some(Signed {
@@ -23,6 +25,7 @@ fn ctx_with(tag: &str, moved: bool) -> (Ctx, Arc<Transport>) {
         Answer::reply(200, json(&signed)),
     )]);
     let mut context = a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(media::running()))
         .build()
         .with_http(transport.clone());
@@ -142,8 +145,7 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
         offer.decline = Some(TokenHash::of("a-refusal"));
     }
     crate::app::record::keep_beside(&context, crate::invitation::RECORD, &offers);
-    let project =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}-stack")).kept();
+    let project = lemonfiber_fixtures::scratch::Scratch::named(&format!("members-{tag}-stack"));
     lemonfiber_fixtures::stack::manifest_into(&project);
     let refusals = if refused {
         vec![crate::ports::service::Declined {
@@ -155,10 +157,9 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
         Vec::new()
     };
     let decline = Arc::new(Decline::default().declining(refusals));
-    let project: &'static std::path::Path = Box::leak(project.into_boxed_path());
     DECLINE
         .reaching(Ctx {
-            stack: crate::stack::Source::External(project),
+            stack: crate::stack::Source::External(project.leaked()),
             ..context
         })
         .with_http(
@@ -166,6 +167,7 @@ fn claimable(tag: &str, lapses_in: i64, refused: bool) -> Ctx {
                 .decline(&decline)
                 .transport(),
         )
+        .holding(project)
 }
 
 /// The token its offer carries claims an account's standing invitation, and nothing

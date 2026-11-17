@@ -190,13 +190,15 @@ pub(crate) fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 /// builder are three places for a test to be set up subtly differently from the code it is
 /// meant to be proving.
 pub(crate) fn ctx_at(name: &str) -> crate::app::Ctx {
-    let dir = scratch(name).kept();
+    let dir_scratch = scratch(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let settings = crate::config::Settings {
         env_file: Some(dir.join(".env")),
         ..crate::config::Settings::default()
     };
     a_context()
+        .holding(dir_scratch)
         .runner(std::sync::Arc::new(crate::test_support::Scripted(Ok(
             crate::test_support::spoke(""),
         ))))

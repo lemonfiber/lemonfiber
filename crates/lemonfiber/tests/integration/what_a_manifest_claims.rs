@@ -10,7 +10,7 @@
 //! command exists to work under — a plugin is written in a checkout, and a claim nobody
 //! can check until they own the software is a claim nobody checks.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// The binary Cargo built for this test.
 const BINARY: &str = env!("CARGO_BIN_EXE_lemonfiber");
@@ -69,9 +69,8 @@ fn recording(status: u16, body: &str) -> String {
 }
 
 /// A plugin source on disk, with whatever manifest it is given.
-fn source(named: &str, manifest: &str) -> PathBuf {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(&format!("claims-{named}")).kept();
-    let _ = std::fs::remove_dir_all(&at);
+fn source(named: &str, manifest: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let at = lemonfiber_fixtures::scratch::Scratch::unmade(&format!("claims-{named}"));
     let _ = std::fs::create_dir_all(at.join("fixtures"));
     let _ = std::fs::write(at.join("plugin.toml"), manifest);
     let _ = std::fs::write(at.join("fixtures/guarded.json"), recording(401, "null"));

@@ -9,9 +9,11 @@ use crate::test_support::{a_context, Reporting};
 
 /// A context over this engine whose records land in a directory of the test's own.
 fn over(name: &str, engine: Reporting) -> Ctx {
-    let dir = crate::app::fixtures::scratch(name).kept();
+    let dir_scratch = crate::app::fixtures::scratch(name);
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(engine))
         .settings(Settings {
             env_file: Some(dir.join(".env")),

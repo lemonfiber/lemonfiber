@@ -30,12 +30,14 @@ fn cors_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
 fn unmoved_ctx(name: &str, administered: bool, http: Arc<Fake>) -> Ctx {
     // Kept rather than scoped to this helper, because the context reads the file long
     // after the helper returns and a scratch directory goes when its handle does.
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     let ctx = a_context()
+        .holding(at_scratch)
         .environment(crate::platform::Environment::LinuxNative)
         .settings(Settings {
             env_file: Some(env),
@@ -375,11 +377,10 @@ async fn the_web_surface_is_listed_where_the_last_run_served_it() {
         let companion = lemonfiber_fixtures::scratch::Scratch::named(&format!(
             "cors-console-companion-{}",
             served.port
-        ))
-        .kept();
+        ));
         let _ = std::fs::create_dir_all(&companion);
         assert!(crate::companion::served::record(&companion, served).is_ok());
-        ctx.settings.companion = Some(companion);
+        ctx.settings.companion = Some(companion.to_path_buf());
 
         let (state, _) = seeded_cors(&ctx, &http).await;
         let listed = media::served(&http.requests(), "allow_origins");

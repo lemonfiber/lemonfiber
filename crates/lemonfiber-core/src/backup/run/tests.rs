@@ -495,7 +495,7 @@ fn what_an_installed_plugins_service_rebuilds_is_read_as_that_service_and_the_pa
     .is_ok());
     let ctx = crate::test_support::a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
         .build();

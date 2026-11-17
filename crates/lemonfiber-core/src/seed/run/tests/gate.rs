@@ -155,12 +155,14 @@ fn gate_ctx_beside(
     gate: Gate,
     http: Arc<Fake>,
 ) -> (Ctx, std::path::PathBuf, Arc<Gate>) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let env = at.join(".env");
     let _ = std::fs::write(&env, "DATA_ROOT=/srv/media\n");
     let ctx = a_context()
+        .holding(at_scratch)
         .environment(crate::platform::Environment::LinuxNative)
         .settings(Settings {
             env_file: Some(env),

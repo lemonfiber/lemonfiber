@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_fixtures::heard::Heard;
@@ -21,13 +20,13 @@ use crate::test_support::a_context;
 /// Where one case keeps everything, and whether it was served where another machine
 /// reaches it.
 struct Machine {
-    companion: PathBuf,
-    kept: PathBuf,
+    companion: Scratch,
+    kept: Scratch,
 }
 
 impl Machine {
     fn new(named: &str, served_on_the_network: bool) -> Self {
-        let companion = Scratch::new(&format!("claim-{named}-companion")).kept();
+        let companion = Scratch::new(&format!("claim-{named}-companion"));
         if served_on_the_network {
             let _ = crate::certificate::kept_or_made(&lemonfiber_adapters::Disk, &companion);
             let _ = served::record(
@@ -39,7 +38,7 @@ impl Machine {
                 },
             );
         }
-        let kept = Scratch::new(&format!("claim-{named}-kept")).kept();
+        let kept = Scratch::new(&format!("claim-{named}-kept"));
         Self { companion, kept }
     }
 
@@ -48,7 +47,7 @@ impl Machine {
         let heard = Arc::new(Heard::default());
         let ctx = a_context()
             .settings(Settings {
-                companion: Some(self.companion.clone()),
+                companion: Some(self.companion.to_path_buf()),
                 env_file: Some(self.kept.join(".env")),
                 stack_dir: Some(self.kept.join("stack")),
                 ..Settings::default()

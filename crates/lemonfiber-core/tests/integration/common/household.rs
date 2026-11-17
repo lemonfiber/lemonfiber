@@ -20,7 +20,6 @@ use lemonfiber_core::ports::service::{
     Address, Asking, Certificate, Headroom, HouseholdRequest, Left, MediaStatus, NamedLibrary,
     RequestStatus, Requesting,
 };
-use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::support::Reporting;
 use lemonfiber_ports::docker::{Health, Lifecycle};
@@ -57,10 +56,10 @@ pub fn half_reached_at() -> Vec<Address> {
 
 /// A scratch environment file holding the media server's recorded password.
 #[track_caller]
-pub fn recorded_admin(name: &str) -> std::path::PathBuf {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+pub fn recorded_admin(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(name);
     let _ = std::fs::create_dir_all(&dir);
-    let env = dir.join(".env");
+    let env = dir.within(".env");
     let _ = lemonfiber_core::config::store::set(
         &env,
         lemonfiber_core::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
@@ -73,16 +72,16 @@ pub fn recorded_admin(name: &str) -> std::path::PathBuf {
 ///
 /// Leaked because `Source::External` holds a `&'static Path`.
 #[track_caller]
-pub fn stack_written(name: &str) -> Source {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-stack")).kept();
+pub fn stack_written(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("{name}-stack"));
     lemonfiber_fixtures::stack::manifest_into(&dir);
-    Source::External(Box::leak(dir.into_boxed_path()))
+    dir
 }
 
 /// [`stack_written`], named after the scratch directory `env` sits in, for the
 /// tests that already keep one per case.
 #[track_caller]
-pub fn stack_beside(env: &std::path::Path) -> Source {
+pub fn stack_beside(env: &std::path::Path) -> lemonfiber_fixtures::scratch::Scratch {
     let name = env
         .parent()
         .and_then(std::path::Path::file_name)
@@ -215,18 +214,20 @@ pub fn context(name: &str, transport: &Arc<Fake>) -> Ctx {
 /// off reaching the household — and that question cannot be asked of a context whose
 /// settings are always the permissive ones.
 pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
+    let env = recorded_admin(name);
     let ctx = lemonfiber_testing::a_context()
-        .over(stack_written(name))
+        .stack_in(stack_written(name))
         .engine(Arc::new(
             Reporting::holding(&["jellyfin", "seerr"], Lifecycle::Running, Health::Healthy)
                 .alongside(media::running())
                 .alongside(REQUESTS.running()),
         ))
         .settings(Settings {
-            env_file: Some(recorded_admin(name)),
+            env_file: Some(env.to_path_buf()),
             reaching: allowed,
             ..Settings::default()
         })
+        .holding(env)
         .build()
         .with_http(transport.clone());
     media::moved_in(&ctx);
@@ -238,8 +239,8 @@ pub fn reaching(name: &str, transport: &Arc<Fake>, allowed: Reaching) -> Ctx {
 ///
 /// Leaked because `Source::External` holds a `&'static Path`, and kept per-service so
 /// two tests wanting different omissions do not share one directory.
-pub fn stack_without(service: &str, tag: &str) -> Source {
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("without-{tag}")).kept();
+pub fn stack_without(service: &str, tag: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("without-{tag}"));
     lemonfiber_fixtures::stack::manifest_without(&to, service);
-    Source::External(Box::leak(to.into_boxed_path()))
+    to
 }

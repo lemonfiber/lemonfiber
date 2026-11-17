@@ -21,8 +21,8 @@ pub fn stack() -> Source {
 
 /// The shipped stack, which runs the request gate, written under a scratch directory
 /// named for `tag` so a test can write the gate's files beside it.
-pub fn with_the_gate(tag: &str) -> std::path::PathBuf {
-    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("gated-{tag}")).kept();
+pub fn with_the_gate(tag: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let to = lemonfiber_fixtures::scratch::Scratch::named(&format!("gated-{tag}"));
     lemonfiber_fixtures::stack::manifest_into(&to);
     to
 }

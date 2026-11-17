@@ -30,9 +30,11 @@ fn line(setting: &str) -> Held {
 /// A run whose settings file is a scratch path unique to the named test, so
 /// concurrent tests do not share one.
 fn keeping(name: &str) -> crate::app::Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("reveal-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("reveal-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join(".env")),
             ..Settings::default()

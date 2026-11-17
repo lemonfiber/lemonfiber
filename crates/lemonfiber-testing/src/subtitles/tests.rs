@@ -70,9 +70,7 @@ fn a_watch_is_answered_on_the_watch_path_with_what_the_script_says() {
 
 #[test]
 fn a_finder_moved_in_is_keyed_where_its_stack_is_and_one_keyed_holds_its_key_unwritten() {
-    let over = |directory: &Scratch| {
-        Source::External(Box::leak(directory.to_path_buf().into_boxed_path()))
-    };
+    let over = |directory: &Scratch| Source::External(directory.leaked());
     let written = Scratch::new("subtitles-moved-in");
     let mut ctx = a_context().over(over(&written)).build();
     ctx.settings.env_file = Some(written.join(".env"));

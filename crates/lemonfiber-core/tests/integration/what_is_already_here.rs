@@ -296,9 +296,11 @@ const THEIR_KEY: &str = "<Config><ApiKey>the-key</ApiKey></Config>";
 fn importing_over(engine: Reporting, stack: Source, files: Arc<SeedFs>, http: Arc<Fake>) -> Ctx {
     static BUILT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let nth = BUILT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("importing-{nth}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("importing-{nth}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::create_dir_all(&dir);
     let mut ctx = lemonfiber_testing::a_context()
+        .holding(dir_scratch)
         .engine(Arc::new(engine.alongside(TELEVISION.running())))
         .filesystem(files)
         .over(stack)

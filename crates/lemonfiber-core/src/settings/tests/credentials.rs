@@ -22,9 +22,10 @@ fn machine(name: &str, lines: &[(&str, &str)]) -> Ctx {
     }
     a_context()
         .settings(crate::config::Settings {
-            env_file: Some(env),
+            env_file: Some(env.to_path_buf()),
             ..crate::config::Settings::default()
         })
+        .holding(env)
         .build()
 }
 

@@ -289,12 +289,11 @@ async fn seed_registers_each_curator_into_the_indexer_aggregator() {
         base_url: (*base_url).to_owned(),
     })
     .collect();
+    let env = crate::test_support::env_without_password("seed-applications");
     let mut ctx = minting_curators(seed_ctx(
         true,
         Some(vec![0x11; 24]),
-        Some(crate::test_support::env_without_password(
-            "seed-applications",
-        )),
+        Some(env.to_path_buf()),
     ))
     .with_http(seeding_with(vec![
         (searching("applications"), answered(&registered)),

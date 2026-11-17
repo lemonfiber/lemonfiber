@@ -134,13 +134,14 @@ fn guarded_vpn_ctx(
         ip_echo,
         port_forward,
         stack_dir: env.parent().map(|config| config.join("data").join("stack")),
-        env_file: Some(env),
+        env_file: Some(env.to_path_buf()),
         ..Settings::default()
     };
     guard::keyed(
         a_context()
             .engine(Arc::new(engine.alongside(guard::running())))
             .settings(settings)
+            .holding(env)
             .build()
             .with_patience(Duration::ZERO)
             .with_http(Fake::by_path(vec![guard::forwarding(forwarded)])),

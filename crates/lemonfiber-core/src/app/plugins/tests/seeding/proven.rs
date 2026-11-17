@@ -5,7 +5,7 @@ use super::*;
 
 /// The seeded plugin's source as a later version, shipping `added` beside the rest,
 /// beneath its upstream's configuration directory.
-fn later(name: &str, added: &str) -> PathBuf {
+fn later(name: &str, added: &str) -> lemonfiber_fixtures::scratch::Scratch {
     let at = shipped(name);
     let manifest = read(&at.join(lemonfiber_bundle::MANIFEST)).replacen(
         "version     = \"1.2.0\"",

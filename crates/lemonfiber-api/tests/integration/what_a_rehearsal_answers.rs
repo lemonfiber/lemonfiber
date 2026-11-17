@@ -33,8 +33,10 @@ use lemonfiber_fixtures::pulled::Pulled;
 /// start; its data root is a scratch directory, because a rehearsal that wrote there
 /// is the failure being held still and the operator's own is not a place to find out.
 fn world() -> Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named("rehearsal").kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("rehearsal");
+    let dir = dir_scratch.to_path_buf();
     lemonfiber_testing::a_context()
+        .holding(dir_scratch)
         .images(Pulled::holding(Vec::new()))
         .settings(Settings {
             data_root: Some(dir),

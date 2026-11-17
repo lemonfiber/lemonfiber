@@ -75,10 +75,14 @@ fn ctx_over(transport: Arc<Transport>, tag: &str, moved: bool) -> Ctx {
     if moved {
         return moved_household(&format!("playing-{tag}"), transport);
     }
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("playing-{tag}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("playing-{tag}"));
+    let dir = dir_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
-    let mut context = a_context().build().with_http(transport);
+    let mut context = a_context()
+        .holding(dir_scratch)
+        .build()
+        .with_http(transport);
     context.settings.env_file = Some(dir.join(".env"));
     context
 }

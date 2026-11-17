@@ -14,7 +14,7 @@ use door::*;
 #[tokio::test]
 async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_takes() {
     let path = keeping("exchanged");
-    let (router, _, admitting) = door(Some(path.clone()), Chance::cycling());
+    let (router, _, admitting) = door(Some(path.path()), Chance::cycling());
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
@@ -40,7 +40,6 @@ async fn the_right_password_is_exchanged_for_a_session_the_rest_of_the_surface_t
         Some(Opened::Operator(a_credential(&chosen()))),
         "the secret handed back was not a session the rest of the surface takes"
     );
-    let _ = fs::remove_dir_all(a_directory("exchanged"));
 }
 
 #[tokio::test]
@@ -49,7 +48,7 @@ async fn a_wrong_password_and_a_machine_with_none_are_refused_the_same_way() {
     // to whoever is knocking: what they sent did not open the door. Saying which of
     // the two it was would tell somebody guessing whether there is anything to guess.
     let path = keeping("wrong");
-    let (router, _, _) = door(Some(path), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
     let wrong = asked(
         router,
         "POST",
@@ -65,7 +64,6 @@ async fn a_wrong_password_and_a_machine_with_none_are_refused_the_same_way() {
     assert_eq!(wrong.status, StatusCode::UNAUTHORIZED);
     assert_eq!(unset.status, StatusCode::UNAUTHORIZED);
     assert_eq!(wrong.body, unset.body);
-    let _ = fs::remove_dir_all(a_directory("wrong"));
 }
 
 #[tokio::test]
@@ -90,7 +88,7 @@ async fn a_body_that_is_not_a_password_is_said_plainly_rather_than_counted() {
 #[tokio::test]
 async fn somebody_made_to_wait_is_told_how_long_and_is_told_it_twice() {
     let path = keeping("waiting");
-    let (router, _, _) = door(Some(path.clone()), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
     let wrong = offering(&chosen().to_uppercase());
 
     // Three are free and the fourth is the one that costs, so four sent wrong answers
@@ -114,7 +112,6 @@ async fn somebody_made_to_wait_is_told_how_long_and_is_told_it_twice() {
     // In the header a client reads and in the sentence a person reads, because both
     // of them are here: the page shows one and the client behind it waits on the other.
     assert!(answer.left.is_some_and(|left| left.parse::<u64>().is_ok()));
-    let _ = fs::remove_dir_all(a_directory("waiting"));
 }
 
 #[tokio::test]
@@ -123,7 +120,7 @@ async fn a_request_that_says_it_came_from_elsewhere_never_reaches_the_door() {
     // negotiable, and it is what stops a page the operator happens to be visiting from
     // posting guesses here with their browser.
     let path = keeping("elsewhere");
-    let (router, _, _) = door(Some(path), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
 
     let answer = asked(
         router,
@@ -135,7 +132,6 @@ async fn a_request_that_says_it_came_from_elsewhere_never_reaches_the_door() {
     .await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN);
-    let _ = fs::remove_dir_all(a_directory("elsewhere"));
 }
 
 #[tokio::test]
@@ -143,18 +139,17 @@ async fn a_run_that_will_not_supply_a_secret_hands_out_no_session() {
     // A session whose secret could not be minted would be one every request reached,
     // so there is nothing here to fall back to.
     let path = keeping("secretless");
-    let (router, _, _) = door(Some(path), Chance::exactly(None));
+    let (router, _, _) = door(Some(path.path()), Chance::exactly(None));
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
     assert_eq!(answer.status, StatusCode::INTERNAL_SERVER_ERROR);
-    let _ = fs::remove_dir_all(a_directory("secretless"));
 }
 
 #[tokio::test]
 async fn a_session_ends_when_it_expires_and_when_the_password_changes() {
     let path = keeping("ending");
-    let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
+    let (_, _, admitting) = door(Some(path.path()), Chance::cycling());
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
@@ -180,7 +175,6 @@ async fn a_session_ends_when_it_expires_and_when_the_password_changes() {
         )
         .await
         .is_none());
-    let _ = fs::remove_dir_all(a_directory("ending"));
 }
 
 #[tokio::test]
@@ -189,7 +183,7 @@ async fn opening_one_lets_go_of_the_ones_that_have_ended_and_keeps_the_rest() {
     // away. What opening one does take away is whatever has already ended, which is
     // the only sweep there is — nothing here runs on a timer.
     let path = keeping("several");
-    let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
+    let (_, _, admitting) = door(Some(path.path()), Chance::cycling());
     let held = a_credential(&chosen());
     let later = moment() + Duration::from_secs(24 * 60 * 60);
 
@@ -237,13 +231,13 @@ async fn opening_one_lets_go_of_the_ones_that_have_ended_and_keeps_the_rest() {
         .holds(Some(&third.token), later, Some(&held))
         .await
         .is_some());
-    let _ = fs::remove_dir_all(a_directory("several"));
 }
 
 #[tokio::test]
 async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     let path = keeping("changed");
-    let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
+    let at = path.to_path_buf();
+    let (_, _, admitting) = door(Some(path.path()), Chance::cycling());
     let held = a_credential(&chosen());
     let opened = admitting
         .sessions
@@ -256,20 +250,19 @@ async fn a_password_change_ends_a_session_somebody_else_is_holding() {
     // Set another password, which is what an operator does when they suspect somebody
     // else is in. The session was opened against the one that is no longer there.
     let another = a_credential(&chosen().to_uppercase());
-    assert!(credential::keep(&path, &another).is_ok());
+    assert!(credential::keep(&at, &another).is_ok());
 
     assert!(admitting
         .sessions
         .holds(Some(&opened.token), moment(), Some(&another))
         .await
         .is_none());
-    let _ = fs::remove_dir_all(a_directory("changed"));
 }
 
 #[tokio::test]
 async fn a_secret_this_run_never_handed_out_is_no_session_and_nor_is_nothing() {
     let path = keeping("unknown");
-    let (_, _, admitting) = door(Some(path.clone()), Chance::cycling());
+    let (_, _, admitting) = door(Some(path.path()), Chance::cycling());
     let held = a_credential(&chosen());
 
     assert!(admitting
@@ -282,7 +275,6 @@ async fn a_secret_this_run_never_handed_out_is_no_session_and_nor_is_nothing() {
         .holds(Some("not a session"), moment(), Some(&held))
         .await
         .is_none());
-    let _ = fs::remove_dir_all(a_directory("unknown"));
 }
 
 #[tokio::test]
@@ -301,7 +293,7 @@ async fn the_token_still_opens_everything_and_nothing_opens_it_where_no_password
 #[tokio::test]
 async fn a_read_carrying_a_session_is_answered_the_same_as_one_carrying_the_token() {
     let path = keeping("reading");
-    let (router, _, _) = door(Some(path.clone()), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
     let opened = asked(
         router.clone(),
         "POST",
@@ -319,18 +311,16 @@ async fn a_read_carrying_a_session_is_answered_the_same_as_one_carrying_the_toke
 
     assert_eq!(answer.status, StatusCode::OK);
     assert!(answer.body.contains(r#""kind":"word""#), "{}", answer.body);
-    let _ = fs::remove_dir_all(a_directory("reading"));
 }
 
 #[tokio::test]
 async fn everything_else_still_needs_a_secret_this_run_admits() {
     let path = keeping("guarded");
-    let (router, _, _) = door(Some(path.clone()), Chance::cycling());
+    let (router, _, _) = door(Some(path.path()), Chance::cycling());
 
     let answer = asked(router, "GET", "/api/explain?word=indexer", &from_here(), "").await;
 
     assert_eq!(answer.status, StatusCode::FORBIDDEN);
-    let _ = fs::remove_dir_all(a_directory("guarded"));
 }
 
 /// Exactly three paths on this surface are let through the token half of the guard: the
@@ -382,7 +372,7 @@ fn only_the_three_doors_are_let_through_without_a_token() {
 #[tokio::test]
 async fn the_token_printed_at_the_machine_answers_as_the_machine() {
     let path = keeping("who-machine");
-    let (_, token, admitting) = door(Some(path), Chance::cycling());
+    let (_, token, admitting) = door(Some(path.path()), Chance::cycling());
 
     assert_eq!(
         admitting
@@ -391,13 +381,12 @@ async fn the_token_printed_at_the_machine_answers_as_the_machine() {
         Knocking::Known(Caller::Machine),
         "the token printed at this machine named somebody other than the machine"
     );
-    let _ = fs::remove_dir_all(a_directory("who-machine"));
 }
 
 #[tokio::test]
 async fn a_session_the_password_bought_answers_as_the_operator() {
     let path = keeping("who-operator");
-    let (router, _, admitting) = door(Some(path), Chance::cycling());
+    let (router, _, admitting) = door(Some(path.path()), Chance::cycling());
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
     let opened = session(&answer.body);
@@ -418,7 +407,6 @@ async fn a_session_the_password_bought_answers_as_the_operator() {
         Knocking::Known(Caller::Operator),
         "a session bought with the password named somebody other than the operator"
     );
-    let _ = fs::remove_dir_all(a_directory("who-operator"));
 }
 
 #[tokio::test]
@@ -426,7 +414,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
     // One answer for both, because a caller told which secret was wrong is a caller
     // told which one to go on guessing at.
     let path = keeping("who-nobody");
-    let (_, token, admitting) = door(Some(path), Chance::cycling());
+    let (_, token, admitting) = door(Some(path.path()), Chance::cycling());
 
     assert_eq!(
         admitting
@@ -447,14 +435,16 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
         Knocking::Nobody,
         "a secret this run never minted was admitted as somebody"
     );
-    let _ = fs::remove_dir_all(a_directory("who-nobody"));
 }
 
 #[tokio::test]
 async fn a_member_the_household_knows_is_let_in_as_that_member() {
     let path = keeping("member-in");
-    let (router, _token, admitting) =
-        door_with(Some(path), Recognising::knowing("a7f3"), Chance::cycling());
+    let (router, _token, admitting) = door_with(
+        Some(path.path()),
+        Recognising::knowing("a7f3"),
+        Chance::cycling(),
+    );
 
     let answer = asked(
         router,
@@ -477,7 +467,6 @@ async fn a_member_the_household_knows_is_let_in_as_that_member() {
         Knocking::Known(Caller::Member("a7f3".to_owned())),
         "a session the household bought named somebody other than that member"
     );
-    let _ = fs::remove_dir_all(a_directory("member-in"));
 }
 
 #[tokio::test]
@@ -485,7 +474,11 @@ async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
     // Two doors and nothing chooses between them. The one that needs no network
     // answers first, so a household that is down cannot keep the operator out.
     let path = keeping("operator-first");
-    let (router, _, _) = door_with(Some(path), Recognising::unreachable(), Chance::cycling());
+    let (router, _, _) = door_with(
+        Some(path.path()),
+        Recognising::unreachable(),
+        Chance::cycling(),
+    );
 
     let answer = asked(router, "POST", SESSION, &from_here(), &offering(&chosen())).await;
 
@@ -494,7 +487,6 @@ async fn the_machines_own_password_is_tried_before_the_household_is_asked() {
         StatusCode::OK,
         "the machine's own password was refused because the household could not be asked"
     );
-    let _ = fs::remove_dir_all(a_directory("operator-first"));
 }
 
 #[tokio::test]
@@ -502,7 +494,11 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
     // The safe direction, and the honest one: nothing proved anything, so nobody
     // is let in on it.
     let path = keeping("household-down");
-    let (router, _, _) = door_with(Some(path), Recognising::unreachable(), Chance::cycling());
+    let (router, _, _) = door_with(
+        Some(path.path()),
+        Recognising::unreachable(),
+        Chance::cycling(),
+    );
 
     let answer = asked(
         router,
@@ -514,13 +510,16 @@ async fn a_household_that_cannot_be_asked_refuses_rather_than_admitting() {
     .await;
 
     assert_eq!(answer.status, StatusCode::UNAUTHORIZED);
-    let _ = fs::remove_dir_all(a_directory("household-down"));
 }
 
 #[tokio::test]
 async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong() {
     let path = keeping("member-unknown");
-    let (router, _, _) = door_with(Some(path), Recognising::knowing_nobody(), Chance::cycling());
+    let (router, _, _) = door_with(
+        Some(path.path()),
+        Recognising::knowing_nobody(),
+        Chance::cycling(),
+    );
 
     let stranger = asked(
         router.clone(),
@@ -537,7 +536,6 @@ async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong
         stranger.body, wrong.body,
         "the refusals differ, so they say which door was meant"
     );
-    let _ = fs::remove_dir_all(a_directory("member-unknown"));
 }
 
 /// The sequence a removed identity is described by, staged end to end.
@@ -550,7 +548,8 @@ async fn a_pair_nobody_recognises_is_refused_without_saying_which_half_was_wrong
 async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
     let path = keeping("member-withdrawn");
     let household = Recognising::knowing("a7f3");
-    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let (router, _, admitting) =
+        door_with(Some(path.path()), Arc::clone(&household), not_the_token());
 
     let answer = asked(
         router,
@@ -583,7 +582,6 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
         Knocking::Nobody,
         "a session outlived the account it was bought with"
     );
-    let _ = fs::remove_dir_all(a_directory("member-withdrawn"));
 }
 
 /// A password changed at the server ends a session opened with the old one at its
@@ -592,7 +590,8 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
 async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
     let path = keeping("member-password-changed");
     let household = Recognising::knowing("a7f3");
-    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let (router, _, admitting) =
+        door_with(Some(path.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router,
         "POST",
@@ -616,7 +615,6 @@ async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
         Knocking::Nobody,
         "a session outlived the password it was opened with"
     );
-    let _ = fs::remove_dir_all(a_directory("member-password-changed"));
 }
 
 /// Gone and could-not-be-asked are different facts and must not arrive alike.
@@ -630,7 +628,8 @@ async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
 async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
     let path = keeping("member-unasked");
     let household = Recognising::knowing("a7f3");
-    let (router, _, admitting) = door_with(Some(path), Arc::clone(&household), not_the_token());
+    let (router, _, admitting) =
+        door_with(Some(path.path()), Arc::clone(&household), not_the_token());
     let answer = asked(
         router,
         "POST",
@@ -654,5 +653,4 @@ async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
         Knocking::Unconfirmed,
         "a household that could not be asked was read as one that answered no"
     );
-    let _ = fs::remove_dir_all(a_directory("member-unasked"));
 }

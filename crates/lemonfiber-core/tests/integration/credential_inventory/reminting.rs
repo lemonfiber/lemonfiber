@@ -112,8 +112,8 @@ fn searching(operation: &str) -> &'static str {
 /// service, indexer aggregator, subtitle finder and media server have moved into their
 /// plugins and run, the curator's key minted as [`OLD_KEY`], over `http`; with the gate.
 fn moved(name: &str, http: &Arc<Fake>) -> (lemonfiber_core::app::Ctx, &'static Path, Arc<Gate>) {
-    let stack: &'static Path =
-        Box::leak(crate::common::stack::with_the_gate(name).into_boxed_path());
+    let stack_dir = crate::common::stack::with_the_gate(name);
+    let stack = stack_dir.leaked();
     let gate = Arc::new(Gate::admitting(gate_routes()));
     let ctx = lemonfiber_testing::adapted::reaching(
         lemonfiber_testing::a_context()
@@ -123,6 +123,7 @@ fn moved(name: &str, http: &Arc<Fake>) -> (lemonfiber_core::app::Ctx, &'static P
                 stack_dir: Some(stack.to_path_buf()),
                 ..Settings::default()
             })
+            .holding(stack_dir)
             .build()
             .with_http(http.clone())
             .with_random(Arc::new(FixedRandom(Some(vec![
@@ -211,7 +212,6 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
     let new_key = held(stack).unwrap_or_default();
     let upstream = std::fs::read_to_string(stack.join("config/sonarr-adapter/upstream.json"))
         .unwrap_or_default();
-    let _ = std::fs::remove_dir_all(stack);
 
     let rotation = inventory.rotated;
     assert!(
@@ -268,10 +268,10 @@ async fn a_minted_curator_key_is_replaced_and_reaches_every_copy() {
 async fn a_rehearsed_rotation_replaces_nothing_and_hands_nothing_over() {
     let http = answering();
     let (ctx, stack, gate) = moved("reminted-rehearsed", &http);
+    let ctx = ctx.rehearsing();
 
-    let inventory = rotated(&ctx.rehearsing()).await;
+    let inventory = rotated(&ctx).await;
     let still = held(stack);
-    let _ = std::fs::remove_dir_all(stack);
 
     let said = format!("{:?}", inventory.rotated.map(|one| one.settled));
     assert!(said.starts_with("Some(Rehearsed"), "{said}");
@@ -295,10 +295,9 @@ async fn a_rehearsed_rotation_replaces_nothing_and_hands_nothing_over() {
 #[tokio::test]
 async fn a_copy_that_refuses_the_new_key_is_said_to_have_failed() {
     let http = registering(refusing());
-    let (ctx, stack, _) = moved("reminted-refused", &http);
+    let (ctx, _, _) = moved("reminted-refused", &http);
 
     let inventory = rotated(&ctx).await;
-    let _ = std::fs::remove_dir_all(stack);
 
     let rotation = inventory.rotated;
     let failed = rotation

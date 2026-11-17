@@ -215,7 +215,8 @@ fn a_setting_that_cannot_be_written_leaves_the_existing_file_alone() {
 
     // Built as a directory and a name rather than derived with `parent()`,
     // which would need a branch for a case that cannot happen.
-    let parent = lemonfiber_fixtures::scratch::Scratch::named("cfg-read-only").kept();
+    let parent_scratch = lemonfiber_fixtures::scratch::Scratch::named("cfg-read-only");
+    let parent = parent_scratch.to_path_buf();
     let path = parent.join(".env");
     let _ = std::fs::remove_dir_all(&parent);
     let _ = std::fs::create_dir_all(&parent);
@@ -247,7 +248,8 @@ fn a_directory_that_cannot_be_created_is_reported_as_such() {
     // The file itself does not exist and its parent does not either, so
     // reading succeeds as "nothing configured" and creating the directory
     // is what fails — the other half of writing.
-    let outer = lemonfiber_fixtures::scratch::Scratch::named("cfg-no-mkdir").kept();
+    let outer_scratch = lemonfiber_fixtures::scratch::Scratch::named("cfg-no-mkdir");
+    let outer = outer_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&outer);
     let _ = std::fs::create_dir_all(&outer);
     let _ = std::fs::set_permissions(&outer, std::fs::Permissions::from_mode(0o500));

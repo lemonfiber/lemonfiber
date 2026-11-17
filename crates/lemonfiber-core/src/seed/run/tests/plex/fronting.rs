@@ -82,7 +82,8 @@ fn carried_ctx(
     std::path::PathBuf,
     Arc<lemonfiber_fixtures::support::Recording>,
 ) {
-    let at = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
+    let at_scratch = lemonfiber_fixtures::scratch::Scratch::named(name);
+    let at = at_scratch.to_path_buf();
     let _ = std::fs::remove_dir_all(&at);
     let _ = std::fs::create_dir_all(&at);
     let _ = std::fs::write(at.join(".env"), "");
@@ -99,6 +100,7 @@ fn carried_ctx(
         },
     )));
     let mut ctx = a_context()
+        .holding(at_scratch)
         .over(crate::test_support::embedded())
         .runner(runner.clone())
         .build();

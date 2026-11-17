@@ -17,8 +17,10 @@ const PUBLISHED: u16 = 41_234;
 /// A context whose engine serves as `serves` does and whose transport answers as `http`,
 /// keeping its plugins' starting files beside an env file of its own.
 fn lending(name: &str, serves: &Arc<Serves>, http: Arc<Fake>) -> crate::app::Ctx {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("lending-{name}")).kept();
+    let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named(&format!("lending-{name}"));
+    let dir = dir_scratch.to_path_buf();
     let mut ctx = a_context()
+        .holding(dir_scratch)
         .settings(Settings {
             env_file: Some(dir.join(".env")),
             ..Settings::default()

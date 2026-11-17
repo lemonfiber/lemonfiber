@@ -206,14 +206,13 @@ async fn the_stacks_administrator_password_is_not_rotated_against_a_plugins_serv
     .is_ok());
     let ctx = crate::test_support::a_context()
         .settings(config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..config::Settings::default()
         })
         .build()
         .with_http(http.clone());
 
     let rotation = super::administrator(&ctx, &held, &fillers).await;
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(
         matches!(&rotation.settled, Settled::Unproven { detail } if detail == super::NO_ADMINISTRATOR_HELD),
@@ -241,7 +240,7 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_not_rotated() {
     let env = crate::test_support::env_without_password("rotate-contracted-server");
     let ctx = crate::test_support::a_context()
         .settings(config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             ..config::Settings::default()
         })
         .build()
@@ -254,7 +253,6 @@ async fn a_contracted_server_unanswered_over_its_contracts_is_not_rotated() {
             .err(),
         None => None,
     };
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
 
     assert!(matches!(
         &refused,
@@ -307,10 +305,11 @@ async fn rotated_answering(
     let asking = Fake::by_path(vec![("identity.source/v1/replace_admin_password", answer)]);
     let ctx = contracted_context(&project, MEDIA_ADAPTER, true)
         .settings(config::Settings {
-            env_file: Some(env.clone()),
+            env_file: Some(env.to_path_buf()),
             stack_dir: Some(project.clone()),
             ..config::Settings::default()
         })
+        .holding(env)
         .build()
         .with_http(asking.clone());
     let fillers = crate::test_support::stack()
@@ -358,7 +357,6 @@ async fn rotated_answering(
         .filter(|asked| asked.url.ends_with("/replace_admin_password"))
         .map(|asked| asked.body)
         .collect();
-    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     OverItsContract {
         rotated,
         recorded,

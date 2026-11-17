@@ -7,18 +7,17 @@ use crate::stack::{Failure, Source};
 use crate::test_support::frozen_day as today;
 
 /// A stack directory of its own, holding the manifest this repository carries.
-fn stack(name: &str) -> &'static Path {
-    let dir = lemonfiber_fixtures::scratch::Scratch::named(name).kept();
-    let _ = std::fs::remove_dir_all(&dir);
+fn stack(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
+    let dir = lemonfiber_fixtures::scratch::Scratch::unmade(name);
     lemonfiber_fixtures::stack::manifest_into(&dir);
-    Box::leak(dir.into_boxed_path())
+    dir
 }
 
 /// A file that has not changed is checked once, and one written since is checked again.
 #[test]
 fn a_manifest_is_checked_again_only_once_its_file_has_changed() {
     let at = stack("remembered");
-    let source = Source::External(at);
+    let source = Source::External(at.leaked());
     let today = today();
     let checks = Cell::new(0);
     let checking = || {
@@ -42,7 +41,7 @@ fn a_manifest_is_checked_again_only_once_its_file_has_changed() {
 fn a_refusal_is_worked_out_afresh_each_time() {
     let at = stack("refused");
     let _ = std::fs::write(at.join("stack.toml"), "this is not a manifest");
-    let source = Source::External(at);
+    let source = Source::External(at.leaked());
     let today = today();
     let checks = Cell::new(0);
     let checking = || -> Result<_, Failure> {
