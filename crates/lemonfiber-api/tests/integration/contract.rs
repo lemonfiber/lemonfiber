@@ -36,14 +36,22 @@ fn committed() -> Files {
 /// The directory this build writes, its examples gathered by the harness, with whatever
 /// kept it from being written.
 fn gathered() -> Files {
-    directory(&Contract::describe().with_examples(lemonfiber_examples::gathered()))
+    directory(
+        &Contract::describe()
+            .with_examples(lemonfiber_examples::gathered())
+            .with_household_words(lemonfiber_fixtures::unhoused::published()),
+    )
 }
 
 /// The directory this build writes around the committed examples, with whatever kept it
 /// from being written: the test above holds those examples to what the harness gathers,
 /// so no other test runs the harness again.
 fn fresh() -> Files {
-    directory(&Contract::describe().with_examples(examples_in(&committed())))
+    directory(
+        &Contract::describe()
+            .with_examples(examples_in(&committed()))
+            .with_household_words(lemonfiber_fixtures::unhoused::published()),
+    )
 }
 
 /// The examples `files` holds, each kind's and each action's read back from its file.
@@ -243,7 +251,7 @@ fn every_file_is_reached_from_the_index() {
             reached.insert(path.to_owned());
         }
     };
-    ["key_callable", "reads"]
+    ["key_callable", "reads", "household_words"]
         .iter()
         .filter_map(|key| index.get(key))
         .for_each(&mut named);

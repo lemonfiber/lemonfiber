@@ -458,5 +458,6 @@
       "watched": "examples/actions/watched.json",
       "wiring-fill": "examples/actions/wiring-fill.json"
     }
-  }
+  },
+  "household_words": "household-words.json"
 }

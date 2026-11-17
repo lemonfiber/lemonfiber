@@ -38,6 +38,9 @@ const ACTIONS: &str = "actions";
 /// The reads the surface serves, inside the contract's directory.
 const READS: &str = "reads.json";
 
+/// What a member's surface may not show, inside the contract's directory.
+const HOUSEHOLD_WORDS: &str = "household-words.json";
+
 /// Where the refusals a request may meet are, a file per code family, inside the
 /// contract's directory.
 const REFUSALS: &str = "refusals";
@@ -86,6 +89,9 @@ struct Index {
     refusals: BTreeMap<String, String>,
     /// Each kind and each action, to the file holding its example.
     examples: Kept,
+    /// The file of what a member's surface may not show, where the contract carries it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    household_words: Option<&'static str>,
 }
 
 impl Contract {
@@ -173,6 +179,9 @@ impl Contract {
             put(&mut files, &path, acted);
             examples.actions.insert(action.clone(), path);
         }
+        if let Some(words) = &self.household_words {
+            put(&mut files, HOUSEHOLD_WORDS, words);
+        }
         let index = Index {
             api_version: self.api_version,
             actions,
@@ -183,6 +192,7 @@ impl Contract {
             reads: READS,
             refusals,
             examples,
+            household_words: self.household_words.as_ref().map(|_| HOUSEHOLD_WORDS),
         };
         put(&mut files, INDEX, &index);
 

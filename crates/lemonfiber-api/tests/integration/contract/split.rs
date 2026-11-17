@@ -43,6 +43,7 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
             })
             .collect(),
         examples: lemonfiber_api::contract::example::Examples::default(),
+        household_words: None,
     }
 }
 
@@ -338,4 +339,22 @@ fn an_argument_reaches_a_definition_by_its_file_name_and_the_definition_is_writt
         file(&files, "defs/Instant.json").get("type"),
         Some(&json!("integer"))
     );
+}
+
+#[test]
+fn what_a_member_may_not_be_shown_is_written_and_named_only_where_the_contract_carries_it() {
+    let words =
+        json!({ "names": ["a part"], "terms": ["a term"], "sizes": ["gb"], "examples": [] });
+    let carrying = holding(&[]).with_household_words(words.clone()).files();
+    let bare = holding(&[]).files();
+
+    let carried = carrying.unwrap_or_default();
+    assert_eq!(file(&carried, "household-words.json"), words);
+    assert_eq!(
+        file(&carried, INDEX).get("household_words"),
+        Some(&json!("household-words.json"))
+    );
+    let bare = bare.unwrap_or_default();
+    assert!(!bare.contains_key("household-words.json"));
+    assert_eq!(file(&bare, INDEX).get("household_words"), None);
 }

@@ -128,6 +128,48 @@ const SIZES: &[&str] = &[
     "b", "kb", "mb", "gb", "tb", "kib", "mib", "gib", "tib", "kbps", "mbps", "gbps",
 ];
 
+/// Every name a member may not be shown: the parts the bundle pins, each id's hyphens read
+/// as spaces, and the services, engines and tunnel it pins none for.
+fn names() -> impl Iterator<Item = String> {
+    crate::parts::pinned()
+        .map(|id| id.replace('-', " "))
+        .chain(UNPINNED.iter().map(|name| (*name).to_owned()))
+}
+
+/// Text a version, an address, a size or a rate makes unfit for a member, published beside
+/// the lists so a surface holding its own words to them restates those rules alike.
+const RULED: &[&str] = &[
+    "It needs 4 GB more",
+    "It needs 12GB more",
+    "Fetching at 3 MB/s",
+    "Fetching forty per second",
+    "Reached at 192.168.1.20",
+    "Open it at localhost",
+    "See www.house.example",
+    "Open it at house://shelf",
+    "Now on v1.4.2",
+];
+
+/// What a member's surface may not show, as the contract publishes it: every name, term
+/// and size unit this holds text to, the parts the bundle pins among the names, and each
+/// ruled example with what it names.
+#[must_use]
+pub fn published() -> serde_json::Value {
+    let mut names: Vec<String> = names().collect();
+    names.sort_unstable();
+    names.dedup();
+    let examples: Vec<serde_json::Value> = RULED
+        .iter()
+        .map(|text| serde_json::json!({ "text": text, "names": unhoused(text) }))
+        .collect();
+    serde_json::json!({
+        "names": names,
+        "terms": TERMS,
+        "sizes": SIZES,
+        "examples": examples,
+    })
+}
+
 /// What in `text` a member may not be shown, or nothing where it is all the household's
 /// words.
 #[must_use]
@@ -137,9 +179,7 @@ pub fn unhoused(text: &str) -> Option<String> {
         .split(|letter: char| !(letter.is_alphanumeric() || letter == '\''))
         .filter(|word| !word.is_empty())
         .collect();
-    let mut named = crate::parts::pinned()
-        .map(|id| id.replace('-', " "))
-        .chain(UNPINNED.iter().chain(TERMS).map(|term| (*term).to_owned()));
+    let mut named = names().chain(TERMS.iter().map(|term| (*term).to_owned()));
     if let Some(term) = named.find(|term| said(&words, term)) {
         return Some(term);
     }
