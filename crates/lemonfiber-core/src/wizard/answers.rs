@@ -175,6 +175,28 @@ pub enum Credentials {
     Given(Indexer),
 }
 
+/// The user and group the containers run as, as the operator answered it.
+///
+/// A three-state value of its own for the reason [`Credentials`] is one: "answered,
+/// keeping the image's own" has to survive being written and read back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ContainerUser {
+    /// The step has not been reached yet.
+    #[default]
+    Unanswered,
+    /// Reached, and left to the image's own user and group.
+    Kept,
+    /// Answered with a user and a group.
+    Set(u32, u32),
+}
+
+impl From<Option<(u32, u32)>> for ContainerUser {
+    fn from(given: Option<(u32, u32)>) -> Self {
+        given.map_or(Self::Kept, |(user, group)| Self::Set(user, group))
+    }
+}
+
 /// A Usenet provider login the operator supplied, and whether it was proven.
 ///
 /// Its password rides here the way the stack holds its other secrets; `validated`
@@ -235,11 +257,11 @@ pub struct Answers {
     /// defaulted.
     #[serde(default)]
     pub usenet: Usenet,
-    /// The container user and group, where the platform makes it meaningful.
-    ///
-    /// Distinguishes "answered: no id needed here" (`Some(None)`) from "not yet
-    /// answered" (`None`), because the wizard must know the step is done.
-    pub service_user: Option<Option<(u32, u32)>>,
+    /// The container user and group, where the platform makes it meaningful. Its own
+    /// three-state value for the reason the indexer's is. Absent from an older progress
+    /// file, so defaulted.
+    #[serde(default)]
+    pub service_user: ContainerUser,
     /// How the library is served.
     pub library: Option<Library>,
     /// Whether the household beyond the operator will use it.

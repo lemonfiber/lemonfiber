@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "lines": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

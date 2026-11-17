@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use lemonfiber_core::docker::Condition;
 
-use super::{offer, walked, yes};
+use super::{offer, offered, walked, yes};
 use crate::setup::tests::{working_ctx, Scripted};
 
 /// The code setup would have exited with, had there been no offer.
@@ -119,4 +119,11 @@ async fn a_stack_that_cannot_be_read_is_complained_about_rather_than_reported() 
     let mut ctx = working_ctx();
     ctx.stack = lemonfiber_core::stack::Source::External(std::path::Path::new("/not-a-stack"));
     assert_ne!(shown(walked(&ctx).await), shown(already_settled()));
+}
+
+/// An answer that is not a walkthrough offer offers nothing.
+#[test]
+fn an_answer_that_is_no_offer_offers_nothing() {
+    let read = lemonfiber_core::app::Outcome::Logs(lemonfiber_core::app::LogsReport { lines: 0 });
+    assert_eq!(offered(&read), None);
 }

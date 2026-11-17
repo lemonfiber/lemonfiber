@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use super::SetUp;
+
 /// What versions are in play: the binary, the stack it operates, and what changed.
 ///
 /// The changelog is here rather than behind a request of its own because it answers
@@ -214,6 +216,15 @@ pub struct WizardReport {
     /// Empty for every other phase, and empty too for an apply that stopped before
     /// it wrote anything.
     pub written: Vec<String>,
+    /// Whether this stack is set up: a previous run left setup part-way, nothing is
+    /// configured and no setup has begun, or it is configured.
+    pub setup: SetUp,
+    /// What testing the data location just given found, where one was given.
+    ///
+    /// Absent for every other answer. A location that does not hardlink is still kept,
+    /// because whether to use it anyway is the operator's to decide once they have read
+    /// this.
+    pub storage: Option<StorageFinding>,
     /// What proving the credential just given came to, where one was given.
     ///
     /// Setup tests an indexer key and a Usenet login against their live services as
@@ -228,6 +239,31 @@ pub struct WizardReport {
     /// What the VPN step asks of the egress guard where one carries the torrents, in the
     /// order it asks it: empty where nothing fills the guard or it asks nothing.
     pub guard: Vec<GuardQuestion>,
+}
+
+/// What testing a data location for hardlinks found.
+///
+/// Tested on the location itself where it exists, and otherwise on the deepest parent
+/// that does, which is named so that a result read off a parent is never shown as the
+/// location's own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[serde(tag = "found", rename_all = "kebab-case")]
+pub enum StorageFinding {
+    /// It hardlinks, so imports are instant and cost no extra disk.
+    Links {
+        /// The parent the test ran on, where the location did not exist yet.
+        inferred_from: Option<std::path::PathBuf>,
+    },
+    /// It works but cannot hardlink, so every import is a copy.
+    CopyOnly {
+        /// The filesystem's reason, where it has one that can be named.
+        limitation: Option<String>,
+    },
+    /// It could not be tested, with the platform's words for why.
+    Untested {
+        /// Why the test could not run.
+        reason: String,
+    },
 }
 
 /// One question the VPN step asks of the service filling `network.egress-guard`.

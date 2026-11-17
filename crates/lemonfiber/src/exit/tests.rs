@@ -46,6 +46,8 @@ fn a_wizard() -> WizardReport {
         ready_for_review: false,
         plan: Vec::new(),
         written: Vec::new(),
+        setup: lemonfiber_core::model::SetUp::None,
+        storage: None,
         proof: None,
         guard: Vec::new(),
     }

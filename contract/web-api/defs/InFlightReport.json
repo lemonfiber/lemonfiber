@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What is still coming down inside the forms a teardown would stop.",
+  "type": "object",
+  "properties": {
+    "downloads": {
+      "description": "Each download still coming down, with how far it has got.",
+      "type": "array",
+      "items": {
+        "$ref": "Unfinished.json"
+      }
+    }
+  },
+  "required": [
+    "downloads"
+  ]
+}

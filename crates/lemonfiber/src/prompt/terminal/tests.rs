@@ -1,16 +1,17 @@
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{
-    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
-};
-use lemonfiber_core::config::Protocols;
+use lemonfiber_core::app::setup::Asking;
+use lemonfiber_core::config::{store, Protocols};
+use lemonfiber_core::model::{SettingReport, StorageFinding};
+use lemonfiber_core::origin::Origin;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::prerequisites;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Answer, Indexer, Library, Plan, Provider, Wizard};
+use lemonfiber_core::wizard::{Answer, Indexer, Library, Plan, Provider};
 
-use super::{reviewed, Terminal, MASKED};
+use super::{reviewed, Terminal};
 use crate::prompt::fixtures::{answered, answered_watching, wizard, Script};
+use crate::prompt::{CredentialChoice, Prompt, ProviderEntry};
 
 /// Worth reading the first time and noise every time after — the rule the
 /// footnote block follows inside one report, carried across the questions of one
@@ -80,6 +81,14 @@ fn a_reviewable_plan() -> Plan {
     wizard.plan()
 }
 
+/// `plan` as setup's walk reports it, every value withheld that the core withholds.
+fn reported(plan: &Plan) -> Vec<SettingReport> {
+    plan.settings()
+        .iter()
+        .map(|(key, value)| SettingReport::of(store::showing(key, value), Origin::Operator))
+        .collect()
+}
+
 #[test]
 fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
     // A review reaches the screen, scrollback and any session recording, so a
@@ -90,18 +99,18 @@ fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
         "the plan carries what was answered"
     );
 
-    let review = reviewed(&plan).join("\n");
+    let review = reviewed(&reported(&plan)).join("\n");
 
     assert!(
-        review.contains("INDEXER_APIKEY = ********"),
+        review.contains(&format!("INDEXER_APIKEY = {}", store::REDACTED)),
         "the indexer key was not marked present only"
     );
     assert!(
-        review.contains("USENET_PASS = ********"),
+        review.contains(&format!("USENET_PASS = {}", store::REDACTED)),
         "the provider password was not marked present only"
     );
     assert!(
-        review.contains("USENET_USER = ********"),
+        review.contains(&format!("USENET_USER = {}", store::REDACTED)),
         "the provider account was not marked present only"
     );
     assert!(
@@ -122,7 +131,7 @@ fn the_review_shows_each_setting_with_a_secret_marked_present_only() {
         review.contains("DATA_ROOT = /srv/media"),
         "where the files go was masked along with the credentials"
     );
-    assert!(answered(&[""]).confirm(&plan));
+    assert!(answered(&[""]).confirm(&reported(&plan)));
 }
 
 #[test]
@@ -210,21 +219,34 @@ fn a_location_that_cannot_hardlink_is_explained_and_still_offered() {
     // without the choice being taken away.
     assert!(!answered(&[""]).storage_warning(
         Path::new("/srv/media"),
-        &StorageWarning::CopyOnly {
+        &StorageFinding::CopyOnly {
             limitation: Some("it is a network share".to_owned())
         }
     ));
     assert!(answered(&["y"]).storage_warning(
         Path::new("/srv/media"),
-        &StorageWarning::CopyOnly { limitation: None }
+        &StorageFinding::CopyOnly { limitation: None }
     ));
     // One that could not be tested is a different sentence.
     assert!(!answered(&["n"]).storage_warning(
         Path::new("/srv/media"),
-        &StorageWarning::Untested {
+        &StorageFinding::Untested {
             reason: "the path does not exist".to_owned()
         }
     ));
+}
+
+/// A location that links needs no warning, so nothing is asked and it is kept.
+#[test]
+fn a_location_that_links_is_kept_without_asking() {
+    let (terminal, unasked) = answered_watching(&["n"]);
+    assert!(terminal.storage_warning(
+        Path::new("/srv/media"),
+        &StorageFinding::Links {
+            inferred_from: None
+        }
+    ));
+    assert_eq!(unasked.borrow().len(), 1, "nothing was asked");
 }
 
 #[test]
@@ -342,7 +364,7 @@ fn the_vpn_question_defaults_to_yes_and_its_warning_defaults_to_no() {
 fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
     let plan = a_reviewable_plan();
 
-    let review = reviewed(&plan);
+    let review = reviewed(&reported(&plan));
 
     // Every setting the plan carries is on the review, shown as it will be
     // written — except the two that carry a credential, which are shown as
@@ -351,7 +373,7 @@ fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
     assert_eq!(review.len(), plan.settings().len());
     for (key, value) in plan.settings() {
         let shown = if WITHHELD.contains(&key.as_str()) {
-            MASKED
+            store::REDACTED
         } else {
             value.as_str()
         };
@@ -370,9 +392,8 @@ fn the_review_shows_every_setting_and_never_a_secret_in_the_clear() {
     }
 
     // Confirmed by default: a bare enter applies.
-    let empty = Wizard::new(Environment::MacOs).plan();
-    assert!(answered(&[""]).confirm(&empty));
-    assert!(!answered(&["n"]).confirm(&empty));
+    assert!(answered(&[""]).confirm(&[]));
+    assert!(!answered(&["n"]).confirm(&[]));
 }
 
 #[test]

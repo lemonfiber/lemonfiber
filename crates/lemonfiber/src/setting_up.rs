@@ -1,23 +1,24 @@
-//! Setup answered without a person: the wizard walked with the command line's flags
-//! as its answers, the answers applied, and the report a parser is handed.
+//! Setup's walk, one step at a time through the dispatcher, put to a person or to the
+//! command line's flags; the answers applied, and the report a parser is handed.
 
 pub mod flags;
+mod prompt;
+mod walk;
 
 use std::path::PathBuf;
 
-use lemonfiber_core::app::apply::Applying;
-use lemonfiber_core::app::setup::{self as core_setup, Prompt};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, service_user_from_env, store, Protocols, Settings,
 };
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{kind, Envelope, SetupOutcome, SetupReport};
-use lemonfiber_core::wizard::Wizard;
+use lemonfiber_core::wizard::Step;
 
 pub use flags::{Flags, SetupFlags};
+pub use prompt::{CredentialChoice, Prompt, ProviderEntry};
+pub use walk::{standing, walk, Walked};
 
 /// Why a run answered by flags ended before it had a report to give.
 #[derive(Debug)]
@@ -26,6 +27,8 @@ pub enum Unwalked {
     Missing(Vec<&'static str>),
     /// What walking or applying the answers was refused with.
     Failed(Box<Problem>),
+    /// Where setup stands was answered with something other than the walk.
+    Unread,
 }
 
 /// The data location setup proposes when the operator names none: a directory under
@@ -40,49 +43,18 @@ pub fn default_data_location(paths: &Paths) -> PathBuf {
 ///
 /// # Errors
 ///
-/// The flag of every question `wizard` still asks that `flags` gives no answer to.
+/// The flag of every step in `unanswered` that `flags` gives no answer to.
 pub fn answering(
-    wizard: &Wizard,
+    unanswered: &[Step],
     flags: SetupFlags,
     paths: &Paths,
 ) -> Result<Flags, Vec<&'static str>> {
-    let missing = flags.missing(wizard);
+    let missing = flags.missing(unanswered);
     if missing.is_empty() {
         Ok(Flags::new(flags, default_data_location(paths)))
     } else {
         Err(missing)
     }
-}
-
-/// What walking `wizard` with `prompt`'s answers and applying them came to, the change
-/// journal stamped by `ctx`'s clock.
-///
-/// # Errors
-///
-/// What the walk or the apply was refused with.
-pub async fn walked(
-    ctx: &Ctx,
-    paths: &Paths,
-    wizard: &mut Wizard,
-    prompt: &dyn Prompt,
-) -> Result<core_setup::Outcome, Box<Problem>> {
-    let guard = core_setup::guard(ctx);
-    let applying = Applying {
-        paths,
-        source: ctx.stack,
-        stamp: Instant::of(ctx.seams.clock.now()),
-        random: ctx.seams.random.as_ref(),
-        confined: ctx.seams.confined.as_ref(),
-        guard: guard.as_ref(),
-    };
-    core_setup::run(
-        wizard,
-        (prompt, guard.as_ref()),
-        ctx.seams.filesystem.as_ref(),
-        ctx.validator.as_ref(),
-        &applying,
-    )
-    .await
 }
 
 /// The report a parser is handed for a run that came to `outcome` under `settings`.
@@ -126,9 +98,12 @@ pub async fn by_flags(
     paths: &Paths,
     flags: SetupFlags,
 ) -> Result<Envelope<SetupReport>, Unwalked> {
-    let mut wizard = Wizard::new(ctx.environment);
-    let prompt = answering(&wizard, flags, paths).map_err(Unwalked::Missing)?;
-    let outcome = walked(ctx, paths, &mut wizard, &prompt)
+    let standing = standing(ctx)
+        .await
+        .map_err(Unwalked::Failed)?
+        .ok_or(Unwalked::Unread)?;
+    let prompt = answering(&standing.unanswered, flags, paths).map_err(Unwalked::Missing)?;
+    let outcome = walk(ctx, &prompt, standing)
         .await
         .map_err(Unwalked::Failed)?;
     Ok(report(outcome.into(), &as_written(ctx, paths)))

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One download a teardown would interrupt.\n\nCarries the protocol as well as the name, because \"still downloading\" is only\nhalf of what an operator needs — the other half is which client to go and look in,\nand a stack running both has two places it could be.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "What it is, as the client names it.",
+      "type": "string"
+    },
+    "progress": {
+      "description": "How far along, from zero to a hundred.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "protocol": {
+      "description": "Which client has it.",
+      "$ref": "DashboardProtocol.json"
+    }
+  },
+  "required": [
+    "protocol",
+    "name",
+    "progress"
+  ]
+}

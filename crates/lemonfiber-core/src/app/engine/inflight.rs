@@ -78,14 +78,28 @@ impl From<bool> for Waiting {
 /// Carries the protocol as well as the name, because "still downloading" is only
 /// half of what an operator needs — the other half is which client to go and look in,
 /// and a stack running both has two places it could be.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Interrupted {
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Unfinished {
     /// Which client has it.
     pub protocol: Protocol,
     /// What it is, as the client names it.
     pub name: String,
     /// How far along, from zero to a hundred.
     pub progress: u8,
+}
+
+/// What is still coming down inside the forms a teardown would stop.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct InFlightReport {
+    /// Each download still coming down, with how far it has got.
+    pub downloads: Vec<Unfinished>,
+}
+
+/// What is still coming down inside `forms`, as the answer to asking.
+pub async fn in_flight_report(ctx: &Ctx, forms: &[String]) -> InFlightReport {
+    InFlightReport {
+        downloads: in_flight(ctx, forms).await,
+    }
 }
 
 /// What the download clients inside these forms are still working on.
@@ -95,7 +109,7 @@ pub struct Interrupted {
 /// teardown should proceed through without comment. Nothing here is worth failing a
 /// stop over: this exists to tell an operator something they would want to know, and
 /// a guard that cannot find out has nothing to tell them.
-pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
+pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Unfinished> {
     let targets = {
         let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
             return Vec::new();
@@ -145,7 +159,7 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Interrupted> {
             downloads
                 .into_iter()
                 .filter(underway)
-                .map(move |download| Interrupted {
+                .map(move |download| Unfinished {
                     protocol,
                     name: download.name,
                     progress: download.progress,

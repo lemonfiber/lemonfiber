@@ -5,40 +5,36 @@
 //! `--yes` on the same run carries them out unasked, which is a thing somebody types
 //! deliberately rather than a default anybody can fall into.
 //!
-//! What may be offered, what has been declined and what has been tried too often are all
-//! the core's to decide. What is here is the asking.
+//! What may be offered, what has been declined and what has been tried too often, and the
+//! asking itself, are the core's. What is here is which consent the run carries.
 
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::repair::run::{mend, retracting, Confirm, Consent};
-use lemonfiber_core::repair::{Repair, Stance};
-
-use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::ports::asking::Asking;
+use lemonfiber_core::repair::run::Consent;
 
 use crate::exit::USAGE;
-use crate::prompt::{yes_no, Answers};
-use crate::render::Lines;
 use crate::say::complain;
 use lemonfiber::cli::Mending;
 
 /// Offer the repairs and carry out the ones agreed to, or put back what the last one did.
 pub(crate) async fn run(
     ctx: &Ctx,
-    paths: Paths,
     asked: Mending,
-    answers: &(dyn Answers + Sync),
+    answers: Arc<dyn Asking>,
     json: bool,
 ) -> ExitCode {
     if asked.undo {
-        return undone(ctx, &paths, json).await;
+        return undone(ctx, json).await;
     }
     let reporting = json || ctx.dry_run;
     let consent = match (asked.fixing.yes, reporting, answers.present()) {
-        (true, _, _) => Some(Consent::Standing),
-        (false, true, _) => Some(Consent::Offer),
-        (false, false, true) => None,
+        (true, _, _) => Consent::Standing,
+        (false, true, _) => Consent::Offer,
+        (false, false, true) => Consent::Asked,
         (false, false, false) => {
             complain!(
                 "error: repairing here is non-interactive, so there is nobody to agree to each repair:"
@@ -56,29 +52,24 @@ pub(crate) async fn run(
     }
 }
 
-/// What a forward repair run comes to: a consent settled in advance is dispatched, and an
-/// unsettled one is asked at the terminal.
+/// What a forward repair run comes to, each repair an unsettled consent offers put to
+/// whoever `answers` reaches.
 async fn repaired(
     ctx: &Ctx,
-    consent: Option<Consent>,
+    consent: Consent,
     disruptive: bool,
-    answers: &(dyn Answers + Sync),
+    answers: Arc<dyn Asking>,
 ) -> Result<Outcome, Box<Problem>> {
-    match consent {
-        Some(consent) => {
-            dispatch(
-                Command::Repair {
-                    consent,
-                    disruptive,
-                },
-                ctx,
-            )
-            .await
-        }
-        None => mend(ctx, Stance::Ask, disruptive, &Asking(answers))
-            .await
-            .map(Outcome::Repair),
-    }
+    let mut asking = ctx.clone();
+    asking.asking = answers;
+    dispatch(
+        Command::Repair {
+            consent,
+            disruptive,
+        },
+        &asking,
+    )
+    .await
 }
 
 /// One outcome, read out and scored, through the paths every other answer takes.
@@ -94,44 +85,11 @@ fn answered(outcome: &Outcome, json: bool) -> ExitCode {
 }
 
 /// Put back what the last repair changed, or say what putting it back would do.
-///
-/// The deciding and the doing are the core's — which repair was last, what reversing it
-/// takes, which of those need a service to reach, and whether this run may act at all.
-/// What is here is the saying. This path does not go through the dispatcher, so the
-/// rehearsal verdict is taken inside the call rather than above it; reading the flag
-/// here would be a second reading to keep in step with the one that already exists.
-async fn undone(ctx: &Ctx, paths: &Paths, json: bool) -> ExitCode {
-    match retracting(ctx, paths).await {
-        Ok(reversal) => answered(&Outcome::Undo(reversal), json),
+async fn undone(ctx: &Ctx, json: bool) -> ExitCode {
+    match dispatch(Command::Undo { run: None }, ctx).await {
+        Ok(outcome) => answered(&outcome, json),
         Err(problem) => crate::complain(&problem),
     }
-}
-
-/// Asking whoever is at the terminal.
-struct Asking<'a>(&'a (dyn Answers + Sync));
-
-impl Confirm for Asking<'_> {
-    /// Ask about one repair, having said what it would do and what else changes.
-    ///
-    /// Stated before the question rather than after it, because an effect somebody learns
-    /// about afterwards is not something they agreed to.
-    fn agreed(&self, repair: &Repair) -> bool {
-        stated(repair).print();
-        yes_no(self.0, &format!("{}?", repair.does), false)
-    }
-}
-
-/// What is about to be agreed to, built as lines like every other answer this binary
-/// gives rather than printed where it is decided — the terminal is reached in one place.
-fn stated(repair: &Repair) -> Lines {
-    let mut lines = Lines::default();
-    for effect in &repair.effects {
-        lines.put(format!("  {effect}"));
-    }
-    if !repair.reversible {
-        lines.put("  This one cannot be undone.");
-    }
-    lines
 }
 
 #[cfg(test)]

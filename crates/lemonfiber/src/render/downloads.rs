@@ -1,6 +1,6 @@
 //! What is still coming down, said in a way an operator can act on.
 
-use lemonfiber_core::app::Interrupted;
+use lemonfiber_core::app::{InFlightReport, Unfinished};
 use lemonfiber_core::dashboard::Protocol;
 use lemonfiber_core::plural::s;
 use lemonfiber_core::text::fitted;
@@ -29,7 +29,7 @@ pub(crate) const fn protocol(protocol: Protocol) -> &'static str {
 ///
 /// The client is named beside each, because "still downloading" is only half of what
 /// they need: the other half is which of the two clients to go and look in.
-pub(crate) fn interrupting(active: &[Interrupted]) -> Lines {
+pub(crate) fn interrupting(active: &[Unfinished]) -> Lines {
     let mut lines = Lines::default();
     lines.spaced(format!(
         "{} download{} still active:",
@@ -46,6 +46,16 @@ pub(crate) fn interrupting(active: &[Interrupted]) -> Lines {
         ));
     }
     lines
+}
+
+/// What is coming down, or that nothing is.
+pub(super) fn in_flight(report: &InFlightReport) -> Lines {
+    if report.downloads.is_empty() {
+        let mut lines = Lines::default();
+        lines.put("Nothing is coming down.");
+        return lines;
+    }
+    interrupting(&report.downloads)
 }
 
 #[cfg(test)]

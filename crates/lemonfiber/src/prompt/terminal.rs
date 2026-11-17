@@ -9,20 +9,17 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use lemonfiber_core::alert::Appetite;
-use lemonfiber_core::app::setup::{
-    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
-};
+use lemonfiber_core::app::setup::Asking;
 use lemonfiber_core::autostart::DECLINE_CONSEQUENCE;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Library, Plan};
+use lemonfiber_core::wizard::Library;
 
-use lemonfiber_core::config::display::in_full;
-
-use super::Answers;
+use super::{Answers, CredentialChoice, Prompt, ProviderEntry};
 use crate::say::say;
 use lemonfiber::setting_up::flags::parse_ids;
 
@@ -116,17 +113,7 @@ impl Terminal {
 
     /// Ask a yes-or-no question, taking the default where the answer is neither.
     fn yes_no(&self, question: &str, default: bool) -> bool {
-        let hint = if default { "[Y/n]" } else { "[y/N]" };
-        match self
-            .answers
-            .ask(&format!("{question} {hint}:"))
-            .to_lowercase()
-            .as_str()
-        {
-            "y" | "yes" => true,
-            "n" | "no" => false,
-            _ => default,
-        }
+        super::yes_no(self.answers.as_ref(), question, default)
     }
 }
 
@@ -212,9 +199,10 @@ impl Prompt for Terminal {
         }
     }
 
-    fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool {
-        match warning {
-            StorageWarning::CopyOnly { limitation } => {
+    fn storage_warning(&self, path: &Path, found: &StorageFinding) -> bool {
+        match found {
+            StorageFinding::Links { .. } => return true,
+            StorageFinding::CopyOnly { limitation } => {
                 match limitation {
                     Some(reason) => say!("  ✗ {} cannot hardlink — {reason}.", path.display()),
                     None => say!("  ✗ {} cannot hardlink.", path.display()),
@@ -224,7 +212,7 @@ impl Prompt for Terminal {
                 // above rather than a new claim.
                 say!("    {COPY_CONSEQUENCE}");
             }
-            StorageWarning::Untested { reason } => {
+            StorageFinding::Untested { reason } => {
                 say!(
                     "  ? {} could not be tested for hardlinks — {reason}.",
                     path.display()
@@ -413,7 +401,7 @@ impl Prompt for Terminal {
         self.yes_no("Start the stack when this machine boots?", false)
     }
 
-    fn confirm(&self, plan: &Plan) -> bool {
+    fn confirm(&self, plan: &[SettingReport]) -> bool {
         say!("\nThis is what setup will write:");
         for line in reviewed(plan) {
             say!("{line}");
@@ -422,25 +410,15 @@ impl Prompt for Terminal {
     }
 }
 
-/// What is shown in place of a secret: that there is one, and nothing more.
-const MASKED: &str = "********";
-
 /// The review of what setup will write, as the lines it puts on the screen.
 ///
-/// A value is shown only where somebody has written down what makes showing it safe:
-/// the review reaches the screen, scrollback and any session recording, and an API
-/// key or password has no business in any of them. Decided by the same allow-list
+/// Every value the plan withholds arrives withheld, decided by the same allow-list
 /// `config show` displays by, so the two surfaces cannot disagree about one setting.
 ///
-/// Built rather than printed straight out, so that what it says can be read back — a
-/// mask nothing reads is a mask that can stop masking silently.
-fn reviewed(plan: &Plan) -> Vec<String> {
-    plan.settings()
-        .iter()
-        .map(|(key, value)| {
-            let shown = if in_full(key) { value.as_str() } else { MASKED };
-            format!("  {key} = {shown}")
-        })
+/// Built rather than printed straight out, so that what it says can be read back.
+fn reviewed(plan: &[SettingReport]) -> Vec<String> {
+    plan.iter()
+        .map(|setting| format!("  {} = {}", setting.key, setting.value))
         .collect()
 }
 

@@ -137,6 +137,8 @@ kinds! {
     HANDOFF = "handoff",
     /// What copying an operator's own records across came to.
     IMPORT = "import",
+    /// What is still coming down inside the forms a teardown would stop.
+    IN_FLIGHT = "in-flight",
     /// An account offered to somebody in the house.
     INVITATION = "invitation",
     /// Somebody taken out of the household, or what taking them would cost.
@@ -151,6 +153,8 @@ kinds! {
     LIFECYCLE = "lifecycle",
     /// One line of a service's log.
     LOG = "log",
+    /// What reading the services' logs came to.
+    LOGS = "logs",
     /// What is already on this machine, before anything is proposed.
     MIGRATION = "migration",
     /// A key minted, with its secret, shown this once.
@@ -165,6 +169,8 @@ kinds! {
     OUTBOUND = "outbound",
     /// What a phone is handed to pair with this stack.
     PAIRING = "pairing",
+    /// What setting the web interface's password came to.
+    PASSWORD = "password",
     /// What pausing or resuming every download client came to, client by client.
     PAUSING = "pausing",
     /// What a plugin's source claims, held to what this build publishes.
@@ -197,6 +203,8 @@ kinds! {
     SEED = "seed",
     /// Where this copy of lemonfiber stands, and what moving it would come to.
     SELF_UPDATE = "self-update",
+    /// How the web surface is served: the certificate it presents and the name it answers to.
+    SERVED = "served",
     /// What setup settled on.
     SETUP = "setup",
     /// A code a member signs in by, or the sign-in by a code still waiting.
@@ -236,6 +244,8 @@ kinds! {
     VERSION = "version",
     /// A walkthrough's outcome.
     WALKTHROUGH = "walkthrough",
+    /// Whether a walkthrough is worth offering this stack, and which one.
+    WALKTHROUGH_OFFER = "walkthrough-offer",
     /// A supervision run's findings.
     WATCH = "watch",
     /// What the outside watcher sees, beside what each of its monitors covers.

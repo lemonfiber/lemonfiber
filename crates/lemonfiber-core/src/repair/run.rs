@@ -23,6 +23,8 @@ use proving::{carried, looked};
 use remembering::{beyond, declined, recorded, remembered};
 pub(crate) use telling::told;
 
+use std::fmt::Write as _;
+
 use crate::config::paths::Paths;
 use crate::doctor::{Check, Finding};
 use crate::error::{Diagnose as _, Problem, Remedy, State};
@@ -297,8 +299,8 @@ pub use crate::app::putting_back::{Left, Reversal};
 /// given for an offer that has since moved on is refused here, having carried
 /// nothing out.
 ///
-/// What it cannot carry is the question a terminal puts mid-run and waits on, which
-/// reaches [`mend`] with an [`Confirm`] of its own.
+/// A consent of [`Consent::Asked`] puts each repair to whoever is present on the
+/// context's asking port, mid-run, as it comes up.
 ///
 /// # Errors
 ///
@@ -309,9 +311,36 @@ pub async fn putting_right(
     consent: &Consent,
     disruptive: bool,
 ) -> Result<Report, Box<Problem>> {
-    let report = mend(ctx, consent.stance(), disruptive, consent).await?;
+    let report = match consent {
+        Consent::Asked => mend(ctx, Stance::Ask, disruptive, &Present(ctx)).await?,
+        _ => mend(ctx, consent.stance(), disruptive, consent).await?,
+    };
     consent.held(&report)?;
     Ok(report)
+}
+
+/// Whoever is present to answer on the run's context, asked about each repair in turn.
+struct Present<'a>(&'a Ctx);
+
+impl Confirm for Present<'_> {
+    fn agreed(&self, repair: &Repair) -> bool {
+        let answer = self.0.asking.ask(&asked_about(repair));
+        matches!(answer.trim().to_lowercase().as_str(), "y" | "yes")
+    }
+}
+
+/// The question one repair is put as: what it changes, whether it can be undone, and
+/// what it does.
+fn asked_about(repair: &Repair) -> String {
+    let mut question = String::new();
+    for effect in &repair.effects {
+        let _ = writeln!(question, "  {effect}");
+    }
+    if !repair.reversible {
+        question.push_str("  This one cannot be undone.\n");
+    }
+    let _ = write!(question, "{}? [y/N]:", repair.does);
+    question
 }
 
 /// Put back what the last repair changed, from wherever this machine keeps them.

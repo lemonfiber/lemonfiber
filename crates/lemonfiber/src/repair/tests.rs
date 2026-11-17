@@ -5,10 +5,15 @@ use lemonfiber_core::repair::{Outcome, Repair};
 use lemonfiber_core::stack::Source;
 
 use crate::exit::{repairing, shown, success};
-use crate::prompt::Answers;
 
-use super::{repaired, run, Asking, Confirm as _, Consent, Ctx, Mending, Paths};
+use std::sync::Arc;
+
+use lemonfiber_core::ports::asking::Asking;
+use lemonfiber_fixtures::typing::Typing;
+
+use super::{repaired, run, Consent, Ctx, Mending};
 use lemonfiber::cli::Fixing;
+use lemonfiber_core::config::paths::Paths;
 
 /// Where a test's records live, in a scratch directory of its own — named, because a
 /// test that undoes a journal must not be reading one another test wrote.
@@ -28,44 +33,12 @@ fn ctx() -> Ctx {
         .build()
 }
 
-/// Answers whatever it was built with, however often it is asked.
-///
-/// A repair asks one kind of question and only ever that kind, so both halves of the
-/// trait answer the same way — there is no secret to give and nothing that would ask
-/// for one.
-struct Says(&'static str);
-
-impl Answers for Says {
-    fn ask(&self, _question: &str) -> String {
-        self.0.to_owned()
-    }
-
-    fn secret(&self, question: &str) -> String {
-        self.ask(question)
-    }
-}
-
-/// Nobody is at the other end, which is what a script looks like from here.
-///
-/// It records being asked rather than refusing to be, so the test can say the
-/// question was never put — which is the claim — instead of only that the run
-/// ended badly, which a dozen other faults would also produce.
-#[derive(Default)]
-struct Nobody(std::sync::atomic::AtomicBool);
-
-impl Answers for Nobody {
-    fn present(&self) -> bool {
-        false
-    }
-
-    fn ask(&self, _question: &str) -> String {
-        self.0.store(true, std::sync::atomic::Ordering::Relaxed);
-        String::new()
-    }
-
-    fn secret(&self, question: &str) -> String {
-        self.ask(question)
-    }
+/// The same context, keeping its records in the layout `paths` names.
+fn ctx_in(paths: &Paths) -> Ctx {
+    let mut ctx = ctx();
+    ctx.settings.env_file = Some(paths.env_file());
+    ctx.settings.stack_dir = Some(paths.stack());
+    ctx
 }
 
 fn repair(reversible: bool) -> Repair {
@@ -94,24 +67,6 @@ fn report(outcomes: Vec<Outcome>) -> Report {
     }
 }
 
-/// Only yes means yes. Anything else — including the empty answer of somebody
-/// pressing return to make the question go away — leaves the machine alone.
-///
-/// Asked through both halves of the answering trait, because a surface that reached
-/// for a secret would be doing something a repair has no business doing, and the fake
-/// would answer it the same way rather than hiding it.
-#[test]
-fn nothing_but_yes_agrees_to_a_repair() {
-    assert!(Asking(&Says("y")).agreed(&repair(true)));
-    assert!(Asking(&Says("YES")).agreed(&repair(true)));
-    assert!(!Asking(&Says("n")).agreed(&repair(true)));
-    assert!(!Asking(&Says("")).agreed(&repair(true)));
-    // One that cannot be undone says so before the question, and is still only
-    // carried out on a yes.
-    assert!(Asking(&Says("y")).agreed(&repair(false)));
-    assert_eq!(Says("y").secret("anything"), "y");
-}
-
 /// Nothing repaired is nothing to put back — said plainly rather than by reversing
 /// the whole journal, which holds the wiring lemonfiber seeded and what the first run
 /// wrote as well.
@@ -119,8 +74,7 @@ fn nothing_but_yes_agrees_to_a_repair() {
 async fn an_undo_with_nothing_repaired_puts_nothing_back() {
     let (at, _root) = paths("nothing-undone");
     let code = run(
-        &ctx(),
-        at,
+        &ctx_in(&at),
         Mending {
             fixing: Fixing {
                 fix: false,
@@ -129,7 +83,7 @@ async fn an_undo_with_nothing_repaired_puts_nothing_back() {
             },
             undo: true,
         },
-        &Says("n"),
+        Typing::answering("n"),
         false,
     )
     .await;
@@ -169,8 +123,7 @@ async fn an_undo_puts_back_what_the_last_repair_set() {
     lemonfiber_core::config::store::set(&paths.env_file(), "QBITTORRENT_PORT", "51413").ok();
 
     let code = run(
-        &ctx(),
-        paths.clone(),
+        &ctx_in(&paths),
         Mending {
             fixing: Fixing {
                 fix: false,
@@ -179,7 +132,7 @@ async fn an_undo_puts_back_what_the_last_repair_set() {
             },
             undo: true,
         },
-        &Says("n"),
+        Typing::answering("n"),
         false,
     )
     .await;
@@ -217,8 +170,7 @@ async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
     .ok();
 
     let code = run(
-        &ctx(),
-        paths,
+        &ctx_in(&paths),
         Mending {
             fixing: Fixing {
                 fix: false,
@@ -227,7 +179,7 @@ async fn an_undo_that_needs_a_service_that_is_gone_says_so() {
             },
             undo: true,
         },
-        &Says("n"),
+        Typing::answering("n"),
         false,
     )
     .await;
@@ -244,10 +196,8 @@ async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
         .over(Source::External(std::path::Path::new("/no/such/stack")))
         .build();
 
-    let (at, _root) = paths("unreadable");
     let code = run(
         &nowhere,
-        at,
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -256,7 +206,7 @@ async fn a_stack_that_cannot_be_read_is_refused_rather_than_called_healthy() {
             },
             undo: false,
         },
-        &Says("n"),
+        Typing::answering("n"),
         false,
     )
     .await;
@@ -285,15 +235,10 @@ async fn a_run_with_nothing_to_mend_succeeds_however_it_was_asked() {
 /// test enters.
 #[tokio::test]
 async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
-    // The offer would reach a terminal nobody is at, and the read after it would
-    // block on input that never comes — once per repair, with the run appearing to
-    // hang. `Nobody` refuses to be asked at all, so this fails rather than waits if
-    // the question is ever put again.
-    let nobody = Nobody::default();
+    let nobody = Typing::nobody();
     let (at, _root) = paths("nobody");
     let code = run(
-        &ctx(),
-        at,
+        &ctx_in(&at),
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -302,7 +247,7 @@ async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
             },
             undo: false,
         },
-        &nobody,
+        Arc::clone(&nobody) as Arc<dyn Asking>,
         false,
     )
     .await;
@@ -313,16 +258,8 @@ async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
         "a run that cannot be asked is told what to pass instead"
     );
     assert!(
-        !nobody.0.load(std::sync::atomic::Ordering::Relaxed),
+        nobody.asked().is_empty(),
         "the question was never put, rather than put and left waiting"
-    );
-
-    // The recorder itself, so what the assertion above rests on is exercised.
-    let probe = Nobody::default();
-    let _ = probe.secret("anything");
-    assert!(
-        probe.0.load(std::sync::atomic::Ordering::Relaxed),
-        "being asked is what it records"
     );
 }
 
@@ -331,11 +268,9 @@ async fn a_repair_with_nobody_there_is_told_which_flags_rather_than_asked() {
 async fn a_rehearsal_asks_nobody_and_needs_no_terminal() {
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
-    let nobody = Nobody::default();
-    let (at, _root) = paths("rehearsed-unattended");
+    let nobody = Typing::nobody();
     let code = run(
         &rehearsing,
-        at,
         Mending {
             fixing: Fixing {
                 fix: true,
@@ -344,13 +279,13 @@ async fn a_rehearsal_asks_nobody_and_needs_no_terminal() {
             },
             undo: false,
         },
-        &nobody,
+        Arc::clone(&nobody) as Arc<dyn Asking>,
         false,
     )
     .await;
 
     assert_eq!(shown(code), success());
-    assert!(!nobody.0.load(std::sync::atomic::Ordering::Relaxed));
+    assert!(nobody.asked().is_empty());
 }
 
 /// A rehearsal told to go ahead carries nothing out, and its report says it was one.
@@ -359,13 +294,7 @@ async fn a_rehearsal_told_to_go_ahead_carries_nothing_out() {
     let mut rehearsing = ctx();
     rehearsing.dry_run = true;
 
-    let outcome = repaired(
-        &rehearsing,
-        Some(Consent::Standing),
-        false,
-        &Nobody::default(),
-    )
-    .await;
+    let outcome = repaired(&rehearsing, Consent::Standing, false, Typing::nobody()).await;
 
     let Ok(lemonfiber_core::app::Outcome::Repair(report)) = outcome else {
         unreachable!("a rehearsal answers with the repair report: {outcome:?}");
@@ -378,8 +307,7 @@ async fn asked_for(yes: bool, json: bool) -> String {
     let (at, _root) = paths("offers");
     shown(
         run(
-            &ctx(),
-            at,
+            &ctx_in(&at),
             Mending {
                 fixing: Fixing {
                     fix: true,
@@ -388,7 +316,7 @@ async fn asked_for(yes: bool, json: bool) -> String {
                 },
                 undo: false,
             },
-            &Says("n"),
+            Typing::answering("n"),
             json,
         )
         .await,

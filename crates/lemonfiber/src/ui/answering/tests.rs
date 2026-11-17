@@ -340,7 +340,7 @@ mod encrypted {
     }
 
     /// What this run presents, from a certificate kept in a directory of its own.
-    fn presenting(named: &str) -> Option<Encrypting> {
+    async fn presenting(named: &str) -> Option<Encrypting> {
         let at_scratch = lemonfiber_fixtures::scratch::Scratch::new(named);
         let at = at_scratch.to_path_buf();
         let ctx = lemonfiber_testing::context::a_context()
@@ -350,7 +350,16 @@ mod encrypted {
                 ..lemonfiber_core::config::Settings::default()
             })
             .build();
-        encrypting(&ctx, true, Some(1)).ok().flatten()
+        let asked =
+            lemonfiber_core::app::Command::Served(lemonfiber_core::companion::served::Served {
+                port: 1,
+                encrypted: true,
+                network: false,
+            });
+        match lemonfiber_core::app::dispatch(asked, &ctx).await {
+            Ok(lemonfiber_core::app::Outcome::Served(served)) => encrypting(&served).ok().flatten(),
+            _ => None,
+        }
     }
 
     /// An encrypted socket being answered, and the switch that stops it.
@@ -399,7 +408,7 @@ mod encrypted {
     /// A client pinning the certificate this run presents is answered.
     #[tokio::test]
     async fn a_client_pinning_the_certificate_is_answered() {
-        let on = presenting("answering-encrypted");
+        let on = presenting("answering-encrypted").await;
         let served = match &on {
             Some(on) => serving_encrypted(on).await,
             None => None,
@@ -423,7 +432,7 @@ mod encrypted {
     /// answering the next connection.
     #[tokio::test]
     async fn plain_text_to_an_encrypted_socket_is_not_answered() {
-        let on = presenting("answering-encrypted-plain");
+        let on = presenting("answering-encrypted-plain").await;
         let served = match &on {
             Some(on) => serving_encrypted(on).await,
             None => None,

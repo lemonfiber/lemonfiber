@@ -30,6 +30,7 @@ pub(crate) mod host;
 mod hosting;
 mod invitation;
 mod keys;
+mod logs;
 mod migration;
 pub(crate) mod moving;
 mod news;
@@ -275,6 +276,11 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Removal(report) => removal::removal(report),
         Outcome::Outbound(report) => outbound::leaving(report),
         Outcome::Plugins(report) => plugin::installs(report),
+        Outcome::Password(_) => crate::ui::password::shown(),
+        Outcome::WalkthroughOffer(why) => walkthrough::offer(*why),
+        Outcome::Logs(read) => logs::read(read.lines),
+        Outcome::InFlight(report) => downloads::in_flight(report),
+        Outcome::Served(report) => companion::served(report),
         Outcome::PluginClaims(read) => plugin::claims(read),
         Outcome::PluginConformance(read) => plugin::conformance::judged(read),
         Outcome::PluginProvenance(read) => plugin::provenance(read),

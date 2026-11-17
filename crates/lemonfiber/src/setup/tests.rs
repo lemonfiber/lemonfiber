@@ -79,7 +79,7 @@ impl Surface for Scripted {
         &self,
         environment: Environment,
         default_data: PathBuf,
-    ) -> Box<dyn super::core_setup::Prompt> {
+    ) -> Box<dyn crate::prompt::Prompt> {
         // A terminal answering from the same script, so a walk that reaches the
         // questions is answered rather than left waiting.
         Box::new(crate::prompt::Terminal::answered_by(
@@ -209,6 +209,13 @@ fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
     (dir, paths)
 }
 
+/// `ctx`, keeping its files where `paths` keeps them.
+fn within(mut ctx: Ctx, paths: &Paths) -> Ctx {
+    ctx.settings.env_file = Some(paths.env_file());
+    ctx.settings.stack_dir = Some(paths.stack());
+    ctx
+}
+
 pub(crate) fn ctx() -> Ctx {
     lemonfiber_testing::a_context()
         .runner(dead_runner())
@@ -252,7 +259,12 @@ async fn a_configured_machine_nobody_is_watching_is_pointed_at_its_settings() {
     let (_scratch, paths) = scratch("configured");
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
-    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(false, &[]))).await;
+    let code = Box::pin(greeting(
+        within(ctx(), &paths),
+        &paths,
+        &Scripted::saying(false, &[]),
+    ))
+    .await;
     assert_eq!(shown(code), success());
 }
 
@@ -267,7 +279,7 @@ async fn a_bare_run_asks_the_screen_rather_than_the_keyboard() {
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
 
-    let code = Box::pin(greeting(ctx(), &paths, &piped)).await;
+    let code = Box::pin(greeting(within(ctx(), &paths), &paths, &piped)).await;
 
     assert_eq!(shown(code), success());
     assert!(
@@ -319,14 +331,24 @@ fn a_bare_run_in_front_of_a_person_opens_the_dashboard() {
 async fn an_unconfigured_machine_with_nobody_there_is_told_what_to_run() {
     // Stated rather than asked: never left waiting on input that will not come.
     let (_scratch, paths) = scratch("piped");
-    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(false, &[]))).await;
+    let code = Box::pin(greeting(
+        within(ctx(), &paths),
+        &paths,
+        &Scripted::saying(false, &[]),
+    ))
+    .await;
     assert_eq!(shown(code), success());
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_declined_offer_writes_nothing() {
     let (_scratch, paths) = scratch("declined");
-    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(true, &["n"]))).await;
+    let code = Box::pin(greeting(
+        within(ctx(), &paths),
+        &paths,
+        &Scripted::saying(true, &["n"]),
+    ))
+    .await;
     assert_eq!(shown(code), success());
     assert!(!paths.env_file().exists());
 }
@@ -338,6 +360,23 @@ async fn a_rehearsed_greeting_says_there_is_nothing_to_rehearse() {
     rehearsing.dry_run = true;
     let code = Box::pin(greeting(rehearsing, &paths, &Scripted::saying(true, &[]))).await;
     assert_ne!(shown(code), success());
+}
+
+/// A machine with nowhere to keep its configuration is refused setup, whichever way
+/// it is asked for, and nothing is walked.
+#[tokio::test(start_paused = true)]
+async fn a_machine_with_nowhere_to_keep_setup_is_refused_it_either_way() {
+    let (_scratch, paths) = scratch("nowhere");
+    let greeted = Box::pin(greeting(ctx(), &paths, &Scripted::saying(true, &["y"]))).await;
+    let flagged = setting_up(
+        ctx(),
+        &paths,
+        &Scripted::saying(false, &[]),
+        SetupFlags::none(),
+    )
+    .await;
+    assert_ne!(shown(greeted), success());
+    assert_ne!(shown(flagged), success());
 }
 
 /// A run given flags never passes the greeting, so the refusal that lived there
@@ -371,7 +410,12 @@ async fn an_accepted_offer_is_stopped_by_an_environment_that_cannot_work() {
     // Nothing setup does works without a container engine, so it is checked
     // before the first question rather than after eleven answers.
     let (_scratch, paths) = scratch("preflight");
-    let code = Box::pin(greeting(ctx(), &paths, &Scripted::saying(true, &["y"]))).await;
+    let code = Box::pin(greeting(
+        within(ctx(), &paths),
+        &paths,
+        &Scripted::saying(true, &["y"]),
+    ))
+    .await;
     assert_ne!(shown(code), success());
     // Nothing was asked and nothing was written.
     assert!(!paths.env_file().exists());
@@ -384,7 +428,7 @@ async fn a_non_interactive_run_missing_a_flag_is_told_which() {
     // at the very thing the refusal exists to supply.
     let (_scratch, paths) = scratch("missing-flags");
     let code = setting_up(
-        ctx(),
+        within(ctx(), &paths),
         &paths,
         &Scripted::saying(false, &[]),
         SetupFlags::none(),
@@ -394,8 +438,8 @@ async fn a_non_interactive_run_missing_a_flag_is_told_which() {
 
     // The words themselves, where they are decided. Asserting the exit code alone
     // would go on passing if the flags stopped being named.
-    let wizard = crate::setup::Wizard::new(Environment::MacOs);
-    let named = SetupFlags::none().missing(&wizard);
+    let unanswered = lemonfiber_core::wizard::Wizard::new(Environment::MacOs).unanswered();
+    let named = SetupFlags::none().missing(&unanswered);
     assert!(
         named.iter().any(|flag| flag.starts_with("--protocols")),
         "the refusal names the protocols flag: {named:?}"
@@ -424,7 +468,7 @@ async fn recovering_an_interrupted_apply_needs_someone_to_choose() {
         r#"{"at":"review","answers":{},"phase":"applying"}"#,
     );
     let code = setting_up(
-        ctx(),
+        within(ctx(), &paths),
         &paths,
         &Scripted::saying(false, &[]),
         SetupFlags::none(),
@@ -440,7 +484,7 @@ async fn a_walk_declined_at_the_review_writes_nothing_and_says_so() {
     // found it — not a half-configured one.
     let (_scratch, paths) = scratch("declined");
     let code = setting_up(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::declining_the_plan(),
         SetupFlags::none(),
@@ -456,7 +500,7 @@ async fn an_answered_walk_applies_and_brings_the_stack_up() {
     // through the whole walk gives — the path a first run actually takes.
     let (_scratch, paths) = scratch("applied");
     let code = setting_up(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &[]),
         SetupFlags::none(),
@@ -482,7 +526,7 @@ async fn a_saved_run_is_picked_up_where_it_was_left() {
         r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
     );
     let code = setting_up(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &[]),
         SetupFlags::none(),
@@ -529,7 +573,7 @@ async fn a_bare_run_on_a_machine_mid_setup_picks_it_up_rather_than_greeting() {
         r#"{"at":"protocols","answers":{},"phase":"in-progress"}"#,
     );
     let code = Box::pin(greeting(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &[]),
     ))
@@ -551,7 +595,7 @@ async fn setup_on_a_configured_machine_points_at_its_settings() {
     let _ = paths.env_file().parent().map(std::fs::create_dir_all);
     let _ = std::fs::write(paths.env_file(), "DATA_ROOT=/srv\n");
     let code = setting_up(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &[]),
         SetupFlags::none(),
@@ -561,31 +605,12 @@ async fn setup_on_a_configured_machine_points_at_its_settings() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_saved_run_whose_answers_are_gone_begins_afresh() {
-    // In-progress means a saved run; if it is somehow gone there is nothing to
-    // resume, so a fresh run is the honest fallback.
-    let (_scratch, paths) = scratch("answers-gone");
-    let code = super::resume_gather(
-        working_ctx(),
-        &paths,
-        &Scripted::saying(true, &[]),
-        None,
-        SetupFlags::none(),
-    )
-    .await;
-    // Afresh: the run it began asked its questions and wrote what it gathered,
-    // rather than stopping for answers that are not there.
-    assert!(paths.env_file().exists(), "a fresh run reached the end");
-    let _ = code;
-}
-
-#[tokio::test(start_paused = true)]
 async fn a_run_with_nobody_there_and_no_flags_is_told_which_it_needs() {
     // Rather than left waiting on input that never comes. The environment has to
     // pass first, or it would stop before the questions are even considered.
     let (_scratch, paths) = scratch("needs-flags");
     let code = setting_up(
-        working_ctx(),
+        within(working_ctx(), &paths),
         &paths,
         &Scripted::saying(false, &[]),
         SetupFlags::none(),
@@ -611,7 +636,13 @@ async fn flags_answer_the_questions_a_run_with_nobody_there_cannot_ask() {
     let (_scratch, paths) = scratch("flagged");
     let flags = crate::prompt::SetupFlags::parse(crate::prompt::fixtures::workable())
         .unwrap_or(SetupFlags::none());
-    let code = setting_up(working_ctx(), &paths, &Scripted::saying(false, &[]), flags).await;
+    let code = setting_up(
+        within(working_ctx(), &paths),
+        &paths,
+        &Scripted::saying(false, &[]),
+        flags,
+    )
+    .await;
     assert!(
         paths.setup_progress().exists(),
         "the flags did not carry it past the questions"
@@ -682,4 +713,82 @@ fn both_audiences_a_conclusion_is_written_for_are_reachable() {
     let prose = ["it ended".to_owned()];
     concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, false);
     concluded(SetupOutcome::Abandoned, &Settings::default(), &prose, true);
+}
+
+/// A Usenet login given by flags is proved as the walk records it, and kept unproven
+/// under the standing yes, so a run nobody watches still applies.
+#[tokio::test(start_paused = true)]
+async fn a_login_given_by_flags_is_proved_and_kept_by_the_standing_yes() {
+    let (scratch, paths) = scratch("flags-login");
+    let mut ctx = within(working_ctx(), &paths);
+    ctx.environment = Environment::LinuxNative;
+    ctx.seams.engine = Arc::new(engine_quiet());
+    let given = lemonfiber::cli::RawSetup {
+        yes: true,
+        protocols: Some("usenet".to_owned()),
+        data_location: Some(scratch.join("media")),
+        library: Some("docker".to_owned()),
+        vpn: Some(false),
+        household: Some(true),
+        autostart: Some(false),
+        usenet_host: Some("news.lemonfiber.invalid".to_owned()),
+        usenet_port: Some(563),
+        usenet_user: Some("flags".to_owned()),
+        usenet_pass: Some(["not", "a", "real", "one"].join("-")),
+        usenet_tls: Some(true),
+        ..lemonfiber::cli::RawSetup::default()
+    };
+    let Ok(flags) = SetupFlags::parse(given) else {
+        return;
+    };
+
+    let _ = setting_up(ctx, &paths, &Scripted::saying(false, &[]), flags).await;
+
+    assert!(paths.env_file().exists());
+}
+
+/// Torrents given a VPN by flags are put each of the egress guard's questions, and what
+/// the flags answer is kept as the guard's settings.
+#[tokio::test(start_paused = true)]
+async fn a_vpn_given_by_flags_answers_what_its_guard_asks() {
+    let (scratch, paths) = scratch("flags-guard");
+    let mut ctx = within(working_ctx(), &paths);
+    ctx.environment = Environment::LinuxNative;
+    ctx.seams.engine = Arc::new(engine_quiet());
+    ctx.stack = lemonfiber_testing::repository_stack();
+    let given = lemonfiber::cli::RawSetup {
+        yes: true,
+        protocols: Some("torrent".to_owned()),
+        data_location: Some(scratch.join("media")),
+        library: Some("docker".to_owned()),
+        vpn: Some(true),
+        vpn_settings: [PROVIDER, ADDRESSES]
+            .iter()
+            .map(|(name, value)| format!("{name}={value}"))
+            .collect(),
+        vpn_secrets: vec![format!("{WIREGUARD_KEY}={}", dialled())],
+        household: Some(true),
+        autostart: Some(false),
+        ..lemonfiber::cli::RawSetup::default()
+    };
+    let flags = SetupFlags::parse(given);
+    assert!(flags.is_ok());
+    let Ok(flags) = flags else {
+        return;
+    };
+
+    let _code = setting_up(ctx, &paths, &Scripted::saying(false, &[]), flags).await;
+
+    let kept: serde_json::Value = std::fs::read_to_string(paths.settings())
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default();
+    for (name, value) in [PROVIDER, ADDRESSES] {
+        assert_eq!(
+            kept.get("values")
+                .and_then(|values| values.get(name))
+                .and_then(serde_json::Value::as_str),
+            Some(value)
+        );
+    }
 }

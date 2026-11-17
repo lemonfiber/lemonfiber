@@ -74,6 +74,10 @@ const A_RECORDING_IS_THE_RUN: &str = "a recording is what the plugin's services 
      when they were run, which does not exist until they have been — --check holds a \
      run to what is recorded and writes nothing";
 
+/// Why setting the password cannot be rehearsed.
+const A_PASSWORD_IS_TYPED: &str = "a password is what the operator types, and a rehearsal \
+     would take one and throw it away";
+
 /// What a rehearsal means for one command.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Rehearsal {
@@ -313,6 +317,10 @@ pub const fn asked(command: &Command) -> Asked {
         // stage. What it would report is what the stack did, and a rehearsal has no stack
         // doing anything.
         Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
+        Command::WalkthroughOffer => reads("walkthrough offer"),
+        Command::Logs(_) => reads("logs"),
+        Command::InFlight { .. } => reads("in flight"),
+        Command::Served(_) => reads("ui"),
 
         // Reports. Each of these builds the report it would have filled in and stops
         // before the step it cannot take back.
@@ -331,6 +339,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
         Command::Plugins(asked) => plugin(asked),
         Command::Authoring(asked) => authored(asked),
+        Command::Password => cannot("ui --set-password", A_PASSWORD_IS_TYPED),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
         Command::Settings(Settling::Set { .. }) => reports("settings set", &[kind::SETTINGS]),
         Command::Settings(Settling::Clear { .. }) => reports("settings clear", &[kind::SETTINGS]),
@@ -455,6 +464,14 @@ mod withheld;
 
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
+/// Whether a command is carried out without what `dispatch` settles about a stack first.
+///
+/// A read of a plugin's own source needs no stack, and a read a surface polls would
+/// settle the stack and say its warnings again on every tick.
+#[must_use]
+pub const fn unsettled(command: &Command) -> bool {
+    matches!(command, Command::Authoring(_))
+}
 
 /// What reading a plugin's own source reads and writes: recording writes what it takes,
 /// unless it is holding what it takes to what is there.

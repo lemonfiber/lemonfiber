@@ -46,7 +46,7 @@ impl Shape {
 }
 
 /// Whether a walkthrough is worth offering to this stack, and which one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Why {
     /// Offer this shape of walk.

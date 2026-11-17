@@ -1,4 +1,5 @@
 use crate::exit::{shown, success};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use lemonfiber_core::config::Settings;
@@ -7,7 +8,10 @@ use lemonfiber_core::ports::process::Output;
 use lemonfiber_core::stack::Source;
 use lemonfiber_fixtures::support::{Question, Reporting, Scripted};
 
-use super::{claimed, emit_line, kind, pull, pull_showing, released, stream, Action, Ctx};
+use lemonfiber_core::app::{claimed, released};
+use lemonfiber_core::stack::compose::Action;
+
+use super::{emit_line, kind, pull, pull_showing, stream, Ctx};
 
 /// An engine that answers nothing, which is all these paths ask of it.
 fn absent() -> Reporting {
@@ -30,11 +34,11 @@ fn quiet() -> Reporting {
         .refusing(&[Question::Exec, Question::Stats])
 }
 
+static CONTEXTS: AtomicUsize = AtomicUsize::new(0);
+
 fn ctx(status: i32, stdout: &'static str) -> Ctx {
-    // A scratch directory to materialise the embedded stack into, so a pull has
-    // a compose file to be run against rather than failing before it starts.
-    let dir =
-        lemonfiber_fixtures::scratch::Scratch::named(&format!("engine-{status}{}", stdout.len()));
+    let made = CONTEXTS.fetch_add(1, Ordering::Relaxed);
+    let dir = lemonfiber_fixtures::scratch::Scratch::named(&format!("engine-{made}"));
     let _ = std::fs::create_dir_all(&dir);
     let settings = Settings {
         stack_dir: Some(dir.to_path_buf()),

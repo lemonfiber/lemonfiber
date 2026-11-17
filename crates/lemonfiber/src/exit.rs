@@ -26,7 +26,7 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
 use lemonfiber_core::error::codes::{leaves, Leaves};
 use lemonfiber_core::error::Problem;
-use lemonfiber_core::model::{Disposition, HandoffState, Triggered};
+use lemonfiber_core::model::{Disposition, HandoffState, MusicReport, Triggered, WiringReport};
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.
@@ -77,6 +77,32 @@ fn handed_off(state: HandoffState) -> ExitCode {
     }
 }
 
+/// A diagnosis that found the stack broken, or could not tell, fails.
+fn diagnosed(overall: Overall) -> ExitCode {
+    match overall {
+        Overall::Healthy | Overall::Degraded => ExitCode::SUCCESS,
+        Overall::Broken | Overall::Unknown => ExitCode::from(FAILURE),
+    }
+}
+
+/// A music choice fails only where the service refused it.
+fn music(report: &MusicReport) -> ExitCode {
+    if matches!(report.outcome, Some(Triggered::Failed { .. })) {
+        ExitCode::from(FAILURE)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// A wiring with an ask nothing fills is the operator's configuration to fix.
+fn wired(report: &WiringReport) -> ExitCode {
+    if report.unfilled.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(VALIDATION)
+    }
+}
+
 /// Most answers are simply produced, so their success is that they arrived. A
 /// diagnosis is different: a script runs it precisely to learn whether the stack
 /// is healthy, so a broken or undetermined result must exit non-zero — reporting
@@ -84,10 +110,7 @@ fn handed_off(state: HandoffState) -> ExitCode {
 /// avoid.
 pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
     match outcome {
-        Outcome::Doctor(report) => match report.overall {
-            Overall::Healthy | Overall::Degraded => ExitCode::SUCCESS,
-            Overall::Broken | Overall::Unknown => ExitCode::from(FAILURE),
-        },
+        Outcome::Doctor(report) => diagnosed(report.overall),
         // Seeding is run to make the wiring true, so leaving any of it unmade is a
         // non-zero result — but the two reasons differ. A refused conflict (two
         // curators on one root folder) is something the operator wrote that lemonfiber
@@ -105,8 +128,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         Outcome::PluginConformance(read) => held(read.conforms),
         Outcome::PluginProvenance(read) => held(read.installable),
         Outcome::PluginRecording(read) => held(read.holds),
-        Outcome::Wiring(report) if report.unfilled.is_empty() => ExitCode::SUCCESS,
-        Outcome::Wiring(_) => ExitCode::from(VALIDATION),
+        Outcome::Wiring(report) => wired(report),
         Outcome::Settings(report) => restarted(report),
         Outcome::Import(report) => carrying(report),
         Outcome::Seed(report) => seed_exit(report),
@@ -121,9 +143,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // The music choice is recorded even when the service could not be reached, so
         // only a service that refused the change is a failure; a rehearsal or a service
         // still coming up has still recorded the choice.
-        Outcome::Music(report) if matches!(report.outcome, Some(Triggered::Failed { .. })) => {
-            ExitCode::from(FAILURE)
-        }
+        Outcome::Music(report) => music(report),
         // A reset run without an offer that found edits to revert only previewed them —
         // like a held quality choice, it needs the operator's say-so, so a script sees a
         // non-zero result to act on. Both an edited stack file and a drifted connection
@@ -135,10 +155,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // success would carry on as though the person were gone; a removal that reached
         // only the media server left an account behind that the next run has to take.
         Outcome::Removal(report) => removing(report),
-        // A listing is a question and asking is never a failure. A removal that was
-        // not confirmed is waiting on the operator's say-so, and one that could not
-        // take a directory left something behind — a script that read either as
-        // success would carry on as though the machine were clean.
         // Listing the credentials is a question, and asking one is never a failure —
         // including when the answer is that several have gone stale, which is an
         // advisory rather than a fault. What is a failure is a replacement that was
@@ -191,7 +207,6 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // which is the thing it was watching for, and it reports whether it got the
         // services stopped — so the report is the answer rather than the failure.
         Outcome::Version(_)
-        | Outcome::Music(_)
         | Outcome::Forms(_)
         | Outcome::Preview(_)
         | Outcome::Config(_)
@@ -281,6 +296,11 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Backup(_)
         | Outcome::Watch(_)
         | Outcome::Archives(_)
+        | Outcome::Password(_)
+        | Outcome::WalkthroughOffer(_)
+        | Outcome::Logs(_)
+        | Outcome::InFlight(_)
+        | Outcome::Served(_)
         | Outcome::Bundle(_) => ExitCode::SUCCESS,
     }
 }

@@ -312,11 +312,13 @@ async fn doctor_runs_the_checks_and_reports_them_in_the_envelope() {
     );
 
     let report = diagnosis(outcome);
-    assert!(report.is_some_and(|report| !report.findings.is_empty()
-        && report
-            .findings
-            .iter()
-            .all(|finding| finding.category == Category::Vpn)));
+    assert!(report.is_some_and(|report| {
+        !report.findings.is_empty()
+            && report
+                .findings
+                .iter()
+                .all(|finding| finding.category == Category::Vpn)
+    }));
 }
 
 #[tokio::test]

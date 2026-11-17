@@ -101,6 +101,32 @@ fn reading() -> Vec<(Command, Kind)> {
     ]
 }
 
+/// Each read the command line reaches the core with, and the kind it answers with.
+fn dispatched() -> Vec<(Command, Kind)> {
+    vec![
+        (Command::Password, kind::PASSWORD),
+        (Command::WalkthroughOffer, kind::WALKTHROUGH_OFFER),
+        (
+            Command::Logs(crate::app::ReadingLogs {
+                forms: Vec::new(),
+                services: Vec::new(),
+                tail: 10,
+                follow: false,
+            }),
+            kind::LOGS,
+        ),
+        (Command::InFlight { forms: Vec::new() }, kind::IN_FLIGHT),
+        (
+            Command::Served(crate::companion::served::Served {
+                port: 8443,
+                encrypted: true,
+                network: false,
+            }),
+            kind::SERVED,
+        ),
+    ]
+}
+
 /// Each question an author asks of a plugin's source, and the kind it answers with.
 fn authoring() -> Vec<(Command, Kind)> {
     vec![
@@ -139,7 +165,7 @@ fn authoring() -> Vec<(Command, Kind)> {
 /// A command that only reads answers with the one kind its outcome is written under.
 #[test]
 fn each_reading_answers_with_its_own_kind() {
-    for (command, expected) in reading().into_iter().chain(authoring()) {
+    for (command, expected) in reading().into_iter().chain(dispatched()).chain(authoring()) {
         assert_eq!(
             answered_under(&command),
             &[expected],

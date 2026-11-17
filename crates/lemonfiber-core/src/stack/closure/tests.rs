@@ -535,6 +535,8 @@ fn a_plan_says_what_is_running_only_where_it_was_asked() {
             dropped: Vec::new(),
             filtered: Vec::new(),
             vanished: Vec::new(),
+            installing: Vec::new(),
+            offer: None,
             footprint: super::Footprint::default(),
             running,
         };

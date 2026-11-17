@@ -10,7 +10,41 @@ use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_testing::context::a_context;
 
-use super::{bound, encrypting};
+use lemonfiber_core::app::{dispatch, Command, Outcome};
+use lemonfiber_core::companion::served::ServedReport;
+use lemonfiber_core::error::Problem;
+
+use super::{bound, encrypting, port_settled, Encrypting};
+
+/// How a run on `port` asked whether to encrypt and whether to offer the network is
+/// served, as the serving loop settles it.
+async fn settled(
+    ctx: &Ctx,
+    port: u16,
+    encrypted: bool,
+    network: bool,
+) -> Result<ServedReport, Box<Problem>> {
+    let asked = Command::Served(served::Served {
+        port,
+        encrypted,
+        network,
+    });
+    match dispatch(asked, ctx).await? {
+        Outcome::Served(report) => Ok(report),
+        _ => Ok(ServedReport::default()),
+    }
+}
+
+/// What a run asked whether to encrypt on `port` presents.
+async fn presenting(
+    ctx: &Ctx,
+    tls: bool,
+    port: Option<u16>,
+) -> Result<Option<Encrypting>, Box<Problem>> {
+    port_settled(tls, port)?;
+    let report = settled(ctx, port.unwrap_or_default(), tls, false).await?;
+    encrypting(&report)
+}
 
 /// A machine keeping what pairing needs at `directory`.
 fn keeping(directory: Option<std::path::PathBuf>) -> Ctx {
@@ -23,12 +57,12 @@ fn keeping(directory: Option<std::path::PathBuf>) -> Ctx {
 }
 
 /// Not asked for, nothing is made and nothing is presented.
-#[test]
-fn a_run_not_asked_to_encrypt_presents_nothing() {
+#[tokio::test]
+async fn a_run_not_asked_to_encrypt_presents_nothing() {
     let at_scratch = Scratch::new("encrypting-unasked");
     let at = at_scratch.to_path_buf();
     assert!(matches!(
-        encrypting(&keeping(Some(at.clone())), false, None),
+        presenting(&keeping(Some(at.clone())), false, None).await,
         Ok(None)
     ));
     assert_eq!(
@@ -40,15 +74,17 @@ fn a_run_not_asked_to_encrypt_presents_nothing() {
 
 /// Asked for, the certificate is made once and presented with the fingerprint a phone
 /// pins, and a later run presents the same one.
-#[test]
-fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
+#[tokio::test]
+async fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
     let at_scratch = Scratch::new("encrypting-asked");
     let at = at_scratch.to_path_buf();
-    let first = encrypting(&keeping(Some(at.clone())), true, Some(8443))
+    let first = presenting(&keeping(Some(at.clone())), true, Some(8443))
+        .await
         .ok()
         .flatten()
         .map(|on| on.fingerprint);
-    let second = encrypting(&keeping(Some(at.clone())), true, Some(8443))
+    let second = presenting(&keeping(Some(at.clone())), true, Some(8443))
+        .await
         .ok()
         .flatten()
         .map(|on| on.fingerprint);
@@ -64,21 +100,25 @@ fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
 }
 
 /// Each way of not being able to encrypt is refused by name.
-#[test]
-fn a_run_that_cannot_encrypt_is_refused_by_name() {
-    let code = |ctx: &Ctx, port| {
-        encrypting(ctx, true, port)
+#[tokio::test]
+async fn a_run_that_cannot_encrypt_is_refused_by_name() {
+    async fn code(ctx: &Ctx, port: Option<u16>) -> Option<lemonfiber_core::error::Code> {
+        presenting(ctx, true, port)
+            .await
             .err()
             .map(|problem| problem.code)
-    };
+    }
     let at_scratch = Scratch::new("encrypting-refused");
     let at = at_scratch.to_path_buf();
-    assert_eq!(code(&keeping(Some(at.clone())), None), Some(UNSETTLED_PORT));
-    assert_eq!(code(&keeping(None), Some(8443)), Some(NO_CERTIFICATE));
+    assert_eq!(
+        code(&keeping(Some(at.clone())), None).await,
+        Some(UNSETTLED_PORT)
+    );
+    assert_eq!(code(&keeping(None), Some(8443)).await, Some(NO_CERTIFICATE));
 
     let _ = std::fs::write(at.join("key.pem"), "half a pair");
     assert_eq!(
-        code(&keeping(Some(at.clone())), Some(8443)),
+        code(&keeping(Some(at.clone())), Some(8443)).await,
         Some(NO_CERTIFICATE)
     );
 
@@ -88,7 +128,7 @@ fn a_run_that_cannot_encrypt_is_refused_by_name() {
     let _ = certificate::replaced(&lemonfiber_adapters::Disk, &other);
     let _ = std::fs::copy(other.join("key.pem"), at.join("key.pem"));
     assert_eq!(
-        code(&keeping(Some(at)), Some(8443)),
+        code(&keeping(Some(at)), Some(8443)).await,
         Some(NO_CERTIFICATE),
         "a key that is not the certificate's own does not serve"
     );
@@ -141,13 +181,20 @@ async fn the_address_a_phone_is_handed_is_one_the_run_answers() {
     let host = address.strip_prefix("https://").unwrap_or_default();
     assert_eq!(host, "den.local:8443");
 
-    assert!(here(&naming(host), &bound(&ctx, 8443, true, true).await));
-    // Only where it is served encrypted on the network, which is the only run
-    // pairing is made for. Anywhere else a name is refused.
-    assert!(!here(&naming(host), &bound(&ctx, 8443, true, false).await));
-    assert!(!here(&naming(host), &bound(&ctx, 8443, false, true).await));
+    let binding = |network: bool, encrypted: bool| {
+        let ctx = &ctx;
+        async move {
+            let report = settled(ctx, 8443, encrypted, network)
+                .await
+                .unwrap_or_default();
+            bound(&report, 8443, network)
+        }
+    };
+    assert!(here(&naming(host), &binding(true, true).await));
+    assert!(!here(&naming(host), &binding(true, false).await));
+    assert!(!here(&naming(host), &binding(false, true).await));
     assert!(!here(
         &naming("elsewhere.local:8443"),
-        &bound(&ctx, 8443, true, true).await
+        &binding(true, true).await
     ));
 }

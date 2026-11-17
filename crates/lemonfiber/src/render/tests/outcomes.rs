@@ -14,6 +14,8 @@ fn part_way() -> WizardReport {
         ready_for_review: false,
         plan: Vec::new(),
         written: Vec::new(),
+        setup: lemonfiber_core::model::SetUp::None,
+        storage: None,
         proof: None,
         guard: Vec::new(),
     }
@@ -217,4 +219,65 @@ fn a_complete_set_of_answers_shows_what_applying_would_write() {
     .text();
     assert!(said.contains("Every question is answered."), "{said}");
     assert!(said.contains("INDEXER_APIKEY=(set, not shown)"), "{said}");
+}
+
+/// Each answer a dispatched read of the command line comes back as renders to what it
+/// says, rather than to nothing.
+#[test]
+fn each_dispatched_read_renders_what_it_says() {
+    use lemonfiber_core::app::password::PasswordReport;
+    use lemonfiber_core::app::{InFlightReport, LogsReport, Unfinished};
+    use lemonfiber_core::companion::served::ServedReport;
+    use lemonfiber_core::dashboard::Protocol;
+    use lemonfiber_core::walkthrough::Why;
+
+    let said = |outcome: Outcome| answer(&outcome, false).text();
+    let coming = Unfinished {
+        protocol: Protocol::Usenet,
+        name: "Sintel".to_owned(),
+        progress: 40,
+    };
+    let cases = [
+        (
+            Outcome::Password(PasswordReport {
+                device_keys_revoked: true,
+            }),
+            "A password is now set",
+        ),
+        (
+            Outcome::WalkthroughOffer(Why::of(false, false)),
+            "A walkthrough would prove",
+        ),
+        (Outcome::WalkthroughOffer(Why::of(true, false)), "  → "),
+        (Outcome::Logs(LogsReport { lines: 0 }), "no output"),
+        (Outcome::Logs(LogsReport { lines: 2 }), "2 lines read"),
+        (
+            Outcome::InFlight(InFlightReport {
+                downloads: Vec::new(),
+            }),
+            "Nothing is coming down.",
+        ),
+        (
+            Outcome::InFlight(InFlightReport {
+                downloads: vec![coming],
+            }),
+            "Sintel",
+        ),
+        (
+            Outcome::Served(ServedReport::default()),
+            "Served under no name.",
+        ),
+        (
+            Outcome::Served(ServedReport {
+                fingerprint: Some("AB:CD".to_owned()),
+                named: Some("lemonfiber.home".to_owned()),
+                ..ServedReport::default()
+            }),
+            "Certificate fingerprint: AB:CD",
+        ),
+    ];
+    for (outcome, expected) in cases {
+        let rendered = said(outcome);
+        assert!(rendered.contains(expected), "{rendered}");
+    }
 }

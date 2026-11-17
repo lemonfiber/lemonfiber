@@ -3,6 +3,7 @@
 //! The code comes first, because the operator is holding the phone: everything under it
 //! is what to check and what to know, and none of it has to be read to pair.
 
+use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::companion::{Pairing, Replacement, LASTS};
 use lemonfiber_core::PRODUCT;
 
@@ -76,6 +77,20 @@ pub(super) fn certificate(report: &Replacement) -> Lines {
             "None has been made yet. One is made the first time the web interface is served \
              with `{PRODUCT} ui --lan --tls --port <port>`."
         )),
+    }
+    lines
+}
+
+/// The name the web surface is served under, and its certificate's fingerprint where it
+/// has one.
+pub(super) fn served(report: &ServedReport) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(report.named.as_ref().map_or_else(
+        || "Served under no name.".to_owned(),
+        |name| format!("Served as {name}."),
+    ));
+    if let Some(fingerprint) = &report.fingerprint {
+        lines.put(format!("Certificate fingerprint: {fingerprint}"));
     }
     lines
 }

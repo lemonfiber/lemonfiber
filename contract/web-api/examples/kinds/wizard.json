@@ -256,6 +256,8 @@
     "proof": null,
     "ready_for_review": false,
     "rehearsed": false,
+    "setup": "none",
+    "storage": null,
     "unanswered": [
       "protocols",
       "data-location",

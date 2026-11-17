@@ -15,6 +15,7 @@ use tokio::sync::mpsc::Receiver;
 
 use super::recreated::Containers;
 use super::{compose, fell_short_into, readied, settled_into, Ctx};
+use crate::app::ReadingLogs;
 use crate::error::{Diagnose, Problem};
 use crate::model::LifecycleReport;
 use crate::ports::docker::{LogLine, LogQuery};
@@ -76,6 +77,32 @@ pub async fn logs(
         return Ok(opened);
     }
     Ok(one_timeline(opened).await)
+}
+
+/// What reading the logs came to.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct LogsReport {
+    /// How many lines were read.
+    pub lines: u64,
+}
+
+/// Read the logs `asked` names, saying each line through the narrator as it arrives.
+///
+/// # Errors
+///
+/// The [`Problem`] [`logs`] refuses with.
+pub(crate) async fn read(ctx: &Ctx, asked: &ReadingLogs) -> Result<LogsReport, Box<Problem>> {
+    let query = LogQuery {
+        tail: asked.tail,
+        follow: asked.follow,
+    };
+    let mut lines = logs(ctx, &asked.forms, &asked.services, query).await?;
+    let mut seen = 0_u64;
+    while let Some(line) = lines.recv().await {
+        seen += 1;
+        ctx.narrator.logged(&line).await;
+    }
+    Ok(LogsReport { lines: seen })
 }
 
 /// The same scrollback, drained and put in the order the containers say it happened.

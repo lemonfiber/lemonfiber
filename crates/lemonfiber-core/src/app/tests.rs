@@ -216,6 +216,11 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::Settings(_)
             | Outcome::Outbound(_)
             | Outcome::Plugins(_)
+            | Outcome::Password(_)
+            | Outcome::WalkthroughOffer(_)
+            | Outcome::Logs(_)
+            | Outcome::InFlight(_)
+            | Outcome::Served(_)
             | Outcome::PluginClaims(_)
             | Outcome::PluginConformance(_)
             | Outcome::PluginProvenance(_)
@@ -347,6 +352,18 @@ mod lifecycle;
 mod linking;
 mod logs;
 mod routing;
+#[tokio::test]
+async fn a_walkthrough_offer_is_the_walks_own_answer() {
+    let ctx = crate::test_support::a_context().build();
+
+    let direct = crate::walkthrough::run::worth_offering(&ctx).await.ok();
+    let dispatched = super::dispatch(super::Command::WalkthroughOffer, &ctx)
+        .await
+        .ok();
+
+    assert_eq!(dispatched, direct.map(super::Outcome::WalkthroughOffer));
+}
+
 mod settling;
 mod status;
 mod switching;

@@ -136,17 +136,13 @@ fn locale() -> Option<String> {
         .find_map(|name| std::env::var(name).ok().filter(|said| !said.is_empty()))
 }
 
-/// A repairing run, which ends here rather than going through dispatch.
-///
-/// It looks, offers, acts and looks again, rendering what became of each — not one
-/// value an envelope holds — so it answers for itself. With nowhere to keep its own
-/// files there is nothing to repair against, which is the one thing it cannot work
-/// around.
+/// A repairing run, each repair it offers put to whoever is at this keyboard. With
+/// nowhere to keep its own files there is nothing to repair against.
 async fn repairing(ctx: &Ctx, mending: Mending, json: bool) -> ExitCode {
-    let Some(paths) = here() else {
+    if here().is_none() {
         return no_config_home();
-    };
-    repair::run(ctx, paths, mending, &Keyboard, json).await
+    }
+    repair::run(ctx, mending, std::sync::Arc::new(Keyboard), json).await
 }
 
 /// A context that narrates each step, as a walk-through wants and a script does not.
@@ -448,7 +444,7 @@ async fn serving(ctx: Ctx, asked: RawUi) -> ExitCode {
     ui::run(
         ctx,
         asked.into(),
-        &crate::keyboard::Keyboard,
+        std::sync::Arc::new(Keyboard),
         EMBEDDED_APP,
         Box::pin(std::future::pending()),
     )

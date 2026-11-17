@@ -6,7 +6,7 @@
 //! are answered with the report that says what is on offer and how to take it, or why it
 //! cannot be taken.
 
-use lemonfiber_core::app::{offline, Ctx};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::error::Problem;
 
 /// What is put to the operator when a start would install a part from this build.
@@ -35,13 +35,21 @@ pub(crate) async fn agreed(
     interactive: bool,
     ask: &dyn Fn(&str) -> String,
 ) -> Result<Agreed, Box<Problem>> {
-    let Some(offline) = offline(ctx, forms).await? else {
-        return Ok(Agreed::Nothing);
+    let previewed = dispatch(
+        Command::Preview {
+            forms: forms.to_vec(),
+        },
+        ctx,
+    )
+    .await?;
+    let plan = match previewed {
+        Outcome::Preview(plan) if !plan.installing.is_empty() => plan,
+        _ => return Ok(Agreed::Nothing),
     };
-    let Some(offer) = offline.offer.filter(|_| interactive) else {
+    let Some(offer) = plan.offer.filter(|_| interactive) else {
         return Ok(Agreed::No);
     };
-    crate::render::moving::installing(&offline.installs, None).print();
+    crate::render::moving::installing(&plan.installing, None).print();
     Ok(if is_yes(&ask(ASK_TO_INSTALL)) {
         Agreed::Yes(offer)
     } else {

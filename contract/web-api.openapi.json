@@ -6645,6 +6645,22 @@
         ],
         "type": "object"
       },
+      "InFlightReport": {
+        "description": "What is still coming down inside the forms a teardown would stop.",
+        "properties": {
+          "downloads": {
+            "description": "Each download still coming down, with how far it has got.",
+            "items": {
+              "$ref": "#/components/schemas/Unfinished"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "downloads"
+        ],
+        "type": "object"
+      },
       "Indexer": {
         "description": "An indexer credential the operator supplied, and whether it was proven.\n\n`validated` records whether the live test passed before this was kept — an\noperator may proceed with one that could not be proven, and a later diagnosis\nis owed the knowledge that it went in unverified rather than treating it as\ngood.",
         "properties": {
@@ -8113,6 +8129,21 @@
           "service",
           "stream",
           "line"
+        ],
+        "type": "object"
+      },
+      "LogsReport": {
+        "description": "What reading the logs came to.",
+        "properties": {
+          "lines": {
+            "description": "How many lines were read.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lines"
         ],
         "type": "object"
       },
@@ -10801,6 +10832,19 @@
         ],
         "type": "object"
       },
+      "PasswordReport": {
+        "description": "What setting the password came to.",
+        "properties": {
+          "device_keys_revoked": {
+            "description": "Whether every device key registered under the password before was revoked.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "device_keys_revoked"
+        ],
+        "type": "object"
+      },
       "PausedClient": {
         "description": "What one download client said about being paused or resumed.",
         "properties": {
@@ -10994,6 +11038,20 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "installing": {
+            "description": "Each part this build carries that the forms hold and this machine has never run,\noffered as an install from the build before a start writes anything; answered by\n[`Self::offer`]. Empty on every plan but a preview's.",
+            "items": {
+              "$ref": "#/components/schemas/UpInstallOffered"
+            },
+            "type": "array"
+          },
+          "offer": {
+            "description": "The offer a start answers to take every install in [`Self::installing`], where it\ncould be read.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "profiles": {
             "description": "The profiles to activate, sorted so the command is reproducible.",
@@ -16581,6 +16639,33 @@
           }
         ]
       },
+      "ServedReport": {
+        "description": "What a run serving the surface presents, answers to and wrote down.",
+        "properties": {
+          "fingerprint": {
+            "description": "What a phone pins for the certificate presented, where the run is encrypted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "named": {
+            "description": "The name a request has to carry beyond this machine, where the run is encrypted on\na network.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unrecorded": {
+            "description": "Why where it is served could not be written down, where it could not.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "Service": {
         "description": "One service, as it stands.",
         "properties": {
@@ -18911,6 +18996,69 @@
         ],
         "type": "object"
       },
+      "StorageFinding": {
+        "description": "What testing a data location for hardlinks found.\n\nTested on the location itself where it exists, and otherwise on the deepest parent\nthat does, which is named so that a result read off a parent is never shown as the\nlocation's own.",
+        "oneOf": [
+          {
+            "description": "It hardlinks, so imports are instant and cost no extra disk.",
+            "properties": {
+              "found": {
+                "const": "links",
+                "type": "string"
+              },
+              "inferred_from": {
+                "description": "The parent the test ran on, where the location did not exist yet.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "found"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "It works but cannot hardlink, so every import is a copy.",
+            "properties": {
+              "found": {
+                "const": "copy-only",
+                "type": "string"
+              },
+              "limitation": {
+                "description": "The filesystem's reason, where it has one that can be named.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "found"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "It could not be tested, with the platform's words for why.",
+            "properties": {
+              "found": {
+                "const": "untested",
+                "type": "string"
+              },
+              "reason": {
+                "description": "Why the test could not run.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "found",
+              "reason"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Stored": {
         "description": "Everything lemonfiber keeps on this machine, and what became of it.",
         "properties": {
@@ -20591,6 +20739,32 @@
         "required": [
           "by",
           "capability"
+        ],
+        "type": "object"
+      },
+      "Unfinished": {
+        "description": "One download a teardown would interrupt.\n\nCarries the protocol as well as the name, because \"still downloading\" is only\nhalf of what an operator needs — the other half is which client to go and look in,\nand a stack running both has two places it could be.",
+        "properties": {
+          "name": {
+            "description": "What it is, as the client names it.",
+            "type": "string"
+          },
+          "progress": {
+            "description": "How far along, from zero to a hundred.",
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/DashboardProtocol",
+            "description": "Which client has it."
+          }
+        },
+        "required": [
+          "protocol",
+          "name",
+          "progress"
         ],
         "type": "object"
       },
@@ -22549,6 +22723,37 @@
           }
         ]
       },
+      "Why": {
+        "description": "Whether a walkthrough is worth offering to this stack, and which one.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "Offer this shape of walk.",
+            "properties": {
+              "offer": {
+                "$ref": "#/components/schemas/Shape"
+              }
+            },
+            "required": [
+              "offer"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Do not offer. What is missing first, said as the reason it would have stopped at.",
+            "properties": {
+              "not": {
+                "$ref": "#/components/schemas/Reason"
+              }
+            },
+            "required": [
+              "not"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Wired": {
         "description": "One of the stack's links, answered.",
         "properties": {
@@ -22795,6 +23000,21 @@
             "$ref": "#/components/schemas/Ran",
             "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone."
           },
+          "setup": {
+            "$ref": "#/components/schemas/SetUp",
+            "description": "Whether this stack is set up: a previous run left setup part-way, nothing is\nconfigured and no setup has begun, or it is configured."
+          },
+          "storage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StorageFinding"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What testing the data location just given found, where one was given.\n\nAbsent for every other answer. A location that does not hardlink is still kept,\nbecause whether to use it anyway is the operator's to decide once they have read\nthis."
+          },
           "unanswered": {
             "description": "Every question that applies on this machine and has no answer yet, in the\norder they are put.",
             "items": {
@@ -22819,6 +23039,7 @@
           "ready_for_review",
           "plan",
           "written",
+          "setup",
           "rehearsed",
           "guard"
         ],
@@ -23428,6 +23649,9 @@
             "$ref": "#/components/schemas/kind-import"
           },
           {
+            "$ref": "#/components/schemas/kind-in-flight"
+          },
+          {
             "$ref": "#/components/schemas/kind-invitation"
           },
           {
@@ -23444,6 +23668,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-log"
+          },
+          {
+            "$ref": "#/components/schemas/kind-logs"
           },
           {
             "$ref": "#/components/schemas/kind-migration"
@@ -23474,6 +23701,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-part-way"
+          },
+          {
+            "$ref": "#/components/schemas/kind-password"
           },
           {
             "$ref": "#/components/schemas/kind-pausing"
@@ -23545,6 +23775,9 @@
             "$ref": "#/components/schemas/kind-self-update"
           },
           {
+            "$ref": "#/components/schemas/kind-served"
+          },
+          {
             "$ref": "#/components/schemas/kind-settings"
           },
           {
@@ -23609,6 +23842,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-walkthrough"
+          },
+          {
+            "$ref": "#/components/schemas/kind-walkthrough-offer"
           },
           {
             "$ref": "#/components/schemas/kind-watch"
@@ -25150,6 +25386,46 @@
         "title": "Envelope",
         "type": "object"
       },
+      "kind-in-flight": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/InFlightReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
       "kind-invitation": {
         "description": "The wrapper every machine-readable payload arrives in.",
         "properties": {
@@ -25361,6 +25637,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/LogLine",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-logs": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LogsReport",
             "description": "The payload."
           },
           "host": {
@@ -25761,6 +26077,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/PartWayReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-password": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PasswordReport",
             "description": "The payload."
           },
           "host": {
@@ -26710,6 +27066,46 @@
         "title": "Envelope",
         "type": "object"
       },
+      "kind-served": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ServedReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
       "kind-settings": {
         "description": "The wrapper every machine-readable payload arrives in.",
         "properties": {
@@ -27561,6 +27957,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/WalkthroughReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-walkthrough-offer": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Why",
             "description": "The payload."
           },
           "host": {

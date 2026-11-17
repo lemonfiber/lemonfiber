@@ -46,14 +46,16 @@ pub(crate) use diagnosis::{assembled, assembling, examined, Stack};
 pub(crate) use fenced::held_back;
 pub(crate) use inflight::drained;
 pub(crate) use inflight::teardown;
-pub use inflight::{in_flight, Interrupted, Waiting};
+pub use inflight::InFlightReport;
+pub use inflight::{in_flight, in_flight_report, Unfinished, Waiting};
 #[cfg(test)]
 pub(crate) use installing::left_out;
 pub use installing::{offline, unstarted, InstallOffered, Offline, REFUSALS as INSTALL_REFUSALS};
 pub(crate) use installing::{plugins as plugins_of, without_waiting};
 pub use lock::{claimed, released, Claim};
 pub use recreated::Containers;
-pub use streaming::{logs, pull_progress, start_progress, started};
+pub(crate) use streaming::read as read_logs;
+pub use streaming::{logs, pull_progress, start_progress, started, LogsReport};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a
 // separate question from what happens to a finding that does.

@@ -40,14 +40,16 @@ use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
-use lemonfiber_api::guard::{Binding, Token};
+use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::companion::served::{Served, ServedReport};
 use lemonfiber_core::error::{Problem, Remedy, State as Standing};
 use lemonfiber_core::frontend::Source;
 use lemonfiber_core::keys::run as keys;
 use lemonfiber_core::platform::HOST_OS;
+use lemonfiber_core::ports::asking::Asking;
 use lemonfiber_core::PRODUCT;
 
 use crate::exit::complain;
@@ -231,7 +233,7 @@ pub(crate) type Until = Pin<Box<dyn Future<Output = ()> + Send>>;
 pub(crate) async fn run(
     ctx: Ctx,
     asked: Asked,
-    answers: &dyn crate::prompt::Answers,
+    asking: Arc<dyn Asking>,
     embedded: Option<Source>,
     until: Until,
 ) -> ExitCode {
@@ -245,7 +247,7 @@ pub(crate) async fn run(
     // loop below is spawned. So the asking finishes before the loop begins, which is
     // also the order an operator reads it in.
     let refused = if asked.password {
-        asking(&ctx, answers).await
+        password(&ctx, asking).await
     } else {
         None
     };
@@ -260,10 +262,10 @@ pub(crate) async fn run(
 /// Nothing where it was set, because there is nothing to exit with yet: the surface
 /// still has to be served, and the words said here are the ones an operator reads
 /// above the announcement.
-async fn asking(ctx: &Ctx, answers: &dyn crate::prompt::Answers) -> Option<ExitCode> {
-    match password::asked(ctx, answers).await {
-        Ok(lines) => {
-            for line in lines {
+async fn password(ctx: &Ctx, asking: Arc<dyn Asking>) -> Option<ExitCode> {
+    match dispatch(Command::Password, &ctx.clone().with_asking(asking)).await {
+        Ok(_) => {
+            for line in password::said() {
                 say!("{line}");
             }
             say!("");
@@ -305,6 +307,33 @@ fn register(ctx: &Arc<Ctx>) -> Arc<Admitting> {
         keys: Keyring::at(keys::at(ctx), keys::used_at(ctx)),
         ..Admitting::default()
     })
+}
+
+/// How the web surface is served on `port`, settled through the dispatcher, and the
+/// certificate it encrypts with where it does.
+async fn settled(
+    ctx: &Ctx,
+    port: u16,
+    encrypted: bool,
+    network: bool,
+) -> Result<(ServedReport, Option<encrypted::Encrypting>), Box<Problem>> {
+    let settling = Command::Served(Served {
+        port,
+        encrypted,
+        network,
+    });
+    let served = served_by(dispatch(settling, ctx).await?);
+    let encrypting = encrypted::encrypting(&served)?;
+    Ok((served, encrypting))
+}
+
+/// How the web surface is served, as settling it answered; served under nothing where
+/// the answer is another.
+fn served_by(answered: Outcome) -> ServedReport {
+    match answered {
+        Outcome::Served(report) => report,
+        _ => ServedReport::default(),
+    }
 }
 
 /// Serve, and go on serving until the operator stops it or the policy turns.
@@ -351,10 +380,9 @@ async fn serving(
     tokio::spawn(untuning(Arc::clone(&ctx)));
     let admitting = register(&ctx);
     let app = app(embedded, asked.assets.clone());
-    let encrypting = match encrypted::encrypting(&ctx, asked.tls, asked.port) {
-        Ok(encrypting) => encrypting,
-        Err(problem) => return complain(&problem),
-    };
+    if let Err(problem) = encrypted::port_settled(asked.tls, asked.port) {
+        return complain(&problem);
+    }
 
     let mut reach = asked.reach;
     let mut browsing = asked.browser;
@@ -368,13 +396,13 @@ async fn serving(
             Err(problem) => return complain(&problem),
         };
         let at: Vec<SocketAddr> = sockets.iter().map(|(_, bound)| *bound).collect();
-        let bound = encrypted::bound(
-            &ctx,
-            at.first().map_or(0, SocketAddr::port),
-            offered == Offered::Network,
-            encrypting.is_some(),
-        )
-        .await;
+        let port = at.first().map_or(0, SocketAddr::port);
+        let network = offered == Offered::Network;
+        let (served, encrypting) = match settled(&ctx, port, asked.tls, network).await {
+            Ok(settled) => settled,
+            Err(problem) => return complain(&problem),
+        };
+        let bound = encrypted::bound(&served, port, network);
         let browser = match (browsing, at.first()) {
             (true, Some(first)) => {
                 opening(
@@ -394,7 +422,7 @@ async fn serving(
         for line in announcement(&at, offered, token.as_str(), browser, fingerprint) {
             say!("{line}");
         }
-        for line in recorded(&ctx, &bound, fingerprint.is_some()) {
+        for line in unrecorded(served.unrecorded.as_deref()) {
             say!("{line}");
         }
         let serving = Serving::for_run(
@@ -432,30 +460,19 @@ async fn serving(
     }
 }
 
-/// Write down how this run is served, and say so where it could not be.
-///
-/// Pairing a phone reads it back, because the port is the one part of the address a
-/// phone reaches that nothing but this run knows. Nothing is said where it was written,
-/// and nothing where there is nowhere to write it, which pairing then says for itself.
-fn recorded(ctx: &Ctx, bound: &Binding, encrypted: bool) -> Vec<String> {
-    let Some(directory) = ctx.settings.companion.as_deref() else {
-        return Vec::new();
-    };
-    let served = lemonfiber_core::companion::served::Served {
-        port: bound.port,
-        encrypted,
-        network: bound.beyond,
-    };
-    match lemonfiber_core::companion::served::record(directory, served) {
-        Ok(()) => Vec::new(),
-        Err(why) => vec![
+/// What is said where how this run is served could not be written down, so a phone
+/// cannot be paired with it; nothing where it was.
+fn unrecorded(why: Option<&str>) -> Vec<String> {
+    why.map(|why| {
+        vec![
             String::new(),
             format!(
                 "Where this is served could not be written down, so a phone cannot be \
                  paired with it: {why}"
             ),
-        ],
-    }
+        ]
+    })
+    .unwrap_or_default()
 }
 
 /// Close the live streams whose passes lapsed unrenewed, every

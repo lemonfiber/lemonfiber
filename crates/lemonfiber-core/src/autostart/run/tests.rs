@@ -40,6 +40,8 @@ fn ran(status: Option<i32>, rehearsed: bool) -> LifecycleReport {
             footprint: crate::stack::closure::Footprint::default(),
             running: crate::stack::closure::Running::Unasked,
             vanished: Vec::new(),
+            installing: Vec::new(),
+            offer: None,
         },
         command: Vec::new(),
         rehearsed,

@@ -4,19 +4,19 @@
 //! operator, offers or resumes or recovers a setup, drives the wizard against a
 //! terminal or the flags, and brings the stack up once the answers are applied.
 //! What to ask, what an answer means, and what to write are all the core's,
-//! reached through [`core_setup`]; reading a line and rendering a question are the
-//! surface's, and that is what lives here. Split out of `main` so the dispatcher
-//! stays a dispatcher.
+//! reached one step at a time through the dispatcher, the same steps a browser
+//! takes; reading a line and rendering a question are the surface's, and that is
+//! what lives here. Split out of `main` so the dispatcher stays a dispatcher.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{setup as core_setup, Ctx};
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::model::SetupOutcome;
+use lemonfiber_core::model::{SetUp, SetupOutcome, WizardReport};
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::wizard::{offer_setup, Progress, Status, Wizard};
+use lemonfiber_core::wizard::Phase;
 use lemonfiber_core::PRODUCT;
 
 mod boot;
@@ -29,9 +29,9 @@ use interrupted::recover_setup;
 
 use crate::context::settings_at;
 use crate::exit::{complain, USAGE};
-use crate::prompt::SetupFlags;
+use crate::prompt::{Prompt, SetupFlags};
 use crate::say::{complain, say};
-use lemonfiber::setting_up::{self, default_data_location};
+use lemonfiber::setting_up::{self, default_data_location, Walked};
 
 /// The three ways setup reaches a person: whether one is there, what they typed,
 /// and what does the asking.
@@ -56,11 +56,24 @@ pub(crate) trait Surface {
     fn line(&self, prompt: &str) -> String;
 
     /// What puts setup's questions, once there is someone to put them to.
-    fn asking(
-        &self,
-        environment: Environment,
-        default_data: PathBuf,
-    ) -> Box<dyn core_setup::Prompt>;
+    fn asking(&self, environment: Environment, default_data: PathBuf) -> Box<dyn Prompt>;
+}
+
+/// Where setup stands on this machine, as the walk's first step reads it.
+async fn standing(ctx: &Ctx) -> Result<WizardReport, ExitCode> {
+    match setting_up::standing(ctx).await {
+        Ok(report) => report.ok_or(ExitCode::FAILURE),
+        Err(problem) => Err(complain(&problem)),
+    }
+}
+
+/// Whether a previous run left setup part-way: answers to pick up, a review to
+/// confirm, or an apply that stopped.
+///
+/// Asked before whether the machine is configured: an apply that stopped part-way
+/// has written settings that question reads as a finished install.
+fn unfinished(report: &WizardReport) -> bool {
+    report.setup == SetUp::PartWay
 }
 
 /// Say what the run came to, in the shape whoever asked for it can use.
@@ -140,16 +153,15 @@ pub(crate) async fn greeting(ctx: Ctx, paths: &Paths, surface: &dyn Surface) -> 
     // finished machine, and must be caught before the configured-yet check below —
     // an interrupted apply leaves half-written settings that check would read as
     // done. Handing these to the setup path detects and offers the way out.
-    let progress = core_setup::progress_at(&paths.setup_progress());
-    if Status::of(progress.as_ref()).unfinished() {
-        // A bare invocation carries no flags; unfinished setup is picked up
-        // interactively, the same conversation a fresh bare run would have.
+    let report = match standing(&ctx).await {
+        Ok(report) => report,
+        Err(code) => return code,
+    };
+    if unfinished(&report) {
         return setting_up(ctx, paths, surface, SetupFlags::none()).await;
     }
 
-    if !offer_setup(paths.env_file().exists()) {
-        // Already set up: setup would walk a done machine back to its first
-        // question, so a bare run does the other thing it could mean.
+    if !report.offered {
         return crate::terminal::configured(ctx, bare_run(surface.drawable())).await;
     }
 
@@ -214,18 +226,18 @@ pub(crate) async fn setting_up(
     if ctx.dry_run {
         return nothing_to_rehearse();
     }
-    // What a previous run left decides what this one does. An apply that stopped
-    // part-way is offered back before anything else — otherwise the configured-yet
-    // check below would see its half-written settings and call the machine done.
-    let progress = core_setup::progress_at(&paths.setup_progress());
-    match Status::of(progress.as_ref()) {
-        Status::FailedApply => Box::pin(recover_setup(ctx, paths, surface, progress)).await,
-        // A run that quit mid-question saved where it reached; pick it back up.
-        Status::InProgress => Box::pin(resume_gather(ctx, paths, surface, progress, flags)).await,
-        // Absent and applied are neither a stopped apply nor a saved run, so they
-        // begin, or decline, a fresh one.
-        _ => Box::pin(fresh_setup(ctx, paths, surface, flags)).await,
+    let report = match standing(&ctx).await {
+        Ok(report) => report,
+        Err(code) => return code,
+    };
+    if !unfinished(&report) {
+        return Box::pin(fresh_setup(ctx, paths, surface, flags, report)).await;
     }
+    if report.phase == Phase::Applying {
+        return Box::pin(recover_setup(ctx, paths, surface, report.written)).await;
+    }
+    say!("Picking up where a previous setup left off.");
+    Box::pin(drive(ctx, paths, surface, report, flags)).await
 }
 
 /// Gather answers on a machine with nothing to recover or resume.
@@ -234,10 +246,9 @@ async fn fresh_setup(
     paths: &Paths,
     surface: &dyn Surface,
     flags: SetupFlags,
+    report: WizardReport,
 ) -> ExitCode {
-    // Setup is for a machine with nothing configured; a configured one is changed
-    // through its settings, not walked back to its first question.
-    if !offer_setup(paths.env_file().exists()) {
+    if !report.offered {
         concluded(
             SetupOutcome::AlreadySetUp,
             &ctx.settings,
@@ -249,63 +260,30 @@ async fn fresh_setup(
         );
         return ExitCode::from(USAGE);
     }
-
-    let environment = ctx.environment;
-    drive(ctx, paths, surface, Wizard::new(environment), flags).await
+    drive(ctx, paths, surface, report, flags).await
 }
 
-/// Pick a setup back up from the answers a quit run saved.
-async fn resume_gather(
-    ctx: Ctx,
-    paths: &Paths,
-    surface: &dyn Surface,
-    progress: Option<Progress>,
-    flags: SetupFlags,
-) -> ExitCode {
-    // In-progress means a saved run; if it is somehow gone there is nothing to
-    // resume, so a fresh run is the honest fallback.
-    let Some(progress) = progress else {
-        return fresh_setup(ctx, paths, surface, flags).await;
-    };
-    say!("Picking up where a previous setup left off.");
-    let environment = ctx.environment;
-    drive(
-        ctx,
-        paths,
-        surface,
-        Wizard::resume(environment, progress),
-        flags,
-    )
-    .await
-}
-
-/// Ask the questions the `wizard` still needs, apply the answers, and start.
+/// Ask the questions setup still needs, apply the answers, and start.
 ///
 /// The answers come from a terminal where there is one; where there is not, they
-/// come from the flags. Either way it is the same walk — the wizard cannot tell —
-/// so a flag run still probes the data location and proves the indexer, with the
-/// warnings a person would weigh settled by the standing `--yes`.
+/// come from the flags. Either way it is the same walk, so a flag run still has the
+/// data location tested and the indexer proven, with the warnings a person would
+/// weigh settled by the standing `--yes`.
 async fn drive(
     mut ctx: Ctx,
     paths: &Paths,
     surface: &dyn Surface,
-    mut wizard: Wizard,
+    report: WizardReport,
     flags: SetupFlags,
 ) -> ExitCode {
-    // The environment is checked before the first question, so a missing or
-    // unreachable container engine is caught here rather than after eleven
-    // answers — nothing setup does can work without one.
     if let Err(code) = preflight(&ctx).await {
         return code;
     }
 
-    // A terminal answers the questions; without one the flags do, and where a flag
-    // a question needs is missing the run is told which rather than left waiting on
-    // input that never comes.
-    let prompt: Box<dyn core_setup::Prompt> = if surface.interactive() {
+    let prompt: Box<dyn Prompt> = if surface.interactive() {
         surface.asking(ctx.environment, default_data_location(paths))
     } else {
-        match setting_up::answering(&wizard, flags, paths) {
+        match setting_up::answering(&report.unanswered, flags, paths) {
             Ok(flags) => Box::new(flags),
             Err(missing) => {
                 complain!("error: setup here is non-interactive, so it needs values as flags:");
@@ -318,10 +296,8 @@ async fn drive(
         }
     };
 
-    match setting_up::walked(&ctx, paths, &mut wizard, prompt.as_ref()).await {
-        Ok(core_setup::Outcome::Applied) => {
-            // The settings read at startup predate the file setup just wrote, so
-            // they are refreshed before the stack is brought up against them.
+    match setting_up::walk(&ctx, prompt.as_ref(), report).await {
+        Ok(Walked::Applied) => {
             ctx.settings = settings_at(Some(&ctx), Some(paths));
             concluded(
                 SetupOutcome::Applied,
@@ -331,7 +307,7 @@ async fn drive(
             );
             Box::pin(start(&ctx, surface)).await
         }
-        Ok(core_setup::Outcome::Abandoned) => {
+        Ok(Walked::Abandoned) => {
             concluded(
                 SetupOutcome::Abandoned,
                 &ctx.settings,

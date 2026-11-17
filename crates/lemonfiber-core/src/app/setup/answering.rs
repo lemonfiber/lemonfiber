@@ -27,11 +27,9 @@ use crate::config::store;
 use crate::error::codes::setup::{ALREADY_SET_UP, NOTHING_TO_RECOVER};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::instant::Instant;
-use crate::model::{SettingReport, WizardReport};
-use crate::validate::{Credential, Validation, Validator};
-use crate::wizard::{
-    offer_setup, Answer, Choice, Indexer, Phase, Progress, Provider, Status, Vpn, Wizard,
-};
+use crate::model::{SetUp, SettingReport, WizardReport};
+use crate::validate::Validation;
+use crate::wizard::{Answer, Choice, Phase, Progress, Vpn, Wizard};
 
 /// What a setup request asks of the wizard.
 ///
@@ -87,15 +85,20 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
     );
     let guard = super::guard(ctx);
 
-    let mut proof = None;
+    let mut proof = super::proving::Proof::default();
     match action {
         SetupAction::Where => {}
         SetupAction::Answer(answer) => {
             if let Answer::Vpn(Vpn::Carrying(given)) = &answer {
                 super::checking(guard.as_ref(), given)?;
             }
-            let (answer, came_to) = proven(ctx.validator.as_ref(), answer).await;
-            proof = came_to;
+            let (answer, proven) = super::proving::proven(
+                ctx.validator.as_ref(),
+                ctx.seams.filesystem.as_ref(),
+                answer,
+            )
+            .await;
+            proof = proven;
             wizard
                 .answer(answer)
                 .map_err(|rejected| Box::new(super::does_not_apply(rejected)))?;
@@ -196,12 +199,8 @@ fn applying<'a>(
 }
 
 /// Whether setup may still be answered or applied on this machine.
-///
-/// A run to pick up beats a machine that looks configured, and is asked first for
-/// that reason: an apply that stopped part-way has written settings that the
-/// configured-yet question reads as a finished install.
 fn open(saved: Option<&Progress>, paths: &Paths) -> bool {
-    Status::of(saved).unfinished() || offer_setup(paths.env_file().exists())
+    super::set_up(saved, paths) != SetUp::Done
 }
 
 /// Where the walk stands now, read off the wizard and the files rather than
@@ -213,17 +212,19 @@ fn open(saved: Option<&Progress>, paths: &Paths) -> bool {
 fn reported(
     wizard: &Wizard,
     paths: &Paths,
-    proof: Option<Validation>,
+    proof: super::proving::Proof,
     guard: Option<&super::Guard>,
 ) -> WizardReport {
     let saved = super::progress_at(&paths.setup_progress());
     WizardReport {
+        setup: super::set_up(saved.as_ref(), paths),
+        storage: proof.storage,
         rehearsed: crate::model::Ran::ForReal,
         // Withheld here as well as where the outcome was made, because a validator is a
         // port and whoever supplies one decides what it says. This is first-run setup —
         // the minutes in which the credentials are entered — and what it answers is
         // serialised to a caller that may log it.
-        proof: proof.map(Validation::withheld),
+        proof: proof.credential.map(Validation::withheld),
         written: if wizard.phase() == Phase::Applying {
             super::written_so_far(paths)
         } else {
@@ -270,62 +271,6 @@ fn guarded(wizard: &Wizard) -> Vec<store::Shown> {
         secret: true,
     });
     settings.chain(secrets).collect()
-}
-
-/// The answer as this path may record it, and what proving it came to.
-///
-/// A credential is tested against its live service before it is kept, the way a
-/// terminal run tests one the moment it is entered — so `validated` records what a
-/// test established rather than what a caller asserted. Taken as submitted it would
-/// let a caller claim a key works by saying it does, and a later diagnosis reads
-/// that flag to decide whether to trust one.
-///
-/// A test that does not prove it is not a refusal. The answer is kept unproven and
-/// what the service said comes back beside it, which leaves whoever asked the three
-/// ways out a terminal run offers: send a different credential, send none, or go on
-/// with one that is recorded as unverified.
-///
-/// Every other answer is about this machine rather than about a service, so there is
-/// nothing to ask and nothing comes back.
-async fn proven(validator: &dyn Validator, answer: Answer) -> (Answer, Option<Validation>) {
-    match answer {
-        Answer::Credentials(Some(indexer)) => {
-            let came_to = validator
-                .validate(&Credential::Indexer {
-                    url: indexer.url.clone(),
-                    key: indexer.key.clone(),
-                })
-                .await;
-            let validated = matches!(came_to, Validation::Valid { .. });
-            (
-                Answer::Credentials(Some(Indexer {
-                    validated,
-                    ..indexer
-                })),
-                Some(came_to),
-            )
-        }
-        Answer::Provider(Some(provider)) => {
-            let came_to = validator
-                .validate(&Credential::Usenet {
-                    host: provider.host.clone(),
-                    port: provider.port,
-                    secure: provider.tls,
-                    user: provider.user.clone(),
-                    pass: provider.pass.clone(),
-                })
-                .await;
-            let validated = matches!(came_to, Validation::Valid { .. });
-            (
-                Answer::Provider(Some(Provider {
-                    validated,
-                    ..provider
-                })),
-                Some(came_to),
-            )
-        }
-        other => (other, None),
-    }
 }
 
 /// The problem of recovering an apply that is not part-way through.

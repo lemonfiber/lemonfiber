@@ -1,5 +1,5 @@
 use super::{named, narrowed, still_transferring, update, Asked, Report};
-use crate::app::engine::Interrupted;
+use crate::app::engine::Unfinished;
 use crate::app::{Ctx, Waiting};
 use crate::dashboard::Protocol;
 use crate::test_support::{a_context, nowhere};
@@ -102,7 +102,7 @@ fn narrowing_to_nothing_takes_every_service_the_stack_declares() {
 
 #[test]
 fn what_is_in_flight_is_named_with_how_far_along_it_is() {
-    let active = [Interrupted {
+    let active = [Unfinished {
         protocol: Protocol::Torrent,
         name: "Ubuntu.iso".to_owned(),
         progress: 94,

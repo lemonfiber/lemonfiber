@@ -1,29 +1,16 @@
-//! The reads that arrive over time rather than all at once.
+//! Starting, pulling, stopping and following logs, with what each says as it goes.
 //!
-//! Logs, a pull and a watch each produce output as they go, so none of them is a
-//! value that comes back from dispatch — they stream, and something has to sit
-//! with them until they end. That is what is here, kept out of the dispatcher so
-//! it stays a dispatcher.
-//!
-//! Starting and stopping sit here too, with the announcement each of them makes
-//! first. They are the same kind of thing — Compose narrates for minutes and its
-//! report comes at the end — and they came across from `main` when the length rule
-//! sent that file looking for a module to put a concern in. This is the module that
-//! already held the half they call.
+//! Each is dispatched; what the engine writes on the way reaches the screen through
+//! the narrator the context carries, and the report follows.
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{
-    claimed, dispatch, in_flight, logs, pull_progress, released, start_progress, started, Command,
-    Containers, Ctx, Outcome, Teardown, Waiting,
-};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, ReadingLogs, Teardown, Waiting};
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
-use lemonfiber_core::ports::docker::LogQuery;
-use lemonfiber_core::ports::process::Progress as PullEvent;
+use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_core::ports::Narrator;
-use lemonfiber_core::stack::compose::Action;
 
 use lemonfiber::cli::RawSwitch;
 
@@ -38,7 +25,8 @@ use crate::say::{complain, emit, say};
 use crate::setup::Surface as _;
 use crate::stopping::{answered, asking, Asking, Choice, ASK_TO_WAIT};
 
-/// Print log lines as they arrive, until the stream ends.
+/// Read the logs through the dispatcher, each line printed through the narrator as it
+/// arrives, until the stream ends.
 ///
 /// Machine-readable output is one envelope per line rather than one document
 /// containing all of them: a stream has no last element to close a document
@@ -52,123 +40,64 @@ pub(crate) async fn stream(
     tail: u32,
     json: bool,
 ) -> ExitCode {
-    let query = LogQuery { tail, follow };
-    let mut lines = match logs(ctx, forms, services, query).await {
-        Ok(opened) => opened,
-        Err(problem) => return complain(&problem),
-    };
-    let mut seen = 0_u64;
-    while let Some(line) = lines.recv().await {
-        seen += 1;
-        if json {
-            emit!(
-                "{}",
-                Envelope::new(kind::LOG, &Line::from(line))
-                    .to_json()
-                    .unwrap_or(UNRENDERABLE.to_owned())
-            );
-        } else {
-            say!("{}", logged(&line.service, &line.line));
+    let asked = Command::Logs(ReadingLogs {
+        forms: forms.to_vec(),
+        services: services.to_vec(),
+        tail,
+        follow,
+    });
+    match dispatch(asked, ctx).await {
+        Ok(Outcome::Logs(read)) if read.lines == 0 && !json => {
+            say!("no output");
+            ExitCode::SUCCESS
         }
+        Ok(_) => ExitCode::SUCCESS,
+        Err(problem) => complain(&problem),
     }
-
-    // Silence and "no output" are different answers, and a viewer that renders
-    // them identically leaves the operator wondering which one they got.
-    if seen == 0 && !json {
-        say!("no output");
-    }
-    ExitCode::SUCCESS
 }
 
 /// Pull the images the forms need, showing each as it downloads.
-///
-/// Image pulls are gigabytes and take minutes; a silent wait reads as a hang, so
-/// the operator is told the wait is coming and then shown Compose's per-image
-/// progress as it arrives.
 pub(crate) async fn pull(ctx: &Ctx, forms: &[String], json: bool) -> ExitCode {
-    // Claimed here rather than inside `pull_showing`, which setup also calls: a pull
-    // asked for on its own is a lifecycle operation like every other, and the same
-    // request through the dispatcher already claims. Setup's pull is left alone —
-    // it is followed immediately by a start that claims, and a first run has nothing
-    // to race. Given back on both paths out.
-    //
-    // Recorded under the action's own word rather than one written here, so a run
-    // waiting behind a streamed pull is told the same thing as one waiting behind the
-    // pull the dispatcher runs. They are the same operation to whoever is waiting.
-    let claim = match claimed(ctx, Action::Pull(Vec::new()).name()).await {
-        Ok(claim) => claim,
-        Err(problem) => return complain(&problem),
-    };
-    let code = match pull_showing(ctx, forms, json).await {
+    match pull_showing(ctx, forms, json).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(code) => code,
-    };
-    released(claim).await;
-    code
+    }
 }
 
-/// Stream a pull to the screen, or report why it could not run.
-///
-/// Split from [`pull`] so setup's Start phase can pull-with-progress and, only if
-/// that succeeds, go on to bring the stack up — a `Result` it can branch on rather
-/// than an exit code it cannot compare.
-pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Result<(), ExitCode> {
-    // A rehearsal reports what would be pulled rather than pulling it; the buffered
-    // path already renders that, so a dry run borrows it rather than streaming.
-    if ctx.dry_run {
-        return pull_rehearsal(ctx, forms, json).await;
+/// What `command` came to, or the exit its refusal was said with.
+pub(crate) async fn dispatched(command: Command, ctx: &Ctx) -> Result<Outcome, ExitCode> {
+    match dispatch(command, ctx).await {
+        Ok(outcome) => Ok(outcome),
+        Err(problem) => Err(complain(&problem)),
     }
+}
 
-    // The expected-duration statement, before the wait — qualitative, because the
-    // real figure depends on the operator's line and what is already cached.
-    if !json {
+/// Pull the images the forms need through the dispatcher, each line the engine writes
+/// shown as it arrives through the narrator, or report why it could not run.
+///
+/// A rehearsal pulls nothing and renders what would be pulled.
+pub(crate) async fn pull_showing(ctx: &Ctx, forms: &[String], json: bool) -> Result<(), ExitCode> {
+    if !json && !ctx.dry_run {
         say!("Pulling images — usually a few minutes, and several gigabytes.");
     }
-
-    let mut progress = pull_progress(ctx, forms)
-        .await
-        .map_err(|problem| complain(&problem))?;
-    let mut failed = false;
-    while let Some(event) = progress.recv().await {
-        match event {
-            PullEvent::Line(line) => emit_line(kind::PULL, &line, json),
-            // A non-zero exit is the pull's own report that an image did not come
-            // down; the operator is told, and a script sees a non-zero code.
-            PullEvent::Ended(status) => failed = status != Some(0),
-        }
-    }
-
-    if failed {
-        if !json {
-            complain!("\nSome images could not be pulled — check the output above.");
-        }
-        return Err(ExitCode::from(FAILURE));
-    }
-    Ok(())
-}
-
-/// A dry run's rehearsal: report what a pull would fetch without fetching it,
-/// borrowing the buffered path's rendering rather than streaming a pull that will
-/// not happen.
-pub(crate) async fn pull_rehearsal(
-    ctx: &Ctx,
-    forms: &[String],
-    json: bool,
-) -> Result<(), ExitCode> {
-    match dispatch(
+    let pulled = dispatched(
         Command::Pull {
             forms: forms.to_vec(),
         },
         ctx,
     )
-    .await
-    {
-        Ok(outcome) => {
-            render(&outcome, json);
-            Ok(())
-        }
-        Err(problem) => Err(complain(&problem)),
+    .await?;
+    if ctx.dry_run {
+        render(&pulled, json);
+        return Ok(());
     }
+    if matches!(&pulled, Outcome::Lifecycle(report) if report.status == Some(0)) {
+        return Ok(());
+    }
+    if !json {
+        complain!("\nSome images could not be pulled — check the output above.");
+    }
+    Err(ExitCode::from(FAILURE))
 }
 
 /// Render one line a narrated command wrote — wrapped in an envelope under `--json`,
@@ -208,6 +137,23 @@ impl Narrator for Narrating {
     async fn say(&self, said: &str) {
         emit_line(kind::START, said, crate::say::for_a_parser());
     }
+
+    async fn pulled(&self, line: &str) {
+        emit_line(kind::PULL, line, crate::say::for_a_parser());
+    }
+
+    async fn logged(&self, line: &LogLine) {
+        if crate::say::for_a_parser() {
+            emit!(
+                "{}",
+                Envelope::new(kind::LOG, &Line::from(line.clone()))
+                    .to_json()
+                    .unwrap_or(UNRENDERABLE.to_owned())
+            );
+        } else {
+            say!("{}", logged(&line.service, &line.line));
+        }
+    }
 }
 
 /// Report what stopping would interrupt, and say what the operator decided about it.
@@ -220,7 +166,13 @@ impl Narrator for Narrating {
 /// carries, and a surface that sat in the loop itself would be a wait only the
 /// command line could ask for.
 pub(crate) async fn settle(ctx: &Ctx, forms: &[String], wait: bool, yes: bool) -> Choice {
-    let active = in_flight(ctx, forms).await;
+    let asked = Command::InFlight {
+        forms: forms.to_vec(),
+    };
+    let active = match dispatch(asked, ctx).await {
+        Ok(Outcome::InFlight(report)) => report.downloads,
+        Ok(_) | Err(_) => Vec::new(),
+    };
     if active.is_empty() {
         return Choice::Stop;
     }
@@ -232,12 +184,8 @@ pub(crate) async fn settle(ctx: &Ctx, forms: &[String], wait: bool, yes: bool) -
     }
 }
 
-/// Start the forms, showing what Compose says as it says it.
-///
-/// A start is minutes of silence otherwise, and the silence is the problem: pulling
-/// an image, creating a network and waiting on a health check all look identical from
-/// outside, and the one that has hung looks identical to all three. So Compose's own
-/// narration goes to the screen as it arrives, and the report follows it.
+/// Start the forms, or the services named, through the dispatcher: what the engine
+/// pulls on the way is shown as it arrives through the narrator, and the report follows.
 pub(crate) async fn start(
     ctx: &Ctx,
     forms: &[String],
@@ -245,41 +193,19 @@ pub(crate) async fn start(
     offer: Option<&str>,
     json: bool,
 ) -> ExitCode {
-    // A streamed start does not go through the dispatcher, so it claims the stack
-    // here rather than inheriting the claim `lifecycle` takes. Given back below on
-    // both paths out, for the same reason it is given back there.
-    //
-    // Recorded under the action's own word for the reason a streamed pull is: a
-    // stack held by a start is held by a start, and which of the two code paths is
-    // running it is not a fact the operator waiting on it has any use for.
-    let claim = match claimed(ctx, Action::Up.name()).await {
-        Ok(claim) => claim,
-        Err(problem) => return complain(&problem),
-    };
-
-    // A rehearsal runs nothing, so it has nothing to narrate — and it needs no
-    // separate path, because the report it wants is the one built from the same plan
-    // without the single irreversible step, which is what a status of nothing gets.
-    let (status, before) = if ctx.dry_run {
-        (None, Containers::default())
+    let command = if services.is_empty() {
+        Command::Up {
+            forms: forms.to_vec(),
+            offer: offer.map(str::to_owned),
+        }
     } else {
-        match narrated(ctx, (forms, services), offer, json).await {
-            Ok(ran) => ran,
-            Err(code) => {
-                released(claim).await;
-                return code;
-            }
+        Command::Start {
+            forms: forms.to_vec(),
+            services: services.to_vec(),
         }
     };
-
-    // The report is asked for whatever the status was: a start that failed part way
-    // has still started something, and which services came up is the first thing an
-    // operator needs in order to do anything about the ones that did not.
-    let outcome = started(ctx, forms, services, (status, &before)).await;
-    released(claim).await;
-    match outcome {
-        Ok(report) => {
-            let outcome = Outcome::from(report);
+    match dispatch(command, ctx).await {
+        Ok(outcome) => {
             render(&outcome, json);
             settled(&outcome)
         }
@@ -287,35 +213,7 @@ pub(crate) async fn start(
     }
 }
 
-/// Spawn the start and put Compose's narration on the screen as it arrives.
-///
-/// Gives back the exit status Compose ended on, with each service's container as it
-/// stood before, or the code a surface should exit with where the command could not be
-/// spawned at all.
-async fn narrated(
-    ctx: &Ctx,
-    (forms, services): (&[String], &[String]),
-    offer: Option<&str>,
-    json: bool,
-) -> Result<(Option<i32>, Containers), ExitCode> {
-    let (mut progress, before) = start_progress(ctx, forms, services, offer)
-        .await
-        .map_err(|problem| complain(&problem))?;
-    let mut status = None;
-    while let Some(event) = progress.recv().await {
-        match event {
-            PullEvent::Line(line) => emit_line(kind::START, &line, json),
-            PullEvent::Ended(code) => status = code,
-        }
-    }
-    Ok((status, before))
-}
-
 /// Announce what starting will affect, then start it, narrated as it goes.
-///
-/// Starting does not go through dispatch, for the same reason a pull and a watch do
-/// not: Compose narrates for minutes and the report comes at the end, which is not a
-/// value that arrives once.
 pub(crate) async fn starting(
     ctx: &Ctx,
     forms: &[String],

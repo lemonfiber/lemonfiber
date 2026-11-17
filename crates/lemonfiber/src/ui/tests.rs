@@ -29,7 +29,8 @@ use lemonfiber_core::admission as credential;
 use lemonfiber_fixtures::support::a_password;
 use std::path::PathBuf;
 
-use crate::prompt::fixtures::Script;
+use lemonfiber_core::ports::asking::Asking;
+use lemonfiber_fixtures::typing::Typing;
 
 #[test]
 fn a_named_directory_is_the_app_instead_of_the_embedded_one() {
@@ -507,15 +508,13 @@ async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
     let dir = a_directory("kept");
     let path = dir.join("admission.json");
     let chosen = a_password();
-    let answers = Script::of(&[&chosen, &chosen]);
-
     let code = run(
         keeping(Some(path.clone())),
         Asked {
             password: true,
             ..Asked::default()
         },
-        &answers,
+        Typing::answering_each(vec![chosen.clone(), chosen.clone()]),
         None,
         Box::pin(std::future::ready(())),
     )
@@ -532,11 +531,11 @@ async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
 /// A run not asked for a password goes straight to serving.
 #[tokio::test]
 async fn a_run_not_asked_for_a_password_serves_without_asking() {
-    let answers = Script::of(&[]);
+    let typing = Typing::nobody();
     let code = run(
         keeping(None),
         Asked::default(),
-        &answers,
+        Arc::clone(&typing) as Arc<dyn Asking>,
         None,
         Box::pin(std::future::ready(())),
     )
@@ -545,6 +544,7 @@ async fn a_run_not_asked_for_a_password_serves_without_asking() {
         crate::exit::shown(code),
         crate::exit::shown(ExitCode::SUCCESS)
     );
+    assert_eq!(typing.asked(), Vec::new());
 }
 
 /// Every way of not getting a password serves nothing, because a run asked for
@@ -578,12 +578,10 @@ async fn a_password_that_could_not_be_set_stops_the_run_rather_than_serving() {
         ),
     ];
     for (kept, said) in ways {
-        let lines: Vec<&str> = said.iter().map(String::as_str).collect();
-        let answers = Script::of(&lines);
         let code = run(
             keeping(kept.clone()),
             asked.clone(),
-            &answers,
+            Typing::answering_each(said),
             None,
             Box::pin(std::future::ready(())),
         )

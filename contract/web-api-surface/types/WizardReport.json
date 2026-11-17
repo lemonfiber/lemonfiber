@@ -54,6 +54,18 @@
       ],
       "required": true
     },
+    "setup": {
+      "type": [
+        "ref:SetUp"
+      ],
+      "required": true
+    },
+    "storage": {
+      "type": [
+        "anyOf(null,ref:StorageFinding)"
+      ],
+      "required": false
+    },
     "unanswered": {
       "type": [
         "array[ref:WizardStep]"

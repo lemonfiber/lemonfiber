@@ -72,6 +72,15 @@ pub struct Plan {
     /// forms: a plugin that joins none of the rest does not run.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vanished: Vec<Vanished>,
+    /// Each part this build carries that the forms hold and this machine has never run,
+    /// offered as an install from the build before a start writes anything; answered by
+    /// [`Self::offer`]. Empty on every plan but a preview's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installing: Vec<crate::app::InstallOffered>,
+    /// The offer a start answers to take every install in [`Self::installing`], where it
+    /// could be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offer: Option<String>,
 }
 
 /// Which of a plan's services are already running, as far as anything asked.
@@ -208,6 +217,8 @@ impl Plan {
             footprint: Footprint::default(),
             running: Running::Unasked,
             vanished: Vec::new(),
+            installing: Vec::new(),
+            offer: None,
         }
     }
 
@@ -370,6 +381,8 @@ fn planned(
         dropped,
         running: Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     })
 }
 

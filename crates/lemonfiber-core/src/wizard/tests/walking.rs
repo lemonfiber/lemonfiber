@@ -1,6 +1,7 @@
 //! Walking the questions: which apply, in what order, and resuming.
 
 use super::*;
+use crate::wizard::ContainerUser;
 
 #[test]
 fn a_recorded_mode_round_trips_back_to_the_library_choice() {
@@ -139,7 +140,7 @@ fn an_answer_is_recorded_against_its_field() {
     let answers = wizard.answers();
     assert_eq!(answers.protocols, Some(Protocols::both()));
     assert_eq!(answers.data_location, Some(PathBuf::from("/srv/media")));
-    assert_eq!(answers.service_user, Some(Some((1000, 1001))));
+    assert_eq!(answers.service_user, ContainerUser::Set(1000, 1001));
     assert_eq!(answers.library, Some(Library::Docker));
     assert_eq!(answers.household, Some(true));
     assert_eq!(answers.autostart, Some(false));
@@ -154,7 +155,7 @@ fn a_container_user_is_refused_where_ownership_is_mapped_away() {
     );
     // But declining one is always fine — there is nothing to map.
     assert_eq!(wizard.answer(Answer::ServiceUser(None)), Ok(()));
-    assert_eq!(wizard.answers().service_user, Some(None));
+    assert_eq!(wizard.answers().service_user, ContainerUser::Kept);
 }
 
 #[test]
@@ -271,7 +272,7 @@ fn resuming_where_ownership_is_mapped_away_drops_the_container_user() {
     let saved = linux.progress().clone();
 
     let resumed = Wizard::resume(Environment::MacOs, saved);
-    assert_eq!(resumed.answers().service_user, None);
+    assert_eq!(resumed.answers().service_user, ContainerUser::Unanswered);
     // macOS never asks it, so it does not come back as unanswered either.
     assert!(!resumed.unanswered().contains(&Step::ServiceUser));
 }
@@ -300,4 +301,21 @@ fn the_serialised_step_and_answers_read_as_their_kebab_names() {
     let json = serde_json::to_string(wizard.progress()).unwrap_or_default();
     assert!(json.contains(r#""at":"data-location""#), "{json}");
     assert!(json.contains(r#""library":"host""#), "{json}");
+}
+
+#[test]
+fn a_container_user_left_to_the_image_is_still_answered_once_written_and_read_back() {
+    let mut linux = on_native_linux();
+    linux.answer(Answer::ServiceUser(None)).unwrap_or(());
+    let written = serde_json::to_string(linux.progress()).unwrap_or_default();
+    let read: Result<Progress, _> = serde_json::from_str(&written);
+    assert!(read.is_ok(), "{written}");
+    let Ok(read) = read else {
+        return;
+    };
+
+    let resumed = Wizard::resume(Environment::LinuxNative, read);
+
+    assert_eq!(resumed.answers().service_user, ContainerUser::Kept);
+    assert!(!resumed.unanswered().contains(&Step::ServiceUser));
 }

@@ -222,6 +222,8 @@ outcomes! {
     Outbound(crate::outbound::Leaving) => OUTBOUND,
     /// Every plugin installed on this machine, and what installing one came to.
     Plugins(crate::plugin::Installs) => PLUGINS [rehearsed],
+    /// What setting the web interface's password came to.
+    Password(super::password::PasswordReport) => PASSWORD,
     /// What a plugin's source claims, held to what this build publishes.
     PluginClaims(crate::plugin::Claimed) => PLUGIN_CLAIMS,
     /// What a plugin's conformance recordings come to against the contracts it speaks.
@@ -276,6 +278,14 @@ outcomes! {
     Watch(SupervisionReport) => WATCH [rehearsed],
     /// How far a walk got, and what it proved.
     Walkthrough(WalkthroughReport) => WALKTHROUGH,
+    /// Whether a walkthrough is worth offering this stack, and which one.
+    WalkthroughOffer(crate::walkthrough::Why) => WALKTHROUGH_OFFER,
+    /// What reading the services' logs came to.
+    Logs(super::engine::LogsReport) => LOGS,
+    /// What is still coming down inside the forms a teardown would stop.
+    InFlight(super::engine::InFlightReport) => IN_FLIGHT,
+    /// How the web surface is served: the certificate it presents and the name it answers to.
+    Served(crate::companion::served::ServedReport) => SERVED,
 }
 
 impl Outcome {

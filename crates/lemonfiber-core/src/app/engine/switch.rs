@@ -308,6 +308,8 @@ fn leaving(manifest: &Manifest, stopping: &[String]) -> Plan {
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     }
 }
 

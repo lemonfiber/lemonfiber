@@ -15,6 +15,7 @@ mod devices;
 mod disk;
 mod house;
 mod surface;
+mod terminal;
 mod world;
 
 use std::fs::File;
@@ -48,6 +49,7 @@ async fn gather() -> Option<Examples> {
     coded::every(&mut seen).await?;
     acted::every(&mut seen).await?;
     authoring::every(&mut seen).await?;
+    terminal::every(&mut seen).await?;
     Some(seen.examples)
 }
 

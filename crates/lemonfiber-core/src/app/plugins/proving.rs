@@ -197,6 +197,8 @@ fn invocation(ctx: &Ctx, installed: &Installed, stack: &Path, action: &Action) -
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     };
     build(&plan, &ctx.settings, stack, action, ctx.environment)
 }

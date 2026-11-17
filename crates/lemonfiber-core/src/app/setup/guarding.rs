@@ -128,12 +128,6 @@ impl Guard {
         chosen.chain(values).chain(secrets).collect()
     }
 
-    /// Ask each question as the answers before it leave it to be asked, through
-    /// `answering`, and take what it gives: nothing leaves a question unanswered.
-    pub fn asked(&self, answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>) -> Guarded {
-        self.walked(answering).given
-    }
-
     /// What of `given` the guard takes, where it answers every question it leaves to be
     /// asked and nothing else: each setting and secret asked under it, and nothing it
     /// leaves blank.
@@ -167,90 +161,23 @@ impl Guard {
 
     /// One walk through the questions, `answering` each as it is asked.
     fn walked(&self, answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>) -> Walked {
-        let mut walked = Walked::default();
-        for (setting, _) in self.chosen() {
-            let held = |name: &str| {
-                walked
-                    .given
-                    .settings
-                    .get(name)
-                    .cloned()
-                    .or_else(|| choices::defaulted(&self.env, name))
-            };
-            let offered = choices::offered(&self.env, setting, &held).unwrap_or_default();
-            let default = choices::defaulted(&self.env, setting);
-            let answer = answering(&Asking::Choice {
-                setting,
-                offered: offered.clone(),
-                default: default.clone(),
-            })
-            .filter(|answer| !answer.is_empty());
-            match (answer, default) {
-                (Some(value), _) => {
-                    if !offered.contains(&value) {
-                        walked.outside.push(Outside {
-                            setting: setting.to_owned(),
-                            value: value.clone(),
-                            choices: offered,
-                        });
-                    }
-                    walked.given.settings.insert(setting.to_owned(), value);
-                }
-                (None, Some(default)) if offered.contains(&default) => {}
-                (None, _) => walked.missing.push(setting.to_owned()),
-            }
-        }
-        for (setting, needs) in self.valued() {
-            if !self.met(needs, &walked.given) {
-                continue;
-            }
-            match answering(&Asking::Value { setting }).filter(|answer| !answer.is_empty()) {
-                Some(value) => {
-                    walked.given.settings.insert(setting.to_owned(), value);
-                }
-                None => walked.missing.push(setting.to_owned()),
-            }
-        }
-        for secret in self.needed() {
-            if !self.met(&secret.needs, &walked.given) {
-                continue;
-            }
-            let asking = Asking::Secret {
-                secret: &secret.name,
-                why: &secret.why,
-            };
-            match answering(&asking).filter(|answer| !answer.is_empty()) {
-                Some(value) => {
-                    walked.given.secrets.insert(secret.name.clone(), value);
-                }
-                None => walked.missing.push(secret.name.clone()),
-            }
-        }
-        walked
-    }
-
-    /// Whether `needs` is met by what `given` gives, and each setting's default beside it.
-    fn met(&self, needs: &choices::Needs, given: &Guarded) -> bool {
-        choices::met(needs, &|name: &str| {
-            given
-                .settings
-                .get(name)
-                .cloned()
-                .or_else(|| choices::defaulted(&self.env, name))
-        })
+        walk(
+            &self.questions(),
+            &|name: &str| choices::defaulted(&self.env, name),
+            answering,
+        )
     }
 
     /// Each setting that declares choices, with them, each after every setting its
     /// choices need; by name where nothing orders two.
     fn chosen(&self) -> Vec<(&str, &[choices::Choice])> {
-        let mut waiting: BTreeMap<&str, &[choices::Choice]> = self
-            .env
-            .values()
-            .filter_map(|value| match value {
-                Value::Setting(read) => Some((read.setting.as_str(), read.one_of.as_deref()?)),
-                _ => None,
-            })
-            .collect();
+        let mut waiting: BTreeMap<&str, &[choices::Choice]> = BTreeMap::new();
+        for (setting, one_of) in self.env.values().filter_map(|value| match value {
+            Value::Setting(read) => Some((read.setting.as_str(), read.one_of.as_deref()?)),
+            _ => None,
+        }) {
+            waiting.entry(setting).or_insert(one_of);
+        }
         let mut ordered = Vec::new();
         while !waiting.is_empty() {
             let ready: Vec<&str> = waiting
@@ -354,6 +281,121 @@ fn unanswered(missing: &[String], unasked: &[String]) -> Problem {
         Remedy::new("Answer the VPN step again with every setting and secret it names"),
     )
     .in_state(State::Guided)
+}
+
+/// Ask each of `questions` as the answers before it leave it to be asked, through
+/// `answering`, and take what it gives: nothing leaves a question unanswered.
+///
+/// The walk a surface holding the conversation takes over the questions a setup report
+/// lists, and the one the core holds an answer to, so what is asked and what is checked
+/// cannot come apart.
+#[must_use]
+pub fn asked(
+    questions: &[GuardQuestion],
+    answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>,
+) -> Guarded {
+    let defaults: BTreeMap<&str, &str> = questions
+        .iter()
+        .filter_map(|question| match question {
+            GuardQuestion::Choice {
+                setting,
+                default: Some(default),
+                ..
+            } => Some((setting.as_str(), default.as_str())),
+            _ => None,
+        })
+        .collect();
+    walk(
+        questions,
+        &|name: &str| defaults.get(name).map(|value| (*value).to_owned()),
+        answering,
+    )
+    .given
+}
+
+/// One walk through `questions`, `answering` each as it is asked, with `defaulted`
+/// saying what a setting holds while nothing is given for it.
+fn walk(
+    questions: &[GuardQuestion],
+    defaulted: &dyn Fn(&str) -> Option<String>,
+    answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>,
+) -> Walked {
+    let mut walked = Walked::default();
+    for question in questions {
+        let held = |name: &str| {
+            walked
+                .given
+                .settings
+                .get(name)
+                .cloned()
+                .or_else(|| defaulted(name))
+        };
+        match question {
+            GuardQuestion::Choice {
+                setting,
+                default,
+                choices,
+            } => {
+                let offered: Vec<String> = choices
+                    .iter()
+                    .filter(|choice| met(&choice.needs, &held))
+                    .map(|choice| choice.value.clone())
+                    .collect();
+                let answer = answering(&Asking::Choice {
+                    setting,
+                    offered: offered.clone(),
+                    default: default.clone(),
+                })
+                .filter(|answer| !answer.is_empty());
+                match (answer, default) {
+                    (Some(value), _) => {
+                        if !offered.contains(&value) {
+                            walked.outside.push(Outside {
+                                setting: setting.clone(),
+                                value: value.clone(),
+                                choices: offered,
+                            });
+                        }
+                        walked.given.settings.insert(setting.clone(), value);
+                    }
+                    (None, Some(default)) if offered.contains(default) => {}
+                    (None, _) => walked.missing.push(setting.clone()),
+                }
+            }
+            GuardQuestion::Value { setting, needs } => {
+                if !met(needs, &held) {
+                    continue;
+                }
+                match answering(&Asking::Value { setting }).filter(|answer| !answer.is_empty()) {
+                    Some(value) => {
+                        walked.given.settings.insert(setting.clone(), value);
+                    }
+                    None => walked.missing.push(setting.clone()),
+                }
+            }
+            GuardQuestion::Secret { secret, why, needs } => {
+                if !met(needs, &held) {
+                    continue;
+                }
+                match answering(&Asking::Secret { secret, why }).filter(|answer| !answer.is_empty())
+                {
+                    Some(value) => {
+                        walked.given.secrets.insert(secret.clone(), value);
+                    }
+                    None => walked.missing.push(secret.clone()),
+                }
+            }
+        }
+    }
+    walked
+}
+
+/// Whether `needs` is met: every setting it names holds one of the values it lists, as
+/// `held` says what each holds.
+fn met(needs: &BTreeMap<String, Vec<String>>, held: &dyn Fn(&str) -> Option<String>) -> bool {
+    needs
+        .iter()
+        .all(|(setting, values)| held(setting).is_some_and(|value| values.contains(&value)))
 }
 
 #[cfg(test)]

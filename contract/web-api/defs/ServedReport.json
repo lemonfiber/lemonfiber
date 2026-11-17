@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a run serving the surface presents, answers to and wrote down.",
+  "type": "object",
+  "properties": {
+    "fingerprint": {
+      "description": "What a phone pins for the certificate presented, where the run is encrypted.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "named": {
+      "description": "The name a request has to carry beyond this machine, where the run is encrypted on\na network.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unrecorded": {
+      "description": "Why where it is served could not be written down, where it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

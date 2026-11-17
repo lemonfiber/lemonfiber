@@ -24,7 +24,7 @@ requirement = [
   { id = "ARCH-R36", state = "partial" },
   { id = "ARCH-R38", state = "partial" },
   { id = "ARCH-R40", state = "partial" },
-  { id = "ARCH-R42", state = "partial", evidence = ["crates/lemonfiber/src/repair.rs"] },
+  { id = "ARCH-R42", state = "partial", evidence = ["crates/lemonfiber/src/repair.rs", "crates/lemonfiber/src/setting_up/walk.rs", "crates/lemonfiber-core/src/app/rehearsal/tests.rs::only_what_needs_no_stack_skips_the_settling"] },
   { id = "ARCH-R43", state = "done", evidence = ["crates/lemonfiber/build.rs"] },
   { id = "ARCH-R44", state = "done", evidence = ["crates/lemonfiber-core/src/stack/compose.rs", "crates/lemonfiber-core/src/app/engine.rs"] },
   { id = "ARCH-R45", state = "done", evidence = ["crates/lemonfiber-fixtures/", "crates/lemonfiber/tests/architecture/a_port_is_faked_in_one_place.rs::every_fake_of_a_port_lives_in_the_fixtures", "crates/lemonfiber/tests/architecture/a_port_is_faked_in_one_place.rs::the_scan_refuses_a_fake_and_keeps_an_adapter"] },

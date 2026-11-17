@@ -25,6 +25,7 @@ mod letting_go;
 mod migrate;
 mod quality;
 mod queueing;
+mod reading_logs;
 mod reclaiming;
 mod restarting;
 mod restoring;
@@ -51,6 +52,7 @@ pub use letting_go::LettingGo;
 pub use migrate::MigrateAction;
 pub use quality::QualityAction;
 pub use queueing::Queueing;
+pub use reading_logs::ReadingLogs;
 pub use reclaiming::Reclaiming;
 pub use restarting::Restarting;
 pub use restoring::Restoring;
@@ -397,6 +399,9 @@ pub enum Command {
     Plugins(plugins::Asked),
     /// Read a plugin's own source as its author would, with no stack.
     Authoring(authoring::Asked),
+    /// Set the web interface's password the operator types twice, revoking every device
+    /// key registered under the one before.
+    Password,
     /// Remove everything lemonfiber keeps on this machine.
     ///
     /// The whole of it: every location the layout names sits under one of two
@@ -480,6 +485,19 @@ pub enum Command {
     Walkthrough {
         /// What to add, as it would be said, or nothing to be suggested something.
         item: Option<String>,
+    },
+    /// Whether a walkthrough is worth offering this stack, and which one.
+    WalkthroughOffer,
+    /// Read what the services wrote to their logs, each line said through the narrator
+    /// as it arrives.
+    Logs(ReadingLogs),
+    /// Settle how the web surface is served: the certificate it presents, the name it
+    /// answers to, and the record pairing reads back.
+    Served(crate::companion::served::Served),
+    /// Say what is still coming down inside the forms, which a teardown would interrupt.
+    InFlight {
+        /// The forms a teardown would stop, or none for the whole stack.
+        forms: Vec<String>,
     },
     /// Wire the stack's services to each other, idempotently.
     Seed,

@@ -121,6 +121,16 @@ fn payload(kind: &str) -> Value {
         .unwrap_or_default()
 }
 
+/// Each shape a payload schema allows: every branch where it is one of several, and
+/// otherwise the schema itself.
+fn branches(payload: &Value) -> Vec<Value> {
+    payload
+        .get("oneOf")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_else(|| vec![payload.clone()])
+}
+
 /// The fields a payload schema describes.
 fn described_fields(payload: &Value) -> BTreeSet<String> {
     payload
@@ -336,16 +346,22 @@ fn each_outcome_is_described_as_the_document_it_writes() {
     let mut seen: HashSet<String> = HashSet::new();
     for outcome in samples() {
         let (kind, fields) = written(outcome);
-        let payload = payload(&kind);
-        let described = described_fields(&payload);
-        let required = required_fields(&payload);
+        let shapes = branches(&payload(&kind));
+        let described: Vec<BTreeSet<String>> = shapes.iter().map(described_fields).collect();
+        let required: Vec<BTreeSet<String>> = shapes.iter().map(required_fields).collect();
 
         assert!(
-            fields.is_subset(&described),
+            described
+                .iter()
+                .any(|described| fields.is_subset(described)),
             "{kind} writes fields the contract does not describe: {fields:?} against {described:?}"
         );
         assert!(
-            required.is_subset(&fields),
+            described
+                .iter()
+                .zip(&required)
+                .any(|(described, required)| fields.is_subset(described)
+                    && required.is_subset(&fields)),
             "{kind} omits fields the contract requires: {required:?} against {fields:?}"
         );
         seen.insert(kind);

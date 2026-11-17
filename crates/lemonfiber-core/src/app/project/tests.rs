@@ -49,6 +49,8 @@ fn plan() -> crate::stack::closure::Plan {
         footprint: crate::stack::closure::Footprint::default(),
         running: crate::stack::closure::Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     }
 }
 

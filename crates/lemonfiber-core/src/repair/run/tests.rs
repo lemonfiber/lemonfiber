@@ -1,5 +1,8 @@
 use super::proving::{judged, proved};
-use super::{beyond, putting_right, reversing, Beyond, Consent, NOWHERE_TO_LOOK};
+use super::{
+    asked_about, beyond, putting_right, reversing, Beyond, Confirm as _, Consent, Present,
+    NOWHERE_TO_LOOK,
+};
 use crate::app::conditions::wrong;
 use crate::app::fixtures::ctx_at;
 use crate::condition::{Conditions, Fault};
@@ -351,4 +354,48 @@ async fn a_repair_with_nowhere_to_record_is_judged_rather_than_stopped() {
     let outcome = super::proving::carried(&ctx, &[], &Changing, &[], &repair("vpn.port")).await;
 
     assert!(!matches!(outcome, Outcome::Stopped { .. }), "{outcome:?}");
+}
+
+#[test]
+fn only_a_yes_from_whoever_is_present_agrees_to_a_repair() {
+    for (said, agreed) in [
+        ("y", true),
+        ("YES", true),
+        (" yes ", true),
+        ("n", false),
+        ("", false),
+    ] {
+        let mut ctx = ctx_at("repair-asked");
+        let asking = lemonfiber_fixtures::typing::Typing::answering(said);
+        ctx.asking = asking.clone();
+
+        assert_eq!(
+            Present(&ctx).agreed(&repair("vpn.port")),
+            agreed,
+            "{said:?}"
+        );
+        assert_eq!(asking.asked(), [(asked_about(&repair("vpn.port")), false)]);
+    }
+}
+
+#[test]
+fn a_repair_is_put_with_what_it_changes_and_whether_it_can_be_undone() {
+    let mut one = repair("vpn.port");
+    one.effects = vec!["the client restarts".to_owned()];
+
+    let question = asked_about(&one);
+
+    assert_eq!(
+        question,
+        "  the client restarts\n  This one cannot be undone.\nmove the client? [y/N]:"
+    );
+    one.reversible = true;
+    assert!(!asked_about(&one).contains("cannot be undone"));
+}
+
+#[test]
+fn an_asked_consent_asks_and_holds_whatever_offer_stands() {
+    assert_eq!(Consent::Asked.stance(), crate::repair::Stance::Ask);
+    assert!(Consent::Asked.stands(&[repair("vpn.port")]));
+    assert!(!Consent::Asked.agreed(&repair("vpn.port")));
 }
