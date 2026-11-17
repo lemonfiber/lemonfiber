@@ -145,8 +145,8 @@ pub struct Arguments {
     /// How long that period is, in days.
     pub days: Option<u32>,
     /// The request being ruled on, by the reference the household list names it with:
-    /// the request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask
-    /// the core keeps.
+    /// the request service's own number (`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or
+    /// `books-<n>` for an ask the core keeps.
     pub request: Option<String>,
     /// Why a request is being turned down, or why a service was chosen to fill a
     /// capability.

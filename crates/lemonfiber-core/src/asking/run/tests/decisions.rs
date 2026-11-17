@@ -384,3 +384,65 @@ async fn a_service_that_will_not_rule_says_so() {
         Some(crate::error::codes::quota::UNREACHABLE)
     );
 }
+
+/// An ask kept until it is filed as the owner is ruled on by its reference: approving it
+/// files it with no member and keeps the request beside the member it was kept for.
+#[tokio::test]
+async fn approving_an_ask_kept_for_the_owner_files_it_with_no_member() {
+    let ctx = answering(
+        "approve-as-owner",
+        vec![(
+            intake("ask"),
+            answered(&crate::ports::service::Asked {
+                request: 12,
+                waiting: false,
+            }),
+        )],
+    );
+    let kept_at = crate::app::targets::beside_env(&ctx, crate::config::paths::ASKED_AS_OWNER);
+    let ada = Member {
+        id: "a7f3".to_owned(),
+        name: "Ada".to_owned(),
+        ..Member::default()
+    };
+    let named = kept_at.as_deref().and_then(|path| {
+        let _ = std::fs::remove_file(path);
+        crate::household::run::as_owner::waits(
+            path,
+            crate::household::run::as_owner::Asking {
+                kind: crate::ports::media::Kind::Movies,
+                title: "603",
+                seasons: &[],
+                called: Some("The Matrix"),
+                year: Some(1999),
+                member: &ada,
+                counts: 1,
+                at: ctx.stamp(),
+            },
+        )
+        .ok()
+    });
+
+    let report = deciding(
+        &ctx,
+        &Decision {
+            request: named.unwrap_or(crate::collected::Reference::Filed(0)),
+            answer: Ruling::LetThrough,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        report
+            .ok()
+            .and_then(|report| report.noted.first().cloned())
+            .as_deref(),
+        Some("The Matrix was approved and is being fetched")
+    );
+    let filed: Vec<(i64, String)> = crate::household::run::as_owner::kept(&ctx)
+        .requests
+        .iter()
+        .map(|one| (one.request, one.member.clone()))
+        .collect();
+    assert_eq!(filed, [(12, "a7f3".to_owned())]);
+}

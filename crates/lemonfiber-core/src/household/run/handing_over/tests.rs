@@ -33,6 +33,7 @@ fn asking(limit: Option<u32>) -> MemberAsking {
 /// One request in the state named.
 fn request(id: i64, state: State, refused: Option<&str>) -> MemberRequest {
     MemberRequest {
+        also_asked: Vec::new(),
         year: None,
         arrived: None,
         shelf_id: None,

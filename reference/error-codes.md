@@ -724,7 +724,6 @@ that it is a fault of the stack.
 | `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-13` | `NO_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title a member may ask for has no picture to show them. | That title has no picture to show. You can still ask for it by its name. |
-| `WISH-14` | `THROUGH_THE_HOUSE` | error | 1 | 409 | 0.18.0 | Said where a member whose asks wait for approval has no account of their own on what files the household's asks, so nothing could wait for anybody's yes. | Your asks go through whoever runs the house here. Ask whoever runs the house for it. |
 
 ## `WORD` — the glossary
 
@@ -734,4 +733,4 @@ that it is a fault of the stack.
 
 ## Retired
 
-Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`, `STACK-3`.
+Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`, `STACK-3`, `WISH-14`.

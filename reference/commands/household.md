@@ -115,7 +115,7 @@ Usage: lemonfiber household approve [OPTIONS] <REQUEST>
 
 Arguments:
   <REQUEST>
-          The request, by the reference beside it: a number, or music-<n> or books-<n>
+          The request, by the reference beside it: a number, tv-<n>, movies-<n>, music-<n> or books-<n>
 
 Options:
       --json
@@ -151,7 +151,7 @@ Usage: lemonfiber household decline [OPTIONS] --reason <REASON> <REQUEST>
 
 Arguments:
   <REQUEST>
-          The request, by the reference beside it: a number, or music-<n> or books-<n>
+          The request, by the reference beside it: a number, tv-<n>, movies-<n>, music-<n> or books-<n>
 
 Options:
       --json

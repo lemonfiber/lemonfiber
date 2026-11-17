@@ -10,8 +10,9 @@ use serde::Serialize;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MemberRequest {
     /// The reference it is named by again when somebody rules on it: the number the
-    /// request service files it under (`42`), or `music-<n>` or `books-<n>` for an ask
-    /// for music or books the core keeps itself.
+    /// request service files it under (`42`), `tv-<n>` or `movies-<n>` for an ask the core
+    /// keeps until it files it as the request service's owner, or `music-<n>` or
+    /// `books-<n>` for an ask for music or books the core keeps itself.
     pub id: String,
     /// When it was asked for, where the request service or the core says.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,6 +73,11 @@ pub struct MemberRequest {
     /// `told`, which is why the two travel together: what an operator does next turns
     /// on it, and a reason read without it is a reason of unknown standing.
     pub refused: Option<crate::asking::Refused>,
+    /// The other members an ask the core keeps is also for, by name, where more than one
+    /// member asked for it: one ask, ruled on once for all of them. Only on the
+    /// household's whole list; a member's own read never names anybody else who asked.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also_asked: Vec<String>,
 }
 
 /// What one member may watch, in the household's own words.

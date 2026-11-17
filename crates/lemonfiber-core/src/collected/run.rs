@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use super::store::{self, Ask, Standing};
 use super::{Collector, Medium, Reference, Unit};
 use crate::app::Ctx;
+use crate::asking::NOTHING_DECIDED;
 use crate::config::paths::ASKS;
 use crate::config::store::Failure;
 use crate::error::codes::quota::UNREACHABLE;
@@ -143,7 +144,7 @@ pub(crate) async fn decided(
     if reason.is_none() {
         crate::space::run::admits(ctx).await?;
     }
-    let said = said_of(&waiting, reason);
+    let said = said_of(&waiting.name, reason);
     if ctx.dry_run {
         return Ok(format!(
             "{said} — rehearsed, and nothing was sent or decided"
@@ -204,19 +205,37 @@ pub(crate) fn expired(ctx: &Ctx, after: u32, reason: &str) -> Result<usize, Stri
         .map_err(|why| why.to_string())?
         .asks
         .iter()
-        .filter(|ask| ask.standing == Standing::Waiting)
-        .filter(|ask| {
-            crate::asking::waiting_for(Some(ask.asked_at), now)
-                .is_some_and(|days| days >= u64::from(after))
-        })
+        .filter(|ask| ask.standing == Standing::Waiting && overstayed(ask.asked_at, after, now))
         .map(Ask::named)
         .collect();
+    closing(ctx, (&overdue, now), reason, &mut |named| {
+        store::settled(&path, named, Standing::Expired, now).map(|_| ())
+    })
+}
+
+/// Whether something asked for at `asked_at` has waited `after` days or more by `now`.
+pub(crate) fn overstayed(asked_at: Instant, after: u32, now: Instant) -> bool {
+    crate::asking::waiting_for(Some(asked_at), now).is_some_and(|days| days >= u64::from(after))
+}
+
+/// Close each ask `overdue` names through `settle`, keeping `reason` as why at `now`, and
+/// say how many; under a rehearsal, how many it would, with nothing written.
+///
+/// # Errors
+///
+/// What stopped an ask or the reasons being written, as the line a run reads.
+pub(crate) fn closing(
+    ctx: &Ctx,
+    (overdue, now): (&[Reference], Instant),
+    reason: &str,
+    settle: &mut dyn FnMut(Reference) -> Result<(), Failure>,
+) -> Result<usize, String> {
     if ctx.dry_run || overdue.is_empty() {
         return Ok(overdue.len());
     }
     let mut reasons = crate::app::refusals::load(ctx);
-    for named in &overdue {
-        store::settled(&path, *named, Standing::Expired, now).map_err(|why| why.to_string())?;
+    for named in overdue {
+        settle(*named).map_err(|why| why.to_string())?;
         reasons.closed(*named, reason, Some(now));
     }
     crate::app::refusals::keep(ctx, &reasons).map_err(|why| why.summary)?;
@@ -334,11 +353,9 @@ pub(crate) fn listed(ask: &Ask, reasons: &crate::asking::Reasons, now: Instant) 
             .flatten(),
         estimate: None,
         refused: reasons.of(ask.named()).cloned(),
+        also_asked: Vec::new(),
     }
 }
-
-/// What is said where the curator could not be asked or would not take the ask.
-const NOTHING_DECIDED: &str = "nothing was decided";
 
 /// Said where the curator of music or books could not be asked or would not answer.
 fn unreached(doing: &str) -> Problem {
@@ -351,9 +368,9 @@ fn unreached(doing: &str) -> Problem {
     )
 }
 
-/// What the decision comes to, as the line an operator reads it back in.
-fn said_of(waiting: &Ask, reason: Option<&str>) -> String {
-    let what = &waiting.name;
+/// What a decision on an ask the core keeps for `what` comes to, as the line an operator
+/// reads it back in.
+pub(crate) fn said_of(what: &str, reason: Option<&str>) -> String {
     match reason {
         None => format!("{what} was approved and is being fetched"),
         Some(reason) => format!(

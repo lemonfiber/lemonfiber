@@ -37,6 +37,7 @@ fn asked(states: &[Option<State>]) -> Panel<HouseholdReport> {
                 .iter()
                 .enumerate()
                 .map(|(at, state)| MemberRequest {
+                    also_asked: Vec::new(),
                     year: None,
                     arrived: None,
                     shelf_id: None,

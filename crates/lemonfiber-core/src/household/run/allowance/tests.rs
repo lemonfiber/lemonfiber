@@ -22,6 +22,7 @@ fn member(asking: Option<Held>, waiting_days: &[u64]) -> HouseholdMember {
         requests: waiting_days
             .iter()
             .map(|days| MemberRequest {
+                also_asked: Vec::new(),
                 year: None,
                 arrived: None,
                 shelf_id: None,

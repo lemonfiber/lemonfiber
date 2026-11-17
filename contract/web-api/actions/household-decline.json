@@ -5,7 +5,7 @@
       "name": "request",
       "type": {
         "default": null,
-        "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `music-<n>` or `books-<n>` for an ask\nthe core keeps.",
+        "description": "The request being ruled on, by the reference the household list names it with:\nthe request service's own number (`42`), or `tv-<n>`, `movies-<n>`, `music-<n>` or\n`books-<n>` for an ask the core keeps.",
         "type": [
           "string",
           "null"

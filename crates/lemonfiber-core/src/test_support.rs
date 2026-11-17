@@ -124,6 +124,23 @@ pub(crate) fn a_fresh_write(key: &str, value: &str) -> crate::journal::Change {
     }
 }
 
+/// The kept file at `path` marked as written by a later release than this one, so it
+/// still reads and is never written over.
+pub(crate) fn written_later(path: &std::path::Path) {
+    let later = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .map(|mut kept| {
+            if let Some(header) = kept.as_object_mut() {
+                header.insert("written_by".to_owned(), serde_json::json!("999.0.0"));
+            }
+            kept.to_string()
+        });
+    if let Some(later) = later {
+        let _ = std::fs::write(path, later);
+    }
+}
+
 /// One installed plugin's service, filling `provides` and answering on `listens` where it
 /// says.
 ///

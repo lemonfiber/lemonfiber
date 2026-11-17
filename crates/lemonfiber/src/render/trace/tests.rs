@@ -11,3 +11,4 @@ use lemonfiber_core::trace::{
 
 mod following;
 mod household;
+mod stuck;

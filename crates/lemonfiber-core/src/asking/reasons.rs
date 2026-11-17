@@ -70,7 +70,7 @@ pub struct Passed {
 
 /// Every reason this machine holds, by the reference the request is named by: the
 /// service's own number for one it files, which is the only name both sides know it by,
-/// and `music-<n>` or `books-<n>` for an ask the core keeps.
+/// and `tv-<n>`, `movies-<n>`, `music-<n>` or `books-<n>` for an ask the core keeps.
 #[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reasons {
     /// The reasons themselves.
@@ -161,7 +161,7 @@ impl Reasons {
     pub fn only(&mut self, held: &BTreeSet<i64>) {
         self.given.retain(|request, _| match request {
             Reference::Filed(number) => held.contains(number),
-            Reference::Kept(..) => true,
+            Reference::Kept(..) | Reference::AsOwner(..) => true,
         });
     }
 

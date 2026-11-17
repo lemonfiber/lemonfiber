@@ -1,5 +1,11 @@
 {
   "fields": {
+    "also_asked": {
+      "type": [
+        "array[string]"
+      ],
+      "required": false
+    },
     "arrived": {
       "type": [
         "anyOf(null,ref:Instant)"

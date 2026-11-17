@@ -135,10 +135,12 @@ fn every_member_read_is_worded_for_the_household() {
 }
 
 /// A member's household row carries none of what is written for the operator: no notes,
-/// no caution about limits, no size and nowhere a refusal was passed on to.
+/// no caution about limits, no size, nowhere a refusal was passed on to and nobody else
+/// who asked for the same thing.
 #[test]
 fn a_members_household_row_carries_nothing_written_for_the_operator() {
     let request = MemberRequest {
+        also_asked: vec!["Ada".to_owned()],
         id: "1".to_owned(),
         asked: None,
         title: Some("Dune".to_owned()),
@@ -185,6 +187,10 @@ fn a_members_household_row_carries_nothing_written_for_the_operator() {
         .first()
         .and_then(|member| member.requests.first());
     assert_eq!(request.and_then(|request| request.estimate), None);
+    assert_eq!(
+        request.map(|request| request.also_asked.is_empty()),
+        Some(true)
+    );
     assert_eq!(
         request
             .and_then(|request| request.refused.as_ref())

@@ -138,7 +138,21 @@ fn asked_for(request: &MemberRequest) -> String {
         Some(state) => state.phrase().to_owned(),
         None => "the request service reports a state this build does not know".to_owned(),
     };
-    format!("  #{} {name}   {said}{}", request.id, pending(request))
+    format!(
+        "  #{} {name}   {said}{}{}",
+        request.id,
+        pending(request),
+        also_asked(request)
+    )
+}
+
+/// The other members one ask is also for, where more than one asked for it.
+fn also_asked(request: &MemberRequest) -> String {
+    if request.also_asked.is_empty() {
+        String::new()
+    } else {
+        format!("   (also asked by {})", request.also_asked.join(", "))
+    }
 }
 
 /// What is worth saying about a request nobody has ruled on yet, and nothing about
@@ -172,11 +186,13 @@ fn pending(request: &MemberRequest) -> String {
 /// Invitations are counted apart because one nobody has taken up is the entry here an
 /// operator might want to do something about today; the rest is context.
 fn counted(report: &HouseholdReport) -> String {
-    let requests: usize = report
+    let requests = report
         .members
         .iter()
-        .map(|member| member.requests.len())
-        .sum();
+        .flat_map(|member| &member.requests)
+        .map(|request| request.id.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
     let waiting = report
         .members
         .iter()
