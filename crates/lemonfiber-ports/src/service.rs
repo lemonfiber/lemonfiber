@@ -72,8 +72,8 @@ pub use collecting::{
     MusicAsk, MusicCurating, MusicUnit, Profile,
 };
 pub use declaring::{
-    joined, spelled_as_a_space, Addressee, Answered, Answers, BytePath, Declared, Declaring, Held,
-    InQuery, LivePath, Locations, Naming, Ports, Presentation, Question, Statuses, Token,
+    joined, spelled_as_a_space, Addressee, Answered, Answers, Bound, BytePath, Declared, Declaring,
+    Held, InQuery, LivePath, Locations, Naming, Ports, Presentation, Question, Statuses, Token,
     Undeclarable, BASE, ITEM, MAY, PLAY, SPACE, SPACE_MOST, STREAM_NAME, TOKEN,
 };
 pub use declining::{

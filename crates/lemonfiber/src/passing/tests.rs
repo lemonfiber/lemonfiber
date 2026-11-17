@@ -41,6 +41,7 @@ fn configured(name: &str) -> Scratch {
             pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: "^[a-z0-9]{6}$".to_owned(),
+            bound: Vec::new(),
         }],
         vec![ItemPath {
             pattern: "^/videos/(?P<item>[^/]+)/".to_owned(),
@@ -140,6 +141,7 @@ fn files_the_service_cannot_read_are_named() {
                 pattern: "^/live/(".to_owned(),
                 parameter: None,
                 stream: "^.+$".to_owned(),
+                bound: Vec::new(),
             }],
             Vec::new(),
         )
@@ -188,6 +190,7 @@ async fn files_the_core_rewrites_hold_from_the_next_question() {
                 pattern: "^/watch/(?P<stream>[^/]+)/".to_owned(),
                 parameter: None,
                 stream: "^[a-z0-9]{6}$".to_owned(),
+                bound: Vec::new(),
             }],
             Vec::new(),
         )

@@ -77,6 +77,25 @@
                   ],
                   "type": "object"
                 },
+                "Bound": {
+                  "additionalProperties": false,
+                  "description": "A further query parameter naming the live stream a live-stream path names.",
+                  "properties": {
+                    "parameter": {
+                      "description": "The parameter, carried once under this spelling on every request the path covers.",
+                      "type": "string"
+                    },
+                    "pattern": {
+                      "description": "What its value, percent-decoded once, matches whole, holding one group named\n`stream` where the live stream's id sits.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "parameter",
+                    "pattern"
+                  ],
+                  "type": "object"
+                },
                 "BytePath": {
                   "additionalProperties": false,
                   "description": "A path the upstream serves an item's bytes under.",
@@ -281,6 +300,13 @@
                   "additionalProperties": false,
                   "description": "A path the upstream serves a live stream's bytes under, its playlists and segments\nincluded.",
                   "properties": {
+                    "bound": {
+                      "description": "The further query parameters every request it covers carries, each naming the same\nlive stream as the path or its parameter does.",
+                      "items": {
+                        "$ref": "#/$defs/Bound"
+                      },
+                      "type": "array"
+                    },
                     "parameter": {
                       "description": "The query parameter whose whole value, decoded once, is the live stream's id,\nwhere the path does not hold it: carried once under this spelling.",
                       "type": [
@@ -289,7 +315,7 @@
                       ]
                     },
                     "pattern": {
-                      "description": "The paths it covers, holding one group named `stream` where the live stream's id\nsits, or none where [`Self::parameter`] holds it, every match starting at the\npath's start.",
+                      "description": "The paths it covers, holding one group named `stream` where the live stream's id\nsits; where [`Self::parameter`] holds it, at most one such group, naming the same\nlive stream; every match starting at the path's start.",
                       "type": "string"
                     },
                     "stream": {

@@ -90,8 +90,8 @@ pub struct InQuery {
 #[serde(deny_unknown_fields)]
 pub struct LivePath {
     /// The paths it covers, holding one group named `stream` where the live stream's id
-    /// sits, or none where [`Self::parameter`] holds it, every match starting at the
-    /// path's start.
+    /// sits; where [`Self::parameter`] holds it, at most one such group, naming the same
+    /// live stream; every match starting at the path's start.
     pub pattern: String,
     /// The query parameter whose whole value, decoded once, is the live stream's id,
     /// where the path does not hold it: carried once under this spelling.
@@ -99,6 +99,23 @@ pub struct LivePath {
     pub parameter: Option<String>,
     /// The shape a live stream's id has, matched against what the group holds.
     pub stream: String,
+    /// The further query parameters every request it covers carries, each naming the same
+    /// live stream as the path or its parameter does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bound: Vec<Bound>,
+}
+
+/// A further query parameter naming the live stream a live-stream path names.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct Bound {
+    /// The parameter, carried once under this spelling on every request the path covers.
+    pub parameter: String,
+    /// What its value, percent-decoded once, matches whole, holding one group named
+    /// `stream` where the live stream's id sits.
+    pub pattern: String,
 }
 
 /// A query parameter naming another item than the one in the path.

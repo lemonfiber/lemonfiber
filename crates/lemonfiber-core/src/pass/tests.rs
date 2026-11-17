@@ -20,6 +20,7 @@ fn watching() -> Watching {
             pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: "^[a-z0-9]{6}$".to_owned(),
+            bound: Vec::new(),
         }],
         Vec::new(),
     ))
@@ -108,6 +109,7 @@ fn live_stream_paths_that_do_not_compile_or_place_no_stream_are_refused() {
                 pattern: pattern.to_owned(),
                 parameter: None,
                 stream: stream.to_owned(),
+                bound: Vec::new(),
             }],
             Vec::new(),
         );
@@ -122,6 +124,7 @@ fn a_live_stream_path_named_by_a_parameter_that_does_not_compile_is_refused_nami
             pattern: "^/live/(".to_owned(),
             parameter: Some("channel".to_owned()),
             stream: "^.+$".to_owned(),
+            bound: Vec::new(),
         }],
         Vec::new(),
     );
@@ -184,11 +187,13 @@ fn everything() -> Watching {
                 pattern: "(?i)^/live/(?P<stream>[^/]+)/".to_owned(),
                 parameter: None,
                 stream: "^[a-z0-9]{6}$".to_owned(),
+                bound: Vec::new(),
             },
             LivePath {
                 pattern: "(?i)^/videos/[^/]+/(?:live|master)\\.m3u8$".to_owned(),
                 parameter: Some("LiveStreamId".to_owned()),
                 stream: "^[a-z]{4}_[a-z]{4}_[a-z]{4}$".to_owned(),
+                bound: Vec::new(),
             },
         ],
         vec![
@@ -242,6 +247,114 @@ fn a_transcoded_live_stream_is_read_from_its_one_parameter_alone() {
         )),
         Some(Confirmed::Live)
     );
+}
+
+/// The live-stream path of a transcoder serving the live stream its `session` names and
+/// reading the one its `path` names.
+fn transcoding() -> Watching {
+    Watching::of(&Paths::of(
+        vec![LivePath {
+            pattern: "^/video/:/transcode/universal/start\\.m3u8$".to_owned(),
+            parameter: Some("session".to_owned()),
+            stream: "^[a-z0-9]{6}$".to_owned(),
+            bound: vec![InQuery {
+                parameter: "path".to_owned(),
+                pattern: "/livetv/sessions/(?P<stream>[a-z0-9]{6})/[a-z0-9]+/index\\.m3u8"
+                    .to_owned(),
+            }],
+        }],
+        Vec::new(),
+    ))
+    .unwrap_or_else(|refused| unreachable!("the paths compile: {refused}"))
+}
+
+#[test]
+fn a_live_stream_a_second_parameter_names_is_confirmed_only_where_it_is_the_same_one() {
+    let pass = key().issue(STREAM, "member-1", NOW);
+    let at = "/video/:/transcode/universal/start.m3u8";
+    let reading = |stream: &str| format!("%2Flivetv%2Fsessions%2F{stream}%2Fc1%2Findex.m3u8");
+    let confirmed = |query: &str| {
+        transcoding().confirms(&key(), &format!("{at}?{query}"), NOW, &Renewals::none())
+    };
+    let same = format!("session={STREAM}&path={}", reading(STREAM));
+
+    assert_eq!(
+        confirmed(&format!("{same}&lfpass={pass}")),
+        Some(Confirmed::Live)
+    );
+    assert_eq!(transcoding().stream(at, &same), Some(STREAM.to_owned()));
+    for refused in [
+        format!("session={STREAM}&path={}", reading("zzz999")),
+        format!("session={STREAM}"),
+        format!("{same}&path={}", reading(STREAM)),
+        format!("session={STREAM}&Path={}", reading(STREAM)),
+        format!("session={STREAM}&path=%2Flibrary%2Fmetadata%2F5"),
+        format!(
+            "session={STREAM}&path=%252Flivetv%252Fsessions%252F{STREAM}%252Fc1%252Findex.m3u8"
+        ),
+    ] {
+        assert_eq!(
+            confirmed(&format!("{refused}&lfpass={pass}")),
+            None,
+            "{refused}"
+        );
+        assert_eq!(transcoding().stream(at, &refused), None, "{refused}");
+    }
+}
+
+#[test]
+fn a_live_stream_a_parameter_names_is_confirmed_only_where_the_paths_own_group_names_it_too() {
+    let watching = Watching::of(&Paths::of(
+        vec![LivePath {
+            pattern: "^/video/:/transcode/universal/session/(?P<stream>[a-z0-9]{6})/base/"
+                .to_owned(),
+            parameter: Some("session".to_owned()),
+            stream: "^[a-z0-9]{6}$".to_owned(),
+            bound: Vec::new(),
+        }],
+        Vec::new(),
+    ))
+    .unwrap_or_else(|refused| unreachable!("the paths compile: {refused}"));
+    let pass = key().issue(STREAM, "member-1", NOW);
+    let confirmed = |path: &str, session: &str| {
+        watching.confirms(
+            &key(),
+            &format!("{path}?session={session}&lfpass={pass}"),
+            NOW,
+            &Renewals::none(),
+        )
+    };
+    let segment =
+        |stream: &str| format!("/video/:/transcode/universal/session/{stream}/base/00001.ts");
+
+    assert_eq!(confirmed(&segment(STREAM), STREAM), Some(Confirmed::Live));
+    assert_eq!(confirmed(&segment("zzz999"), STREAM), None);
+    assert_eq!(
+        watching.stream(&segment("zzz999"), &format!("session={STREAM}")),
+        None
+    );
+    assert_eq!(watching.stream(&segment(STREAM), ""), None);
+}
+
+#[test]
+fn the_pass_service_is_told_the_parameters_a_live_stream_path_binds() {
+    let mut declared = lemonfiber_fixtures::declaring::enforceable();
+    let bound = lemonfiber_ports::service::Bound {
+        parameter: "path".to_owned(),
+        pattern: "^/live/(?P<stream>[0-9a-f]{32})$".to_owned(),
+    };
+    for live in &mut declared.live {
+        live.bound = vec![bound.clone()];
+    }
+
+    let told = super::told(&declared).live;
+    let expected = [InQuery {
+        parameter: bound.parameter.clone(),
+        pattern: bound.pattern.clone(),
+    }];
+
+    assert!(!told.is_empty());
+    assert!(told.iter().all(|live| live.bound == expected));
 }
 
 #[test]
@@ -362,6 +475,7 @@ fn the_pass_service_is_told_each_path_with_the_parameter_it_finds_an_item_in() {
                 pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
                 parameter: None,
                 stream: "^[0-9a-f]{32}$".to_owned(),
+                bound: Vec::new(),
             }],
             vec![
                 ItemPath {

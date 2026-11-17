@@ -81,10 +81,20 @@ pub enum Undeclarable {
         /// The byte path's pattern.
         pattern: String,
     },
-    /// A live-stream path does not say once where the live stream's id sits: in one group
-    /// named `stream` of its pattern, or in the parameter it names and no group.
+    /// A live-stream path does not say where the live stream's id sits: in one group named
+    /// `stream` of its pattern, or in the parameter it names and at most one such group.
     #[error("its live-stream path {pattern} does not say once where its live stream sits")]
     Unstreamed {
+        /// The live-stream path's pattern.
+        pattern: String,
+    },
+    /// A live-stream path binds a parameter that does not name its live stream once, in
+    /// one group named `stream` of a whole-value pattern, or binds a parameter it already
+    /// reads.
+    #[error(
+        "its live-stream path {pattern} binds a parameter that does not name its live stream once"
+    )]
+    Unbound {
         /// The live-stream path's pattern.
         pattern: String,
     },
@@ -230,11 +240,11 @@ fn shape(shape: &str) -> Result<(), Undeclarable> {
     }
 }
 
-/// How many groups named `item` `engine` holds.
-fn items(engine: &regex::Regex) -> usize {
+/// How many groups named `group` `engine` holds.
+fn groups(engine: &regex::Regex, group: &str) -> usize {
     engine
         .capture_names()
-        .filter(|name| *name == Some(ITEM_NAME))
+        .filter(|name| *name == Some(group))
         .count()
 }
 
@@ -245,9 +255,9 @@ fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
     let placed = match &path.query {
         Some(query) => {
             plain(&query.parameter)?;
-            items(&engine) == 0 && items(&compiled(&query.pattern)?.0) == 1
+            groups(&engine, ITEM_NAME) == 0 && groups(&compiled(&query.pattern)?.0, ITEM_NAME) == 1
         }
-        None => items(&engine) == 1,
+        None => groups(&engine, ITEM_NAME) == 1,
     };
     if !placed {
         return Err(Undeclarable::Unplaced {
@@ -267,23 +277,37 @@ fn byte_path(path: &BytePath) -> Result<(), Undeclarable> {
     Ok(())
 }
 
-/// Whether a live-stream path says once where its live stream sits, in its pattern or in
-/// one plainly spelled parameter, and is anchored throughout.
+/// Whether a live-stream path says where its live stream sits, in one group of its pattern
+/// or in one plainly spelled parameter and at most that one group, binds each further
+/// parameter once to one group naming it, and is anchored throughout.
 fn live_path(path: &LivePath) -> Result<(), Undeclarable> {
     let engine = path_pattern(&path.pattern)?;
-    let streams = engine
-        .capture_names()
-        .filter(|name| *name == Some(STREAM_NAME))
-        .count();
+    let streams = groups(&engine, STREAM_NAME);
     if let Some(parameter) = &path.parameter {
         plain(parameter)?;
     }
-    if streams != usize::from(path.parameter.is_none()) {
+    if path.parameter.is_none() && streams != 1 {
         return Err(Undeclarable::Unstreamed {
             pattern: path.pattern.clone(),
         });
     }
-    shape(&path.stream)
+    shape(&path.stream)?;
+    let mut read: Vec<&str> = path.parameter.iter().map(String::as_str).collect();
+    for bound in &path.bound {
+        plain(&bound.parameter)?;
+        shape(&bound.pattern)?;
+        let named = groups(&compiled(&bound.pattern)?.0, STREAM_NAME);
+        let again = read
+            .iter()
+            .any(|parameter| parameter.eq_ignore_ascii_case(&bound.parameter));
+        if named != 1 || again {
+            return Err(Undeclarable::Unbound {
+                pattern: path.pattern.clone(),
+            });
+        }
+        read.push(&bound.parameter);
+    }
+    Ok(())
 }
 
 /// Whether every byte path names a space where the question goes to the adapter, spelled

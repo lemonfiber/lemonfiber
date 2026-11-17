@@ -1,6 +1,6 @@
 use super::{
-    Addressee, Answered, Answers, BytePath, Declared, Held, InQuery, LivePath, Locations, Naming,
-    Ports, Presentation, Question, Statuses, Token, Undeclarable, MAY,
+    Addressee, Answered, Answers, Bound, BytePath, Declared, Held, InQuery, LivePath, Locations,
+    Naming, Ports, Presentation, Question, Statuses, Token, Undeclarable, MAY,
 };
 use crate::http::Method;
 
@@ -30,6 +30,7 @@ fn declared() -> Declared {
             pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: "^[0-9]+$".to_owned(),
+            bound: Vec::new(),
         }],
         refused: vec!["^/everything$".to_owned()],
         question: Some(Question {
@@ -574,7 +575,7 @@ fn a_live_stream_path_that_does_not_say_where_the_stream_sits_once_is_refused() 
 }
 
 #[test]
-fn a_live_stream_found_in_a_query_value_is_named_by_one_plain_parameter_and_no_group() {
+fn a_live_stream_found_in_a_query_value_is_named_by_one_plain_parameter_and_at_most_one_group() {
     let in_query = |pattern: &str, parameter: &str| {
         let mut found = declared();
         for live in &mut found.live {
@@ -585,14 +586,40 @@ fn a_live_stream_found_in_a_query_value_is_named_by_one_plain_parameter_and_no_g
     };
 
     assert!(in_query("^/media/(?:live|master)\\.m3u8$", "LiveStreamId").is_ok());
-    assert_eq!(
-        in_query("^/media/live/(?P<stream>[^/]+)/", "LiveStreamId"),
-        Err(Undeclarable::Unstreamed {
-            pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned()
-        })
-    );
+    assert!(in_query("^/media/live/(?P<stream>[^/]+)/", "LiveStreamId").is_ok());
     assert!(matches!(
         in_query("^/media/live\\.m3u8$", "Live Stream"),
+        Err(Undeclarable::Unspelled { .. })
+    ));
+}
+
+#[test]
+fn a_bound_parameter_names_the_live_stream_once_in_a_whole_value_under_a_name_not_read_already() {
+    let binding = |parameter: &str, pattern: &str| {
+        let mut bound = declared();
+        for live in &mut bound.live {
+            "^/media/transcoded\\.m3u8$".clone_into(&mut live.pattern);
+            live.parameter = Some("session".to_owned());
+            live.bound = vec![Bound {
+                parameter: parameter.to_owned(),
+                pattern: pattern.to_owned(),
+            }];
+        }
+        bound.checked()
+    };
+    let unbound = || Undeclarable::Unbound {
+        pattern: "^/media/transcoded\\.m3u8$".to_owned(),
+    };
+
+    assert!(binding("path", "^/media/live/(?P<stream>[0-9]+)/index\\.m3u8$").is_ok());
+    assert_eq!(binding("path", "^/media/live/[0-9]+$"), Err(unbound()));
+    assert_eq!(binding("Session", "^(?P<stream>[0-9]+)$"), Err(unbound()));
+    assert!(matches!(
+        binding("path", "/media/live/(?P<stream>[0-9]+)"),
+        Err(Undeclarable::Unanchored { .. })
+    ));
+    assert!(matches!(
+        binding("the path", "^(?P<stream>[0-9]+)$"),
         Err(Undeclarable::Unspelled { .. })
     ));
 }

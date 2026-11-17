@@ -409,6 +409,10 @@ pub struct LivePath {
     pub parameter: Option<String>,
     /// The shape a live stream's id has.
     pub stream: String,
+    /// The further query parameters every request it covers carries, each naming the same
+    /// live stream in one group named `stream`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bound: Vec<InQuery>,
 }
 
 /// One path the media server serves an item's bytes under.
@@ -425,14 +429,14 @@ pub struct ItemPath {
     pub item: String,
 }
 
-/// Where in a query value an item's id sits.
+/// Where in a query value an item's id, or a live stream's, sits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InQuery {
     /// The parameter, carried once under this spelling.
     pub parameter: String,
     /// What its value, percent-decoded once, matches whole, holding one group named
-    /// `item` where the item's id sits.
+    /// `item` where the item's id sits, or `stream` where the live stream's does.
     pub pattern: String,
 }
 

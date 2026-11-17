@@ -56,6 +56,7 @@ pub fn enforceable() -> Declared {
             pattern: "^/media/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: "^[0-9a-f]{32}$".to_owned(),
+            bound: Vec::new(),
         }],
         refused: Vec::new(),
         question: Some(Question {

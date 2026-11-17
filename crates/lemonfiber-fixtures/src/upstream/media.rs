@@ -239,6 +239,7 @@ pub fn declared() -> Declared {
             pattern: "^/films/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: "^[a-z]{6}$".to_owned(),
+            bound: Vec::new(),
         }],
         refused: vec!["^/posters/by-name/.*$".to_owned()],
         question: Some(Question {
