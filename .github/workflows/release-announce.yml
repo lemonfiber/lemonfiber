@@ -28,7 +28,7 @@ permissions:
 jobs:
   announce:
     if: ${{ !contains(github.event.release.tag_name, '-') }}
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@f60d147988899bcb7a3422d132d8985992bf77a4 # v1.0.156
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@d5edfb9b4e961857c8e2b9212413907ad086aba6 # v1.0.160
     with:
       content: ${{ vars.DISCORD_RELEASE_ROLE_ID && format('<@&{0}>', vars.DISCORD_RELEASE_ROLE_ID) || '' }}
       title: "🍋 Lemonfiber ${{ github.event.release.tag_name }}"
@@ -44,7 +44,7 @@ jobs:
   # anything. The title says what it is before the tag does.
   maintainers:
     if: ${{ contains(github.event.release.tag_name, '-') }}
-    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@f60d147988899bcb7a3422d132d8985992bf77a4 # v1.0.156
+    uses: lemonfiber/spec/.github/workflows/discord-notify.yml@d5edfb9b4e961857c8e2b9212413907ad086aba6 # v1.0.160
     with:
       title: "🧪 Pre-release ${{ github.event.release.tag_name }} — not the release"
       body: ${{ github.event.release.body }}
