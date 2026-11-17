@@ -128,6 +128,22 @@ const SIZES: &[&str] = &[
     "b", "kb", "mb", "gb", "tb", "kib", "mib", "gib", "tib", "kbps", "mbps", "gbps",
 ];
 
+/// What shows an address or a rate wherever it is written.
+const MARKS: &[&str] = &["://", "localhost", "www.", "/s", "per second"];
+
+/// The names lemonfiber gives its own things, each with what it names: the words that also
+/// name a file, a command or an argument, which every locale renders as declared.
+const DECLARED: &[(&str, &str)] = &[
+    (
+        "form",
+        "names a combination of profiles a stack declares, and an argument to the verbs that act on one",
+    ),
+    (
+        "stack",
+        "names the machine in every command, every path and every page of the documentation",
+    ),
+];
+
 /// Every name a member may not be shown: the parts the bundle pins, each id's hyphens read
 /// as spaces, and the services, engines and tunnel it pins none for.
 fn names() -> impl Iterator<Item = String> {
@@ -150,9 +166,9 @@ const RULED: &[&str] = &[
     "Now on v1.4.2",
 ];
 
-/// What a member's surface may not show, as the contract publishes it: every name, term
-/// and size unit this holds text to, the parts the bundle pins among the names, and each
-/// ruled example with what it names.
+/// What a member's surface may not show, as the contract publishes it: every name, term,
+/// size unit and mark this holds text to, the parts the bundle pins among the names, each
+/// name lemonfiber declares with what it names, and each ruled example with what it names.
 #[must_use]
 pub fn published() -> serde_json::Value {
     let mut names: Vec<String> = names().collect();
@@ -166,6 +182,8 @@ pub fn published() -> serde_json::Value {
         "names": names,
         "terms": TERMS,
         "sizes": SIZES,
+        "marks": MARKS,
+        "declared": DECLARED.iter().copied().collect::<std::collections::BTreeMap<_, _>>(),
         "examples": examples,
     })
 }
@@ -203,10 +221,10 @@ pub fn unhoused(text: &str) -> Option<String> {
             return Some(token.to_owned());
         }
     }
-    ["://", "localhost", "www.", "/s", "per second"]
-        .into_iter()
-        .find(|marked| lower.contains(marked))
-        .map(str::to_owned)
+    MARKS
+        .iter()
+        .find(|marked| lower.contains(*marked))
+        .map(|marked| (*marked).to_owned())
 }
 
 /// Whether `term`, which may be several words, is said among `words`.

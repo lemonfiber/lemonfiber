@@ -56,6 +56,14 @@ fn what_is_published_names_every_pinned_part_and_what_each_example_breaks() {
     assert!(names.contains(&"plex".to_owned()));
     assert!(listed("terms").contains(&"indexer".to_owned()));
     assert!(listed("sizes").contains(&"gb".to_owned()));
+    assert!(listed("marks").contains(&"://".to_owned()));
+    assert_eq!(
+        published
+            .get("declared")
+            .and_then(serde_json::Value::as_object)
+            .map(|declared| declared.keys().cloned().collect::<Vec<_>>()),
+        Some(vec!["form".to_owned(), "stack".to_owned()])
+    );
     let examples = published
         .get("examples")
         .and_then(serde_json::Value::as_array)
