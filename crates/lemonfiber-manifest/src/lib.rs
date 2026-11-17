@@ -14,6 +14,7 @@ mod date;
 mod error;
 pub mod names;
 mod recognising;
+pub mod schedule;
 mod schema;
 mod spelling;
 mod validate;

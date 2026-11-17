@@ -17,8 +17,8 @@ use crate::model::{
 impl Outcome {
     /// The outcome as a household member's session is answered with it.
     ///
-    /// An outcome no member's read or action answers with is left as it is: nothing a
-    /// member is handed carries one.
+    /// An outcome no member's read or action answers with is left as a key is answered
+    /// with it: nothing a member is handed carries one.
     #[must_use]
     pub fn for_household(self) -> Self {
         match self {
@@ -56,7 +56,7 @@ impl Outcome {
                 unlocated: report.unlocated.as_ref().map(Obstacle::spoken),
                 ..report
             }),
-            other => other,
+            other => other.for_a_key(),
         }
     }
 }

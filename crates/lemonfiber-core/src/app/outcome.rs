@@ -170,6 +170,8 @@ outcomes! {
     Stuck(StuckReport) => STUCK,
     /// When this machine last started, and what the run after it came to.
     Boot(crate::model::BootReport) => BOOT,
+    /// What one minute's look at a run-and-exit service came to.
+    Ran(crate::model::RunReport) => RAN [rehearsed],
     /// What the outside watcher sees, beside what each of its monitors covers.
     Watcher(crate::model::WatcherReport) => WATCHER,
     /// What the download queue holds that is wedged, and what the newest runs did to it.

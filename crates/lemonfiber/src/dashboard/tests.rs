@@ -43,6 +43,7 @@ pub(crate) fn a_snapshot() -> Snapshot {
             hardlink: Hardlink::Linking,
         }),
         services: Panel::Ready(Vec::new()),
+        scheduled: Vec::new(),
         door: Panel::Ready(lemonfiber_core::model::FrontDoorReport {
             standing: lemonfiber_core::model::Standing::Established,
             chosen: Some(lemonfiber_core::door::Chosen::Derived),

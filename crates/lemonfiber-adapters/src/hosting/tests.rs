@@ -18,6 +18,7 @@ fn a_command() -> Hosted {
         arguments: vec!["watch".to_owned()],
         output: PathBuf::from("/records/watch.log"),
         about: "guards the data location".to_owned(),
+        cadence: lemonfiber_ports::hosting::Cadence::Kept,
     }
 }
 

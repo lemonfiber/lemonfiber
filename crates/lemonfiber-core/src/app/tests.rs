@@ -199,6 +199,7 @@ fn report(outcome: Result<Outcome, Box<super::Problem>>) -> Option<crate::model:
             | Outcome::News(_)
             | Outcome::Stuck(_)
             | Outcome::Boot(_)
+            | Outcome::Ran(_)
             | Outcome::Watcher(_)
             | Outcome::Queue(_)
             | Outcome::Word(_)
@@ -290,106 +291,16 @@ const LIBRARY: [&str; 8] = [
 
 /// The status a survey produced, as pairs of service and state.
 fn stated(outcome: Result<Outcome, Box<super::Problem>>) -> Option<Vec<(String, ServiceState)>> {
-    match outcome {
-        Ok(Outcome::Status(report)) => Some(
-            report
-                .services
-                .into_iter()
-                .map(|service| (service.id, service.state))
-                .collect(),
-        ),
-        Ok(
-            Outcome::Version(_)
-            | Outcome::Alerts(_)
-            | Outcome::Migration(_)
-            | Outcome::History(_)
-            | Outcome::Adoption(_)
-            | Outcome::Beside(_)
-            | Outcome::Replacement(_)
-            | Outcome::Import(_)
-            | Outcome::Forms(_)
-            | Outcome::Preview(_)
-            | Outcome::Lifecycle(_)
-            | Outcome::Config(_)
-            | Outcome::Quality(_)
-            | Outcome::Upgrade(_)
-            | Outcome::Music(_)
-            | Outcome::Trace(_)
-            | Outcome::Hosting(_)
-            | Outcome::Household(_)
-            | Outcome::Held(_)
-            | Outcome::Playing(_)
-            | Outcome::Title(_)
-            | Outcome::PartWay(_)
-            | Outcome::Granted(_)
-            | Outcome::Watched(_)
-            | Outcome::Channels(_)
-            | Outcome::Guide(_)
-            | Outcome::Tuned(_)
-            | Outcome::Play(_)
-            | Outcome::Askable(_)
-            | Outcome::AskableKinds(_)
-            | Outcome::Asked(_)
-            | Outcome::FrontDoor(_)
-            | Outcome::Stack(_)
-            | Outcome::Settled(_)
-            | Outcome::News(_)
-            | Outcome::Stuck(_)
-            | Outcome::Boot(_)
-            | Outcome::Watcher(_)
-            | Outcome::Queue(_)
-            | Outcome::Word(_)
-            | Outcome::Glossary(_)
-            | Outcome::Clients(_)
-            | Outcome::Invitation(_)
-            | Outcome::Handoff(_)
-            | Outcome::Pairing(_)
-            | Outcome::Certificate(_)
-            | Outcome::Removal(_)
-            | Outcome::Catalogue(_)
-            | Outcome::Wiring(_)
-            | Outcome::Substitution(_)
-            | Outcome::Settings(_)
-            | Outcome::Outbound(_)
-            | Outcome::Plugins(_)
-            | Outcome::PluginClaims(_)
-            | Outcome::PluginConformance(_)
-            | Outcome::PluginProvenance(_)
-            | Outcome::PluginRecording(_)
-            | Outcome::Provenance(_)
-            | Outcome::Credentials(_)
-            | Outcome::Stored(_)
-            | Outcome::SelfUpdate(_)
-            | Outcome::Space(_)
-            | Outcome::StopSeeding(_)
-            | Outcome::Bandwidth(_)
-            | Outcome::Pausing(_)
-            | Outcome::Minted(_)
-            | Outcome::KeyClaim(_)
-            | Outcome::Keys(_)
-            | Outcome::DeviceKey(_)
-            | Outcome::DeviceKeys(_)
-            | Outcome::PushEndpoint(_)
-            | Outcome::PushEndpoints(_)
-            | Outcome::Notify(_)
-            | Outcome::NotifyMine(_)
-            | Outcome::Doctor(_)
-            | Outcome::Repair(_)
-            | Outcome::Undo(_)
-            | Outcome::Seed(_)
-            | Outcome::Reset(_)
-            | Outcome::Uninstall(_)
-            | Outcome::Wizard(_)
-            | Outcome::Update(_)
-            | Outcome::Backup(_)
-            | Outcome::Bundle(_)
-            | Outcome::Archives(_)
-            | Outcome::Restore(_)
-            | Outcome::Watch(_)
-            | Outcome::Walkthrough(_),
-        )
-        | Err(_) => None,
-    }
+    let Ok(Outcome::Status(report)) = outcome else {
+        return None;
+    };
+    Some(
+        report
+            .services
+            .into_iter()
+            .map(|service| (service.id, service.state))
+            .collect(),
+    )
 }
 
 #[tokio::test]

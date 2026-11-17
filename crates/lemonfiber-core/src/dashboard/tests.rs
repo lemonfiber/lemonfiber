@@ -187,6 +187,7 @@ fn a_whole_snapshot_serialises_with_each_panel_filled_or_marked() {
             hardlink: Hardlink::Linking,
         }),
         services: Panel::Ready(vec![service("sonarr", State::Healthy)]),
+        scheduled: Vec::new(),
         door: Panel::Ready(crate::model::FrontDoorReport {
             standing: crate::model::Standing::Established,
             chosen: Some(crate::door::Chosen::Derived),

@@ -391,6 +391,7 @@ fn the_rest_of_them() -> Vec<Outcome> {
             condition: Condition::Inactive,
             undeclared: Vec::new(),
             services: Vec::new(),
+            scheduled: Vec::new(),
             disturbs: lemonfiber_core::model::Disturbances::all(lemonfiber_core::app::PATIENCE),
             waiting: Vec::new(),
         }),

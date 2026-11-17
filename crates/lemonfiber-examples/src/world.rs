@@ -58,6 +58,12 @@ pub(crate) const STAND_IN: &str = "/srv/lemonfiber";
 /// Where the household reaches this machine.
 const HOUSEHOLD_HOST: &str = "192.168.1.20";
 
+/// The run-and-exit service a scheduling world holds, and the plugin holding it.
+pub(crate) const SCHEDULED: &str = "configarr";
+
+/// The times that service runs at: every minute, so one fell due whatever the zone.
+const EVERY_MINUTE: &str = "* * * * *";
+
 /// The services every world's engine reports running and healthy.
 const RUNNING: &[&str] = &["jellyfin", "sonarr", "radarr", "prowlarr", "qbittorrent"];
 
@@ -171,6 +177,33 @@ impl World {
             &self.root.join(".env"),
             lemonfiber_core::config::IDENTITY_SOURCE_ADMIN_PASSWORD_KEY,
             &a_password(),
+        );
+        self
+    }
+
+    /// The same world, its plugins recorded as one holding [`SCHEDULED`], run to completion
+    /// at [`EVERY_MINUTE`].
+    #[must_use]
+    pub(crate) fn scheduling(self) -> Self {
+        let register = json!({ "installed": [{
+            "plugin": SCHEDULED,
+            "version": "1.0.0",
+            "services": [{
+                "service": SCHEDULED,
+                "image": "example.invalid/configarr",
+                "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "tag": "1.0.0",
+                "config_path": "/config",
+                "takes_data": false,
+                "fields": { "schedule": {
+                    "setting": format!("{SCHEDULED}:schedule"),
+                    "default": EVERY_MINUTE,
+                } },
+            }],
+        }] });
+        let _ = std::fs::write(
+            self.root.join(lemonfiber_core::config::paths::PLUGINS),
+            register.to_string(),
         );
         self
     }

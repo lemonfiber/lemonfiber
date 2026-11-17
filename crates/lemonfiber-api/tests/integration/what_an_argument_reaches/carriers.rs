@@ -286,6 +286,7 @@ fn carries_service(command: &Command) -> bool {
     matches!(command, Command::Backup { service: Some(_) })
         || matches!(command, Command::Update(asked) if asked.service.is_some())
         || matches!(command, Command::Wiring(Linking::Fill(filling)) if filling.service == "sonarr")
+        || matches!(command, Command::Run { service } if service == "sonarr")
 }
 
 /// Whether the command has the archive it was named in it, as a name rather than a

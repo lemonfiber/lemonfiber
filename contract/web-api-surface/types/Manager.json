@@ -3,6 +3,7 @@
   "variants": [
     "\"launchd\"",
     "\"systemd\"",
+    "\"task-scheduler\"",
     "\"unsupported\""
   ]
 }

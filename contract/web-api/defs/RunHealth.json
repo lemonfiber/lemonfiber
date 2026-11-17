@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How a run-and-exit service's last run exited.",
+  "oneOf": [
+    {
+      "description": "It has not run yet.",
+      "type": "string",
+      "const": "not-run"
+    },
+    {
+      "description": "It exited zero.",
+      "type": "string",
+      "const": "succeeded"
+    },
+    {
+      "description": "It exited non-zero, or ended before it exited.",
+      "type": "string",
+      "const": "failed"
+    }
+  ]
+}

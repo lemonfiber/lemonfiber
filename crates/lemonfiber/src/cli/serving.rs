@@ -1,13 +1,26 @@
-//! What serving the surface is asked for, and what a question about it carries.
+//! What serving the surface or the pass service is asked for, and what a question about
+//! the surface carries.
 //!
-//! Both are the same shape of thing — a command taking more flags than a line of
-//! the parser has room for — and both belong to the surface rather than to the
+//! Each is the same shape of thing — a command taking more flags than a line of the
+//! parser has room for — and each belongs to what it serves rather than to the
 //! declaration of the tree.
 
 use std::path::PathBuf;
 
 use clap::Args;
 use lemonfiber_core::bundle::run::LINES;
+
+/// What the pass service was started with.
+#[derive(Debug, Args)]
+pub struct RawPass {
+    /// The directory holding the pass key and the media server's live-stream paths.
+    #[arg(long, value_name = "PATH", default_value = lemonfiber_core::pass::CONFIGURATION)]
+    pub config: PathBuf,
+    /// The address to answer at: the service's own on the network it shares with the
+    /// guard.
+    #[arg(long, value_name = "ADDRESS")]
+    pub listen: std::net::SocketAddr,
+}
 
 /// What the web interface was asked for.
 ///

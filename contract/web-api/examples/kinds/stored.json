@@ -125,6 +125,12 @@
         "why": "So a run can tell a machine that has just restarted from one that has not, and report a boot that failed once rather than every time you type something. It is what this machine did, kept apart from what you asked for."
       },
       {
+        "at": "/srv/lemonfiber/scheduled",
+        "secret": false,
+        "what": "what each service run on a schedule last did",
+        "why": "When each run-and-exit service last ran, how it ended and the lines a failed run wrote, its credentials withheld, so a missed time is made up once and a failed run is reported until one ends well."
+      },
+      {
         "at": "/srv/lemonfiber/watcher.json",
         "secret": false,
         "what": "the monitors lemonfiber made in the outside watcher",

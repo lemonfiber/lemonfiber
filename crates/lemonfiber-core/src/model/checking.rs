@@ -195,6 +195,11 @@ pub struct StatusReport {
     /// not put there is the operator's business whether or not lemonfiber understands
     /// it.
     pub undeclared: Vec<crate::docker::Undeclared>,
+    /// Each run-and-exit service, with how its last run ended.
+    ///
+    /// Apart from the services, which are kept running: one of these has a container
+    /// only while a run of it is going, and its health is the exit of its last run.
+    pub scheduled: Vec<crate::model::ScheduledService>,
     /// How long each way of acting on these services takes them away for.
     ///
     /// Here so that a surface can say it before it asks the operator to confirm,

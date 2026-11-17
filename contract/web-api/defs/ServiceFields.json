@@ -84,6 +84,17 @@
         "type": "string"
       }
     },
+    "schedule": {
+      "description": "When it runs, where it runs to completion on a schedule rather than for good.",
+      "anyOf": [
+        {
+          "$ref": "Schedule.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "shares_config": {
       "description": "Where the whole configuration directory of the service it fronts lands in it.",
       "type": [

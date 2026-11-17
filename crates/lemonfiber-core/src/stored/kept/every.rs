@@ -172,6 +172,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::boot,
     },
     Entry {
+        accessor: "scheduled",
+        what: "what each service run on a schedule last did",
+        why: "When each run-and-exit service last ran, how it ended and the lines a failed run \
+              wrote, its credentials withheld, so a missed time is made up once and a failed \
+              run is reported until one ends well.",
+        secret: false,
+        at: Paths::scheduled,
+    },
+    Entry {
         accessor: "watcher",
         what: "the monitors lemonfiber made in the outside watcher",
         why: "The id the watcher answered for each monitor lemonfiber provisioned, what each \

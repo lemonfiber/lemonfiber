@@ -99,6 +99,7 @@ pub const OFFERED: &[&str] = &[
     "watch",
     "hosting-install",
     "hosting-remove",
+    "run",
     "walkthrough",
     "diagnose",
     "repair",
@@ -195,10 +196,7 @@ const NAMES_ITS_FORMS: [&str; 4] = ["switch", "restart", "pull", "watch"];
 /// it safe. It takes no `confirm` — the yes is the offer's own name, so the only way
 /// to reach the removal is through the run that said what it costs.
 fn stopping(download: Option<String>, offer: Option<String>) -> Result<Command, Refused> {
-    let download = download.ok_or_else(|| Refused::Missing {
-        action: "stop-seeding".to_owned(),
-        argument: "download".to_owned(),
-    })?;
+    let download = download.ok_or_else(|| missing("stop-seeding", "download"))?;
     Ok(Command::StopSeeding(LettingGo {
         download,
         agreement: offer,
@@ -216,10 +214,7 @@ fn stopping(download: Option<String>, offer: Option<String>) -> Result<Command, 
 /// is longer than a row.
 fn accepting(check: Option<String>, disruptive: Disturbing) -> Result<Command, Refused> {
     let Some(check) = check else {
-        return Err(Refused::Missing {
-            action: "accept".to_owned(),
-            argument: "check".to_owned(),
-        });
+        return Err(missing("accept", "check"));
     };
     Ok(Command::Doctor(Diagnosing {
         narrowing: Narrowing::Suite,
@@ -286,10 +281,6 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
     if settling::about_settings(action) {
         return settling::asked_for(action, given);
     }
-    let needs = |argument: &str| Refused::Missing {
-        action: action.to_owned(),
-        argument: argument.to_owned(),
-    };
     let Arguments {
         forms,
         services,
@@ -386,7 +377,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // resolved beneath the backups directory by the core and nowhere else.
         "restore" => match archive {
             Some(name) => listing(confirm, offer).map(|consent| restoring(name, repoint, consent)),
-            None => Err(needs("archive")),
+            None => Err(missing(action, "archive")),
         },
         "watch" => Ok(Command::Watch { forms }),
         "companion-pair" => Ok(Command::Companion(Paired::Pair)),
@@ -398,6 +389,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "hosting-remove" => {
             keeping(action, kept).map(|what| Command::Hosting(Keeping::Remove { what }))
         }
+        "run" => running(service),
         // Naming nothing is a request rather than an omission: a walk asked for
         // nothing in particular suggests something likely to work, which is what an
         // operator with an empty library needs. Blank is nothing named, not an
@@ -437,10 +429,7 @@ fn removing(
     wait: Waiting,
 ) -> Result<Command, Refused> {
     let Some(named) = tier else {
-        return Err(Refused::Missing {
-            action: "uninstall".to_owned(),
-            argument: "tier".to_owned(),
-        });
+        return Err(missing("uninstall", "tier"));
     };
     let chosen = Tier::named(&named).ok_or_else(|| Refused::Unrecognised {
         argument: named,
@@ -481,15 +470,27 @@ fn updating(
     })
 }
 
+/// The run-and-exit service a run names, or why it names none.
+fn running(service: Option<String>) -> Result<Command, Refused> {
+    service
+        .map(|service| Command::Run { service })
+        .ok_or_else(|| missing("run", "service"))
+}
+
+/// The refusal of `action` for lacking `argument`.
+fn missing(action: &str, argument: &str) -> Refused {
+    Refused::Missing {
+        action: action.to_owned(),
+        argument: argument.to_owned(),
+    }
+}
+
 /// Which long-running command was named, or why the word names none: it can refuse, so it
 /// sits beside its refusal rather than in the table, and what it offers is built from the
 /// list itself, so a command that becomes hostable is offered without anybody saying so.
 fn keeping(action: &str, kept: Option<String>) -> Result<Hostable, Refused> {
     let Some(named) = kept else {
-        return Err(Refused::Missing {
-            action: action.to_owned(),
-            argument: "kept".to_owned(),
-        });
+        return Err(missing(action, "kept"));
     };
     Hostable::named(&named).ok_or_else(|| Refused::Unrecognised {
         argument: named,
@@ -514,10 +515,7 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
     // fetching nothing and guarding nothing are each a request with nothing to act
     // on, and the command line refuses all four the same way.
     if NAMES_ITS_FORMS.contains(&action) && given.forms.is_empty() {
-        return Some(Refused::Missing {
-            action: action.to_owned(),
-            argument: "forms".to_owned(),
-        });
+        return Some(missing(action, "forms"));
     }
     if let Some(refused) = unwanted(action, given, OFFERED) {
         return Some(refused);

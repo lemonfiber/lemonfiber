@@ -81,6 +81,29 @@ pub(crate) fn valued(name: &str, value: &str) -> Result<(), Box<Problem>> {
     })
 }
 
+pub(crate) fn timed(
+    scheduled: &[crate::scheduled::Scheduled],
+    name: &str,
+    value: &str,
+) -> Result<(), Box<Problem>> {
+    let Some(one) = crate::scheduled::reading(scheduled, name) else {
+        return Ok(());
+    };
+    if value.trim().is_empty() || lemonfiber_manifest::schedule::Cron::parse(value).is_some() {
+        return Ok(());
+    }
+    Err(Box::new(Problem::new(
+        UNWRITABLE_VALUE,
+        format!("That value cannot be written as {name}"),
+        format!(
+            "{name} names when {} runs, as a five-field cron expression or one of @hourly, \
+             @daily, @weekly and @monthly, and {value} is none of them. Nothing was changed.",
+            one.service
+        ),
+        Remedy::new("Give the value in that form"),
+    )))
+}
+
 fn taken(name: &str, command: &str) -> Problem {
     Problem::new(
         TAKEN_ELSEWHERE,

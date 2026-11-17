@@ -13,6 +13,11 @@
       "const": "systemd"
     },
     {
+      "description": "Windows, through a task in the operator's own Task Scheduler.",
+      "type": "string",
+      "const": "task-scheduler"
+    },
+    {
       "description": "A platform lemonfiber does not configure.",
       "type": "string",
       "const": "unsupported"

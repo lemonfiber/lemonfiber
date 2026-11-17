@@ -1,6 +1,6 @@
-use super::{quoted, quoting, written, Host, Hosted, Standing, Systemd};
+use super::{quoted, quoting, timed, written, Host, Hosted, Standing, Systemd};
 use lemonfiber_fixtures::support::Sequenced;
-use lemonfiber_ports::hosting::{Failure, Held, Manager, Placed, Program};
+use lemonfiber_ports::hosting::{Cadence, Failure, Held, Manager, Placed, Program};
 use lemonfiber_ports::process::Output;
 use lemonfiber_ports::Runner;
 use std::path::{Path, PathBuf};
@@ -21,7 +21,22 @@ fn a_command(output: PathBuf) -> Hosted {
         arguments: vec!["household".to_owned(), "expiring".to_owned()],
         output,
         about: "closes requests nobody ruled on".to_owned(),
+        cadence: Cadence::Kept,
     }
+}
+
+fn every_minute(output: PathBuf) -> Hosted {
+    Hosted {
+        cadence: Cadence::Minutely,
+        ..a_command(output)
+    }
+}
+
+fn both(dir: &Path) -> (PathBuf, PathBuf) {
+    (
+        dir.join("lemonfiber-expiring.service"),
+        dir.join("lemonfiber-expiring.timer"),
+    )
 }
 
 fn units(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
@@ -377,4 +392,132 @@ async fn one_that_is_still_running_afterwards_is_refused_and_kept() {
         })
     );
     assert!(at.exists());
+}
+
+#[test]
+fn a_command_started_every_minute_runs_once_a_start_and_only_its_timer_is_installed() {
+    let hosted = every_minute(PathBuf::from("/r/expiring.log"));
+    let unit = written(&hosted);
+    assert!(unit.contains("Type=oneshot"));
+    assert!(unit.contains("Restart=no"));
+    assert!(!unit.contains("[Install]"));
+    let timer = timed(&hosted);
+    assert!(timer.contains("OnCalendar=minutely"));
+    assert!(timer.contains("WantedBy=timers.target"));
+    assert!(timer.contains("Description=lemonfiber: closes requests nobody ruled on"));
+}
+
+#[tokio::test]
+async fn installing_one_started_every_minute_enables_and_starts_its_timer() {
+    let dir = units("systemd-place-minutely");
+    let (unit, timer) = both(&dir);
+    let (systemd, runner) = over(&dir, vec![spoke(0, ""), spoke(0, "")]);
+    assert_eq!(
+        systemd.place(&every_minute(dir.join("expiring.log"))).await,
+        Ok(Placed {
+            definition: unit.clone(),
+            started: true,
+        })
+    );
+    assert!(runner.ran("lemonfiber-expiring.timer"));
+    assert!(!runner.ran("lemonfiber-expiring.service"));
+    assert!(unit.is_file() && timer.is_file());
+}
+
+#[tokio::test]
+async fn a_timer_systemd_refused_leaves_neither_file_behind() {
+    let dir = units("systemd-refused-minutely");
+    let (unit, timer) = both(&dir);
+    let (systemd, _) = over(&dir, vec![spoke(0, ""), spoke(1, ""), spoke(0, "")]);
+    assert!(systemd
+        .place(&every_minute(dir.join("expiring.log")))
+        .await
+        .is_err());
+    assert!(!unit.exists() && !timer.exists());
+}
+
+#[tokio::test]
+async fn one_started_every_minute_is_asked_about_through_its_timer() {
+    let dir = units("systemd-standing-minutely");
+    let (unit, timer) = both(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(&unit, written(&every_minute(dir.join("expiring.log"))));
+    let _ = std::fs::write(&timer, "[Timer]\n");
+    let (systemd, runner) = over(&dir, vec![spoke(0, "active\n")]);
+    assert_eq!(
+        systemd.standing("expiring").await.map(|held| held.standing),
+        Ok(Standing::Running)
+    );
+    assert!(runner.ran("lemonfiber-expiring.timer"));
+}
+
+#[tokio::test]
+async fn taking_back_one_started_every_minute_takes_its_timer_too() {
+    let dir = units("systemd-withdraw-minutely");
+    let (unit, timer) = both(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(&unit, "[Unit]\n");
+    let _ = std::fs::write(&timer, "[Timer]\n");
+    let (systemd, runner) = over(
+        &dir,
+        vec![spoke(0, ""), spoke(3, "inactive\n"), spoke(0, "")],
+    );
+    assert_eq!(
+        systemd.withdraw("expiring").await,
+        Ok(vec![timer.clone(), unit.clone()])
+    );
+    assert!(runner.ran("lemonfiber-expiring.timer"));
+    assert!(!unit.exists() && !timer.exists());
+}
+
+#[tokio::test]
+async fn a_unit_that_cannot_be_written_is_refused_and_systemd_never_asked() {
+    let dir = units("systemd-unwritable");
+    let _ = std::fs::create_dir_all(dir.parent().unwrap_or(&dir));
+    let _ = std::fs::write(&*dir, "");
+    let (systemd, runner) = over(&dir, Vec::new());
+    let placed = systemd
+        .place(&a_command(PathBuf::from("/nowhere/expiring.log")))
+        .await;
+    let _ = std::fs::remove_file(&*dir);
+    assert!(matches!(placed, Err(Failure::Unwritable { .. })));
+    assert!(!runner.ran("systemctl"));
+}
+
+#[tokio::test]
+async fn a_timer_that_cannot_be_written_takes_its_unit_back() {
+    let dir = units("systemd-untimed");
+    let (unit, timer) = both(&dir);
+    let _ = std::fs::create_dir_all(&timer);
+    let (systemd, runner) = over(&dir, Vec::new());
+    assert!(matches!(
+        systemd.place(&every_minute(dir.join("expiring.log"))).await,
+        Err(Failure::Unwritable { .. })
+    ));
+    assert!(!unit.exists());
+    assert!(!runner.ran("systemctl"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_unit_or_timer_that_will_not_go_is_refused_as_unwritable() {
+    use std::os::unix::fs::PermissionsExt as _;
+    for minutely in [true, false] {
+        let dir = units(&format!("systemd-kept-{minutely}"));
+        let (unit, timer) = both(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(&unit, "[Unit]\n");
+        if minutely {
+            let _ = std::fs::write(&timer, "[Timer]\n");
+        }
+        let _ = std::fs::set_permissions(&*dir, std::fs::Permissions::from_mode(0o555));
+        let (systemd, _) = over(&dir, vec![spoke(0, ""), spoke(3, "inactive\n")]);
+        let withdrawn = systemd.withdraw("expiring").await;
+        let _ = std::fs::set_permissions(&*dir, std::fs::Permissions::from_mode(0o755));
+        assert!(
+            matches!(withdrawn, Err(Failure::Unwritable { ref at, .. })
+                if *at == if minutely { timer.clone() } else { unit.clone() }),
+            "{withdrawn:?}"
+        );
+    }
 }

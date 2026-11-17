@@ -5,6 +5,7 @@ use std::path::PathBuf;
 fn each_manager_is_named_the_way_its_own_documentation_names_it() {
     assert_eq!(Manager::Launchd.named(), "launchd");
     assert_eq!(Manager::Systemd.named(), "systemd");
+    assert_eq!(Manager::TaskScheduler.named(), "Task Scheduler");
     assert_eq!(Manager::Unsupported.named(), "none");
 }
 

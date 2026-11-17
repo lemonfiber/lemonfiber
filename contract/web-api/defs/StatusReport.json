@@ -32,6 +32,13 @@
         "type": "string"
       }
     },
+    "scheduled": {
+      "description": "Each run-and-exit service, with how its last run ended.\n\nApart from the services, which are kept running: one of these has a container\nonly while a run of it is going, and its health is the exit of its last run.",
+      "type": "array",
+      "items": {
+        "$ref": "ScheduledService.json"
+      }
+    },
     "services": {
       "description": "Each service, worst first.\n\nA service the active forms filtered out is listed only while it is there; one\nthat is not is in `filtered` and nowhere else.",
       "type": "array",
@@ -62,6 +69,7 @@
     "condition",
     "services",
     "undeclared",
+    "scheduled",
     "disturbs"
   ]
 }

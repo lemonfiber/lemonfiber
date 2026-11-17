@@ -18,6 +18,7 @@ Commands:
   down           Stop and remove what a form started
   switch         Make these forms the active set, leaving shared services running
   restart        Restart services without touching the rest
+  run            Run a run-and-exit service where one of its times fell due since its last run
   pull           Fetch newer images without applying them
   ps             Report what each service is actually doing
   logs           Show what services are saying
@@ -115,6 +116,7 @@ Options:
 - [`lemonfiber down`](commands/down.md)
 - [`lemonfiber switch`](commands/switch.md)
 - [`lemonfiber restart`](commands/restart.md)
+- [`lemonfiber run`](commands/run.md)
 - [`lemonfiber pull`](commands/pull.md)
 - [`lemonfiber ps`](commands/ps.md)
 - [`lemonfiber logs`](commands/logs.md)

@@ -196,3 +196,28 @@ async fn a_moved_media_servers_adapter_is_a_service_of_its_form_and_not_a_strang
     );
     assert!(report.undeclared.iter().all(|one| one.id != media::ADAPTER));
 }
+
+#[tokio::test]
+async fn a_container_nothing_declares_is_named_a_stranger() {
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy).alongside(
+        Reporting::holding(&["whoever"], Lifecycle::Running, Health::Healthy),
+    );
+    let ctx = watching(engine);
+
+    let answered = dispatch(
+        Command::Status {
+            forms: vec!["library".to_owned()],
+        },
+        &ctx,
+    )
+    .await;
+    let Ok(Outcome::Status(report)) = answered else {
+        unreachable!("a status answers with a status");
+    };
+
+    assert!(
+        report.undeclared.iter().any(|one| one.id == "whoever"),
+        "{:?}",
+        report.undeclared
+    );
+}

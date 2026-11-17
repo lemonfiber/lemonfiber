@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lemonfiber_adapters::{Launchd, Systemd, Unhosted};
+use lemonfiber_adapters::{Launchd, Systemd, TaskScheduler, Unhosted};
 use lemonfiber_core::acknowledged::{self, Acknowledged};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::archive::Archiving;
@@ -145,6 +145,10 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
         )),
         Manager::Systemd => Arc::new(Systemd::over(
             strategy.config_dir().join("systemd/user"),
+            Arc::clone(runner),
+        )),
+        Manager::TaskScheduler => Arc::new(TaskScheduler::over(
+            strategy.data_dir().join("lemonfiber/tasks"),
             Arc::clone(runner),
         )),
         Manager::Unsupported => Arc::new(Unhosted),

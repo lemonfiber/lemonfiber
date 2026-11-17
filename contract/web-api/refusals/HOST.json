@@ -1,0 +1,7 @@
+{
+  "HOST-7": {
+    "name": "NOT_SCHEDULED",
+    "status": 404,
+    "description": "Raised when the service named to run on its schedule is no run-and-exit service."
+  }
+}

@@ -1,6 +1,6 @@
 use super::{arguments, escaped, inside, plain, under, Host, Hosted, Launchd, Standing, OUT};
 use lemonfiber_fixtures::support::Sequenced;
-use lemonfiber_ports::hosting::{Failure, Held, Manager, Program};
+use lemonfiber_ports::hosting::{Cadence, Failure, Held, Manager, Program};
 use lemonfiber_ports::process::Output;
 use lemonfiber_ports::Runner;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,7 @@ fn a_command(output: PathBuf) -> Hosted {
         arguments: vec!["watch".to_owned(), "full".to_owned()],
         output,
         about: "guards the data location".to_owned(),
+        cadence: Cadence::Kept,
     }
 }
 
@@ -392,4 +393,38 @@ async fn one_that_is_still_running_afterwards_is_refused_and_kept() {
         })
     );
     assert!(at.exists());
+}
+
+#[test]
+fn only_a_command_started_every_minute_is_started_again_each_minute() {
+    let kept = a_command(PathBuf::from("/r/watch.log"));
+    let minutely = Hosted {
+        cadence: Cadence::Minutely,
+        ..kept.clone()
+    };
+    let interval = "<key>StartInterval</key>\n<integer>60</integer>\n";
+    assert!(super::written("com.lemonfiber.watch", &minutely).contains(interval));
+    assert!(!super::written("com.lemonfiber.watch", &kept).contains("StartInterval"));
+}
+
+#[tokio::test]
+async fn one_started_every_minute_reads_as_running_between_its_runs() {
+    let dir = agents("launchd-minutely");
+    let _ = std::fs::create_dir_all(&dir);
+    let text = super::written(
+        "com.lemonfiber.watch",
+        &Hosted {
+            cadence: Cadence::Minutely,
+            ..a_command(dir.join("watch.log"))
+        },
+    );
+    let _ = std::fs::write(dir.join("com.lemonfiber.watch.plist"), text);
+    let (launchd, _) = over(
+        &dir,
+        vec![spoke(0, "501"), spoke(0, "\tstate = not running\n")],
+    );
+    assert_eq!(
+        launchd.standing("watch").await.map(|held| held.standing),
+        Ok(Standing::Running)
+    );
 }

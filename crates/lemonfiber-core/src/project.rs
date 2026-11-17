@@ -364,6 +364,7 @@ fn pass_unit<'a>(
         hostname: None,
         granted: &[],
         reaches_host: false,
+        schedule: None,
     })
 }
 
@@ -438,6 +439,7 @@ fn stack_unit<'a>(service: &'a Service, reading: &Reading<'_>) -> Unit<'a> {
         hostname: service.container_hostname.as_deref(),
         granted: &[],
         reaches_host: false,
+        schedule: None,
     }
 }
 

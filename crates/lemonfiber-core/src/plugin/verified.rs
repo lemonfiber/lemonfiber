@@ -102,8 +102,10 @@ impl Verification {
 ///
 /// A warning raised about one of `own`, the services the plugin brings, is reported
 /// among the unsettled rather than reversing it: the operator chose that service, and a
-/// caveat about it is the service's own rather than something it broke. A warning about
-/// any other service, and any failure, still reverses it.
+/// caveat about it is the service's own rather than something it broke. So is a warning
+/// about no service, about the machine rather than a part of the stack: a disk that became
+/// small for the chosen quality once the plugin's images were pulled is the operator's to
+/// weigh. A warning about any other service, and any failure, still reverses it.
 ///
 /// Whether a move onto a plugin is on offer is left out: the second reading is taken
 /// before the install is recorded, so it would name the very move being made.
@@ -131,7 +133,7 @@ pub fn against(before: &[Finding], after: &[Finding], own: &[&str]) -> Verificat
                     && finding
                         .service
                         .as_deref()
-                        .is_some_and(|service| own.contains(&service)) =>
+                        .is_none_or(|service| own.contains(&service)) =>
             {
                 verification.unsettled.push(changed());
             }

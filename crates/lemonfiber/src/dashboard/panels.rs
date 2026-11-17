@@ -33,7 +33,7 @@ use lemonfiber_core::dashboard::{
 use lemonfiber_core::docker::Service;
 use lemonfiber_core::health::Summary;
 use lemonfiber_core::household::State;
-use lemonfiber_core::model::{FrontDoorReport, HouseholdReport};
+use lemonfiber_core::model::{FrontDoorReport, HouseholdReport, ScheduledService};
 use lemonfiber_core::queue::Stuck;
 use lemonfiber_core::text::{fitted, plain};
 use lemonfiber_core::walkthrough::{size, spell_out};
@@ -291,31 +291,57 @@ pub(super) fn storage(panel: &Panel<Storage>, room: usize) -> Vec<Line<'static>>
     ]
 }
 
-/// The services panel: what each one is doing.
-pub(super) fn services(panel: &Panel<Vec<Service>>, room: usize) -> Vec<Line<'static>> {
+/// The services panel: what each one is doing, then each run-and-exit service's last run.
+pub(super) fn services(
+    panel: &Panel<Vec<Service>>,
+    scheduled: &[ScheduledService],
+    room: usize,
+) -> Vec<Line<'static>> {
     let services = match panel {
         Panel::Ready(services) => services,
         Panel::Unavailable { reason } => return unavailable(reason, room),
         Panel::Pending => return pending(),
     };
-    if services.is_empty() {
+    if services.is_empty() && scheduled.is_empty() {
         return vec![Line::styled("no services are running", quiet())];
     }
+    let row = |id: &str, state: String| {
+        let allowed = room.saturating_sub(state.chars().count());
+        let column = LISTED.min(allowed);
+        let named = shortened(id, allowed);
+        Line::from(vec![
+            Span::raw(format!("{named:<column$}")),
+            Span::raw(state),
+        ])
+    };
     let mut lines: Vec<Line<'static>> = services
         .iter()
         .take(SHOWN)
-        .map(|service| {
-            let state = format!("{:?}", service.state).to_lowercase();
-            let allowed = room.saturating_sub(state.chars().count());
-            let column = LISTED.min(allowed);
-            let named = shortened(&service.id, allowed);
-            Line::from(vec![
-                Span::raw(format!("{named:<column$}")),
-                Span::raw(state),
-            ])
-        })
+        .map(|service| row(&service.id, format!("{:?}", service.state).to_lowercase()))
         .collect();
     lines.extend(rest(services.len(), "service"));
+    for one in scheduled {
+        let state = match one.last.as_ref().map(|last| last.exit) {
+            _ if one.running => "running".to_owned(),
+            _ if !one.fired => "not fired".to_owned(),
+            None => "scheduled".to_owned(),
+            Some(Some(0)) => "ran".to_owned(),
+            Some(Some(code)) => format!("failed ({code})"),
+            Some(None) => "failed".to_owned(),
+        };
+        lines.push(row(&one.id, state));
+        if let Some(said) = one
+            .last
+            .as_ref()
+            .filter(|_| !one.healthy())
+            .and_then(|last| last.log.last())
+        {
+            lines.push(Line::styled(
+                format!("  {}", shortened(said, room)),
+                quiet(),
+            ));
+        }
+    }
     lines
 }
 

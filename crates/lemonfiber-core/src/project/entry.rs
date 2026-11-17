@@ -8,20 +8,19 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lemonfiber_manifest::container::choices;
-use lemonfiber_manifest::container::{
-    is_source, is_target, lies_inside, shares_a_source, Mount, Posture, Shape, UrlOf, UserMode,
-    Value, CONFIGURATION,
-};
+use lemonfiber_manifest::container::{Mount, Posture, Shape, UrlOf, UserMode, Value};
 use serde::Serialize;
 
 use crate::config::storage::Export;
-use crate::config::{DATA_ROOT_KEY, DEFAULT_ZONE, LAN_BIND_KEY, ZONE_KEY};
+use crate::config::{DEFAULT_ZONE, LAN_BIND_KEY, ZONE_KEY};
 use crate::topology::Placed;
 use joined::Joined;
 
 mod joined;
+mod mounting;
 mod running_as;
 
+pub(crate) use mounting::{configuration, mounts, tmpfs};
 pub(crate) use running_as::{operated_ids, OperatedIds};
 
 /// Where the library is kept while the operator's environment file names nowhere.
@@ -42,6 +41,13 @@ const HOST_GATEWAY: &str = "host-gateway";
 
 /// What brings a container back after it stops for any reason but being taken down.
 const RESTART: &str = "unless-stopped";
+
+/// What a run-and-exit service is given in place of a restart policy: none.
+const RUN_TO_COMPLETION: &str = "no";
+
+/// How many containers of a run-and-exit service the stack starts: none, since each run
+/// starts its own.
+const NOT_KEPT: u8 = 0;
 
 /// The interface a household port is published on while the operator's environment file
 /// narrows it to none.
@@ -151,6 +157,8 @@ pub struct Unit<'a> {
     /// Whether it reaches this machine by the name containers do, as an adapter telling
     /// the core what happened does.
     pub reaches_host: bool,
+    /// When it runs, where it runs to completion on a schedule rather than for good.
+    pub schedule: Option<&'a lemonfiber_manifest::schedule::Schedule>,
 }
 
 /// What an entry's values are read from beyond its unit.
@@ -180,6 +188,9 @@ pub struct Entry {
     profiles: Vec<String>,
     /// What brings it back.
     restart: &'static str,
+    /// How many containers of it the stack starts, where not one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scale: Option<u8>,
     /// Who it runs as, where not the image's choice.
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<String>,
@@ -298,7 +309,12 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
     Entry {
         image: unit.image.clone(),
         profiles: vec![unit.profile.clone()],
-        restart: RESTART,
+        restart: if unit.schedule.is_some() {
+            RUN_TO_COMPLETION
+        } else {
+            RESTART
+        },
+        scale: unit.schedule.map(|_| NOT_KEPT),
         user: (unit.user == UserMode::Uid).then(|| {
             let (uid, gid) = ids(unit, values);
             format!("{uid}:{gid}")
@@ -321,7 +337,7 @@ pub fn entry(unit: &Unit<'_>, placed: &Placed, values: &Values<'_>) -> Entry {
         } else {
             Vec::new()
         },
-        volumes: volumes(unit, values),
+        volumes: mounting::volumes(unit, values),
         tmpfs: tmpfs(unit.tmpfs, unit.takes_data)
             .map(|path| literal(path))
             .collect(),
@@ -458,81 +474,6 @@ pub(crate) fn ports(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
                 .map(|listens| format!("{LOOPBACK}::{listens}")),
         )
         .collect()
-}
-
-/// The library where it asked for it, its own configuration directory, and each path
-/// mounted from its own mount tree.
-fn volumes(unit: &Unit<'_>, values: &Values<'_>) -> Vec<String> {
-    let service = literal(unit.id);
-    let mut volumes = Vec::new();
-    if unit.takes_data {
-        let from = match values.nfs {
-            Some(_) => LIBRARY_VOLUME.to_owned(),
-            None => operated(values, DATA_ROOT_KEY, LIBRARY),
-        };
-        volumes.push(format!("{from}:{LIBRARY_TARGET}"));
-    }
-    volumes.extend(unit.config_path.map(|path| {
-        mounted(
-            &format!("./{CONFIGURATION_TREE}/{service}"),
-            configuration(path),
-            unit.config_ro,
-        )
-    }));
-    if let Some((fronted, to)) = unit.shares.filter(|(_, to)| is_target(to, unit.takes_data)) {
-        volumes.push(mounted(
-            &format!("./{CONFIGURATION_TREE}/{}", literal(fronted)),
-            to,
-            false,
-        ));
-    }
-    volumes.extend(
-        mounts(unit.mounts, unit.takes_data).map(|Mount { from, to, ro }| {
-            mounted(
-                &format!("./{MOUNT_TREE}/{service}/{}", literal(from)),
-                to,
-                *ro,
-            )
-        }),
-    );
-    volumes
-}
-
-/// Where a configuration directory lands: where it is declared, where that is a target
-/// the model allows, and the model's own default otherwise.
-pub(crate) fn configuration(declared: &str) -> &str {
-    if is_target(declared, true) {
-        declared
-    } else {
-        CONFIGURATION
-    }
-}
-
-/// Each further mount the model allows: a source inside its own mount tree, inside no
-/// other of its sources and the source of no other mount, landing where a mount may land.
-pub(crate) fn mounts(all: &[Mount], takes_data: bool) -> impl Iterator<Item = &Mount> {
-    all.iter()
-        .enumerate()
-        .filter(move |(index, mount)| {
-            is_source(&mount.from)
-                && is_target(&mount.to, takes_data)
-                && !shares_a_source(all, *index)
-                && !all
-                    .iter()
-                    .any(|other| lies_inside(&mount.from, &other.from))
-        })
-        .map(|(_, mount)| mount)
-}
-
-/// Each scratch path in memory the model allows.
-pub(crate) fn tmpfs(all: &[String], takes_data: bool) -> impl Iterator<Item = &String> {
-    all.iter().filter(move |path| is_target(path, takes_data))
-}
-
-/// One bind mount of `source` at `to`.
-fn mounted(source: &str, to: &str, ro: bool) -> String {
-    let mode = if ro { ":ro" } else { "" };
-    format!("{source}:{}{mode}", literal(to))
 }
 
 /// A value Compose reads back as exactly itself.

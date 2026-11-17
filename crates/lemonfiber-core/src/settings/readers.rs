@@ -2,10 +2,14 @@ use std::collections::BTreeMap;
 
 use lemonfiber_manifest::container::choices::{self, Choice};
 use lemonfiber_manifest::container::{Constant, Value, NAMESPACED};
+use lemonfiber_manifest::schedule::Schedule;
 use lemonfiber_manifest::Manifest;
 
 use crate::model::{Choosable, Owner, Reader};
 use crate::plugin::Installed;
+
+/// What a reader names in place of a variable where the setting says when its service runs.
+pub(crate) const SCHEDULE: &str = "schedule";
 
 #[derive(Debug, Default)]
 pub(crate) struct Readers {
@@ -15,6 +19,19 @@ pub(crate) struct Readers {
 }
 
 impl Readers {
+    fn timed(&mut self, service: &str, schedule: &Schedule) {
+        self.settings
+            .entry(schedule.setting.clone())
+            .or_default()
+            .push(Reader {
+                service: service.to_owned(),
+                variable: SCHEDULE.to_owned(),
+                default: Some(schedule.default.clone()),
+                needs: BTreeMap::new(),
+                met: true,
+            });
+    }
+
     fn add(
         &mut self,
         service: &str,
@@ -98,6 +115,9 @@ pub(crate) fn readers(
     for one in installed {
         for placed in &one.services {
             readers.add(&placed.service, &one.plugin, &placed.fields.env, recorded);
+            if let Some(schedule) = &placed.fields.schedule {
+                readers.timed(&placed.service, schedule);
+            }
         }
     }
     for switch in crate::outbound::behalf::switches(&manifest.services, installed) {

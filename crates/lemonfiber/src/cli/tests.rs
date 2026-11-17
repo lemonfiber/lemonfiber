@@ -1,4 +1,4 @@
-use super::{Cli, Mending, RawUnrated, Request};
+use super::{Cli, Mending, RawPass, RawUnrated, Request};
 use clap::{CommandFactory, Parser};
 
 /// What `doctor` was asked to do about what it finds, for one command line.
@@ -240,7 +240,7 @@ fn the_command_the_project_starts_the_pass_service_with_is_one_this_parser_reads
     assert!(
         matches!(
             read,
-            Some(Request::Pass { ref config, listen })
+            Some(Request::Pass(RawPass { ref config, listen }))
                 if listen == at
                     && config.as_path() == std::path::Path::new(lemonfiber_core::pass::CONFIGURATION)
         ),

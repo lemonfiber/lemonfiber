@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "ended": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "exit": {
+      "type": [
+        "integer|null/int32"
+      ],
+      "required": false
+    },
+    "log": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "started": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

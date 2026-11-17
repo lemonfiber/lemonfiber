@@ -103,6 +103,7 @@ pub(crate) fn unit<'a>(
         hostname: fields.container_hostname.as_deref(),
         granted: &[],
         reaches_host: !placed.speaks.is_empty(),
+        schedule: fields.schedule.as_ref(),
     }
 }
 

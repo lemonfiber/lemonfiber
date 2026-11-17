@@ -9,8 +9,8 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{
-    Cli, Mending, RawDoctor, RawDown, RawLogs, RawSetup, RawSpace, RawStopSeeding, RawUi, RawUp,
-    Request,
+    Cli, Mending, RawDoctor, RawDown, RawLogs, RawPass, RawSetup, RawSpace, RawStopSeeding, RawUi,
+    RawUp, Request,
 };
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Restoring, SetupAction};
@@ -283,6 +283,7 @@ async fn main() -> ExitCode {
         // saying "starts eight services" first would name the wrong set twice over.
         Request::Switch(asked) => taken!(switching(&ctx, asked, cli.json).await),
         Request::Restart(asked) => restarting(asked),
+        Request::Run { service } => Command::Run { service },
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,
@@ -362,7 +363,9 @@ async fn main() -> ExitCode {
         // log viewer it runs its own way instead of through dispatch. It takes the
         // context by value because every request it answers reaches through it.
         Request::Ui(asked) => return serving(ctx, asked).await,
-        Request::Pass { config, listen } => return passing::answering(&config, listen).await,
+        Request::Pass(RawPass { config, listen }) => {
+            return passing::answering(&config, listen).await
+        }
         // A restore is the one request that is the same command twice: what it
         // would overwrite, and then the overwrite. Both are dispatched, so what
         // an operator is shown before it happens is the command's own answer

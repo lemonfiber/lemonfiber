@@ -125,6 +125,11 @@ pub(crate) async fn remove(
     // Off the machine before the files that describe it go back.
     let directory = super::super::project::directory(ctx).unwrap_or_default();
     let stayed = !super::proving::removed(ctx, &going, &directory).await;
+    let scheduled: Vec<String> = crate::scheduled::all(std::slice::from_ref(&going))
+        .into_iter()
+        .map(|one| one.service)
+        .collect();
+    super::super::hosting::runs_withdrawn(ctx, &scheduled).await;
 
     // Carried out through the one call the rehearsal asked, so what goes back is the
     // same machinery reporting rather than a second description of it.

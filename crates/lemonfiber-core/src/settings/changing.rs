@@ -44,10 +44,12 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     let recorded = Recorded::of(ctx);
     let held = |name: &str| recorded.value(name).map(str::to_owned);
     let readers = readers::readers(&manifest, installed, &held);
+    let scheduled = crate::scheduled::all(installed);
     for (setting, value) in &asked.changing {
         named(ctx, setting, &readers)?;
         if let Some(value) = value {
             fences::valued(setting, value)?;
+            fences::timed(&scheduled, setting, value)?;
         }
     }
     let changing: BTreeMap<&str, Option<&str>> = asked

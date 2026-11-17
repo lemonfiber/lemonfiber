@@ -36,6 +36,12 @@
       ],
       "required": true
     },
+    "scheduled": {
+      "type": [
+        "array[ref:ScheduledService]"
+      ],
+      "required": true
+    },
     "services": {
       "type": [
         "ref:PanelArray_of_Service"

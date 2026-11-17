@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One run of a run-and-exit service, as it ended.",
+  "type": "object",
+  "properties": {
+    "ended": {
+      "description": "When it ended.",
+      "$ref": "Instant.json"
+    },
+    "exit": {
+      "description": "How it exited, absent where it never started or a signal ended it.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "log": {
+      "description": "The last lines it wrote, oldest first, each with any credential in it withheld;\nnone to a key, a member or the shared stream, none of which is handed them.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "started": {
+      "description": "When it started.",
+      "$ref": "Instant.json"
+    }
+  },
+  "required": [
+    "started",
+    "ended",
+    "log"
+  ]
+}

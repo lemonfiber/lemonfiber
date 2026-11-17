@@ -44,6 +44,7 @@ pub use docker::Daemon;
 pub use filesystem::Disk;
 pub use hosting::launchd::Launchd;
 pub use hosting::systemd::Systemd;
+pub use hosting::task_scheduler::TaskScheduler;
 pub use hosting::Unhosted;
 pub use http::Web;
 pub use lemonfiber_random::Os;

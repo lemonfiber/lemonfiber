@@ -182,6 +182,8 @@ pub(super) async fn install(
                 return Err(Box::new(unrecordable(&would.plugin, *why, &back)));
             }
             recorded = true;
+            super::super::hosting::runs_placed(ctx, std::slice::from_ref(&would)).await;
+            super::super::scheduled::owe(ctx, std::slice::from_ref(&would), None);
             super::guarding::journalled(ctx, &stack_manifest, &would)?;
             super::kept::kept(ctx, &would, &crate::plugin::root(path));
             let _ = super::conformance::cleared(ctx, &would.plugin);

@@ -1,0 +1,18 @@
+{
+  "action": "run",
+  "arguments": [
+    {
+      "name": "service",
+      "type": {
+        "default": null,
+        "description": "The one service to act on instead of the whole stack.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  ],
+  "consent": [],
+  "rehearsal": true
+}

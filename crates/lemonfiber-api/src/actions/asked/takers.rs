@@ -316,13 +316,13 @@ pub const TAKES_TIER: &[&str] = &["uninstall"];
 
 /// The actions whose command carries the one service it was given.
 ///
-/// Three, and each takes one name rather than a list because what it decides is one
+/// Four, and each takes one name rather than a list because what it decides is one
 /// thing: the scope recorded in an archive is one scope, an update narrowed to a
-/// service is narrowed to a service, and a capability is filled by one service. Apart
-/// from [`TAKES_SERVICES`] for the same reason the command line spells them
-/// differently: those narrow what a lifecycle command touches, and none of these is a
-/// lifecycle command.
-pub const TAKES_SERVICE: &[&str] = &["backup", "update", "wiring-fill"];
+/// service is narrowed to a service, a capability is filled by one service, and a
+/// run-and-exit service is run on its own. Apart from [`TAKES_SERVICES`] for the same
+/// reason the command line spells them differently: those narrow what a lifecycle
+/// command touches, and none of these is a lifecycle command.
+pub const TAKES_SERVICE: &[&str] = &["backup", "update", "wiring-fill", "run"];
 
 /// The action whose command carries the run it was given.
 ///

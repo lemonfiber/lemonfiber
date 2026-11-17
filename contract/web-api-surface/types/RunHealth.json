@@ -1,0 +1,8 @@
+{
+  "fields": {},
+  "variants": [
+    "\"failed\"",
+    "\"not-run\"",
+    "\"succeeded\""
+  ]
+}

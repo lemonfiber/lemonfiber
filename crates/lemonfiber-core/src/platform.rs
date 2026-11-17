@@ -21,9 +21,8 @@ pub const fn manager(host: HostOs) -> Manager {
     match host {
         HostOs::MacOs => Manager::Launchd,
         HostOs::Linux => Manager::Systemd,
-        // Windows has a way to start something at login and lemonfiber does not
-        // configure it, which is a thing to say rather than a thing to guess at.
-        HostOs::Windows | HostOs::Other => Manager::Unsupported,
+        HostOs::Windows => Manager::TaskScheduler,
+        HostOs::Other => Manager::Unsupported,
     }
 }
 

@@ -29,6 +29,7 @@ pub use evidence::{
 };
 pub use health::{Health, HealthKind};
 pub use lemonfiber_manifest::container::{Secret, Shape};
+pub use lemonfiber_manifest::schedule::Schedule;
 pub use reach::Reach;
 pub use recipe::{
     Capture, Condition, Input, On, Origin, Pair, Recipe, Retry, Step, StepCall, ALL_WAITING,
@@ -262,6 +263,10 @@ pub struct Service {
     /// order as the Compose `command`; absent where the image runs its own command.
     #[serde(default)]
     pub args: Option<Vec<String>>,
+    /// When it runs, for a run-and-exit service: run to completion at each time the
+    /// setting names, never kept running.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<Schedule>,
 }
 }
 

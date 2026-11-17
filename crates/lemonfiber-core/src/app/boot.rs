@@ -431,7 +431,7 @@ fn observed(ctx: &Ctx, fault: Option<&Fault>) {
 }
 
 /// A report for a run that started nothing, and the reason it did not.
-fn nothing_started(reason: &str) -> LifecycleReport {
+pub(crate) fn nothing_started(reason: &str) -> LifecycleReport {
     LifecycleReport {
         action: BOOT.to_owned(),
         plan: Plan {

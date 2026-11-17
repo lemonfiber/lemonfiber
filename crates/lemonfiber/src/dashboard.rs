@@ -152,7 +152,7 @@ fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line
     let transfers = panels::transfers(&snapshot.transfers, room());
     let queues = panels::queues(&snapshot.queue, room());
     let storage = panels::storage(&snapshot.storage, room());
-    let services = panels::services(&snapshot.services, room());
+    let services = panels::services(&snapshot.services, &snapshot.scheduled, room());
     let stuck = panels::stuck(&snapshot.stuck, room());
     let alerts = panels::alerts(&snapshot.alerts, room());
     let door = panels::front_door(&snapshot.door, room());

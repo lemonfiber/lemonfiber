@@ -18,7 +18,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use lemonfiber_ports::hosting::{Failure, Held, Host, Hosted, Manager, Placed, Program, Standing};
+use lemonfiber_ports::hosting::{
+    Cadence, Failure, Held, Host, Hosted, Manager, Placed, Program, Standing,
+};
 use lemonfiber_ports::process::Output;
 use lemonfiber_ports::Runner;
 
@@ -61,9 +63,28 @@ impl Systemd {
         format!("lemonfiber-{name}.service")
     }
 
+    /// The timer that starts that unit, for a command started on a clock.
+    fn timer(name: &str) -> String {
+        format!("lemonfiber-{name}.timer")
+    }
+
     /// Where that unit's definition is written.
     fn at(&self, name: &str) -> PathBuf {
         self.units.join(Self::unit(name))
+    }
+
+    /// Where that unit's timer is written.
+    fn timer_at(&self, name: &str) -> PathBuf {
+        self.units.join(Self::timer(name))
+    }
+
+    /// The unit systemd is told to enable and asked about: the timer, where one is written.
+    fn enabled(&self, name: &str) -> String {
+        if definition(&self.timer_at(name)).is_some() {
+            Self::timer(name)
+        } else {
+            Self::unit(name)
+        }
     }
 
     /// Run a program, or nothing where it could not be run at all.
@@ -83,7 +104,7 @@ impl Systemd {
     /// answers a question by its exit status, so a unit that is merely not
     /// running looks exactly like a systemd that could not be asked.
     async fn says(&self, name: &str) -> Standing {
-        let unit = Self::unit(name);
+        let unit = self.enabled(name);
         let Some(output) = self
             .spoke(&["systemctl", "--user", "is-active", &unit])
             .await
@@ -107,19 +128,37 @@ fn written(hosted: &Hosted) -> String {
         .collect();
     let runs = runs.join(" ");
     let about = specified(&hosted.about);
+    let (kind, install) = match hosted.cadence {
+        Cadence::Kept => ("simple", "\n[Install]\nWantedBy=default.target\n"),
+        Cadence::Minutely => ("oneshot", ""),
+    };
     format!(
         "[Unit]\n\
          Description=lemonfiber: {about}\n\
          \n\
          [Service]\n\
-         Type=simple\n\
+         Type={kind}\n\
          {RUNS}{runs}\n\
          Restart=no\n\
          {WRITES}{APPEND}{out}\n\
          StandardError={APPEND}{out}\n\
+         {install}"
+    )
+}
+
+/// The timer that starts a command at the start of every minute.
+fn timed(hosted: &Hosted) -> String {
+    let about = specified(&hosted.about);
+    format!(
+        "[Unit]\n\
+         Description=lemonfiber: {about}\n\
+         \n\
+         [Timer]\n\
+         OnCalendar=minutely\n\
+         AccuracySec=1s\n\
          \n\
          [Install]\n\
-         WantedBy=default.target\n"
+         WantedBy=timers.target\n"
     )
 }
 
@@ -211,8 +250,15 @@ async fn placed(systemd: &Systemd, hosted: &Hosted) -> Result<Placed, Failure> {
         });
     }
     put(&at, &written(hosted))?;
+    let timer = systemd.timer_at(&hosted.name);
+    if hosted.cadence == Cadence::Minutely {
+        if let Err(failure) = put(&timer, &timed(hosted)) {
+            let _ = take(&at);
+            return Err(failure);
+        }
+    }
     systemd.reread().await;
-    let unit = Systemd::unit(&hosted.name);
+    let unit = systemd.enabled(&hosted.name);
     // Enabling and starting in one act, so a name that was already installed
     // is replaced rather than joined by a second under a different unit.
     let told = systemd
@@ -225,11 +271,13 @@ async fn placed(systemd: &Systemd, hosted: &Hosted) -> Result<Placed, Failure> {
         }),
         Some(output) => {
             let _ = take(&at);
+            let _ = take(&timer);
             systemd.reread().await;
             Err(refused(&complaint(&output)))
         }
         None => {
             let _ = take(&at);
+            let _ = take(&timer);
             Err(refused("systemctl could not be run"))
         }
     }
@@ -266,16 +314,23 @@ async fn withdrawn(systemd: &Systemd, name: &str) -> Result<Vec<PathBuf>, Failur
     if definition(&at).is_none() {
         return Ok(Vec::new());
     }
-    let unit = Systemd::unit(name);
+    let unit = systemd.enabled(name);
     let _ = systemd
         .spoke(&["systemctl", "--user", "disable", "--now", &unit])
         .await;
     if matches!(systemd.says(name).await, Standing::Running) {
         return Err(refused("it is still running"));
     }
+    let timer = systemd.timer_at(name);
+    let mut removed = Vec::new();
+    if definition(&timer).is_some() {
+        take(&timer)?;
+        removed.push(timer);
+    }
     take(&at)?;
+    removed.push(at);
     systemd.reread().await;
-    Ok(vec![at])
+    Ok(removed)
 }
 
 /// A refusal in systemd's name.

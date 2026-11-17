@@ -303,6 +303,35 @@ fn the_service_sits_in_a_profile_named_for_the_plugin() {
     );
 }
 
+#[test]
+fn a_scheduled_service_is_started_by_no_up_and_brought_back_by_nothing() {
+    let mut scheduled = placed();
+    scheduled.fields.schedule = Some(lemonfiber_plugin::Schedule {
+        setting: "komga:scan".to_owned(),
+        default: "@daily".to_owned(),
+    });
+    let kept = read(&document(placed()));
+    let scheduled = read(&document(scheduled));
+    let field = |document: &serde_norway::Value, key: &str| {
+        document
+            .get("services")
+            .and_then(|services| services.get("komga"))
+            .and_then(|entry| entry.get(key))
+            .cloned()
+            .unwrap_or_default()
+    };
+    assert_eq!(
+        field(&scheduled, "restart"),
+        serde_norway::Value::from("no")
+    );
+    assert_eq!(field(&scheduled, "scale"), serde_norway::Value::from(0));
+    assert_eq!(
+        field(&kept, "restart"),
+        serde_norway::Value::from("unless-stopped")
+    );
+    assert_eq!(field(&kept, "scale"), serde_norway::Value::Null);
+}
+
 /// A plugin that places nothing writes a document with nothing in it, rather
 /// than a document that is not one.
 #[test]
@@ -374,6 +403,7 @@ const KEYS: &[&str] = &[
     "image",
     "profiles",
     "restart",
+    "scale",
     "environment",
     "env_file",
     "ports",
