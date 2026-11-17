@@ -75,9 +75,13 @@ pub enum Request {
     /// What this machine's scheduler calls every minute for each installed
     /// run-and-exit service. Where none of its times fell due it exits at once and
     /// records nothing; a run still going when a time falls due has that time skipped.
+    /// With `--now` it runs at once, whether or not one of its times fell due.
     Run {
         /// The service.
         service: String,
+        /// Run it at once, whether or not one of its times fell due.
+        #[arg(long)]
+        now: bool,
     },
     /// Fetch newer images without applying them.
     Pull {

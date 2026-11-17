@@ -1,5 +1,6 @@
 //! What the host's scheduler calls every minute for each run-and-exit service: run it
-//! where one of its times fell due or a run is owed, and say how the run ended.
+//! where one of its times fell due or a run is owed, or at once where the operator asks,
+//! and say how the run ended.
 
 use crate::condition::Fault;
 use crate::error::codes::host::NOT_SCHEDULED;
@@ -7,7 +8,7 @@ use crate::error::{Code, Diagnose, Problem, Remedy, State};
 use crate::instant::{Instant, MINUTE};
 use crate::model::RunReport;
 use crate::ports::docker::Lifecycle;
-use crate::scheduled::fires::{fired, minute_of, zone};
+use crate::scheduled::fires::{fired, minute_of, zone, Fired};
 use crate::scheduled::kept::{self, Kept, ScheduledRun};
 use crate::scheduled::Scheduled;
 use crate::stack::compose::Action;
@@ -26,13 +27,13 @@ const DOWN: &str = "the stack is not running, so it runs once when the stack nex
 /// Why nothing was looked at where its setting names no time.
 const TIMELESS: &str = "its schedule setting names no time it runs at";
 
-/// Look at `service` for this minute, and run it where it is due.
+/// Look at `service` for this minute, and run it where it is due, or at once where `now`.
 ///
 /// # Errors
 ///
 /// Where nothing is configured to keep its record in, the register cannot be read,
 /// `service` is no installed run-and-exit service, or its lock cannot be opened.
-pub(crate) async fn run(ctx: &Ctx, service: &str) -> Result<RunReport, Box<Problem>> {
+pub(crate) async fn run(ctx: &Ctx, service: &str, now: bool) -> Result<RunReport, Box<Problem>> {
     let directory =
         records(ctx).ok_or_else(|| Box::new(crate::config::store::Failure::Nowhere.problem()))?;
     let register = super::plugins::read(ctx)?;
@@ -61,29 +62,33 @@ pub(crate) async fn run(ctx: &Ctx, service: &str) -> Result<RunReport, Box<Probl
         return held(DOWN);
     }
     let holding = crate::settings::holding(ctx);
-    let Some(times) = scheduled.times(&holding) else {
-        let timeless = crate::scheduled::timeless(&scheduled);
-        observed(
-            ctx,
-            &scheduled,
-            Some(&crate::scheduled::fault(&timeless, None)),
-        );
+    let times = scheduled.times(&holding);
+    let timeless = times
+        .is_none()
+        .then(|| crate::scheduled::fault(&crate::scheduled::timeless(&scheduled), None));
+    if timeless.is_some() && !now {
+        observed(ctx, &scheduled, timeless.as_ref());
         return held(TIMELESS);
-    };
+    }
     let zone = zone(holding(crate::config::ZONE_KEY).as_deref());
-    let now = ctx.stamp();
+    let falling = |after, until| {
+        times
+            .as_ref()
+            .map_or_else(Fired::default, |times| fired(times, &zone, after, until))
+    };
+    let started = ctx.stamp();
     let mut kept = kept::read(&directory, service);
     let after = kept
         .considered
-        .unwrap_or_else(|| minute_of(now).earlier(MINUTE));
-    let due = kept.owed || fired(&times, &zone, after, now).count > 0;
+        .unwrap_or_else(|| minute_of(started).earlier(MINUTE));
+    let due = now || kept.owed || falling(after, started).count > 0;
     if !due || ctx.dry_run {
         return Ok(report(service, ctx.dry_run, due, None));
     }
     kept.owed = false;
     kept::write(&directory, service, &kept)?;
-    let ran = ran(ctx, service, now).await;
-    let skipped = fired(&times, &zone, now, ran.ended);
+    let ran = ran(ctx, service, started).await;
+    let skipped = falling(started, ran.ended);
     kept.owed = kept::read(&directory, service).owed;
     kept.considered = Some(minute_of(ran.ended));
     kept.skipped = kept.skipped.saturating_add(skipped.count);
@@ -92,7 +97,7 @@ pub(crate) async fn run(ctx: &Ctx, service: &str) -> Result<RunReport, Box<Probl
     kept::write(&directory, service, &kept)?;
     let failed = crate::scheduled::failed(service, &ran)
         .map(|problem| crate::scheduled::fault(&problem, ran.exit));
-    observed(ctx, &scheduled, failed.as_ref());
+    observed(ctx, &scheduled, failed.as_ref().or(timeless.as_ref()));
     drop(lock);
     Ok(RunReport {
         skipped: skipped.count,

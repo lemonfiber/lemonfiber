@@ -332,6 +332,9 @@ pub const TAKES_SERVICE: &[&str] = &["backup", "update", "wiring-fill", "run"];
 /// offering a reversal it has no way to carry out.
 pub const TAKES_RUN: &[&str] = &["undo"];
 
+/// The action whose command runs a run-and-exit service at once.
+pub const TAKES_NOW: &[&str] = &["run"];
+
 /// The action whose command carries the configuration key it was given.
 pub const TAKES_KEY: &[&str] = &["config-set"];
 

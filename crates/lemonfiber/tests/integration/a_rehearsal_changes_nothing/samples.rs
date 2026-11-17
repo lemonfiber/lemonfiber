@@ -143,6 +143,7 @@ fn over_the_stack() -> Vec<(&'static str, Command)> {
             "run",
             Command::Run {
                 service: "configarr".to_owned(),
+                now: true,
             },
         ),
         ("pull", Command::Pull { forms: Vec::new() }),

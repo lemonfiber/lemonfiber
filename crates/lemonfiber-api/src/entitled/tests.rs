@@ -308,6 +308,7 @@ fn a_run_of_a_scheduled_service_is_the_operators_alone() {
     use lemonfiber_core::keys::Scope;
     let run = || Command::Run {
         service: "configarr".to_owned(),
+        now: true,
     };
     assert_eq!(
         may(&Caller::Operator, Door::Acting, run()),

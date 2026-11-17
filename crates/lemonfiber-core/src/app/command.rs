@@ -99,6 +99,8 @@ pub enum Command {
     Run {
         /// The service.
         service: String,
+        /// Whether it runs at once, whether or not one of its times fell due.
+        now: bool,
     },
     /// Start named services, leaving the rest of the form where it is.
     ///

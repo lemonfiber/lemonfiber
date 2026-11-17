@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "due": {
-      "description": "Whether a time fell due or a run was owed, so it ran or would have.",
+      "description": "Whether a time fell due, a run was owed or one was asked for at once, so it ran or\nwould have.",
       "type": "boolean"
     },
     "held": {

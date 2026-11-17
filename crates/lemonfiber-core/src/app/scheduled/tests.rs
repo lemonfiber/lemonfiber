@@ -80,7 +80,7 @@ fn raised(ctx: &Ctx) -> Option<crate::condition::Condition> {
 async fn a_service_with_no_schedule_is_refused() {
     let scratch = Scratch::new("unscheduled");
     let (ctx, runner) = holding(&scratch, "@daily", true, spoke(""));
-    let refused = run(&ctx, "jellyfin")
+    let refused = run(&ctx, "jellyfin", false)
         .await
         .err()
         .unwrap_or_else(|| unreachable!("refused"));
@@ -93,7 +93,7 @@ async fn an_owed_run_runs_to_completion_and_is_recorded() {
     let scratch = Scratch::new("owed");
     let (ctx, runner) = holding(&scratch, "0 0 1 1 *", true, spoke("synced"));
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(report.due, "{report:?}");
@@ -120,7 +120,7 @@ async fn a_minute_none_of_its_times_fell_in_runs_nothing_and_records_nothing() {
         ..Kept::default()
     };
     kept_as(&ctx, &considered);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(!report.due);
@@ -140,7 +140,7 @@ async fn a_time_missed_since_the_last_run_runs_it_once() {
             ..Kept::default()
         },
     );
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(report.due);
@@ -157,7 +157,7 @@ async fn a_run_that_exits_non_zero_raises_its_exit_and_the_next_that_exits_zero_
         exited(2, "one\ntwo\nrefused: 401"),
     );
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert_eq!(report.ran.as_ref().and_then(|ran| ran.exit), Some(2));
@@ -172,7 +172,7 @@ async fn a_run_that_exits_non_zero_raises_its_exit_and_the_next_that_exits_zero_
 
     let (ctx, _) = holding(&scratch, "* * * * *", true, spoke("fine"));
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    run(&ctx, "configarr")
+    run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(raised(&ctx).is_none());
@@ -183,7 +183,7 @@ async fn a_stack_that_is_down_is_not_looked_at() {
     let scratch = Scratch::new("down");
     let (ctx, runner) = holding(&scratch, "* * * * *", false, spoke(""));
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert_eq!(report.held.as_deref(), Some(DOWN));
@@ -197,7 +197,7 @@ async fn a_second_run_while_one_holds_the_lock_looks_at_nothing() {
     let (ctx, runner) = holding(&scratch, "* * * * *", true, spoke(""));
     let lock = kept::locked(&directory(&ctx), "configarr")
         .unwrap_or_else(|why| unreachable!("opened: {why:?}"));
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     drop(lock);
@@ -212,7 +212,7 @@ async fn times_falling_due_while_it_runs_are_skipped_and_recorded() {
     let clock = Arc::new(Ticking::by(Duration::from_secs(5 * MINUTE)));
     ctx.seams.clock = clock;
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(report.skipped > 0, "{report:?}");
@@ -227,7 +227,7 @@ async fn a_rehearsal_says_it_is_due_and_runs_nothing() {
     let (mut ctx, runner) = holding(&scratch, "* * * * *", true, spoke(""));
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
     ctx.dry_run = true;
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert!(report.due && report.rehearsed && report.ran.is_none());
@@ -284,7 +284,7 @@ async fn a_lock_that_cannot_be_opened_refuses_the_run() {
     let scratch = Scratch::new("unlockable");
     let (ctx, runner) = holding(&scratch, "* * * * *", true, spoke(""));
     let _ = std::fs::write(directory(&ctx), "");
-    assert!(run(&ctx, "configarr").await.is_err());
+    assert!(run(&ctx, "configarr", false).await.is_err());
     assert!(!ran_once(&runner));
 }
 
@@ -296,7 +296,7 @@ async fn a_stack_stopped_on_purpose_is_not_looked_at() {
     returning.stopped();
     crate::autostart::run::save(&ctx, &returning);
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert_eq!(report.held.as_deref(), Some(DOWN));
@@ -315,13 +315,13 @@ async fn a_setting_naming_no_time_raises_it_and_runs_nothing_and_a_rehearsal_rai
         crate::settings::store::recorded(&settings, &[(SETTING, Some("never"))].into()).is_ok()
     );
 
-    let rehearsed = run(&ctx.clone().rehearsing(), "configarr")
+    let rehearsed = run(&ctx.clone().rehearsing(), "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert_eq!(rehearsed.held.as_deref(), Some(TIMELESS));
     assert!(raised(&ctx).is_none());
 
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     assert_eq!(report.held.as_deref(), Some(TIMELESS));
@@ -340,7 +340,7 @@ async fn a_run_that_could_not_be_started_ends_with_no_exit_and_says_why() {
     )));
     ctx.seams.runner = runner.clone();
     owe(&ctx, &installed(&[("configarr", Some("@daily"))]), None);
-    let report = run(&ctx, "configarr")
+    let report = run(&ctx, "configarr", false)
         .await
         .unwrap_or_else(|why| unreachable!("looked at: {why:?}"));
     let ran = report.ran.unwrap_or_else(|| unreachable!("ran"));
@@ -361,7 +361,7 @@ async fn each_run_and_exit_service_stands_as_its_last_run_left_it() {
     let (ctx, _) = holding(&scratch, "* * * * *", true, exited(1, "refused"));
     let scheduled = installed(&[("configarr", Some("@daily")), ("kept", None)]);
     owe(&ctx, &scheduled, None);
-    let _ = run(&ctx, "configarr").await;
+    let _ = run(&ctx, "configarr", false).await;
     let containers = Reporting::holding(&["configarr"], Lifecycle::Running, Health::Healthy)
         .list(&ctx.settings.project)
         .await
@@ -406,7 +406,7 @@ async fn a_run_with_nowhere_to_keep_its_record_is_refused() {
     let (mut ctx, runner) = holding(&scratch, "@daily", true, spoke(""));
     ctx.settings.env_file = None;
 
-    let refused = run(&ctx, "configarr")
+    let refused = run(&ctx, "configarr", false)
         .await
         .err()
         .map(|problem| problem.code);
@@ -467,3 +467,5 @@ async fn a_run_and_exit_services_container_is_no_stranger_and_any_other_is() {
     assert!(strangers.contains(&"whoever"), "{strangers:?}");
     assert!(!strangers.contains(&"configarr"), "{strangers:?}");
 }
+
+mod now;

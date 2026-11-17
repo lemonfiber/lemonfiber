@@ -388,7 +388,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Preview { forms } => engine::preview(ctx, &forms).await.map(Outcome::Preview),
         Command::Up { forms, offer } => engine::up(ctx, &forms, offer).await,
         Command::AtBoot => boot::at_boot(ctx).await.map(Outcome::from),
-        Command::Run { service } => scheduled::run(ctx, &service).await.map(Outcome::Ran),
+        Command::Run { service, now } => scheduled::run(ctx, &service, now).await.map(Outcome::Ran),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
         Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,

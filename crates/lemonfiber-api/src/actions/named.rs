@@ -299,6 +299,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         offer,
         agreed,
         confirm,
+        now,
         item,
         term,
         season,
@@ -389,7 +390,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         "hosting-remove" => {
             keeping(action, kept).map(|what| Command::Hosting(Keeping::Remove { what }))
         }
-        "run" => running(service),
+        "run" => running(service, now.at_once()),
         // Naming nothing is a request rather than an omission: a walk asked for
         // nothing in particular suggests something likely to work, which is what an
         // operator with an empty library needs. Blank is nothing named, not an
@@ -470,10 +471,10 @@ fn updating(
     })
 }
 
-/// The run-and-exit service a run names, or why it names none.
-fn running(service: Option<String>) -> Result<Command, Refused> {
+/// The run-and-exit service a run names, run at once where `now`, or why it names none.
+fn running(service: Option<String>, now: bool) -> Result<Command, Refused> {
     service
-        .map(|service| Command::Run { service })
+        .map(|service| Command::Run { service, now })
         .ok_or_else(|| missing("run", "service"))
 }
 
