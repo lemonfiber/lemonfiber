@@ -52,6 +52,7 @@ use std::collections::BTreeMap;
 
 use schemars::{schema_for, Schema};
 use serde::Serialize;
+use serde_json::Value;
 
 use lemonfiber_core::agreement;
 use lemonfiber_core::alert::Alert;
@@ -134,6 +135,10 @@ pub struct Contract {
     /// fakes answered it.
     #[serde(skip)]
     pub examples: example::Examples,
+    /// What a member's surface may not show, as the one list the core's own tests hold a
+    /// member's text to publishes it.
+    #[serde(skip)]
+    pub household_words: Option<Value>,
 }
 
 /// The event stream, as the contract describes it.
@@ -226,6 +231,7 @@ impl Contract {
             reads: published::every(),
             refusals: refusals(),
             examples: example::Examples::default(),
+            household_words: None,
         }
     }
 
@@ -233,6 +239,15 @@ impl Contract {
     #[must_use]
     pub fn with_examples(self, examples: example::Examples) -> Self {
         Self { examples, ..self }
+    }
+
+    /// The same contract, carrying `words`, what a member's surface may not show.
+    #[must_use]
+    pub fn with_household_words(self, words: Value) -> Self {
+        Self {
+            household_words: Some(words),
+            ..self
+        }
     }
 }
 

@@ -15,6 +15,7 @@ use lemonfiber_api::contract::{layout, Contract, CONTRACT_DIR};
 fn main() {
     let files = match Contract::describe()
         .with_examples(lemonfiber_examples::gathered())
+        .with_household_words(lemonfiber_fixtures::unhoused::published())
         .files()
     {
         Ok(files) => files,

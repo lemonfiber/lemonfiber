@@ -34,3 +34,38 @@ fn the_households_own_words_pass() {
         assert_eq!(unhoused(text), None, "{text}");
     }
 }
+
+/// What the contract publishes names every part the bundle pins, and each ruled example
+/// names what it is ruled for.
+#[test]
+fn what_is_published_names_every_pinned_part_and_what_each_example_breaks() {
+    let published = super::published();
+    let listed = |key: &str| -> Vec<String> {
+        published
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|one| one.as_str().map(str::to_owned))
+            .collect()
+    };
+    let names = listed("names");
+    for part in crate::parts::pinned() {
+        assert!(names.contains(&part.replace('-', " ")), "{part}");
+    }
+    assert!(names.contains(&"plex".to_owned()));
+    assert!(listed("terms").contains(&"indexer".to_owned()));
+    assert!(listed("sizes").contains(&"gb".to_owned()));
+    let examples = published
+        .get("examples")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(examples.len(), super::RULED.len());
+    for example in examples {
+        let text = example.get("text").and_then(serde_json::Value::as_str);
+        let found = example.get("names").and_then(serde_json::Value::as_str);
+        assert!(text.is_some() && found.is_some(), "{example}");
+        assert_eq!(text.and_then(unhoused).as_deref(), found, "{example}");
+    }
+}
