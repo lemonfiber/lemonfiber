@@ -1,6 +1,6 @@
 use crate::settings::own::{
-    is_configs, is_core, refusal, DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH,
-    DEVICE_KEY_APPS, DOMAIN, GUIDE_HOURS,
+    is_configs, is_core, refusal, CODES_BY_ADDRESS, CODES_PERIOD, CODES_PER_PERIOD, CODES_WAITING,
+    DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH, DEVICE_KEY_APPS, DOMAIN, GUIDE_HOURS,
 };
 
 fn fingerprint() -> String {
@@ -262,4 +262,81 @@ async fn changing_the_dashboards_search_address_applies_the_dashboard_again() {
         .collect();
     assert_eq!(told.len(), 1, "{told:?}");
     assert!(told.iter().all(|body| body.contains(search)), "{told:?}");
+}
+
+#[test]
+fn the_sign_in_code_limits_are_core_settings_each_held_to_its_range_or_on_and_off() {
+    for (name, taken, refused) in [
+        (CODES_WAITING, ["1", "3", "100"], ["0", "101", ""]),
+        (CODES_PER_PERIOD, ["1", "10", "1000"], ["0", "1001", ""]),
+        (CODES_PERIOD, ["1", "15", "1440"], ["0", "1441", ""]),
+        (
+            CODES_BY_ADDRESS,
+            ["on", "off", "yes"],
+            ["maybe", "sure", "2"],
+        ),
+    ] {
+        assert!(is_core(name));
+        assert!(!is_configs(name));
+        for value in taken {
+            assert_eq!(refusal(name, value), None, "{name}={value}");
+        }
+        for value in refused.into_iter().chain(["three"]) {
+            assert!(
+                refusal(name, value).is_some_and(|said| said.starts_with(name)),
+                "{name}={value:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_sign_in_code_limits_are_those_recorded_or_their_defaults_where_none_or_no_value_is() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("sign-in-codes");
+    let env = scratch.path().join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let settings = env.with_file_name(crate::config::paths::SETTINGS);
+    let record = |values: &[(&str, &str)]| {
+        let changing = values
+            .iter()
+            .map(|(name, value)| (*name, Some(*value)))
+            .collect();
+        crate::settings::store::recorded(&settings, &changing).is_ok()
+    };
+    let defaults = crate::sign_in_codes::Limits {
+        waiting: 3,
+        per_period: 10,
+        period: std::time::Duration::from_secs(15 * 60),
+        by_address: false,
+    };
+
+    assert_eq!(crate::settings::sign_in_codes(&ctx), defaults);
+    assert!(record(&[
+        (CODES_WAITING, "5"),
+        (CODES_PER_PERIOD, "20"),
+        (CODES_PERIOD, "60"),
+        (CODES_BY_ADDRESS, "on"),
+    ]));
+    assert_eq!(
+        crate::settings::sign_in_codes(&ctx),
+        crate::sign_in_codes::Limits {
+            waiting: 5,
+            per_period: 20,
+            period: std::time::Duration::from_secs(60 * 60),
+            by_address: true,
+        }
+    );
+    assert!(record(&[
+        (CODES_WAITING, "many"),
+        (CODES_PER_PERIOD, "0"),
+        (CODES_PERIOD, "a day"),
+        (CODES_BY_ADDRESS, "maybe"),
+    ]));
+    assert_eq!(crate::settings::sign_in_codes(&ctx), defaults);
 }

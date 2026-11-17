@@ -193,4 +193,59 @@ codes! {
             remedy: "Choose one of at least twelve characters.",
         },
     }
+    /// Raised when a sign-in by a code names a handle that waits on nothing for this caller.
+    CODE_NOT_WAITING = "ADMIT-15" {
+        severity: Error,
+        status: 401,
+        since: "0.18.0",
+        meaning: "This sign-in by a code can no longer be finished, and no session was begun. The \
+            same is said whether the code lapsed, was used already, was asked for by another \
+            session or was never one, so a guess learns nothing about which.",
+        remedy: "Ask for a new code and approve it before it lapses.",
+        household: {
+            said: "That sign-in code can't be used any more.",
+            remedy: "Ask for a new code and try again.",
+        },
+    }
+    /// Raised when one source has asked for as many codes to sign in by as it may.
+    TOO_MANY_CODES = "ADMIT-16" {
+        severity: Warning,
+        status: 429,
+        since: "0.18.0",
+        meaning: "This device or session has asked for as many sign-in codes as it may for now, \
+            so no code was asked for. Other devices are still given codes. The message says how \
+            long is left, and so does the answer's Retry-After header.",
+        remedy: "Wait as long as it says, or finish a code already shown.",
+        household: {
+            said: "Too many sign-in codes were asked for, so the house is waiting a while.",
+            remedy: "Wait a little, then try once more.",
+        },
+    }
+    /// Raised when a code to sign in by is asked of a household whose members sign in with a
+    /// password.
+    SIGNS_IN_BY_PASSWORD = "ADMIT-17" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "This household keeps its own accounts, so its members sign in with their name \
+            and password, and no code was asked for.",
+        remedy: "Sign in with the member's name and password.",
+        household: {
+            said: "This house signs in with your name and password.",
+            remedy: "Enter your name and password instead.",
+        },
+    }
+    /// Raised when what was sent to ask for or finish a sign-in by a code cannot be read.
+    NOT_A_CODE_REQUEST = "ADMIT-18" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "What was sent to sign in by a code cannot be read. An empty object asks for a \
+            code, and an object naming the handle as waiting finishes one.",
+        remedy: "Send {} to ask for a code, or the handle as waiting to finish one.",
+        household: {
+            said: "That sign-in couldn't be read.",
+            remedy: "Try again.",
+        },
+    }
 }

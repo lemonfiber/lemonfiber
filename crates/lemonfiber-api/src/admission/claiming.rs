@@ -72,7 +72,7 @@ impl Admitting {
 /// A name for one sign-in at the server, fresh each time: the server keeps one sign-in per
 /// account and device, so a second under one name would end the first, and a member
 /// signed in from two browsers would lose one of them.
-fn device(random: &dyn Random) -> Option<String> {
+pub(super) fn device(random: &dyn Random) -> Option<String> {
     Some(
         random
             .bytes(DEVICE_BYTES)?
@@ -118,7 +118,7 @@ async fn claimable(at: Arc<dyn HouseholdAtHand>, id: &str, token: &str) -> bool 
 
 /// Whether the household `at` holds vouches for whoever holds this account, asked on a
 /// thread made for blocking: it reads what was offered from disk, and may write it back.
-async fn vouched(at: Arc<dyn HouseholdAtHand>, id: &str) -> bool {
+pub(super) async fn vouched(at: Arc<dyn HouseholdAtHand>, id: &str) -> bool {
     let id = id.to_owned();
     tokio::task::spawn_blocking(move || at.vouches_for(&id))
         .await

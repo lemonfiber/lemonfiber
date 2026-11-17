@@ -8,7 +8,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
 use lemonfiber_api::admission::keyring::Keyring;
-use lemonfiber_api::admission::Admitting;
+use lemonfiber_api::admission::{Admitting, HouseholdAtHand};
 use lemonfiber_api::events::live::{Listening, Live};
 use lemonfiber_api::events::wire::BEAT_SAID;
 use lemonfiber_api::events::Streaming;
@@ -74,6 +74,15 @@ pub(crate) struct Surface {
 impl Surface {
     /// The surface over `world`.
     pub(crate) async fn over(world: World) -> Option<Self> {
+        let household = Arc::new(world.ctx.clone());
+        Self::over_household(world, household).await
+    }
+
+    /// The surface over `world`, asking `household` who somebody is.
+    pub(crate) async fn over_household(
+        world: World,
+        household: Arc<dyn HouseholdAtHand>,
+    ) -> Option<Self> {
         let token = Arc::new(Token::mint(&Chance::repeating(RUN.to_vec()))?);
         let clock = Stopped::at(AT);
         let live = Arc::new(Live::opening(clock.as_ref()));
@@ -81,7 +90,7 @@ impl Surface {
         let ctx = Arc::new(world.ctx.clone());
         let admitting = Arc::new(Admitting {
             kept: world.ctx.settings.admission.clone(),
-            household: Some(Arc::new(world.ctx.clone())),
+            household: Some(household),
             keys: Keyring::at(at(&world.ctx), used_at(&world.ctx)),
             ..Admitting::default()
         });

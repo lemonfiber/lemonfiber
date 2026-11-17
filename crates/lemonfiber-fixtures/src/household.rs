@@ -1,7 +1,7 @@
 //! A household that answers who somebody is and refuses everything else.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lemonfiber_ports::service::{
@@ -11,6 +11,19 @@ use lemonfiber_ports::service::{
 
 /// The name a household that does not answer, or refuses, is reported under.
 const SERVICE: &str = "jellyfin";
+
+/// What every id a household signing in by a code answers begins with.
+pub const CODE_ID: &str = "code-for-";
+
+/// The code a household signing in by a code shows the member.
+pub const CODE: &str = "WXYZ";
+
+/// Where a household signing in by a code has the member approve it.
+pub const APPROVE_AT: &str = "https://approve.example/link";
+
+/// When every code a household signing in by a code issues lapses, in seconds since the
+/// epoch.
+pub const LAPSES: u64 = 1_700_000_600;
 
 /// A household knowing one account or nobody, answering who somebody is, whether a sign-in
 /// still stands and whether the account is still here, and refusing every other question.
@@ -23,6 +36,12 @@ pub struct Recognising {
     withdrawn: AtomicBool,
     /// Whether the account's password has since been changed at the server.
     moved_on: AtomicBool,
+    /// Whether its members sign in by a code an outside service issues.
+    by_code: bool,
+    /// Whether the member has approved every code issued so far.
+    approved: AtomicBool,
+    /// Each device a code was asked for, in the order asked.
+    devices: Mutex<Vec<String>>,
 }
 
 impl Recognising {
@@ -44,6 +63,30 @@ impl Recognising {
         Self::new(None, true)
     }
 
+    /// One that knows this account and signs it in by a code an outside service issues,
+    /// approved once [`Self::approve`] is called.
+    #[must_use]
+    pub fn by_code(id: &str) -> Arc<Self> {
+        Arc::new(Self {
+            by_code: true,
+            ..Self::fresh(Some(id.to_owned()), false)
+        })
+    }
+
+    /// Each device a code was asked for, in the order asked.
+    #[must_use]
+    pub fn devices(&self) -> Vec<String> {
+        self.devices
+            .lock()
+            .map(|devices| devices.clone())
+            .unwrap_or_default()
+    }
+
+    /// Approve every code issued.
+    pub fn approve(&self) {
+        self.approved.store(true, Ordering::SeqCst);
+    }
+
     /// Take the account off the server.
     pub fn withdraw(&self) {
         self.withdrawn.store(true, Ordering::SeqCst);
@@ -60,12 +103,33 @@ impl Recognising {
     }
 
     fn new(known: Option<String>, unreachable: bool) -> Arc<Self> {
-        Arc::new(Self {
+        Arc::new(Self::fresh(known, unreachable))
+    }
+
+    fn fresh(known: Option<String>, unreachable: bool) -> Self {
+        Self {
             known,
             unreachable: AtomicBool::new(unreachable),
             withdrawn: AtomicBool::new(false),
             moved_on: AtomicBool::new(false),
-        })
+            by_code: false,
+            approved: AtomicBool::new(false),
+            devices: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Fails where it has stopped answering, and answers `unsupported` where its members
+    /// sign in by a password.
+    fn coding(&self) -> Result<(), Failure> {
+        self.answering()?;
+        if self.by_code {
+            Ok(())
+        } else {
+            Err(Failure::Unsupported {
+                service: SERVICE.to_owned(),
+                detail: "this household's members sign in by a password".to_owned(),
+            })
+        }
     }
 
     /// Fails where it has stopped answering.
@@ -156,11 +220,13 @@ impl Household for Recognising {
     async fn signs_devices_in(&self) -> Result<bool, Failure> {
         unasked()
     }
-    async fn sign_in_by_code(&self, _: &str) -> Result<SignInCode, Failure> {
-        unasked()
+
+    async fn sign_in_by_code(&self, device: &str) -> Result<SignInCode, Failure> {
+        sign_in_by_code(self, device)
     }
-    async fn signed_by_code(&self, _: &str) -> Result<Option<Signed>, Failure> {
-        unasked()
+
+    async fn signed_by_code(&self, id: &str) -> Result<Option<Signed>, Failure> {
+        signed_by_code(self, id)
     }
 }
 
@@ -190,6 +256,32 @@ fn household(fake: &Recognising) -> Result<Vec<Member>, Failure> {
             last_seen: None,
         })
         .collect())
+}
+
+/// How `Recognising` answers `sign_in_by_code`.
+fn sign_in_by_code(fake: &Recognising, device: &str) -> Result<SignInCode, Failure> {
+    fake.coding()?;
+    if let Ok(mut devices) = fake.devices.lock() {
+        devices.push(device.to_owned());
+    }
+    Ok(SignInCode {
+        id: format!("{CODE_ID}{device}"),
+        code: CODE.to_owned(),
+        approve_at: APPROVE_AT.to_owned(),
+        lapses_at: lemonfiber_ports::Instant::from_seconds(LAPSES),
+    })
+}
+
+/// How `Recognising` answers `signed_by_code`.
+fn signed_by_code(fake: &Recognising, id: &str) -> Result<Option<Signed>, Failure> {
+    fake.coding()?;
+    if !id.starts_with(CODE_ID) || !fake.approved.load(Ordering::SeqCst) {
+        return Ok(None);
+    }
+    Ok(fake.known.clone().map(|known| Signed {
+        id: known,
+        token: id.to_owned(),
+    }))
 }
 
 #[cfg(test)]

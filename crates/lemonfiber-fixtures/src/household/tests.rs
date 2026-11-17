@@ -82,3 +82,29 @@ async fn every_other_question_is_refused() {
     assert!(household.sign_in_by_code("phone").await.is_err());
     assert!(household.signed_by_code("code").await.is_err());
 }
+
+/// A household signing in by a code issues one per device, proving its member once approved.
+#[tokio::test]
+async fn a_code_proves_the_member_once_approved_and_nothing_before_or_for_another_id() {
+    let household = Recognising::by_code("a7f3");
+    let Ok(issued) = household.sign_in_by_code("phone").await else {
+        unreachable!("a household signing in by a code issues one");
+    };
+
+    assert_eq!(issued.id, format!("{CODE_ID}phone"));
+    assert_eq!(household.devices(), ["phone"]);
+    assert_eq!(household.signed_by_code(&issued.id).await.ok(), Some(None));
+    household.approve();
+    assert_eq!(
+        household
+            .signed_by_code(&issued.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|signed| signed.id),
+        Some("a7f3".to_owned())
+    );
+    assert_eq!(household.signed_by_code("forged").await.ok(), Some(None));
+    household.go_dark();
+    assert!(household.sign_in_by_code("phone").await.is_err());
+}

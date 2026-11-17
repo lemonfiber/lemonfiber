@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "approve_at": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "code": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "lapses_at": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "waiting": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

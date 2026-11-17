@@ -69,7 +69,11 @@ fn only_the_door_answers_unauthorized() {
         .collect();
     assert_eq!(
         unauthorized,
-        vec![Refusal::NotThePassword, Refusal::NotOpen]
+        vec![
+            Refusal::NotThePassword,
+            Refusal::NotOpen,
+            Refusal::NotWaiting
+        ]
     );
 }
 
@@ -100,6 +104,7 @@ fn only_the_refusals_that_are_not_faults_are_warnings() {
             Refusal::NotYours
                 | Refusal::Unconfirmed
                 | Refusal::TooManyAttempts
+                | Refusal::TooManyCodes
                 | Refusal::NotForAKey
         );
         let severity = refusal.problem("").severity;

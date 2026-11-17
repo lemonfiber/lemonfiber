@@ -34,6 +34,10 @@ that it is a fault of the stack.
 | `ADMIT-12` | `NOT_FOR_A_KEY` | warning | 1 | 403 | 0.17.0 | Raised when a key asked for something its scope does not reach. | That isn't something this app may do for you. Ask whoever runs the house if you need it. |
 | `ADMIT-13` | `NOT_OPEN` | error | 1 | 401 | 0.18.0 | Raised when a claim names an invitation that is not open. | This invitation can't be used any more. Ask whoever invited you for a new one. |
 | `ADMIT-14` | `SHORT_CHOICE` | error | 1 | 400 | 0.18.0 | Raised when the password chosen at a claim is shorter than the least this takes. | That password is too short. Choose one of at least twelve characters. |
+| `ADMIT-15` | `CODE_NOT_WAITING` | error | 1 | 401 | 0.18.0 | Raised when a sign-in by a code names a handle that waits on nothing for this caller. | That sign-in code can't be used any more. Ask for a new code and try again. |
+| `ADMIT-16` | `TOO_MANY_CODES` | warning | 1 | 429 | 0.18.0 | Raised when one source has asked for as many codes to sign in by as it may. | Too many sign-in codes were asked for, so the house is waiting a while. Wait a little, then try once more. |
+| `ADMIT-17` | `SIGNS_IN_BY_PASSWORD` | error | 1 | 409 | 0.18.0 | Raised when a code to sign in by is asked of a household whose members sign in with a password. | This house signs in with your name and password. Enter your name and password instead. |
+| `ADMIT-18` | `NOT_A_CODE_REQUEST` | error | 1 | 400 | 0.18.0 | Raised when what was sent to ask for or finish a sign-in by a code cannot be read. | That sign-in couldn't be read. Try again. |
 
 ## `ASK` — putting a request to the web surface
 

@@ -23,19 +23,17 @@ impl Refusal {
                  removed and the session has not ended."
             }
             Self::NotThePassword | Self::NotOpen | Self::ShortChoice => self.at_the_door(),
+            Self::TooManyAttempts
+            | Self::NotAPassword
+            | Self::NotWaiting
+            | Self::TooManyCodes
+            | Self::SignsInByPassword
+            | Self::NotACodeRequest => self.knocking(),
             Self::KeyInTheClear => {
                 "The key crossed a network unencrypted, so it was not looked at and nothing \
                  was answered. Anything between that machine and this one may have read it."
             }
             Self::NotForAKey => "The key is admitted and may not call this, so nothing was done.",
-            Self::TooManyAttempts => {
-                "This surface has stopped looking at passwords and keys for a while. \
-                 Another attempt now makes the wait longer."
-            }
-            Self::NotAPassword => {
-                "The door reads a password, and a household member's name beside it, and \
-                 this body carried neither in a form it can read."
-            }
             Self::Unwanted => {
                 "It is refused rather than dropped, because dropping it would answer a \
                  wider question than the one that was asked — and a wider answer reads \
@@ -142,6 +140,36 @@ impl Refusal {
                  longer password."
             }
             _ => "Nothing was opened, and no session was begun.",
+        }
+    }
+
+    /// What a refusal of what was offered at a door means, other than a wrong answer.
+    const fn knocking(self) -> &'static str {
+        match self {
+            Self::TooManyAttempts => {
+                "This surface has stopped looking at passwords and keys for a while. \
+                 Another attempt now makes the wait longer."
+            }
+            Self::NotAPassword => {
+                "The door reads a password, and a household member's name beside it, and \
+                 this body carried neither in a form it can read."
+            }
+            Self::NotWaiting => {
+                "No session was begun. The same is said whether the code lapsed, was used \
+                 already, was asked for by another session or was never one."
+            }
+            Self::TooManyCodes => {
+                "This device or session has asked for as many sign-in codes as it may for now. \
+                 Other devices are still given codes."
+            }
+            Self::SignsInByPassword => {
+                "No code was asked for. This household keeps its own accounts, so its members \
+                 sign in with a name and password."
+            }
+            _ => {
+                "The door reads an empty object to ask for a code, or the handle as waiting to \
+                 finish one, and this body carried neither in a form it can read."
+            }
         }
     }
 }
