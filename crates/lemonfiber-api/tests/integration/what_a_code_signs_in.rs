@@ -67,15 +67,17 @@ fn said(body: &str, pointer: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// A surface over a household signing `MEMBER` in by a code, the operator's password kept.
-fn signing_in_by_code(named: &str) -> (axum::Router, Arc<Recognising>) {
+/// A surface over a household signing `MEMBER` in by a code, the operator's password kept
+/// in the scratch directory handed back with it.
+fn signing_in_by_code(named: &str) -> (axum::Router, Arc<Recognising>, Scratch) {
     let household = Recognising::by_code(MEMBER);
+    let kept = keeping(named);
     let (router, _, _) = door_with(
-        Some(keeping(named)),
+        Some(kept.path()),
         Arc::clone(&household),
         Chance::turning(1),
     );
-    (router, household)
+    (router, household, kept)
 }
 
 /// A session the operator opened at `router` from `from`.
@@ -99,7 +101,7 @@ fn finishing(handle: &str) -> String {
 
 #[tokio::test]
 async fn a_code_is_answered_with_where_to_approve_it_and_a_handle_never_the_sources_id() {
-    let (router, _) = signing_in_by_code("code-asked");
+    let (router, _, _kept) = signing_in_by_code("code-asked");
 
     let answer = at_the_door(router, a_device(7), None, "{}").await;
 
@@ -119,7 +121,7 @@ async fn a_code_is_answered_with_where_to_approve_it_and_a_handle_never_the_sour
 
 #[tokio::test]
 async fn a_sign_in_waits_until_approved_then_opens_the_members_session_once() {
-    let (router, household) = signing_in_by_code("code-finished");
+    let (router, household, _kept) = signing_in_by_code("code-finished");
     let handle = a_handle(router.clone(), a_device(7), None).await;
 
     let waiting = at_the_door(router.clone(), a_device(7), None, &finishing(&handle)).await;
@@ -144,7 +146,7 @@ async fn a_sign_in_waits_until_approved_then_opens_the_members_session_once() {
 
 #[tokio::test]
 async fn a_second_session_cannot_finish_the_sign_in_the_first_asked_for() {
-    let (router, household) = signing_in_by_code("code-bound");
+    let (router, household, _kept) = signing_in_by_code("code-bound");
     let first = an_operator_session(router.clone(), a_device(7)).await;
     let second = an_operator_session(router.clone(), a_device(7)).await;
     assert_ne!(first, second);
@@ -171,7 +173,7 @@ async fn a_second_session_cannot_finish_the_sign_in_the_first_asked_for() {
 
 #[tokio::test]
 async fn one_source_flooding_meets_its_own_limit_while_another_is_still_given_codes() {
-    let (router, _) = signing_in_by_code("code-flooded");
+    let (router, _, _kept) = signing_in_by_code("code-flooded");
     for _ in 0..3 {
         assert!(!a_handle(router.clone(), a_device(7), None).await.is_empty());
     }
@@ -187,8 +189,9 @@ async fn one_source_flooding_meets_its_own_limit_while_another_is_still_given_co
 
 #[tokio::test]
 async fn a_household_whose_members_sign_in_by_a_password_is_asked_for_no_code() {
+    let kept = keeping("code-by-password");
     let (router, _, _) = door_with(
-        Some(keeping("code-by-password")),
+        Some(kept.path()),
         Recognising::knowing(MEMBER),
         Chance::turning(1),
     );
@@ -201,7 +204,7 @@ async fn a_household_whose_members_sign_in_by_a_password_is_asked_for_no_code() 
 
 #[tokio::test]
 async fn a_body_that_neither_asks_nor_finishes_is_refused_and_an_unknown_handle_finishes_nothing() {
-    let (router, _) = signing_in_by_code("code-unread");
+    let (router, _, _kept) = signing_in_by_code("code-unread");
 
     let unread = at_the_door(router.clone(), a_device(7), None, r#"{"code":"WXYZ"}"#).await;
     let unknown = at_the_door(router, a_device(7), None, &finishing("0f0f")).await;
@@ -214,7 +217,7 @@ async fn a_body_that_neither_asks_nor_finishes_is_refused_and_an_unknown_handle_
 
 #[tokio::test]
 async fn a_household_that_cannot_be_asked_issues_no_code_and_finishes_nothing() {
-    let (router, household) = signing_in_by_code("code-dark");
+    let (router, household, _kept) = signing_in_by_code("code-dark");
     let handle = a_handle(router.clone(), a_device(7), None).await;
     household.go_dark();
 
@@ -228,7 +231,7 @@ async fn a_household_that_cannot_be_asked_issues_no_code_and_finishes_nothing() 
 
 #[tokio::test]
 async fn the_device_a_code_is_asked_for_is_drawn_by_the_core_and_never_named_by_the_caller() {
-    let (router, household) = signing_in_by_code("code-device");
+    let (router, household, _kept) = signing_in_by_code("code-device");
 
     let named = at_the_door(router.clone(), a_device(7), None, r#"{"device":"tv-1"}"#).await;
     let first = at_the_door(router.clone(), a_device(7), None, "{}").await;
@@ -249,11 +252,8 @@ async fn the_device_a_code_is_asked_for_is_drawn_by_the_core_and_never_named_by_
 #[tokio::test]
 async fn no_code_is_issued_where_no_device_or_no_handle_can_be_drawn() {
     for random in [Chance::exactly(None), Chance::exactly(Some(vec![1; 32]))] {
-        let (router, _, _) = door_with(
-            Some(keeping("code-undrawn")),
-            Recognising::by_code(MEMBER),
-            random,
-        );
+        let kept = keeping("code-undrawn");
+        let (router, _, _) = door_with(Some(kept.path()), Recognising::by_code(MEMBER), random);
 
         let answer = at_the_door(router, a_device(7), None, "{}").await;
 
@@ -291,7 +291,8 @@ async fn finished_after(named: &str, fade: impl Fn(&Fading)) -> Answer {
         gone: AtomicBool::new(false),
         vouching: AtomicBool::new(true),
     });
-    let path = Some(keeping(named));
+    let kept = keeping(named);
+    let path = Some(kept.path().to_path_buf());
     let admitting = Arc::new(Admitting {
         kept: path.clone(),
         household: Some(Arc::clone(&fading) as Arc<dyn HouseholdAtHand>),
@@ -330,7 +331,7 @@ async fn a_sign_in_finishes_nothing_where_the_household_is_gone_withdrew_the_mem
 
 #[tokio::test]
 async fn two_finishes_of_one_approved_code_at_once_open_exactly_one_session() {
-    let (router, household) = signing_in_by_code("code-raced");
+    let (router, household, _kept) = signing_in_by_code("code-raced");
     let handle = a_handle(router.clone(), a_device(7), None).await;
     household.approve();
     let body = finishing(&handle);
@@ -356,7 +357,8 @@ async fn two_finishes_of_one_approved_code_at_once_open_exactly_one_session() {
 
 #[tokio::test]
 async fn a_stack_with_no_household_to_ask_issues_no_code() {
-    let (router, _, _) = door(Some(keeping("code-no-household")), Chance::turning(1));
+    let kept = keeping("code-no-household");
+    let (router, _, _) = door(Some(kept.path()), Chance::turning(1));
 
     let answer = at_the_door(router, a_device(7), None, "{}").await;
 
