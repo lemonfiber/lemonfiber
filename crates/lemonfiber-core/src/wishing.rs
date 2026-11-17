@@ -18,6 +18,7 @@ mod beside;
 mod collect;
 mod cover;
 mod find;
+mod found;
 mod kinds;
 mod place;
 mod poster;
@@ -31,7 +32,8 @@ use crate::app::targets::{fillers_here, identity, request_service, requests_as_o
 use crate::app::{Ctx, Outcome, Wishing};
 use crate::error::codes::wish::{
     ALREADY_HERE, CANNOT_FETCH, NOBODY_ASKING, NOTHING_LEFT, NOT_ASKABLE, NOT_A_MEMBER,
-    NOT_A_PLACE, NOT_A_SEARCH, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_PICTURE, NO_ROOM,
+    NOT_A_PLACE, NOT_A_SEARCH, NOT_CHECKED, NOT_ITS_SEASON, NOT_SET_UP, NOT_WORKING, NO_PICTURE,
+    NO_ROOM,
 };
 use crate::error::{Code, Problem, Remedy, State};
 use crate::ports::docker::Lifecycle;
@@ -48,7 +50,7 @@ pub use poster::poster;
 
 /// Every refusal a member's search, ask or poster answers with, which a client names by
 /// its code.
-pub const REFUSALS: [Code; 13] = [
+pub const REFUSALS: [Code; 14] = [
     NOT_A_SEARCH,
     NOT_A_PLACE,
     NOT_ASKABLE,
@@ -62,6 +64,7 @@ pub const REFUSALS: [Code; 13] = [
     NOBODY_ASKING,
     NOT_A_MEMBER,
     NO_PICTURE,
+    NOT_CHECKED,
 ];
 
 /// What a member's search or ask comes to.
@@ -88,12 +91,19 @@ pub(crate) async fn wished(ctx: &Ctx, wishing: Wishing) -> Result<Outcome, Box<P
             .await
             .map(Outcome::Askable),
         Wishing::Kinds { member } => kinds::kinds(ctx, &member).await.map(Outcome::AskableKinds),
-        Wishing::Ask { member, wish } => ask::asked(ctx, &member, wish).await.map(Outcome::Asked),
+        Wishing::Ask {
+            member,
+            wish,
+            found,
+        } => ask::asked(ctx, &member, wish, found.as_deref())
+            .await
+            .map(Outcome::Asked),
         Wishing::Collect {
             member,
             unit,
             reference,
-        } => collect::asked(ctx, &member, unit, &reference)
+            found,
+        } => collect::asked(ctx, &member, unit, &reference, found.as_deref())
             .await
             .map(Outcome::Asked),
     }
@@ -205,16 +215,22 @@ async fn deliverable(ctx: &Ctx, fillers: &Fillers) -> Vec<Kind> {
         .collect()
 }
 
-/// What the title `id` of `kind` is, where it is one `reached` may ask for.
+/// What the title `id` of `kind` is, where it is one `reached` may ask for, looked up
+/// again before it is called unknown where the member's own search `vouched` for it.
 ///
 /// A title outside the member's limits and one the service does not know get the same
 /// answer, so nothing reveals a title a search hides.
 ///
 /// # Errors
 ///
-/// The refusal for a kind this house cannot fetch, for a title it may not ask for, and
-/// for a service that does not answer.
-async fn titled(reached: &Reached, kind: Kind, id: &str) -> Result<Detail, Box<Problem>> {
+/// The refusal for a kind this house cannot fetch, for a title it may not ask for, for one
+/// vouched for that could not be looked up again, and for a service that does not answer.
+async fn titled(
+    reached: &Reached,
+    kind: Kind,
+    id: &str,
+    vouched: bool,
+) -> Result<Detail, Box<Problem>> {
     if !reached.kinds.contains(&kind) {
         return Err(refused(
             CANNOT_FETCH,
@@ -224,12 +240,13 @@ async fn titled(reached: &Reached, kind: Kind, id: &str) -> Result<Detail, Box<P
     if id.trim().is_empty() {
         return Err(no_such_title());
     }
-    let detail = reached
-        .requests
-        .detail(kind, id, reached.limits.region())
-        .await
-        .map_err(|_| not_working())?
-        .ok_or_else(no_such_title)?;
+    let region = reached.limits.region();
+    let detail = found::looked_up(
+        vouched,
+        reached.requests.detail(kind, id, region).await,
+        || reached.requests.detail(kind, id, region),
+    )
+    .await?;
     if reached.limits.restricted() && !reached.limits.admits(detail.certification.as_deref()) {
         return Err(no_such_title());
     }

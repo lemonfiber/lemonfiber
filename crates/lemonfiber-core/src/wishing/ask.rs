@@ -40,12 +40,19 @@ enum Choice {
 /// # Errors
 ///
 /// A [`Problem`] where the house cannot fetch that kind, where no title the member may
-/// ask for goes by that id, where a season named is not the title's, where it is already
+/// ask for goes by that id, where one the member's search vouched for with `found` could
+/// not be looked up again, where a season named is not the title's, where it is already
 /// here, where the house has no room, where the member's allowance has none left, and
 /// wherever [`reached`] refuses or what answers does not.
-pub(super) async fn asked(ctx: &Ctx, named: &str, wish: Wish) -> Result<AskedReport, Box<Problem>> {
+pub(super) async fn asked(
+    ctx: &Ctx,
+    named: &str,
+    wish: Wish,
+    found: Option<&str>,
+) -> Result<AskedReport, Box<Problem>> {
     let reached = reached(ctx, named).await?;
-    let detail = titled(&reached, wish.kind, &wish.id).await?;
+    let vouched = super::found::vouches(ctx, found, &reached.member.id, wish.kind.into(), &wish.id);
+    let detail = titled(&reached, wish.kind, &wish.id, vouched).await?;
     let theirs = super::allowance(ctx, &reached)
         .await
         .map_err(|_| not_working())?;

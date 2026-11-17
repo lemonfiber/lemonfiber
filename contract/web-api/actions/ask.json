@@ -57,6 +57,17 @@
           "null"
         ]
       }
+    },
+    {
+      "name": "found",
+      "type": {
+        "default": null,
+        "description": "The token a page of a member's search vouched for the title asked for with, handed\nback as the page gave it.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     }
   ],
   "consent": [],

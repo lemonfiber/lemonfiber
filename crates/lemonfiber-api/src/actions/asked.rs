@@ -232,6 +232,9 @@ pub struct Arguments {
     /// The seasons of a series asked for. None names every season not already here or
     /// on its way.
     pub seasons: Vec<u32>,
+    /// The token a page of a member's search vouched for the title asked for with, handed
+    /// back as the page gave it.
+    pub found: Option<String>,
     /// Each way to be told a member chooses, by the id the operator's offer lists it under.
     pub backends: Vec<String>,
     /// Whether to say what the action would do and do none of it.

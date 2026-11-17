@@ -133,6 +133,15 @@ pub(super) fn carries_seasons(command: &Command) -> bool {
     matches!(command, Command::Wish(Wishing::Ask { wish, .. }) if wish.seasons == [SEASON + 1])
 }
 
+pub(super) fn give_found(given: &mut Arguments) {
+    given.found = Some("another-token".to_owned());
+}
+
+/// Whether the command has the token a member's search vouched for the title with in it.
+pub(super) fn carries_found(command: &Command) -> bool {
+    matches!(command, Command::Wish(Wishing::Ask { found, .. }) if found.as_deref() == Some("another-token"))
+}
+
 pub(super) fn give_position(given: &mut Arguments) {
     given.position = Some(POSITION + 1);
 }

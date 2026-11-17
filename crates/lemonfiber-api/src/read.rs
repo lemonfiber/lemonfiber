@@ -38,7 +38,7 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Doorway};
 use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{kind, Envelope};
 
-use crate::admission::Caller;
+use crate::admission::{Caller, RETRY_AFTER};
 use crate::entitled::{may, Door};
 use crate::guard::Arrived;
 use crate::read::table::{named, wanted, Wanted, OFFERED, TITLE};
@@ -144,10 +144,9 @@ async fn answering(
                 Some(id) => serving.kept.read(&serving.ctx, id, command).await,
                 None => carried_out(&serving.ctx, command).await,
             },
-            Ok(command) => {
-                let (status, body) = rendered(&serving.ctx, command, Audience::of(caller)).await;
-                enveloped(status, body)
-            }
+            Ok(command) => rendered(&serving.ctx, command, Audience::of(caller))
+                .await
+                .response(),
             Err(refused) => *refused,
         },
         Err(why) => why.answered(),
@@ -167,19 +166,14 @@ fn arrived_from(command: Command, from: Option<IpAddr>) -> Command {
 /// The three calls a machine-readable command line makes, in the order it makes
 /// them, so the bytes a caller reads here are the bytes it would have piped.
 pub async fn carried_out(ctx: &Ctx, command: Command) -> Response {
-    let (status, body) = rendered(ctx, command, Audience::Operator).await;
-    enveloped(status, body)
+    rendered(ctx, command, Audience::Operator).await.response()
 }
 
 /// Carry out a command, and the status and envelope it is answered with, worded for
 /// `audience`.
-pub(crate) async fn rendered(
-    ctx: &Ctx,
-    command: Command,
-    audience: Audience,
-) -> (StatusCode, Option<String>) {
+pub(crate) async fn rendered(ctx: &Ctx, command: Command, audience: Audience) -> Reply {
     match dispatch(command, ctx).await {
-        Ok(outcome) => (
+        Ok(outcome) => Reply::of(
             StatusCode::OK,
             audience.outcome(outcome).envelope().to_json(),
         ),
@@ -187,12 +181,60 @@ pub(crate) async fn rendered(
     }
 }
 
+/// A command's answer: its status, its envelope, and how many seconds a caller it refused
+/// is told to wait before trying again, where its refusal's code says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reply {
+    /// The status it is answered at.
+    pub status: StatusCode,
+    /// The envelope it is answered with.
+    pub body: Option<String>,
+    /// How many seconds to wait before trying again, where the refusal says.
+    pub retry_after: Option<u64>,
+}
+
+impl Reply {
+    /// `body` at `status`, saying nothing about trying again.
+    #[must_use]
+    pub const fn of(status: StatusCode, body: Option<String>) -> Self {
+        Self {
+            status,
+            body,
+            retry_after: None,
+        }
+    }
+
+    /// It as a response, carrying `Retry-After` where it says how long to wait.
+    #[must_use]
+    pub fn response(&self) -> Response {
+        let mut response = enveloped(self.status, self.body.clone());
+        if let Some(seconds) = self.retry_after {
+            response
+                .headers_mut()
+                .insert(RETRY_AFTER, axum::http::HeaderValue::from(seconds));
+        }
+        response
+    }
+}
+
 /// The failure a command reported, as the status and envelope it is answered with.
-fn failed(problem: &Problem) -> (StatusCode, Option<String>) {
-    (
-        refusing(problem),
-        Envelope::new(kind::ERROR, problem).to_json(),
-    )
+fn failed(problem: &Problem) -> Reply {
+    Reply {
+        retry_after: retry_after(problem),
+        ..Reply::of(
+            refusing(problem),
+            Envelope::new(kind::ERROR, problem).to_json(),
+        )
+    }
+}
+
+/// How many seconds `problem`'s code tells a caller to wait before trying again, where it
+/// says.
+pub(crate) fn retry_after(problem: &Problem) -> Option<u64> {
+    problem
+        .code
+        .declaration()
+        .and_then(lemonfiber_core::error::codes::Declared::retry_after)
 }
 
 /// The failure a command reported, in the envelope machine-readable output gives
@@ -250,3 +292,6 @@ pub fn enveloped(status: StatusCode, rendered: Option<String>) -> Response {
     *response.status_mut() = status;
     response
 }
+
+#[cfg(test)]
+mod tests;

@@ -724,6 +724,7 @@ that it is a fault of the stack.
 | `WISH-11` | `NOBODY_ASKING` | error | 1 | 400 | 0.18.0 | Said where nobody is named for something only a member can do. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-12` | `NOT_A_MEMBER` | error | 1 | 404 | 0.18.0 | Said where the member named is not somebody in the household. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WISH-13` | `NO_PICTURE` | error | 1 | 404 | 0.18.0 | Said where a title a member may ask for has no picture to show them. | That title has no picture to show. You can still ask for it by its name. |
+| `WISH-15` | `NOT_CHECKED` | error | 1 | 503 | 0.18.0 | Said where a title the member's own search just found could not be looked up again for their ask, so it was neither asked for nor called unknown. | It couldn't be checked just now. Try again in a moment. |
 
 ## `WORD` — the glossary
 

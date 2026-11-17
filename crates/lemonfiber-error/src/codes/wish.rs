@@ -157,4 +157,20 @@ codes! {
             remedy: "You can still ask for it by its name.",
         },
     }
+    /// Said where a title the member's own search just found could not be looked up again
+    /// for their ask, so it was neither asked for nor called unknown.
+    NOT_CHECKED = "WISH-15" {
+        severity: Error,
+        status: 503,
+        retry_after: 5,
+        since: "0.18.0",
+        meaning: "A title this member's own search just found could not be looked up again, \
+            so nothing was asked for. Whoever looks it up was slow to answer, which is not a \
+            fault in the house.",
+        remedy: "Try again in a moment.",
+        household: {
+            said: "It couldn't be checked just now.",
+            remedy: "Try again in a moment.",
+        },
+    }
 }

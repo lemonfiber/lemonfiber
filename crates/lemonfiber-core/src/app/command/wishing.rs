@@ -29,6 +29,8 @@ pub enum Wishing {
         member: String,
         /// The title, its kind and the seasons asked for.
         wish: Wish,
+        /// The token the member's search vouched for the title with, where it handed one.
+        found: Option<String>,
     },
     /// Ask for one album, artist, book, author or series on a member's behalf.
     Collect {
@@ -38,5 +40,7 @@ pub enum Wishing {
         unit: Unit,
         /// The curator's reference for it, as their search listed it.
         reference: String,
+        /// The token the member's search vouched for it with, where it handed one.
+        found: Option<String>,
     },
 }

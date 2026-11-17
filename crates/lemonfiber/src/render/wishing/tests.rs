@@ -47,6 +47,7 @@ fn a_title(id: &str, kind: TitleKind, year: Option<u16>, stands: Stands) -> Aska
         year,
         cover: None,
         stands,
+        found: None,
     }
 }
 

@@ -235,6 +235,7 @@ pub(super) async fn asked(
                 kind,
                 seasons: seasons.to_vec(),
             },
+            found: None,
         },
     )
     .await

@@ -122,6 +122,10 @@ pub struct Askable {
     pub cover: Option<String>,
     /// Where it stands in the house.
     pub stands: Stands,
+    /// The token vouching that this member's search offered it, for their ask to hand
+    /// back, where the core could sign one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub found: Option<String>,
 }
 
 /// One page of what a member's search found, under their limits.

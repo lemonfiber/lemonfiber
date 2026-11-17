@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "found": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "id": {
       "type": [
         "string"

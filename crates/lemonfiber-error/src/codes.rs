@@ -58,6 +58,7 @@ macro_rules! codes {
             severity: $severity:ident,
             status: $status:literal,
             $(leaves: $leaves:ident,)?
+            $(retry_after: $retry_after:literal,)?
             since: $since:literal,
             meaning: $meaning:literal,
             remedy: $remedy:literal,
@@ -76,6 +77,7 @@ macro_rules! codes {
             severity: crate::Severity::$severity,
             status: $status,
             leaves: codes!(@leaves $($leaves)?),
+            retry_after: codes!(@retry_after $($retry_after)?),
             since: $since,
             meaning: $meaning,
             remedy: $remedy,
@@ -88,6 +90,8 @@ macro_rules! codes {
     };
     (@leaves) => { crate::codes::Leaves::Failure };
     (@leaves $leaves:ident) => { crate::codes::Leaves::$leaves };
+    (@retry_after) => { None };
+    (@retry_after $seconds:literal) => { Some($seconds) };
 }
 
 /// Declares each family's module, with the line saying what it covers and the parts its
@@ -231,6 +235,7 @@ pub struct Declared {
     severity: Severity,
     status: u16,
     leaves: Leaves,
+    retry_after: Option<u64>,
     since: &'static str,
     meaning: &'static str,
     remedy: &'static str,
@@ -272,6 +277,13 @@ impl Declared {
     #[must_use]
     pub const fn leaves(self) -> Leaves {
         self.leaves
+    }
+
+    /// How many seconds a caller refused with it is told to wait before trying again, where
+    /// it says.
+    #[must_use]
+    pub const fn retry_after(self) -> Option<u64> {
+        self.retry_after
     }
 
     /// The version of lemonfiber it first appeared in.

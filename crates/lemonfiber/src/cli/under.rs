@@ -165,6 +165,10 @@ pub enum HouseholdCommand {
         /// already here or on its way.
         #[arg(long = "season")]
         seasons: Vec<u32>,
+        /// The token their search listed the title with, so a title it just found is looked
+        /// up again before it is called unknown.
+        #[arg(long)]
+        found: Option<String>,
     },
 }
 

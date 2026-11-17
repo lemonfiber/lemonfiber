@@ -40,7 +40,7 @@ pub async fn poster(
 ) -> Result<Pictured, Box<Problem>> {
     let reached = reached(ctx, named).await?;
     let kind = Kind::for_media_type(kind).ok_or_else(no_such_title)?;
-    let detail = titled(&reached, kind, id).await?;
+    let detail = titled(&reached, kind, id, false).await?;
     if !ctx.settings.reaching.allows(REACH_POSTERS_KEY) {
         return Err(no_picture());
     }

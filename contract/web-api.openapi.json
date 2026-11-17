@@ -1207,6 +1207,13 @@
               "null"
             ]
           },
+          "found": {
+            "description": "The token vouching that this member's search offered it, for their ask to hand\nback, where the core could sign one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "description": "The id it is asked for by.",
             "type": "string"
@@ -27926,6 +27933,14 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "found": {
+                    "default": null,
+                    "description": "The token a page of a member's search vouched for the title asked for with, handed\nback as the page gave it.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "id": {
                     "default": null,
                     "description": "The thing an action is about, by its id: the title or episode a player's progress\nis on, by the identifier the shelf lists it under, the title a member asks for, by\nthe identifier their search listed it under, or the wake a phone confirms.",

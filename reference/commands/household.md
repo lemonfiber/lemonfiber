@@ -478,6 +478,9 @@ Options:
       --season <SEASONS>
           A season to ask for, given once for each. None asks for every season not already here or on its way
 
+      --found <FOUND>
+          The token their search listed the title with, so a title it just found is looked up again before it is called unknown
+
       --stack-dir <PATH>
           Operate a stack directory of your own instead of the built-in one
 

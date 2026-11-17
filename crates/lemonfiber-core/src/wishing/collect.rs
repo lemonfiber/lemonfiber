@@ -42,15 +42,17 @@ pub(super) async fn found(
         .await
         .map_err(|_| not_working())?;
     let kept = crate::collected::run::every(ctx);
+    let mut titles: Vec<Askable> = page
+        .found
+        .into_iter()
+        .map(|found| askable(unit, found, &kept))
+        .collect();
+    super::found::vouched(ctx, &reached.member.id, &mut titles);
     Ok(AskableReport {
         member: reached.member.name,
         term: term.to_owned(),
         kinds: vec![TitleKind::from(unit.medium())],
-        titles: page
-            .found
-            .into_iter()
-            .map(|found| askable(unit, found, &kept))
-            .collect(),
+        titles,
         next: page.next,
         approval: format!("{}.", capitalised(theirs.asking.policy.household())),
         asking: theirs.asking,
@@ -67,7 +69,8 @@ pub(super) async fn found(
 /// # Errors
 ///
 /// A [`Problem`] where no curator here answers for the unit's medium, where it holds no
-/// such candidate, where it is already here, where the house has no room, where the
+/// such candidate, where one the member's search vouched for with `found` could not be
+/// looked up again, where it is already here, where the house has no room, where the
 /// member's allowance has none left, and wherever [`reached`] refuses or what answers
 /// does not.
 pub(super) async fn asked(
@@ -75,15 +78,19 @@ pub(super) async fn asked(
     named: &str,
     unit: Unit,
     reference: &str,
+    found: Option<&str>,
 ) -> Result<AskedReport, Box<Problem>> {
     let path = crate::collected::run::kept_at(ctx).map_err(|_| not_working())?;
     let reached = reached(ctx, named).await?;
     let (service, curator) = curator_of(ctx, unit).await?;
-    let candidate = curator
-        .candidate(unit, reference)
-        .await
-        .map_err(|_| not_working())?
-        .ok_or_else(super::no_such_title)?;
+    let vouched = super::found::vouches(
+        ctx,
+        found,
+        &reached.member.id,
+        TitleKind::from(unit.medium()),
+        reference,
+    );
+    let candidate = candidate_of(&curator, unit, reference, vouched).await?;
     let theirs = super::allowance(ctx, &reached)
         .await
         .map_err(|_| not_working())?;
@@ -224,7 +231,27 @@ fn askable(unit: Unit, found: Candidate, kept: &[Ask]) -> Askable {
         by: found.by,
         year: found.year,
         cover: found.cover,
+        found: None,
     }
+}
+
+/// The candidate `reference` names as a `unit`, looked up again before it is called unknown
+/// where the member's own search `vouched` for it.
+///
+/// # Errors
+///
+/// No such title where the curator holds none and nothing vouches for it, the try-again
+/// where it is vouched for and still unknown, and asking not working where it fails.
+async fn candidate_of(
+    curator: &Collector,
+    unit: Unit,
+    reference: &str,
+    vouched: bool,
+) -> Result<Candidate, Box<Problem>> {
+    super::found::looked_up(vouched, curator.candidate(unit, reference).await, || {
+        curator.candidate(unit, reference)
+    })
+    .await
 }
 
 /// Whether the core keeps an ask for the `unit` `reference` names waiting for the operator.

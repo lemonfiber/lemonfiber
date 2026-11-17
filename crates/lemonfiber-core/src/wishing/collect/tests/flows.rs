@@ -115,6 +115,7 @@ pub(super) async fn asked(
             member: member.to_owned(),
             unit,
             reference: KIND_OF_BLUE.to_owned(),
+            found: None,
         },
     )
     .await
