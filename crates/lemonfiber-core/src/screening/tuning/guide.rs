@@ -8,7 +8,9 @@
 //!
 //! **The window is the operator's.** It is the hours `LEMONFIBER_GUIDE_HOURS` holds,
 //! and each channel says where the media server's guide ends inside it, so a window
-//! longer than the guide reaches no further than the guide does.
+//! longer than the guide reaches no further than the guide does. That is where the
+//! adapter says it ends, before the server's own policy left anything out, or where the
+//! last programme it answered ends, whichever is later.
 
 use crate::app::targets::Media;
 use crate::app::Ctx;
@@ -66,7 +68,7 @@ async fn listed(server: &Media, member: &Member, hours: u32) -> Result<Vec<Listi
 }
 
 /// `channel` with the programmes its listing holds airing between `now` and `until`, in
-/// the order they air, each outside `limits` left out.
+/// the order they air, each outside `limits` left out, and where its guide ends.
 fn guided(
     channel: Channel,
     listings: &[Listing],
@@ -74,15 +76,23 @@ fn guided(
     now: Instant,
     until: Instant,
 ) -> Guided {
-    let mut aired: Vec<&Airing> = listings
+    let listed: Vec<&Listing> = listings
         .iter()
         .filter(|listing| listing.channel == channel.id)
+        .collect();
+    let mut aired: Vec<&Airing> = listed
+        .iter()
         .flat_map(|listing| &listing.programmes)
         .filter(|airing| airing.ends > now && airing.starts < until)
         .collect();
     aired.sort_by_key(|airing| airing.starts);
     Guided {
-        guide_until: aired.iter().map(|airing| airing.ends).max(),
+        guide_until: aired
+            .iter()
+            .map(|airing| airing.ends)
+            .chain(listed.iter().filter_map(|listing| listing.until))
+            .filter(|ends| *ends > now)
+            .max(),
         programmes: aired
             .into_iter()
             .filter(|airing| limits.admits(airing.certificate.as_deref()))

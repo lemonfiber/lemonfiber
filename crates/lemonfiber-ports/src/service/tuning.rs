@@ -58,8 +58,13 @@ pub struct Listing {
     /// The channel, by the identifier the channels list gives it.
     pub channel: String,
     /// Each programme the server's guide holds on it from now across the hours asked, in
-    /// the order they air, none past where the guide ends.
+    /// the order they air, none past where the guide ends, and from minor 6 none the
+    /// server's own policy keeps from the member's account.
     pub programmes: Vec<Airing>,
+    /// From minor 6, where the server's guide ends on it across the hours asked: the end of
+    /// the last programme it holds there before any is left out, none where it holds none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<Instant>,
 }
 
 /// A programme in a channel's guide.
@@ -106,7 +111,8 @@ pub trait Tuning: Send + Sync {
     async fn channels(&self, member: &str) -> Result<Vec<Channel>, Failure>;
 
     /// The guide of each channel `member`'s own account may watch, across `hours` from
-    /// now; none where their account may not watch live TV.
+    /// now, and where the server's guide ends on it; none where their account may not watch
+    /// live TV.
     ///
     /// # Errors
     ///
