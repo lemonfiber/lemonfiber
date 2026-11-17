@@ -67,6 +67,14 @@ pub fn told(declared: &lemonfiber_ports::service::Declared) -> Paths {
                 pattern: path.pattern.clone(),
                 parameter: path.parameter.clone(),
                 stream: path.stream.clone(),
+                bound: path
+                    .bound
+                    .iter()
+                    .map(|bound| InQuery {
+                        parameter: bound.parameter.clone(),
+                        pattern: bound.pattern.clone(),
+                    })
+                    .collect(),
             })
             .collect(),
         declared
@@ -95,19 +103,21 @@ const ITEM: &str = "item";
 enum Naming {
     /// In the group of the path pattern.
     Path,
-    /// In the whole value of this query parameter.
+    /// In the whole value of this query parameter, and where the path pattern holds the
+    /// group, in that group too.
     Parameter(String),
     /// In the group of this pattern, matched whole against this query parameter's value.
     Value(String, regex::Regex),
 }
 
-/// One compiled path: the paths it covers, where it finds what it names, and the shape
-/// what it names has.
+/// One compiled path: the paths it covers, where it finds what it names, the shape what
+/// it names has, and the further parameters that have to name it too.
 #[derive(Debug)]
 struct Compiled {
     pattern: regex::Regex,
     naming: Naming,
     shape: regex::Regex,
+    bound: Vec<(String, regex::Regex)>,
 }
 
 impl Compiled {
@@ -124,9 +134,10 @@ impl Compiled {
             }
     }
 
-    /// What a request on `path` with the query pairs `pairs` names, read from the one
-    /// place this path finds it, where it has this path's shape; nothing where the
-    /// parameter it is found in is carried other than once under its spelling.
+    /// What a request on `path` with the query pairs `pairs` names, read from the place
+    /// this path finds it, where it has this path's shape, and where a parameter names it,
+    /// the path's own group and every bound parameter name the same; nothing where a
+    /// parameter it is read from is carried other than once under its spelling.
     fn named(&self, group: &str, path: &str, pairs: &[(&str, Option<&str>)]) -> Option<String> {
         let found = match &self.naming {
             Naming::Path => self
@@ -135,14 +146,33 @@ impl Compiled {
                 .name(group)?
                 .as_str()
                 .to_owned(),
-            Naming::Parameter(parameter) => once(pairs, parameter)?,
+            Naming::Parameter(parameter) => {
+                let carried = once(pairs, parameter)?;
+                let in_path = self.pattern.captures(path).and_then(|captured| {
+                    captured.name(group).map(|named| named.as_str() == carried)
+                });
+                if in_path == Some(false) {
+                    return None;
+                }
+                carried
+            }
             Naming::Value(parameter, value) => value
                 .captures(&once(pairs, parameter)?)?
                 .name(group)?
                 .as_str()
                 .to_owned(),
         };
-        self.shape.is_match(&found).then_some(found)
+        let agreed = self.bound.iter().all(|(parameter, value)| {
+            once(pairs, parameter)
+                .and_then(|carried| {
+                    value
+                        .captures(&carried)?
+                        .name(group)
+                        .map(|named| named.as_str() == found)
+                })
+                .unwrap_or(false)
+        });
+        (agreed && self.shape.is_match(&found)).then_some(found)
     }
 }
 
@@ -218,7 +248,15 @@ impl Watching {
                     .parameter
                     .clone()
                     .map_or(Naming::Path, Naming::Parameter);
-                compiled(&path.pattern, naming, &path.stream, STREAM)
+                let bound = path
+                    .bound
+                    .iter()
+                    .map(|bound| Ok((bound.parameter.clone(), in_value(&bound.pattern, STREAM)?)))
+                    .collect::<Result<_, String>>()?;
+                Ok(Compiled {
+                    bound,
+                    ..compiled(&path.pattern, naming, &path.stream, STREAM)?
+                })
             })
             .collect::<Result<_, String>>()?;
         let bytes = paths
@@ -227,10 +265,9 @@ impl Watching {
             .map(|path| {
                 let naming = match &path.query {
                     None => Naming::Path,
-                    Some(query) => Naming::Value(
-                        query.parameter.clone(),
-                        grouped(&format!("^(?:{})$", query.pattern), ITEM)?,
-                    ),
+                    Some(query) => {
+                        Naming::Value(query.parameter.clone(), in_value(&query.pattern, ITEM)?)
+                    }
                 };
                 compiled(&path.pattern, naming, &path.item, ITEM)
             })
@@ -302,7 +339,13 @@ fn compiled(pattern: &str, naming: Naming, shape: &str, group: &str) -> Result<C
         pattern,
         naming,
         shape,
+        bound: Vec::new(),
     })
+}
+
+/// `pattern`, matched against a whole query value, where it holds a group named `group`.
+fn in_value(pattern: &str, group: &str) -> Result<regex::Regex, String> {
+    grouped(&format!("^(?:{pattern})$"), group)
 }
 
 /// `pattern` compiled, where it holds a group named `group`.

@@ -111,7 +111,7 @@
     },
     {
       "path": "media.serve/v1/operations/declared.json",
-      "sha256": "aa3b8ffc13c513628efe881b3ca885440c79ff13978e932e4e2422c2efed270e"
+      "sha256": "6b02ea8ec371a5676b2bc73181f47fdbe66d3f15ae30cdc25dc58f0b254354c5"
     },
     {
       "path": "media.serve/v1/operations/furnish.json",

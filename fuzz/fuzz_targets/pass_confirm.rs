@@ -19,11 +19,13 @@ fuzz_target!(|data: &[u8]| {
                 pattern: "(?i)^/live/(?P<stream>[^/]+)/".to_owned(),
                 parameter: None,
                 stream: "^[0-9a-f]{32}$".to_owned(),
+                bound: Vec::new(),
             },
             LivePath {
                 pattern: "(?i)^/videos/[^/]+/live\\.m3u8$".to_owned(),
                 parameter: Some("LiveStreamId".to_owned()),
                 stream: "^[0-9a-f_]{98}$".to_owned(),
+                bound: Vec::new(),
             },
         ],
         vec![

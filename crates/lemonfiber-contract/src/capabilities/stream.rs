@@ -50,6 +50,7 @@ fn declared() -> Declared {
             pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
             parameter: None,
             stream: HEX.to_owned(),
+            bound: Vec::new(),
         }],
         refused: vec!["^/everything/picture$".to_owned()],
         question: Some(Question {

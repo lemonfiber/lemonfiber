@@ -97,11 +97,13 @@ fn the_paths_read_back_as_written_and_another_format_is_refused() {
                 pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
                 parameter: None,
                 stream: "^[a-z0-9]+$".to_owned(),
+                bound: Vec::new(),
             },
             LivePath {
                 pattern: "^/videos/[^/]+/live\\.m3u8$".to_owned(),
                 parameter: Some("LiveStreamId".to_owned()),
                 stream: "^[a-z0-9]+$".to_owned(),
+                bound: Vec::new(),
             },
         ],
         vec![ItemPath {

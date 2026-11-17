@@ -150,6 +150,7 @@ pub(crate) fn declared() -> Declared {
             pattern: "^/LiveTv/LiveStreamFiles/(?P<stream>[^/]+)/stream\\.".to_owned(),
             parameter: None,
             stream: "^[0-9A-Za-z]{1,64}$".to_owned(),
+            bound: Vec::new(),
         }],
         refused: vec![
             format!("{PREFIXED}/{BY_NAME}/[^/]+/Images(?:/|$)"),

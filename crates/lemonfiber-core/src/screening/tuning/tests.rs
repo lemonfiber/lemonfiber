@@ -223,11 +223,13 @@ fn ready() -> Ready {
                     pattern: "^/live/(?P<stream>[^/]+)/".to_owned(),
                     parameter: None,
                     stream: "^[0-9a-f]{32}$".to_owned(),
+                    bound: Vec::new(),
                 },
                 LivePath {
                     pattern: "^/videos/[^/]+/live\\.m3u8$".to_owned(),
                     parameter: Some("LiveStreamId".to_owned()),
                     stream: "^ls[0-9]$".to_owned(),
+                    bound: Vec::new(),
                 },
             ],
             Vec::new(),
