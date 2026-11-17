@@ -20,7 +20,9 @@ use crate::ports::serving::{Bound, Serve};
 /// as install runs both as the operator, the adapter from the
 /// image a check names in place of its pin, its upstream's copy mounted where it shares
 /// its upstream's configuration. An adapter that is its own upstream is the
-/// one container, run as the adapter.
+/// one container, run as the adapter. An upstream that runs only at the times its
+/// schedule names is never started: its adapter is the one container, reaching
+/// `reaching`, with the upstream's copy mounted where it shares it.
 pub(super) fn serves(
     recorder: Recorder<'_>,
     upstream: &Placed,
@@ -64,6 +66,15 @@ pub(super) fn serves(
             ..started
         }
     };
+    if upstream.fields.schedule.is_some() && !alone {
+        return (
+            Serve {
+                reaching,
+                ..adapting(None)
+            },
+            None,
+        );
+    }
     let settled = if alone {
         adapting(prepared.data.as_deref())
     } else {
