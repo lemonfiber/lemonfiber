@@ -238,6 +238,29 @@ fn a_given_provider_is_planned_but_dropped_when_usenet_is_no_longer_chosen() {
 }
 
 #[test]
+fn the_vpn_answer_is_written_while_torrents_are_chosen_and_dropped_when_they_are_not() {
+    let mut wizard = on_native_linux();
+    wizard
+        .answer(Answer::Protocols(Protocols::both()))
+        .unwrap_or(());
+    wizard.answer(Answer::Vpn(Vpn::Absent)).unwrap_or(());
+    assert_eq!(setting(&wizard.plan(), "LEMONFIBER_VPN"), Some("off"));
+
+    wizard
+        .answer(Answer::Vpn(Vpn::Carrying(Guarded::default())))
+        .unwrap_or(());
+    assert_eq!(setting(&wizard.plan(), "LEMONFIBER_VPN"), Some("on"));
+
+    wizard
+        .answer(Answer::Protocols(Protocols {
+            usenet: true,
+            torrent: false,
+        }))
+        .unwrap_or(());
+    assert_eq!(setting(&wizard.plan(), "LEMONFIBER_VPN"), None);
+}
+
+#[test]
 fn an_unanswered_question_contributes_no_setting() {
     // A fresh wizard writes nothing; a partly answered one writes only what it
     // has, never a guessed default for what it does not.

@@ -357,3 +357,39 @@ fn an_events_address_is_read_trimmed_and_a_blank_one_as_absent() {
         None
     );
 }
+
+#[test]
+fn only_a_written_off_declines_the_vpn() {
+    let declined = |written: &str| super::vpn_declined_from_env(&env::EnvFile::parse(written));
+    assert!(declined("LEMONFIBER_VPN=off\n"));
+    assert!(declined("LEMONFIBER_VPN=\"no\"\n"));
+    assert!(!declined("LEMONFIBER_VPN=on\n"));
+    assert!(!declined("LEMONFIBER_VPN=\n"));
+    assert!(!declined(""));
+    assert!(!Settings::default().vpn_declined);
+}
+
+#[test]
+fn torrents_are_tunnelled_unless_the_vpn_was_declined() {
+    let settings = Settings {
+        protocols: Protocols::both(),
+        ..Settings::default()
+    };
+    assert!(settings.supported().tunnelled());
+    assert!(!settings.supported().unguarded());
+    let declined = Settings {
+        vpn_declined: true,
+        ..settings
+    };
+    assert!(!declined.supported().tunnelled());
+    assert!(declined.supported().unguarded());
+    let usenet = super::Supported {
+        protocols: Protocols {
+            usenet: true,
+            torrent: false,
+        },
+        vpn_declined: true,
+    };
+    assert!(!usenet.tunnelled() && !usenet.unguarded());
+    assert!(!super::Supported::from(Protocols::both()).vpn_declined);
+}

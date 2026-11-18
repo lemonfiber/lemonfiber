@@ -3,8 +3,9 @@
 
 use lemonfiber_manifest::Manifest;
 
-use super::super::{everything, joined, resolve, Joining, Plan, Protocols, Vanished};
+use super::super::{everything, joined, resolve, Joining, Plan, Vanished};
 use super::{named, STACK};
+use crate::config::Protocols;
 
 /// A plugin bringing one service, joining `forms`.
 fn plugin(id: &str, forms: &[&str]) -> Joining {

@@ -16,7 +16,7 @@ use super::Indexer;
 use super::{
     DATA_ROOT_KEY, DEFAULT_IP_ECHO, DOMAIN_KEY, EXPOSED_KEY, FRONT_DOOR_KEY, HOUSEHOLD_HOST_KEY,
     INDEXER_APIKEY_KEY, INDEXER_URL_KEY, IP_ECHO_KEY, PGID_KEY, PROVIDER_HOST_KEY, PUID_KEY,
-    SECOND_IP_ECHO, UNMANAGED_KEY, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
+    SECOND_IP_ECHO, UNMANAGED_KEY, VPN_KEY, VPN_PORT_FORWARDING_KEY, VPN_PROVIDER_KEY,
 };
 
 /// A recorded value with the whitespace and surrounding quotes a person might
@@ -53,6 +53,14 @@ pub fn reads_as_on(value: &str) -> bool {
 #[must_use]
 pub fn reads_as_off(value: &str) -> bool {
     matches!(bare(value).as_str(), "off" | "false" | "no" | "0" | "")
+}
+
+/// Whether the operator chose torrents without a VPN: only a written off says so, and a
+/// blank or absent setting leaves a VPN carrying them.
+#[must_use]
+pub fn vpn_declined_from_env(file: &env::EnvFile) -> bool {
+    file.get(VPN_KEY)
+        .is_some_and(|value| !unquoted(value).is_empty() && reads_as_off(value))
 }
 
 /// The IP-echo service to verify egress against, or `None` where the operator

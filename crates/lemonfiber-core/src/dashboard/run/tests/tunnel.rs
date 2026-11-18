@@ -150,6 +150,23 @@ async fn a_stack_without_a_torrent_client_has_no_vpn_panel() {
 }
 
 #[tokio::test]
+async fn torrents_chosen_without_a_vpn_have_no_vpn_panel() {
+    let mut ctx = vpn_ctx(
+        tunnel_engine(true, Some(healthy_tunnel())),
+        vec!["https://echo".to_owned()],
+        forwarding(),
+        Protocols::both(),
+    );
+    ctx.settings.vpn_declined = true;
+    let panel = vpn_panel(&ctx).await;
+    assert!(panel.is_none());
+    assert_eq!(
+        super::super::egress(panel.as_ref()),
+        crate::health::Egress::NotApplicable
+    );
+}
+
+#[tokio::test]
 async fn port_forwarding_off_reads_no_forwarded_port() {
     let ctx = vpn_ctx(
         tunnel_engine(true, Some(healthy_tunnel())),
@@ -229,7 +246,7 @@ async fn a_torrent_stack_with_no_vpn_pair_does_not_apply() {
         &Reporting::absent(),
         "lemonfiber",
         &manifest,
-        Protocols::both(),
+        Protocols::both().into(),
         vec!["https://echo".to_owned()],
         Some(51413),
     )

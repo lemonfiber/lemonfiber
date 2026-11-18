@@ -268,7 +268,8 @@ pub(super) async fn vpn(
         Ok(manifest) => manifest,
         Err(reason) => return Some(Panel::unavailable(reason.clone())),
     };
-    let forwarded = if ctx.settings.port_forward.enabled && ctx.settings.protocols.torrent {
+    let supported = ctx.settings.supported();
+    let forwarded = if ctx.settings.port_forward.enabled && supported.tunnelled() {
         Grant::of(crate::app::forwarding::forwarded(ctx, manifest, project).await).port()
     } else {
         None
@@ -277,7 +278,7 @@ pub(super) async fn vpn(
         ctx.seams.engine.as_ref(),
         &ctx.settings.project,
         manifest,
-        ctx.settings.protocols,
+        supported,
         ctx.settings.ip_echo.clone(),
         forwarded,
     )
@@ -433,7 +434,7 @@ pub(super) async fn observe(
             &profiles,
             &containers,
             &halted,
-            ctx.settings.protocols,
+            ctx.settings.supported(),
         ),
         crate::docker::undeclared_beside(manifest, &beside, &containers, &halted),
     ))

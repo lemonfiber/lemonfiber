@@ -16,6 +16,7 @@
       "type": [
         "const:\"chosen\"",
         "const:\"contested\"",
+        "const:\"declined\"",
         "const:\"each\"",
         "const:\"outright\"",
         "const:\"unfilled\""
@@ -38,6 +39,7 @@
   "variants": [
     "\"chosen\"",
     "\"contested\"",
+    "\"declined\"",
     "\"each\"",
     "\"outright\"",
     "\"unfilled\""

@@ -6,14 +6,14 @@
 //! containers. A form can be perfectly startable and not started, or running and
 //! no longer startable because the credential it needed was removed since.
 //!
-//! Kept pure over what it is handed — the manifest, the protocols, and a survey of
+//! Kept pure over what it is handed — the manifest, what is supported, and a survey of
 //! what is up — so the whole vocabulary tests without a daemon, the same way
 //! resolving a closure does.
 
 use lemonfiber_manifest::Manifest;
 use serde::Serialize;
 
-use crate::config::Protocols;
+use crate::config::Supported;
 use crate::docker::{condition, Condition, Service, State};
 
 use super::closure::{filtered, resolve, Dropped, Filtered, Plan};
@@ -57,9 +57,10 @@ pub enum Standing {
 #[must_use]
 pub fn standings(
     manifest: &Manifest,
-    protocols: Protocols,
+    supported: impl Into<Supported>,
     running: &[Service],
 ) -> Vec<(String, Standing)> {
+    let supported = supported.into();
     // Resolved once per form and read twice. Deciding one form's standing needs its
     // own closure and every other form's, so resolving inside the per-form pass
     // would redo the same pure computation a second time for every form.
@@ -69,7 +70,7 @@ pub fn standings(
         .map(|form| {
             (
                 form.id.as_str(),
-                resolve(manifest, std::slice::from_ref(&form.id), protocols).ok(),
+                resolve(manifest, std::slice::from_ref(&form.id), supported).ok(),
             )
         })
         .collect();
@@ -157,11 +158,12 @@ fn all_up(running: &[Service], services: &[String]) -> bool {
 #[must_use]
 pub(crate) fn needed_by(
     manifest: &Manifest,
-    protocols: Protocols,
+    supported: impl Into<Supported>,
     running: &[Service],
     stopping: &[String],
 ) -> Vec<String> {
-    let Ok(going) = resolve(manifest, stopping, protocols) else {
+    let supported = supported.into();
+    let Ok(going) = resolve(manifest, stopping, supported) else {
         // Nothing resolvable is going, so nothing can be deprived of it. The caller
         // refuses an unresolvable form on its own account, with a better sentence
         // than this could give.
@@ -173,7 +175,7 @@ pub(crate) fn needed_by(
     // otherwise be refused on behalf of a form the operator has never named and cannot
     // meaningfully stop. Naming those would make the refusal noise, and a refusal that
     // is noise is one an operator learns to override without reading.
-    let up: Vec<String> = standings(manifest, protocols, running)
+    let up: Vec<String> = standings(manifest, supported, running)
         .into_iter()
         .filter(|(_, standing)| matches!(standing, Standing::Active))
         .map(|(form, _)| form)
@@ -182,7 +184,7 @@ pub(crate) fn needed_by(
 
     up.into_iter()
         .filter(|form| {
-            resolve(manifest, std::slice::from_ref(form), protocols).is_ok_and(|theirs| {
+            resolve(manifest, std::slice::from_ref(form), supported).is_ok_and(|theirs| {
                 theirs
                     .services
                     .iter()
@@ -205,14 +207,15 @@ pub(crate) fn needed_by(
 #[must_use]
 pub(crate) fn brought(
     manifest: &Manifest,
-    protocols: Protocols,
+    supported: impl Into<Supported>,
     running: &[Service],
 ) -> Vec<(String, Plan)> {
+    let supported = supported.into();
     let started: Vec<(String, Plan)> = manifest
         .forms
         .iter()
         .filter_map(|form| {
-            let plan = resolve(manifest, std::slice::from_ref(&form.id), protocols).ok()?;
+            let plan = resolve(manifest, std::slice::from_ref(&form.id), supported).ok()?;
             held(running, &plan.services).then(|| (form.id.clone(), plan))
         })
         .collect();

@@ -7,7 +7,7 @@ use super::Answers;
 use crate::config::{
     Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, MEDIA_SERVER_MODE_KEY, PGID_KEY,
     PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY, PROVIDER_USER_KEY,
-    PUID_KEY, TORRENT_KEY, USENET_KEY,
+    PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_KEY,
 };
 use serde::{Deserialize, Serialize};
 
@@ -153,11 +153,11 @@ impl Step {
     /// credentials its own steps carry, and naming them from here is what keeps that
     /// list from drifting from the questions setup actually asks.
     ///
-    /// The tunnel names none here. What its step writes are the egress guard's own
-    /// settings and secrets, named by the manifest of whatever fills the guard rather
-    /// than by this build, so no list of keys fixed here could hold them. What a torrent
-    /// run has to go and obtain is a prerequisite rather than a credential, and is said
-    /// as one.
+    /// The tunnel's step names only whether a VPN carries the torrents. What it writes
+    /// beside that are the egress guard's own settings and secrets, named by the manifest
+    /// of whatever fills the guard rather than by this build, so no list of keys fixed
+    /// here could hold them. What a torrent run has to go and obtain is a prerequisite
+    /// rather than a credential, and is said as one.
     #[must_use]
     pub const fn settings(self) -> &'static [&'static str] {
         match self {
@@ -173,6 +173,7 @@ impl Step {
             ],
             Self::ServiceUser => &[PUID_KEY, PGID_KEY],
             Self::Library => &[MEDIA_SERVER_MODE_KEY],
+            Self::Vpn => &[VPN_KEY],
             _ => &[],
         }
     }

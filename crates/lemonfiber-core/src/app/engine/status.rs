@@ -20,12 +20,12 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let protocols = ctx.settings.protocols;
+    let supported = ctx.settings.supported();
     let whole: Vec<String> = manifest.profile_ids();
     let profiles: Vec<String> = if forms.is_empty() {
         whole.clone()
     } else {
-        resolve(&manifest, forms, protocols)
+        resolve(&manifest, forms, supported)
             .map_err(|err| Box::new(err.problem()))?
             .profiles
             .into_iter()
@@ -42,8 +42,8 @@ pub(crate) async fn status(ctx: &Ctx, forms: &[String]) -> Result<StatusReport, 
     // about every service they hold rather than about the ones asked after.
     let halted = super::halted::load(ctx);
     let beside = crate::app::plugins::profiled(ctx);
-    let everything = survey_beside(&manifest, &beside, &whole, &containers, &halted, protocols);
-    let brought = brought(&manifest, protocols, &everything);
+    let everything = survey_beside(&manifest, &beside, &whole, &containers, &halted, supported);
+    let brought = brought(&manifest, supported, &everything);
     let active_forms: Vec<String> = brought.iter().map(|(form, _)| form.clone()).collect();
     let filtered = left_out(&manifest, &brought);
     let installed = crate::app::plugins::read(ctx)
@@ -98,16 +98,16 @@ pub(crate) async fn active(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest) 
     let Ok(containers) = ctx.seams.engine.list(&ctx.settings.project).await else {
         return Vec::new();
     };
-    let protocols = ctx.settings.protocols;
+    let supported = ctx.settings.supported();
     let surveyed = survey_beside(
         manifest,
         &crate::app::plugins::profiled(ctx),
         &manifest.profile_ids::<Vec<String>>(),
         &containers,
         &super::halted::load(ctx),
-        protocols,
+        supported,
     );
-    brought(manifest, protocols, &surveyed)
+    brought(manifest, supported, &surveyed)
         .into_iter()
         .map(|(form, _)| form)
         .collect()

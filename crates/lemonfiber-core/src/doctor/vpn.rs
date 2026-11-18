@@ -29,7 +29,7 @@ use async_trait::async_trait;
 use lemonfiber_manifest::Manifest;
 
 use super::{Category, Check, Finding, Verdict};
-use crate::config::{PortForward, Protocols};
+use crate::config::{PortForward, Supported};
 use crate::ports::docker::{Container, Engine};
 
 pub use echo::Seen;
@@ -51,6 +51,11 @@ pub(crate) use reading::{read_vpn, VpnReading};
 /// Why the port-forward check does not apply when the switch is off.
 const NOT_ENABLED: &str = "port forwarding is not enabled, so there is no forwarded port to verify";
 
+/// Why no check of a tunnel applies where the operator chose torrents without a VPN.
+pub(crate) const NOT_CONFIGURED: &str =
+    "no VPN is configured: torrents run without one, as chosen at \
+     setup, so every peer sees this connection's own address";
+
 /// The VPN leak check: compare the client's egress against the tunnel's.
 pub struct VpnCheck {
     engine: Arc<dyn Engine>,
@@ -71,8 +76,9 @@ pub struct VpnCheck {
 /// the check takes one value rather than a row of loose arguments whose order is
 /// the only thing keeping them apart.
 pub struct Asked {
-    /// Which download protocols are configured.
-    pub protocols: Protocols,
+    /// What the configuration supports: the download protocols, and whether torrents
+    /// were chosen without a VPN.
+    pub supported: Supported,
     /// The address services to compare egress against; empty switches leak
     /// detection off.
     pub echo: Vec<String>,
@@ -117,14 +123,16 @@ impl VpnCheck {
         asked: Asked,
     ) -> Self {
         let Asked {
-            protocols,
+            supported,
             echo,
             listening,
             granted,
             port_forward,
             disruptive,
         } = asked;
-        let target = if protocols.torrent {
+        let target = if supported.unguarded() {
+            Target::Skip(NOT_CONFIGURED.to_owned())
+        } else if supported.protocols.torrent {
             // A pair that will not resolve is two different situations, and only
             // one of them is a skip. A stack with a torrent client and nothing
             // containing it is the arrangement this whole category exists to

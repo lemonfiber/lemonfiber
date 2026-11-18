@@ -47,7 +47,12 @@ pub const SHOWN: &[(&str, &str)] = &[
     ),
     (
         super::TORRENT_KEY,
-        "whether this stack torrents at all, which decides whether a tunnel runs",
+        "whether this stack torrents at all, which decides whether a torrent client runs",
+    ),
+    (
+        super::VPN_KEY,
+        "whether a VPN carries the torrents, which decides whether a tunnel runs and the \
+         torrent client sits inside it",
     ),
     (
         super::IP_ECHO_KEY,

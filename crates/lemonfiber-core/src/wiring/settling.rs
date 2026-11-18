@@ -88,6 +88,9 @@ fn asked(
     (installed, trusted): (&[Installed], &[FirstParty]),
 ) -> (Vec<String>, Settled) {
     let names: Vec<String> = held.iter().map(|one| one.service.clone()).collect();
+    if chosen.declines(capability) {
+        return (Vec::new(), Settled::Declined { over: names });
+    }
     if wiring.each && !names.is_empty() {
         return (names, Settled::Each);
     }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use common::tunnel::*;
 
 use crate::common;
-use lemonfiber_core::config::Protocols;
+use lemonfiber_core::config::{PortForward, Protocols, Supported};
 use lemonfiber_core::doctor::vpn::{VpnCheck, CLIENT_ISOLATED};
 use lemonfiber_core::doctor::{examine, Category, Check, Narrowing, Verdict};
 use lemonfiber_core::error::codes::vpn::LEAKING;
@@ -625,4 +625,31 @@ async fn a_stack_with_no_gateway_does_not_apply() {
         verdict(&subject.run().await, "vpn"),
         Some(Verdict::Skipped { .. })
     ));
+}
+
+#[tokio::test]
+async fn torrents_chosen_without_a_vpn_report_it_not_configured_and_check_no_tunnel() {
+    let subject = asking(Fake::new(vec![
+        Behavior::up("gluetun", Some("185.65.1.1")),
+        Behavior::up("qbittorrent", Some("203.0.113.9")),
+    ]))
+    .over(Supported {
+        protocols: Protocols::both(),
+        vpn_declined: true,
+    })
+    .forwarding(PortForward {
+        enabled: true,
+        provider: Some("protonvpn".to_owned()),
+    })
+    .disruptive()
+    .check();
+    for _ in 0..2 {
+        let findings = subject.run().await;
+        let checks: Vec<&str> = findings.iter().map(|one| one.check.as_str()).collect();
+        assert_eq!(checks, ["vpn"]);
+        assert!(matches!(
+            verdict(&findings, "vpn"),
+            Some(Verdict::Skipped { reason }) if reason.contains("no VPN is configured")
+        ));
+    }
 }

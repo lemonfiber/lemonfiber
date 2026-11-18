@@ -702,6 +702,7 @@ that it is a fault of the stack.
 | `WIRE-5` | `WIRING_MOVED` | error | 1 | 400 | 0.17.0 | Raised when a choice answers an offer that was read against a wiring that has since moved. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WIRE-6` | `UNREASONABLE` | error | 1 | 400 | 0.17.0 | Raised when the reason given for a choice is longer than a reason may be, or holds a line break or another control character. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `WIRE-7` | `ALREADY_FILLS` | advisory | 1 | 400 | 0.18.0 | Raised where the service chosen already fills the capability, so there is nothing to change. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `WIRE-8` | `VPN_DECLINED` | error | 1 | 409 | 0.18.0 | Raised where a choice names what fills the egress guard while torrents run without a VPN. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `WIRING` — drift between services
 

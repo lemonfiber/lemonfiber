@@ -12,7 +12,7 @@
 //! learns to skim, and the check itself stays skipped precisely because there is
 //! nothing here to fix.
 
-use crate::config::{PortForward, Protocols};
+use crate::config::{PortForward, Supported};
 
 /// What no forwarded port costs, in the terms it is felt in.
 ///
@@ -28,12 +28,12 @@ pub(crate) const COST: &str =
 /// The consequence to state when a stack is set up this way, or nothing where it
 /// costs this stack nothing.
 ///
-/// Nothing where torrents are not configured: a forwarded port buys a Usenet-only
-/// stack exactly nothing, and saying it anyway is a sentence about a problem the
-/// operator cannot have.
+/// Nothing where no VPN carries torrents: a port the VPN forwards buys a Usenet-only
+/// stack, and one torrenting without a VPN, exactly nothing, and saying it anyway is a
+/// sentence about a problem the operator cannot have.
 #[must_use]
-pub const fn at_setup(protocols: Protocols, port_forward: &PortForward) -> Option<&'static str> {
-    if protocols.torrent && !port_forward.enabled {
+pub const fn at_setup(supported: Supported, port_forward: &PortForward) -> Option<&'static str> {
+    if supported.tunnelled() && !port_forward.enabled {
         Some(COST)
     } else {
         None

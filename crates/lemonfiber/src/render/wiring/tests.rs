@@ -241,6 +241,42 @@ fn what_nothing_fills_is_listed_again_naming_what_asked() {
 }
 
 #[test]
+fn a_declined_ask_says_nothing_fills_it_by_choice_and_what_it_passed_over() {
+    let said = shown(&WiringReport {
+        wired: vec![asking(
+            "torrent-client",
+            "network.egress-guard",
+            &[],
+            Settled::Declined {
+                over: vec!["tunnel".to_owned()],
+            },
+        )],
+        unfilled: Vec::new(),
+    });
+    assert!(
+        said.contains("declined  your choice, nothing fills it"),
+        "{said}"
+    );
+    assert!(said.contains("over tunnel"), "{said}");
+    assert!(!said.contains("Asked for, and nothing fills it:"), "{said}");
+}
+
+#[test]
+fn a_declined_ask_nothing_claims_names_no_service_it_passed_over() {
+    let said = shown(&WiringReport {
+        wired: vec![asking(
+            "torrent-client",
+            "network.egress-guard",
+            &[],
+            Settled::Declined { over: Vec::new() },
+        )],
+        unfilled: Vec::new(),
+    });
+    assert!(said.contains("nothing fills it"), "{said}");
+    assert!(!said.contains(" over "), "{said}");
+}
+
+#[test]
 fn a_stack_that_declares_no_wiring_says_so_rather_than_showing_an_empty_list() {
     let said = shown(&WiringReport {
         wired: Vec::new(),

@@ -151,6 +151,10 @@ pub(super) fn settling(settled: &Settled) -> Vec<String> {
             said
         }
         Settled::Unfilled => vec!["unfilled  nothing in this stack provides it".to_owned()],
+        Settled::Declined { over } => std::iter::once("declined  your choice, nothing fills it")
+            .map(str::to_owned)
+            .chain((!over.is_empty()).then(|| format!("          over {}", over.join(", "))))
+            .collect(),
     }
 }
 

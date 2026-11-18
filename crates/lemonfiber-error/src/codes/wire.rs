@@ -79,4 +79,16 @@ codes! {
         remedy: "Nothing to do. lemonfiber wiring lists what fills each capability.",
         household: fault,
     }
+    /// Raised where a choice names what fills the egress guard while torrents run without
+    /// a VPN.
+    VPN_DECLINED = "WIRE-8" {
+        severity: Error,
+        status: 409,
+        since: "0.18.0",
+        meaning: "Torrents run without a VPN, as LEMONFIBER_VPN records, so nothing fills the \
+            egress guard and a choice of what does would change nothing. Nothing was changed.",
+        remedy: "Turn the VPN on first, with lemonfiber config set LEMONFIBER_VPN on, then \
+            choose what fills it.",
+        household: fault,
+    }
 }

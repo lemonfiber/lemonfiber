@@ -56,6 +56,7 @@ mod the_gate_holds_its_own_key;
 mod the_gate_record_is_read;
 mod the_gate_tokens_are_replaced;
 mod the_household_needs_no_account_here;
+mod torrents_without_a_vpn;
 mod uninstall;
 mod update;
 mod viewer;

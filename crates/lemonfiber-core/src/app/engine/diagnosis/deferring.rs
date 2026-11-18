@@ -355,17 +355,24 @@ async fn tunnelled(
     project: Option<&Path>,
     disruptive: bool,
 ) -> VpnCheck {
+    let supported = ctx.settings.supported();
+    let (listening, forwarded) = if supported.unguarded() {
+        (None, None)
+    } else {
+        (
+            crate::app::forwarding::listening_port(ctx, manifest, project).await,
+            crate::app::forwarding::forwarded(ctx, manifest, project).await,
+        )
+    };
     VpnCheck::new(
         ctx.seams.engine.clone(),
         ctx.settings.project.clone(),
         manifest,
         crate::doctor::vpn::Asked {
-            protocols: ctx.settings.protocols,
+            supported,
             echo: ctx.settings.ip_echo.clone(),
-            listening: crate::app::forwarding::listening_port(ctx, manifest, project).await,
-            granted: crate::doctor::vpn::Grant::of(
-                crate::app::forwarding::forwarded(ctx, manifest, project).await,
-            ),
+            listening,
+            granted: crate::doctor::vpn::Grant::of(forwarded),
             port_forward: ctx.settings.port_forward.clone(),
             disruptive,
         },

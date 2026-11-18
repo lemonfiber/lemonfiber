@@ -370,6 +370,7 @@
       "VersionReport",
       "WalkthroughStep",
       "Wired",
+      "WiringSettled",
       "WizardReport",
       "WizardStep"
     ]
@@ -597,6 +598,7 @@
       "UNDO-5",
       "UPDATE-5",
       "WIRE-7",
+      "WIRE-8",
       "WISH-1",
       "WISH-10",
       "WISH-11",

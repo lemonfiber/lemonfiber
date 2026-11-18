@@ -39,7 +39,7 @@ pub use reading::{
     front_door_from_env, household_domain_from_env, household_host_from_env, indexer_from_env,
     ip_echo_from_env, nfs_from_env, port_forward_from_env, project_from_env,
     provider_host_from_env, quiet_from_env, reads_as_off, reads_as_on, service_user_from_env,
-    unmanaged_from_env, PortForward,
+    unmanaged_from_env, vpn_declined_from_env, PortForward,
 };
 
 use std::path::PathBuf;
@@ -123,6 +123,39 @@ impl Protocols {
     }
 }
 
+/// What the configuration supports, which a stack is narrowed to before anything runs:
+/// the download protocols configured, and whether torrents were chosen without a VPN.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Supported {
+    /// Which download protocols are configured.
+    pub protocols: Protocols,
+    /// Whether the operator chose torrents without a VPN.
+    pub vpn_declined: bool,
+}
+
+impl From<Protocols> for Supported {
+    fn from(protocols: Protocols) -> Self {
+        Self {
+            protocols,
+            vpn_declined: false,
+        }
+    }
+}
+
+impl Supported {
+    /// Whether torrents are configured and a VPN carries them.
+    #[must_use]
+    pub const fn tunnelled(self) -> bool {
+        self.protocols.torrent && !self.vpn_declined
+    }
+
+    /// Whether torrents are configured and run without a VPN, as the operator chose.
+    #[must_use]
+    pub const fn unguarded(self) -> bool {
+        self.protocols.torrent && self.vpn_declined
+    }
+}
+
 /// What the operator chose: enough for the compose driver to know what runs,
 /// and the answers other subsystems act on.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +176,8 @@ pub struct Settings {
     pub stack_dir: Option<PathBuf>,
     /// Which download protocols are configured.
     pub protocols: Protocols,
+    /// Whether the operator chose torrents without a VPN.
+    pub vpn_declined: bool,
     /// The IP-echo service the VPN leak check compares egress against, or `None`
     /// where the operator has switched leak detection off.
     ///
@@ -293,6 +328,17 @@ pub struct Indexer {
     pub key: String,
 }
 
+impl Settings {
+    /// What this configuration supports.
+    #[must_use]
+    pub const fn supported(&self) -> Supported {
+        Supported {
+            protocols: self.protocols,
+            vpn_declined: self.vpn_declined,
+        }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -302,6 +348,7 @@ impl Default for Settings {
             overlays: Vec::new(),
             stack_dir: None,
             protocols: Protocols::none(),
+            vpn_declined: false,
             ip_echo: vec![DEFAULT_IP_ECHO.to_owned(), SECOND_IP_ECHO.to_owned()],
             data_root: None,
             nfs: None,

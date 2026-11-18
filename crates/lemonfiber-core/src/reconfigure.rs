@@ -28,7 +28,7 @@
 use crate::config::{
     DATA_ROOT_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, MEDIA_SERVER_MODE_KEY,
     PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY,
-    PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_PROVIDER_KEY,
+    PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_KEY, VPN_PROVIDER_KEY,
 };
 
 // Reached by their own names rather than flattened up here. Three questions about
@@ -68,16 +68,16 @@ pub struct Decision {
 
 /// Every answer setup writes, with what revising it costs.
 ///
-/// The four questions setup asks that have no configuration home — the VPN's own
-/// prompt, the household, notifications and autostart — are applied by their own
-/// features. They are deliberately absent rather than duplicated into a second surface
-/// that could disagree with the first.
+/// The three questions setup asks that have no configuration home — the household,
+/// notifications and autostart — are applied by their own features. They are
+/// deliberately absent rather than duplicated into a second surface that could disagree
+/// with the first.
 ///
 /// The household and autostart are revised through their own commands. The notification
 /// appetite is not: setup writes it and nothing changes it afterwards, which is a
 /// decision made once and then unchangeable, which is the trap this catalogue exists to
 /// close. It is listed as owed rather than quietly left out.
-pub(crate) const DECISIONS: [Decision; 15] = [
+pub(crate) const DECISIONS: [Decision; 16] = [
     Decision {
         key: DATA_ROOT_KEY,
         cost: Cost::Consequential,
@@ -97,6 +97,11 @@ pub(crate) const DECISIONS: [Decision; 15] = [
         key: TORRENT_KEY,
         cost: Cost::Consequential,
         affects: "whether torrents run at all, and with them the VPN that carries them. Turning it off stops and removes the download client and the tunnel, and keeps everything already downloaded",
+    },
+    Decision {
+        key: VPN_KEY,
+        cost: Cost::Consequential,
+        affects: "whether a VPN carries the torrents. Turning it off stops the tunnel and runs the torrent client on its own network, where every peer sees this connection's own address; turning it on puts the client back inside the tunnel",
     },
     Decision {
         key: PUID_KEY,

@@ -2,8 +2,8 @@ use lemonfiber_manifest::Manifest;
 
 use super::{
     distance, everything, nearest, resolve, Diagnose, Dropped, Failure, Footprint, Plan, Protocol,
-    Protocols,
 };
+use crate::config::Protocols;
 use crate::error::{Severity, State};
 
 const STACK: &str = lemonfiber_bundled::STACK;

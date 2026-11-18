@@ -77,14 +77,21 @@ pub(crate) fn recorded_credential(ctx: &Ctx, service: &str, holds: &str) -> Opti
 }
 
 /// Which service the operator chose to fill each capability, and what they said about
-/// each choice, as the environment file records them.
+/// each choice, as the environment file records them, with the egress guard declined
+/// where the operator chose torrents without a VPN.
 ///
 /// Read through the same seam every other recorded answer is, and answering with
 /// nothing chosen where there is no file: a stack that has never been substituted in
 /// is wired by what its own manifest says, which is the state every stack starts in.
 pub(crate) fn chosen_fillers(ctx: &Ctx) -> crate::wiring::Chosen {
-    crate::wiring::Chosen::read(recorded_secret(ctx, crate::wiring::FILLS_KEY).as_deref())
-        .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref())
+    let chosen =
+        crate::wiring::Chosen::read(recorded_secret(ctx, crate::wiring::FILLS_KEY).as_deref())
+            .because(recorded_secret(ctx, crate::wiring::FILLS_WHY_KEY).as_deref());
+    if ctx.settings.vpn_declined {
+        chosen.declining(lemonfiber_contract::capabilities::network::egress::CAPABILITY)
+    } else {
+        chosen
+    }
 }
 
 /// The parts the operator's choices of filler take out of their form, as

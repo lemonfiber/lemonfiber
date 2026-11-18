@@ -412,8 +412,8 @@ pub(crate) fn moving<'a>(
         })
 }
 
-/// The one service that fills `capability`: the operator's choice where it names a
-/// service that claims it, and the only claimant otherwise. An adapter's place is its
+/// The one service that fills `capability`: none where the operator declined it, their
+/// choice where it names a service that claims it, and the only claimant otherwise. An adapter's place is its
 /// upstream's, so a capability an adapter fills is held by the service it fronts.
 pub(crate) fn filler(
     manifest: &Manifest,
@@ -421,6 +421,9 @@ pub(crate) fn filler(
     chosen: &Chosen,
     capability: &str,
 ) -> Option<String> {
+    if chosen.declines(capability) {
+        return None;
+    }
     let claimants: Vec<(String, Option<String>)> = written(manifest, installed)
         .filter(|service| claims(&service.provides, capability))
         .map(|service| (service.id.clone(), None))

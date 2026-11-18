@@ -21,7 +21,7 @@ use std::path::Path;
 use lemonfiber_manifest::Manifest;
 
 use super::Opening;
-use crate::config::{reads_as_on, Protocols, TORRENT_KEY, USENET_KEY};
+use crate::config::{reads_as_on, Protocols, Supported, TORRENT_KEY, USENET_KEY};
 use crate::plugin::Profiled;
 use crate::prerequisites::prerequisites;
 use crate::stack::closure::everything;
@@ -82,8 +82,8 @@ pub fn opened(before: Protocols, after: Protocols) -> Vec<Opening> {
 pub fn stopped(
     manifest: &Manifest,
     beside: &[Profiled],
-    before: Protocols,
-    after: Protocols,
+    before: impl Into<Supported>,
+    after: impl Into<Supported>,
 ) -> Vec<String> {
     let Ok(was) = everything(manifest, before) else {
         return Vec::new();

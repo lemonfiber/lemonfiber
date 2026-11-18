@@ -133,14 +133,14 @@ impl Origin {
 
 /// What has to be running for a credential to be one this stack needs.
 ///
-/// A stack that does not torrent needs no VPN key, and reporting one absent there
-/// would be reporting a gap nobody has.
+/// A stack whose torrents no VPN carries needs no VPN key, and reporting one absent
+/// there would be reporting a gap nobody has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Needed {
     /// Needed whatever this stack runs.
     Always,
-    /// Needed only where this stack torrents.
-    Torrenting,
+    /// Needed only where a VPN carries this stack's torrents.
+    ThroughVpn,
     /// Needed only where this stack downloads over Usenet.
     OverUsenet,
 }
@@ -148,11 +148,11 @@ pub enum Needed {
 impl Needed {
     /// Whether what this stack runs makes the credential one it needs.
     #[must_use]
-    pub const fn by(self, protocols: config::Protocols) -> bool {
+    pub const fn by(self, supported: config::Supported) -> bool {
         match self {
             Self::Always => true,
-            Self::Torrenting => protocols.torrent,
-            Self::OverUsenet => protocols.usenet,
+            Self::ThroughVpn => supported.tunnelled(),
+            Self::OverUsenet => supported.protocols.usenet,
         }
     }
 }
@@ -197,7 +197,7 @@ const VPN: Entry = Entry {
         "lemonfiber restart torrent",
     )],
     origin: Origin::Operator,
-    needed: Needed::Torrenting,
+    needed: Needed::ThroughVpn,
     proven_by: None,
 };
 
@@ -287,10 +287,11 @@ pub const CATALOGUE: &[Entry] = &[VPN, USENET, INDEXER, MEDIA_SERVER];
 
 /// The credentials this stack needs, given what it runs.
 #[must_use]
-pub fn catalogue(protocols: config::Protocols) -> Vec<Entry> {
+pub fn catalogue(supported: impl Into<config::Supported>) -> Vec<Entry> {
+    let supported = supported.into();
     CATALOGUE
         .iter()
-        .filter(|entry| entry.needed.by(protocols))
+        .filter(|entry| entry.needed.by(supported))
         .copied()
         .collect()
 }

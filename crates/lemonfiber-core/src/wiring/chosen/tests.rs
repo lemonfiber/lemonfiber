@@ -44,3 +44,14 @@ fn the_reasons_a_setting_holds_are_written_back_as_they_were_read() {
         Chosen::read(Some("media.serve=plex,indexer.search=nzbhydra2")).because(Some(setting));
     assert_eq!(chosen.reasons().as_deref(), Some(setting));
 }
+
+#[test]
+fn a_declined_capability_is_declined_and_kept_through_another_choice() {
+    let chosen = Chosen::read(Some("media.serve=plex")).declining("network.egress-guard");
+    assert!(chosen.declines("network.egress-guard"));
+    assert!(!chosen.declines("media.serve"));
+    assert!(!Chosen::default().declines("network.egress-guard"));
+    let rechosen = chosen.recorded("media.serve=jellyfin");
+    assert!(rechosen.declines("network.egress-guard"));
+    assert_eq!(rechosen.filler("media.serve"), Some("jellyfin"));
+}

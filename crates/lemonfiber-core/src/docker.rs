@@ -220,16 +220,16 @@ fn read(container: &Container, halted: &Halted) -> State {
 ///
 /// Which forms a service is up for is read from the whole stack whatever profiles
 /// were asked about, since whether a form is up is a question about all of its
-/// services. `protocols` decides what each form resolves to.
+/// services. `supported` decides what each form resolves to.
 #[must_use]
 pub fn survey(
     manifest: &Manifest,
     profiles: &[String],
     containers: &[Container],
     halted: &Halted,
-    protocols: crate::config::Protocols,
+    supported: impl Into<crate::config::Supported>,
 ) -> Vec<Service> {
-    survey_beside(manifest, &[], profiles, containers, halted, protocols)
+    survey_beside(manifest, &[], profiles, containers, halted, supported)
 }
 
 /// The same, with `beside` among the stack's services: those of the plugins the bundle
@@ -243,10 +243,10 @@ pub fn survey_beside(
     profiles: &[String],
     containers: &[Container],
     halted: &Halted,
-    protocols: crate::config::Protocols,
+    supported: impl Into<crate::config::Supported>,
 ) -> Vec<Service> {
     let mut whole = surveyed(manifest, beside, containers, halted);
-    let brought = crate::stack::standing::brought(manifest, protocols, &whole);
+    let brought = crate::stack::standing::brought(manifest, supported, &whole);
     whole.retain(|service| profiles.iter().any(|profile| profile == &service.profile));
     for service in &mut whole {
         let alongside = beside.iter().any(|one| one.id == service.id);

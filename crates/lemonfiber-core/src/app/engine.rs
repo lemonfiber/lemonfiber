@@ -476,9 +476,9 @@ pub(super) fn resolved(
     // and `everything` is every declared profile rather than every form composed
     // together, which forms that refuse each other's company would refuse.
     let mut plan = if forms.is_empty() {
-        everything(&manifest, ctx.settings.protocols)
+        everything(&manifest, ctx.settings.supported())
     } else {
-        resolve(&manifest, forms, ctx.settings.protocols)
+        resolve(&manifest, forms, ctx.settings.supported())
     }
     .map_err(|err| Box::new(err.problem()))?;
     plan = crate::stack::closure::joined(plan, &manifest, &inflight::joining(ctx));

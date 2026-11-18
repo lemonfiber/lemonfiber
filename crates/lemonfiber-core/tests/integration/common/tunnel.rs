@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use lemonfiber_core::config::{PortForward, Protocols};
+use lemonfiber_core::config::{PortForward, Protocols, Supported};
 use lemonfiber_core::doctor::vpn::VpnCheck;
 use lemonfiber_core::doctor::vpn::{Asked, Grant};
 use lemonfiber_core::doctor::{Finding, Verdict};
@@ -61,7 +61,7 @@ pub fn asking_engine(engine: Arc<Fake>) -> Asking {
         engine,
         manifest: stack(),
         asked: Asked {
-            protocols: Protocols::both(),
+            supported: Protocols::both().into(),
             echo: vec!["https://ifconfig.me".to_owned()],
             listening: None,
             granted: Grant::Unreadable,
@@ -128,10 +128,10 @@ impl Asking {
         self
     }
 
-    /// The protocols the stack is configured for.
+    /// What the stack is configured for.
     #[must_use]
-    pub fn over(mut self, protocols: Protocols) -> Self {
-        self.asked.protocols = protocols;
+    pub fn over(mut self, supported: impl Into<Supported>) -> Self {
+        self.asked.supported = supported.into();
         self
     }
 

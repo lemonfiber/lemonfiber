@@ -144,6 +144,27 @@ async fn a_substitution_is_recorded_and_read_back() {
     );
 }
 
+/// While torrents run without a VPN, a choice of what fills the egress guard is refused
+/// and names the setting that turns the VPN back on, and nothing is recorded.
+#[tokio::test]
+async fn filling_the_egress_guard_while_the_vpn_is_declined_is_refused_naming_the_setting() {
+    let (mut ctx, at) = ctx("vpn-declined");
+    ctx.settings.vpn_declined = true;
+    let guard = lemonfiber_contract::capabilities::network::egress::CAPABILITY;
+
+    let problem = substituting(&ctx, &fill(guard, "gluetun")).await.err();
+
+    assert_eq!(
+        problem.as_ref().map(|problem| problem.code),
+        Some(crate::error::codes::wire::VPN_DECLINED)
+    );
+    assert!(crate::wiring::REFUSED.contains(&crate::error::codes::wire::VPN_DECLINED));
+    assert!(problem.as_ref().is_some_and(|problem| problem.summary
+        == "torrents run without a VPN; turn the VPN on first"
+        && problem.meaning.contains(crate::config::VPN_KEY)));
+    assert_eq!(recorded(&at), None);
+}
+
 /// Each refusal is its own mistake with its own next step, so each carries its
 /// own code rather than one that did not work.
 #[tokio::test]

@@ -23151,6 +23151,27 @@
               "settled"
             ],
             "type": "object"
+          },
+          {
+            "description": "The operator chose that nothing fills it.",
+            "properties": {
+              "over": {
+                "description": "Every claimant passed over.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "settled": {
+                "const": "declined",
+                "type": "string"
+              }
+            },
+            "required": [
+              "settled",
+              "over"
+            ],
+            "type": "object"
           }
         ]
       },

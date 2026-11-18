@@ -69,3 +69,21 @@ fn an_adapter_passed_over_takes_the_upstream_it_fronts_out_with_it() {
         Some(vec!["jelly".to_owned()])
     );
 }
+
+#[test]
+fn a_declined_capability_takes_every_part_claiming_it_out_of_its_form() {
+    let declined = Chosen::default().declining("media.serve");
+    assert_eq!(
+        two_servers().map(|manifest| replaced(&manifest, &[], &declined)),
+        Some(vec!["jelly".to_owned()])
+    );
+    let installed = [a_fronted_server()];
+    assert_eq!(
+        two_servers().map(|manifest| replaced(&manifest, &installed, &declined)),
+        Some(vec![
+            "jelly".to_owned(),
+            "server-adapter".to_owned(),
+            "server".to_owned()
+        ])
+    );
+}

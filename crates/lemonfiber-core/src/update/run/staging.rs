@@ -404,7 +404,7 @@ async fn answering(ctx: &Ctx, manifest: &Manifest, service: &str) -> (Ending, Op
             &profiles,
             &containers,
             &engine::halted::load(ctx),
-            ctx.settings.protocols,
+            ctx.settings.supported(),
         );
         let state = seen
             .iter()

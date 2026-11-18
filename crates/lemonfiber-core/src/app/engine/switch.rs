@@ -110,7 +110,7 @@ async fn standing(ctx: &Ctx, manifest: &Manifest) -> Result<Vec<Service>, Box<Pr
         &manifest.profile_ids::<Vec<String>>(),
         &containers,
         &halted::load(ctx),
-        ctx.settings.protocols,
+        ctx.settings.supported(),
     ))
 }
 

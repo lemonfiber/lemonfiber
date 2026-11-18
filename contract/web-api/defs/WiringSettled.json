@@ -94,6 +94,27 @@
       "required": [
         "settled"
       ]
+    },
+    {
+      "description": "The operator chose that nothing fills it.",
+      "type": "object",
+      "properties": {
+        "over": {
+          "description": "Every claimant passed over.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settled": {
+          "type": "string",
+          "const": "declined"
+        }
+      },
+      "required": [
+        "settled",
+        "over"
+      ]
     }
   ]
 }
