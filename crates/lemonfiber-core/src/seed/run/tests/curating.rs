@@ -644,7 +644,9 @@ async fn the_moved_book_curator_is_seeded_its_folder_and_clients_over_its_contra
         unreachable!("the moved book curator is a curator");
     };
 
-    let (wirings, _) = super::super::curating::seed_curator(&ctx, *bindery, &seeding).await;
+    let wirings = super::super::curating::seed_curator(&ctx, *bindery, &seeding)
+        .await
+        .wirings;
 
     assert!(
         !wirings.is_empty()

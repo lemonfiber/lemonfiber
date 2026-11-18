@@ -44,10 +44,12 @@
         "const:\"restarted\"",
         "const:\"skipped\"",
         "const:\"stale\"",
+        "const:\"taken-back\"",
         "const:\"unmanaged\"",
         "const:\"unmatched\"",
         "const:\"wired\"",
         "const:\"would-adopt\"",
+        "const:\"would-take-back\"",
         "const:\"would-wire\""
       ],
       "required": true
@@ -71,10 +73,12 @@
     "\"restarted\"",
     "\"skipped\"",
     "\"stale\"",
+    "\"taken-back\"",
     "\"unmanaged\"",
     "\"unmatched\"",
     "\"wired\"",
     "\"would-adopt\"",
+    "\"would-take-back\"",
     "\"would-wire\""
   ]
 }

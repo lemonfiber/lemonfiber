@@ -67,6 +67,12 @@ fn connection(wiring: &lemonfiber_core::seed::Wiring) -> Lines {
         SeedState::WouldAdopt => lines.put(format!(
             "  → {connection}   found already set — yours, would be adopted"
         )),
+        SeedState::TakenBack => lines.put(format!(
+            "  ✓ {connection}   taken back — nothing here answers where it pointed"
+        )),
+        SeedState::WouldTakeBack => lines.put(format!(
+            "  → {connection}   would be taken back — nothing here answers where it pointed"
+        )),
         SeedState::Skipped { reason } => {
             lines.put(format!("  ? {connection}   skipped"));
             lines.put(format!("      {reason}"));

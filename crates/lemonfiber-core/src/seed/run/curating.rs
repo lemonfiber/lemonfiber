@@ -127,7 +127,7 @@ pub(super) async fn seed_curator(
     ctx: &Ctx,
     curator: Curator<'_>,
     seeding: &CuratorSeeding<'_>,
-) -> (Vec<crate::seed::Wiring>, crate::baseline::Baseline) {
+) -> Seeded {
     let wanted = wanted_roots(curator.media_types());
     let clients = wanted_clients(curator, seeding.fillers, seeding.held);
     // What this curator writes is recorded in its own baseline, against the loaded
@@ -138,22 +138,11 @@ pub(super) async fn seed_curator(
     // The curator is opened once, for both its root folders and its download clients.
     // One that cannot be asked yet has both skipped for a re-run and nothing recorded.
     let Some(client) = curator.client(ctx).await else {
-        let mut wirings: Vec<_> = wanted
-            .iter()
-            .map(|folder| {
-                skipped(
-                    format!("{} root folder in {}", folder.media_type, curator.name()),
-                    curator.name(),
-                )
-            })
-            .collect();
-        wirings.extend(clients.iter().map(|client| {
-            skipped(
-                format!("{} into {}", client.name, curator.name()),
-                curator.name(),
-            )
-        }));
-        return (wirings, records);
+        return Seeded {
+            wirings: not_yet(curator, &wanted, &clients),
+            records,
+            let_go: Vec::new(),
+        };
     };
 
     // The journal seed records each write into is not persisted: seeding is
@@ -240,7 +229,68 @@ pub(super) async fn seed_curator(
             .await,
         );
     }
-    (wirings, records)
+    let taken = crate::seed::take_back_clients(
+        &client,
+        curator.name(),
+        seeding.expected,
+        &filled_at(curator, seeding.fillers),
+        ctx.dry_run,
+    )
+    .await;
+    wirings.extend(taken.wirings);
+    Seeded {
+        wirings,
+        records,
+        let_go: taken.let_go,
+    }
+}
+
+/// Each root folder and download client of a curator that cannot be asked yet, skipped
+/// for a re-run.
+fn not_yet(
+    curator: Curator<'_>,
+    wanted: &[RootFolder],
+    clients: &[DownloadClient],
+) -> Vec<crate::seed::Wiring> {
+    let mut wirings: Vec<_> = wanted
+        .iter()
+        .map(|folder| {
+            skipped(
+                format!("{} root folder in {}", folder.media_type, curator.name()),
+                curator.name(),
+            )
+        })
+        .collect();
+    wirings.extend(clients.iter().map(|client| {
+        skipped(
+            format!("{} into {}", client.name, curator.name()),
+            curator.name(),
+        )
+    }));
+    wirings
+}
+
+/// What seeding one curator came to.
+pub(super) struct Seeded {
+    /// How each of its connections went.
+    pub(super) wirings: Vec<crate::seed::Wiring>,
+    /// What it wrote, to fold into the pass's baseline.
+    pub(super) records: crate::baseline::Baseline,
+    /// The fields of its baseline the pass no longer keeps.
+    pub(super) let_go: Vec<String>,
+}
+
+/// Where each service filling one of a curator's download asks answers, as it declares,
+/// whether or not its credential is in hand.
+fn filled_at(curator: Curator<'_>, fillers: &Fillers) -> Vec<(String, u16)> {
+    pairings(fillers)
+        .into_iter()
+        .filter(|pairing| pairing.asker == curator.named)
+        .filter_map(|pairing| match &pairing.made {
+            Ok((Connection::DownloadClient(_), at, _)) => Some((at.host.clone(), at.port)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The download clients a curator is told about: each service filling one of its asks

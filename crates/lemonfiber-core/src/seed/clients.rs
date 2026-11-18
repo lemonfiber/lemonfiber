@@ -5,8 +5,8 @@
 
 use super::{
     intent, observe_client, observe_or_skip, record_outcome, same_endpoint, unreached, wire_one,
-    Baseline, Client, DownloadClient, Intent, Journal, Naming, Observed, RegisteredClient, State,
-    Wiring,
+    Baseline, Change, Client, DownloadClient, Intent, Journal, Kind, Naming, Observed,
+    RegisteredClient, State, Wiring,
 };
 
 use crate::instant::Instant;
@@ -132,7 +132,19 @@ async fn wire_one_client(
     } else if adopting {
         State::Adopted
     } else {
-        wire_by_intent(client, service, want, observed, found.as_ref(), journal, at).await
+        let before = journal.changes().len();
+        let state =
+            wire_by_intent(client, service, want, observed, found.as_ref(), journal, at).await;
+        if let Some(Change {
+            kind: Kind::Created { resource, id },
+            ..
+        }) = journal.changes().get(before)
+        {
+            if resource == CLIENT {
+                super::kept(baselines.records, service, id, want, at);
+            }
+        }
+        state
     };
     record_outcome(
         baselines,
