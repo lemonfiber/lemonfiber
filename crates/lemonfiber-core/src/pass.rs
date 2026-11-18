@@ -279,6 +279,9 @@ impl Watching {
     /// first live-stream path covering it places in it, where it has that path's shape.
     #[must_use]
     pub fn stream(&self, path: &str, query: &str) -> Option<String> {
+        if !normal(path) {
+            return None;
+        }
         let pairs = pairs(query)?;
         self.live
             .iter()
@@ -357,9 +360,13 @@ fn grouped(pattern: &str, group: &str) -> Result<regex::Regex, String> {
 }
 
 /// The pairs of `query`, each name with its value where it has one, empty pairs left
-/// out; nothing where a name holds anything but ASCII letters, digits, `_`, `-` and `.`,
-/// so no name reads as another once the upstream decodes it.
+/// out; nothing where the query holds a `;`, which a reader may split it at too, or a
+/// name holds anything but ASCII letters, digits, `_`, `-` and `.`, so no name reads as
+/// another once the upstream decodes it.
 fn pairs(query: &str) -> Option<Vec<(&str, Option<&str>)>> {
+    if query.contains(';') {
+        return None;
+    }
     query
         .split('&')
         .filter(|pair| !pair.is_empty())

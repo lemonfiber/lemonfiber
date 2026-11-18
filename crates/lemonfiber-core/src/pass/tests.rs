@@ -495,3 +495,53 @@ fn the_pass_service_is_told_each_path_with_the_parameter_it_finds_an_item_in() {
         )
     );
 }
+
+#[test]
+fn a_request_read_more_than_one_way_is_refused_whether_or_not_a_parameter_is_bound() {
+    let pass = key().issue(STREAM, "member-1", NOW);
+    let at = "/video/:/transcode/universal/start.m3u8";
+    let path = format!("path=%2Flivetv%2Fsessions%2F{STREAM}%2Fc1%2Findex.m3u8");
+    for (route, query) in [
+        (at.to_owned(), format!("session={STREAM};x=B&{path}")),
+        (
+            at.to_owned(),
+            format!("session={STREAM}&{path}&x=B;session=zzz999"),
+        ),
+        (
+            at.replace(".m3u8", "%2em3u8"),
+            format!("session={STREAM}&{path}"),
+        ),
+        (
+            at.replace("/universal", "%2Funiversal"),
+            format!("session={STREAM}&{path}"),
+        ),
+        (at.to_owned(), format!("session={STREAM}&{path}&na:me=1")),
+    ] {
+        assert_eq!(
+            transcoding().confirms(
+                &key(),
+                &format!("{route}?{query}&lfpass={pass}"),
+                NOW,
+                &Renewals::none()
+            ),
+            None,
+            "{route}?{query}"
+        );
+        assert_eq!(
+            transcoding().stream(&route, &query),
+            None,
+            "{route}?{query}"
+        );
+    }
+    for (route, query) in [
+        (format!("/live/{STREAM}/s.ts"), "x=1;y=2".to_owned()),
+        (format!("/live/{STREAM}/s%2ets"), String::new()),
+        (format!("/live/{STREAM}/s.ts"), "na:me=1".to_owned()),
+    ] {
+        assert!(
+            !live(&format!("{route}?{query}&lfpass={pass}"), NOW),
+            "{route}?{query}"
+        );
+        assert_eq!(watching().stream(&route, &query), None, "{route}?{query}");
+    }
+}
