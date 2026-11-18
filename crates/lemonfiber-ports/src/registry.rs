@@ -141,7 +141,22 @@ pub trait Registry: Send + Sync {
     /// Returns [`Unanswerable`] where the question could not be put or the answer
     /// could not be read.
     async fn digest(&self, tagged: &Tagged) -> Result<Option<String>, Unanswerable>;
+
+    /// The commit `image` says it was built from, in its image configuration's
+    /// [`REVISION`] label: the one every platform's image carries, where it is an index.
+    ///
+    /// Nothing where it carries none, or its platforms' images do not carry one and the
+    /// same, which is an answer. Anything that stopped the asking is [`Unanswerable`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unanswerable`] where the question could not be put or the answer
+    /// could not be read.
+    async fn revision(&self, image: &Image) -> Result<Option<String>, Unanswerable>;
 }
+
+/// The label an image configuration names the commit it was built from in.
+pub const REVISION: &str = "org.opencontainers.image.revision";
 
 #[cfg(test)]
 mod tests;

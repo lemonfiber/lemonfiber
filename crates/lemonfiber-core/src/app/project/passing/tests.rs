@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lemonfiber_fixtures::ports::Chance;
-use lemonfiber_fixtures::registered::Registered;
-use lemonfiber_ports::registry::Tagged;
+use lemonfiber_fixtures::registered::{Registered, ELSEWHERE, REVISION};
+use lemonfiber_ports::registry::{Image, Tagged};
 
 use crate::app::Ctx;
 use crate::config::{Reaching, REACH_REGISTRY_KEY};
@@ -74,10 +74,11 @@ async fn a_guard_pins_this_releases_image_and_makes_the_pass_services_files() {
     let pin = crate::pass::pin(RUNNING, DIGEST);
     assert_eq!(
         std::fs::read_to_string(project.join(PINNED)).ok(),
-        Some(format!("{pin}\n"))
+        Some(crate::pass::held(&pin, REVISION))
     );
     assert_eq!(super::super::pinned(&ctx), Some(pin));
     assert_eq!(registry.asked(), vec![Tagged::new(crate::IMAGE, RUNNING)]);
+    assert_eq!(registry.inspected(), vec![Image::new(crate::IMAGE, DIGEST)]);
     assert!(held(&project, File::Key).is_some_and(|text| Key::read(&text).is_ok()));
     assert_eq!(
         held(&project, File::Paths),
@@ -138,6 +139,88 @@ async fn a_pin_of_another_release_is_asked_again() {
         super::super::pinned(&ctx),
         Some(crate::pass::pin(RUNNING, DIGEST))
     );
+}
+
+#[tokio::test]
+async fn an_image_built_from_another_commit_leaves_the_pass_service_out_and_says_so() {
+    let registry = Registered::revised(DIGEST, Ok(Some(ELSEWHERE)));
+    let (ctx, project) = machine("pass-another-build", &registry, true);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(
+        said.contains(&format!("is built from {ELSEWHERE}")),
+        "{said}"
+    );
+    assert!(
+        said.contains(&format!("this build from {REVISION}")),
+        "{said}"
+    );
+    assert!(
+        said.contains("no image of this build is published"),
+        "{said}"
+    );
+    assert!(!project.join(PINNED).exists());
+    assert_eq!(held(&project, File::Key), None);
+}
+
+#[tokio::test]
+async fn an_image_naming_no_commit_leaves_the_pass_service_out_and_says_so() {
+    let registry = Registered::revised(DIGEST, Ok(None));
+    let (ctx, project) = machine("pass-unrevised", &registry, true);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains("names no commit it was built from"), "{said}");
+    assert!(said.contains(RUNNING), "{said}");
+    assert!(!project.join(PINNED).exists());
+}
+
+#[tokio::test]
+async fn a_build_naming_no_commit_asks_nothing_leaves_the_pass_service_out_and_says_so() {
+    let registry = Registered::publishing(DIGEST);
+    let (mut ctx, project) = machine("pass-uncommitted", &registry, true);
+    ctx.built_from = None;
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(
+        said.contains("this build names no commit it was made from"),
+        "{said}"
+    );
+    assert!(registry.asked().is_empty());
+    assert!(!project.join(PINNED).exists());
+}
+
+#[tokio::test]
+async fn an_image_whose_commit_cannot_be_read_leaves_the_pass_service_out_and_says_why() {
+    let registry = Registered::revised(DIGEST, Err("its manifest names no configuration"));
+    let (ctx, project) = machine("pass-unreadable-revision", &registry, true);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(said.contains("could not be pinned"), "{said}");
+    assert!(said.contains("names no configuration"), "{said}");
+    assert!(!project.join(PINNED).exists());
+}
+
+#[tokio::test]
+async fn a_pin_kept_by_a_build_of_another_commit_is_asked_again() {
+    let registry = Registered::revised(DIGEST, Ok(Some(ELSEWHERE)));
+    let (ctx, project) = machine("pass-kept-elsewhere", &registry, true);
+    let _ = std::fs::create_dir_all(&project);
+    let pin = crate::pass::pin(RUNNING, DIGEST);
+    assert!(std::fs::write(project.join(PINNED), crate::pass::held(&pin, ELSEWHERE)).is_ok());
+    assert_eq!(super::super::pinned(&ctx), None);
+
+    let said = readied(&ctx).await.unwrap_or_default();
+
+    assert!(
+        said.contains("no image of this build is published"),
+        "{said}"
+    );
+    assert_eq!(registry.asked().len(), 1);
+    assert_eq!(super::super::pinned(&ctx), None);
 }
 
 #[tokio::test]

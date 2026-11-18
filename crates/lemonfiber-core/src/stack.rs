@@ -39,6 +39,10 @@ pub use failure::{Failure, FAILURES};
 /// The version of lemonfiber running, which a stack's `min_cli_version` is held to.
 pub(crate) const RUNNING: &str = env!("CARGO_PKG_VERSION");
 
+/// The commit this build was made from, as its build stamped it; nothing where the build
+/// could name none.
+pub(crate) const BUILT_FROM: Option<&str> = include!(concat!(env!("OUT_DIR"), "/commit.rs"));
+
 /// One file a stack would write: its path within the stack directory, and its
 /// content.
 pub type StackFile = (PathBuf, &'static [u8]);

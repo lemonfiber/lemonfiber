@@ -1,6 +1,6 @@
 use lemonfiber_ports::registry::{Image, Registry as _, Tagged};
 
-use super::Registered;
+use super::{Registered, REVISION};
 
 const REPOSITORY: &str = "ghcr.io/lemonfiber/lemonfiber";
 const DIGEST: &str = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
@@ -42,4 +42,32 @@ async fn an_unreachable_registry_keeps_its_reason_about_the_tag() {
         .await;
 
     assert!(refused.is_err_and(|why| why.asked == "1.0.0" && why.reason == "connection refused"));
+}
+
+#[tokio::test]
+async fn a_registry_says_each_image_it_publishes_was_built_from_one_commit_and_records_each_asked()
+{
+    let registry = Registered::publishing(DIGEST);
+    let image = Image::new(REPOSITORY, DIGEST);
+
+    assert_eq!(
+        registry.revision(&image).await,
+        Ok(Some(REVISION.to_owned()))
+    );
+
+    assert_eq!(registry.inspected(), vec![image]);
+}
+
+#[tokio::test]
+async fn a_registry_answers_the_revision_it_was_given_or_keeps_its_reason_about_the_image() {
+    let image = Image::new(REPOSITORY, DIGEST);
+
+    assert_eq!(
+        Registered::revised(DIGEST, Ok(None)).revision(&image).await,
+        Ok(None)
+    );
+    let refused = Registered::revised(DIGEST, Err("connection refused"))
+        .revision(&image)
+        .await;
+    assert!(refused.is_err_and(|why| why.asked == DIGEST && why.reason == "connection refused"));
 }

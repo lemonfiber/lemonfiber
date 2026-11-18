@@ -40,14 +40,25 @@ pub fn pin(version: &str, digest: &str) -> String {
     format!("{}:{version}@{digest}", crate::IMAGE)
 }
 
-/// The image `held` pins the pass service to, where it pins release `version`'s own by
-/// its digest.
+/// What the project keeps of the pass service's image: `pin`, and the commit the build
+/// that pinned it was made from.
 #[must_use]
-pub fn pinned(held: &str, version: &str) -> Option<String> {
-    let held = held.trim();
-    held.strip_prefix(&pin(version, ""))
-        .filter(|digest| lemonfiber_ports::registry::is_digest(digest))
-        .map(|_| held.to_owned())
+pub fn held(pin: &str, commit: &str) -> String {
+    format!("{pin}\n{commit}\n")
+}
+
+/// The image `held` pins the pass service to, where it pins release `version`'s own by
+/// its digest for a build made from `commit`.
+#[must_use]
+pub fn pinned(held: &str, version: &str, commit: &str) -> Option<String> {
+    let mut lines = held.lines().map(str::trim);
+    let (Some(pinned), Some(built_from), None) = (lines.next(), lines.next(), lines.next()) else {
+        return None;
+    };
+    pinned
+        .strip_prefix(&pin(version, ""))
+        .filter(|digest| built_from == commit && lemonfiber_ports::registry::is_digest(digest))
+        .map(|_| pinned.to_owned())
 }
 
 /// What the pass service is started with: answering at `at`.
