@@ -246,9 +246,13 @@ const fn viewed(viewing: &Viewing) -> Asked {
     }
 }
 
-/// What a certificate replacement reports, replacing nothing.
-const fn reissued() -> Asked {
-    reports("companion certificate", CERTIFICATE)
+/// What pairing a companion comes to: pairing is refused, and a certificate replacement
+/// unconfirmed already is the rehearsal, what replacing costs with nothing replaced.
+const fn paired(pairing: Pairing) -> Asked {
+    match pairing {
+        Pairing::Pair => cannot("companion pair", MATERIAL_IS_MATERIAL),
+        Pairing::Certificate { .. } => reports("companion certificate", CERTIFICATE),
+    }
 }
 
 /// What each command is: the name an operator knows it by, what a rehearsal of it
@@ -281,10 +285,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Settled => reads("settled"),
         Command::News => reads("news"),
         Command::Playing { .. } => reads("playing"),
-        Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),
-        // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
-        // replaced.
-        Command::Companion(Pairing::Certificate { .. }) => reissued(),
+        Command::Companion(pairing) => paired(*pairing),
         Command::Explain { .. } => reads("explain"),
         Command::Glossary => reads("glossary"),
         Command::Clients => reads("clients"),
