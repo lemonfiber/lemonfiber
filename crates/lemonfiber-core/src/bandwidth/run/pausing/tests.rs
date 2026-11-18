@@ -240,3 +240,60 @@ async fn a_pause_answering_an_offer_that_moved_tells_no_client_anything() {
     );
     assert!(!transport.asked_for(torrent::operation("stop")));
 }
+
+/// A usenet client the operator passed over for another, for the curator asking for one,
+/// is not asked or named.
+#[tokio::test]
+async fn a_client_the_wiring_passed_over_leaves_a_pause_whole() {
+    let ctx = a_stack("passed-over", a_client(Answered::Stopped));
+    crate::test_support::usenet::unkeyed(&ctx);
+    let standing_in = crate::test_support::adapted::Adapted {
+        plugin: "nzbget",
+        adapter: "nzbget-adapter",
+        port: crate::test_support::adapted::PORT,
+    };
+    standing_in.recorded(&ctx);
+    crate::test_support::adapted::Adapted {
+        plugin: "radarr",
+        adapter: "radarr-adapter",
+        port: crate::test_support::adapted::PORT,
+    }
+    .recorded(&ctx);
+    let chosen = format!(
+        "{}={}",
+        lemonfiber_contract::capabilities::download::usenet::CAPABILITY,
+        standing_in.adapter
+    );
+    if let Some(env) = ctx.settings.env_file.as_deref() {
+        assert!(crate::config::store::set(env, crate::wiring::FILLS_KEY, &chosen).is_ok());
+    }
+
+    let paused = pausing(&ctx, Pausing::Pause, None).await;
+
+    let named: Vec<String> = paused
+        .as_ref()
+        .map(|paused| {
+            paused
+                .clients
+                .iter()
+                .map(|client| client.client.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert!(
+        !named
+            .iter()
+            .any(|client| client == crate::test_support::usenet::ADAPTER),
+        "{named:?}"
+    );
+    assert!(
+        named.iter().any(|client| client == standing_in.adapter),
+        "{named:?}"
+    );
+    assert!(
+        named
+            .iter()
+            .any(|client| client == crate::test_support::torrent::ADAPTER),
+        "{named:?}"
+    );
+}

@@ -59,6 +59,48 @@ async fn a_client_that_cannot_be_asked_is_declared_and_never_reached() {
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
 
+/// The usenet client standing in for the stack's own, as the bundle offers it.
+const STANDING_IN: crate::test_support::adapted::Adapted = crate::test_support::adapted::Adapted {
+    plugin: "nzbget",
+    adapter: "nzbget-adapter",
+    port: crate::test_support::adapted::PORT,
+};
+
+/// The usenet client the operator chose another over for the curator asking for one is not
+/// declared, and the one they chose is.
+#[tokio::test]
+async fn a_client_the_wiring_passed_over_is_not_declared() {
+    let asking = crate::test_support::adapted::Adapted {
+        plugin: "radarr",
+        adapter: "radarr-adapter",
+        port: crate::test_support::adapted::PORT,
+    };
+    let installed: Vec<_> = [
+        crate::test_support::usenet::moved(),
+        STANDING_IN.installed(),
+        asking.installed(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let chosen = format!("{}={}", usenet::CAPABILITY, STANDING_IN.adapter);
+    let fillers = stack()
+        .manifest()
+        .map(|manifest| Fillers::of(&manifest, &installed, &Chosen::read(Some(&chosen)), None))
+        .unwrap_or_default();
+    let ctx = a_context().build();
+
+    let declared: Vec<String> = declared_downloads(&ctx, &fillers)
+        .await
+        .into_iter()
+        .map(|client| client.id)
+        .filter(|id| id == crate::test_support::usenet::ADAPTER || id == STANDING_IN.adapter)
+        .collect();
+
+    assert_eq!(installed.len(), 3);
+    assert_eq!(declared, [STANDING_IN.adapter]);
+}
+
 /// A record of what is installed that will not read narrows a host read to the stack's
 /// own services rather than failing it.
 #[test]

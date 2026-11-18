@@ -14,7 +14,7 @@
 //! traffic goes to. The port is the one it says it listens on inside the network, never
 //! the one it publishes on the host and never one this build's source names.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lemonfiber_manifest::{ApiKind, Manifest, Service};
@@ -187,6 +187,8 @@ pub struct Fillers {
     declared: BTreeMap<String, (Vec<String>, Vec<String>)>,
     /// The service the operator chose for each capability, by id.
     chosen: BTreeMap<String, String>,
+    /// Every service the operator's choices take out of its form, by id.
+    replaced: BTreeSet<String>,
 }
 
 impl Fillers {
@@ -298,6 +300,9 @@ impl Fillers {
                 .choices()
                 .map(|(capability, service)| (capability.to_owned(), service.to_owned()))
                 .collect(),
+            replaced: super::replaced(manifest, installed, chosen)
+                .into_iter()
+                .collect(),
         }
     }
 
@@ -327,6 +332,13 @@ impl Fillers {
     #[must_use]
     pub fn service(&self, id: &str) -> Option<&Filler> {
         self.services.iter().find(|one| one.id == id)
+    }
+
+    /// Whether the operator's choices take `filler` out of its form, as
+    /// [`super::replaced`] answers: a filler the wiring passed over.
+    #[must_use]
+    pub fn passed_over(&self, filler: &Filler) -> bool {
+        self.replaced.contains(&filler.id)
     }
 
     /// The upstream `adapter` stands in front of: the service of its own plugin it names
