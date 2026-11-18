@@ -166,3 +166,36 @@ fn an_apply_with_no_guard_to_hold_a_vpn_answer_to_writes_none_of_it() {
     assert!(!paths.env_file().with_file_name(SECRETS).exists());
     assert!(!paths.env_file().exists());
 }
+
+/// An egress guard moved into its plugin is asked of through its adapter, and setup's VPN
+/// step puts the questions of the service the adapter fronts.
+#[test]
+fn the_vpn_step_asks_what_the_guard_its_adapter_fronts_needs() {
+    let env = crate::test_support::env_without_password("setup-guard-fronted");
+    let ctx = crate::test_support::guard::keyed(
+        crate::test_support::a_context()
+            .settings(crate::config::Settings {
+                env_file: Some(env.to_path_buf()),
+                stack_dir: env.parent().map(|config| config.join("data").join("stack")),
+                ..crate::config::Settings::default()
+            })
+            .holding(env)
+            .build(),
+    );
+
+    let asked: Vec<String> = super::guard(&ctx)
+        .map(|guard| guard.questions())
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|question| match question {
+            crate::model::GuardQuestion::Choice { setting, .. } => Some(setting),
+            crate::model::GuardQuestion::Value { .. }
+            | crate::model::GuardQuestion::Secret { .. } => None,
+        })
+        .collect();
+
+    assert!(
+        asked.iter().any(|setting| setting == "gluetun:provider"),
+        "{asked:?}"
+    );
+}

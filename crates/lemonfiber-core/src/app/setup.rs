@@ -38,8 +38,8 @@ pub const REFUSALS: [Code; 5] = [
     GUARD_UNANSWERED,
 ];
 
-/// The service filling `network.egress-guard` in the stack `ctx` sets up, where one does:
-/// what setup's VPN step asks of it.
+/// The service filling `network.egress-guard` in the stack `ctx` sets up, where one does,
+/// or the service its adapter fronts: what setup's VPN step asks of it.
 #[must_use]
 pub fn guard(ctx: &crate::app::Ctx) -> Option<Guard> {
     let manifest = ctx.stack.manifest().ok()?;
@@ -54,7 +54,8 @@ pub fn guard(ctx: &crate::app::Ctx) -> Option<Guard> {
         project.as_deref(),
     );
     let (filler, _) = fillers.filling(lemonfiber_manifest::container::EGRESS_GUARD)?;
-    Guard::of(&manifest, installed, &filler.id)
+    let guarding = fillers.fronted_by(filler).unwrap_or(filler);
+    Guard::of(&manifest, installed, &guarding.id)
 }
 
 /// Take back a VPN answer that no longer gives `guard` what it needs, so its step is
