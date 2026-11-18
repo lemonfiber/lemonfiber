@@ -160,7 +160,7 @@ async fn a_torrent_account_is_in_hand_only_once_minted() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_media_server_the_household_set_up_leaves_the_request_identity_to_them() {
     let env = config_scratch("targets-household-set-up");
     let _ = std::fs::create_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));

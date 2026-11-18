@@ -97,15 +97,12 @@ pub(crate) async fn reinstalled(ctx: &Ctx) {
     let _ = remonitor(ctx).await;
 }
 
-/// Wire the stack, and try each connection the pass found not answering once more, after
-/// the rest of it: a service still starting when it was reached is answering by then.
+/// Wire the stack, and try each connection the pass found not answering again after the
+/// rest of it, as [`again::UNANSWERED`] allows: a service still starting when it was
+/// reached answers within it.
 pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
     let first = Box::pin(pass(ctx, adopt)).await?;
-    if !first.wirings.iter().any(again::unanswered) {
-        return Ok(first);
-    }
-    let later = Box::pin(pass(ctx, adopt)).await?;
-    Ok(again::retried(first, &later))
+    again::settled(first, again::UNANSWERED, || Box::pin(pass(ctx, adopt))).await
 }
 
 /// Wire the stack's services to each other, idempotently, and report what was
