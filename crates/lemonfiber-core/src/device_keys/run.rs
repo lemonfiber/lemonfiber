@@ -34,7 +34,7 @@ pub use refused::{challenge_not_standing, no_challenge, signature_wrong};
 #[derive(Clone, PartialEq, Eq)]
 pub enum Asked {
     /// Register a device key under a name, with the platform's attestation, once the
-    /// operator's password it carries proves them.
+    /// password the asker gives proves the operator.
     Register {
         /// What to call it.
         name: String,
@@ -42,8 +42,6 @@ pub enum Asked {
         public_key: String,
         /// The platform's attestation of where it lives, where one was given.
         attestation: Option<Attestation>,
-        /// The operator's password, proving them in the same request.
-        password: String,
         /// Where the request came from, where it came over a socket.
         from: Option<IpAddr>,
     },
@@ -77,7 +75,7 @@ impl std::fmt::Debug for Asked {
                 .field("name", name)
                 .field("attestation", attestation)
                 .field("from", from)
-                .finish_non_exhaustive(),
+                .finish(),
             Self::List => out.write_str("List"),
             Self::Revoke { name } => out.debug_struct("Revoke").field("name", name).finish(),
             Self::Challenge { name, .. } => out
@@ -107,10 +105,10 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             name,
             public_key,
             attestation,
-            password,
             from,
         } => {
             let now = ctx.seams.clock.now();
+            let password = ctx.asking.secret(crate::app::admitting::PASSWORD);
             match crate::app::admitting::proves_the_operator(ctx, &password, from, now).await {
                 Ok(true) => register(ctx, &name, &public_key, attestation.as_ref())
                     .await

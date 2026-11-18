@@ -701,3 +701,22 @@ async fn a_member_sees_only_their_own_keys_and_never_another_keys_name() {
             .iter()
             .any(|key| key.name == "anas" && key.member_minted)));
 }
+
+#[test]
+fn a_proof_is_debugged_without_what_proves_it() {
+    let device = super::Proof::Device {
+        name: "pixel".to_owned(),
+        challenge: "ch4ll3ng3".to_owned(),
+        signature: "s1gn4tur3".to_owned(),
+        session: "s3ss10n".to_owned(),
+    };
+    let said = format!("{device:?}");
+    assert!(said.contains("pixel"), "{said}");
+    assert!(
+        ["ch4ll3ng3", "s1gn4tur3", "s3ss10n"]
+            .iter()
+            .all(|secret| !said.contains(secret)),
+        "{said}"
+    );
+    assert_eq!(format!("{:?}", super::Proof::Password), "Password");
+}

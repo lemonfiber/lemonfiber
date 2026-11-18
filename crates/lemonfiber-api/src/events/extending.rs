@@ -119,8 +119,6 @@ impl Gathers for Together {
     }
 }
 
-/// What each source says, in the order given, each handing what it has early to
-/// `early` where there is one.
 /// Whether any of `sources` is worth gathering with nobody listening.
 async fn any_wanted_unheard(sources: &[Arc<dyn Gathers>]) -> bool {
     for source in sources {
@@ -131,6 +129,8 @@ async fn any_wanted_unheard(sources: &[Arc<dyn Gathers>]) -> bool {
     false
 }
 
+/// What each source says, in the order given, each handing what it has early to
+/// `early` where there is one.
 async fn each(sources: &[Arc<dyn Gathers>], joined: bool, early: Option<&Early>) -> Vec<Rendered> {
     let mut said = Vec::new();
     for source in sources {

@@ -3,7 +3,7 @@
 
 use std::net::IpAddr;
 
-use crate::app::admitting::{held, proves_the_member, proves_the_operator, Door};
+use crate::app::admitting::{held, proves_the_member, proves_the_operator, Door, PASSWORD};
 use crate::app::Ctx;
 use crate::device_keys::proof::Mint;
 use crate::device_keys::run::{challenge_not_standing, misproved, signature_wrong, standing, used};
@@ -13,8 +13,8 @@ use crate::keys::Minter;
 /// How a mint proves who asked.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Proof {
-    /// The minter's password.
-    Password(String),
+    /// The minter's password, which the asker gives when asked.
+    Password,
     /// A signature over a challenge by one of the operator's device keys.
     Device {
         /// The device key's name.
@@ -31,7 +31,7 @@ pub enum Proof {
 impl std::fmt::Debug for Proof {
     fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Password(_) => out.write_str("Password"),
+            Self::Password => out.write_str("Password"),
             Self::Device { name, .. } => out
                 .debug_struct("Device")
                 .field("name", name)
@@ -95,11 +95,13 @@ pub(super) async fn proved(
             used(ctx, &name).await?;
             Ok(Some(name))
         }
-        (Proof::Password(_), Minter::Member { .. }) if !super::members_may_mint(ctx) => Ok(None),
-        (Proof::Password(password), Minter::Operator) => {
+        (Proof::Password, Minter::Member { .. }) if !super::members_may_mint(ctx) => Ok(None),
+        (Proof::Password, Minter::Operator) => {
+            let password = ctx.asking.secret(PASSWORD);
             answered(proves_the_operator(ctx, &password, proving.from, now).await)
         }
-        (Proof::Password(password), Minter::Member { id }) => {
+        (Proof::Password, Minter::Member { id }) => {
+            let password = ctx.asking.secret(PASSWORD);
             answered(proves_the_member(ctx, id, &password, proving.from, now).await)
         }
     }

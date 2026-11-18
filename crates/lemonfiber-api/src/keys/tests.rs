@@ -78,7 +78,7 @@ fn a_mint_carries_the_password_or_the_whole_of_a_device_keys_proof_and_never_bot
     ));
     assert!(matches!(
         mint(serde_json::json!({"password": "p"})),
-        Some(Proof::Password(_))
+        Some(Proof::Password)
     ));
     let mut both = device;
     if let Some(both) = both.as_object_mut() {

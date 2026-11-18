@@ -33,6 +33,7 @@ mod caller;
 pub mod coded;
 
 use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, State};
@@ -42,6 +43,8 @@ use axum::routing::post;
 use axum::{Extension, Json, Router};
 use lemonfiber_core::app::admitting::{Answer, Asked, Carried, Offered};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::error::Problem;
+use lemonfiber_core::ports::asking::Asking;
 use serde::Deserialize;
 
 use crate::guard::{host_is_here, origin_is_here, Arrived, Binding, Token, TOKEN_HEADER};
@@ -80,10 +83,37 @@ pub async fn knocking(
         offered: offered.map(str::to_owned),
         arrived,
     };
-    match dispatch(Command::Admission(Asked::Caller(carried)), ctx).await {
+    knocked(dispatch(Command::Admission(Asked::Caller(carried)), ctx).await)
+}
+
+/// Who a caller's check answered, and nobody where it answered anything else.
+fn knocked(answered: Result<Outcome, Box<Problem>>) -> Knocking {
+    match answered {
         Ok(Outcome::Admitting(Answer::Caller(calling))) => calling.into(),
         _ => Knocking::Nobody,
     }
+}
+
+/// What a request offered as its password, the answer it gives when the core asks.
+struct Typed(String);
+
+impl Asking for Typed {
+    fn present(&self) -> bool {
+        true
+    }
+
+    fn ask(&self, _question: &str) -> String {
+        String::new()
+    }
+
+    fn secret(&self, _question: &str) -> String {
+        self.0.clone()
+    }
+}
+
+/// `ctx`, answering with `password` when the core asks the asker for theirs.
+pub(crate) fn typed(ctx: &Ctx, password: String) -> Ctx {
+    ctx.clone().with_asking(Arc::new(Typed(password)))
 }
 
 /// What a caller offers at the door.
@@ -137,11 +167,11 @@ async fn opening(
     };
     let offered = Offered {
         name: given.name,
-        password: given.password,
         claim: given.claim,
         peer: peer(connected),
     };
-    carried_out(&serving.ctx, Command::Admission(Asked::Password(offered))).await
+    let ctx = typed(&serving.ctx, given.password);
+    carried_out(&ctx, Command::Admission(Asked::Password(offered))).await
 }
 
 /// The address a request came from, or nothing for a surface answered without a
@@ -149,3 +179,6 @@ async fn opening(
 fn peer(connected: Option<Extension<ConnectInfo<SocketAddr>>>) -> Option<IpAddr> {
     connected.map(|Extension(ConnectInfo(at))| at.ip())
 }
+
+#[cfg(test)]
+mod tests;

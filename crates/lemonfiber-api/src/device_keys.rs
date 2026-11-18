@@ -107,10 +107,10 @@ async fn registered(
         name: given.name,
         public_key: given.public_key,
         attestation: given.attestation,
-        password: given.password,
         from: Some(arrived.from),
     };
-    carried_out(&serving.ctx, Command::DeviceKeys(asked)).await
+    let ctx = crate::admission::typed(&serving.ctx, given.password);
+    carried_out(&ctx, Command::DeviceKeys(asked)).await
 }
 
 /// A device key revoked, by its name, and every challenge standing for it spent.

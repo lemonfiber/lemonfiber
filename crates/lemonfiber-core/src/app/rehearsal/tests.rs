@@ -332,7 +332,6 @@ fn refused_for_good() -> Vec<(Command, Rehearsal)> {
             Command::Admission(crate::app::admitting::Asked::Password(
                 crate::app::admitting::Offered {
                     name: None,
-                    password: String::new(),
                     claim: None,
                     peer: None,
                 },

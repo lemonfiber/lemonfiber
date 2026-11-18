@@ -619,11 +619,13 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
         name: "pixel".to_owned(),
         public_key: key.clone(),
         attestation: Some(attestation.clone()),
-        password: "not the password".to_owned(),
         from: None,
     };
+    let mistyped = ctx
+        .clone()
+        .with_asking(lemonfiber_fixtures::typing::Typing::answering("not it"));
     assert_eq!(
-        super::asked(&ctx, wrong)
+        super::asked(&mistyped, wrong)
             .await
             .err()
             .map(|problem| problem.code),
@@ -633,11 +635,15 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
         name: "pixel".to_owned(),
         public_key: key,
         attestation: Some(attestation),
-        password: lemonfiber_fixtures::passwords::a_password(),
         from: None,
     };
+    let typed = ctx
+        .clone()
+        .with_asking(lemonfiber_fixtures::typing::Typing::answering_each(vec![
+            lemonfiber_fixtures::passwords::a_password(),
+        ]));
     assert!(matches!(
-        super::asked(&ctx, registering).await,
+        super::asked(&typed, registering).await,
         Ok(crate::app::Outcome::DeviceKey(_))
     ));
     assert!(matches!(
@@ -697,4 +703,32 @@ async fn a_signature_a_device_key_did_not_make_is_heard() {
         .said()
         .iter()
         .any(|said| said.contains("did not make")));
+}
+
+#[test]
+fn what_is_asked_of_the_device_keys_is_debugged_without_a_session() {
+    let asked = [
+        super::Asked::List,
+        super::Asked::Revoke {
+            name: "pixel".to_owned(),
+        },
+        super::Asked::Challenge {
+            name: "pixel".to_owned(),
+            session: "s3ss10n".to_owned(),
+        },
+        super::Asked::Register {
+            name: "pixel".to_owned(),
+            public_key: "k3y".to_owned(),
+            attestation: None,
+            from: None,
+        },
+    ];
+    let said: Vec<String> = asked.iter().map(|one| format!("{one:?}")).collect();
+    assert_eq!(said.first().map(String::as_str), Some("List"));
+    assert!(said
+        .iter()
+        .all(|one| one.contains("pixel") || one == "List"));
+    assert!(said
+        .iter()
+        .all(|one| !one.contains("s3ss10n") && !one.contains("k3y")));
 }

@@ -161,6 +161,10 @@ async fn minted(
     let Some(proof) = proof(&given, &presented) else {
         return Refusal::NotAKeyRequest.answered();
     };
+    let ctx = match given.password.clone() {
+        Some(password) => crate::admission::typed(&serving.ctx, password),
+        None => serving.ctx.as_ref().clone(),
+    };
     let asked = Asked::Mint {
         name: given.name,
         scope: given.scope,
@@ -172,7 +176,7 @@ async fn minted(
             from: Some(arrived.from),
         })),
     };
-    carried_out(&serving.ctx, Command::Keys(asked)).await
+    carried_out(&ctx, Command::Keys(asked)).await
 }
 
 /// What the body offers as proof: the password alone, or a device key's signature over a
@@ -184,7 +188,7 @@ fn proof(given: &Minting, presented: &Presented) -> Option<Proof> {
         &given.challenge,
         &given.signature,
     ) {
-        (Some(password), None, None, None) => Some(Proof::Password(password.clone())),
+        (Some(_), None, None, None) => Some(Proof::Password),
         (None, Some(name), Some(challenge), Some(signature)) => Some(Proof::Device {
             name: name.clone(),
             challenge: challenge.clone(),

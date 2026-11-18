@@ -1,9 +1,27 @@
-use lemonfiber_core::app::admitting::{Admitted, Caller, Calling, SignInCode};
+use lemonfiber_core::app::admitting::{Admitted, Answer, Caller, Calling, SignInCode};
+use lemonfiber_core::app::standing::StackStanding;
+use lemonfiber_core::app::Outcome;
 use lemonfiber_core::device_keys::Challenged;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::Scope;
 
-use super::{admitted, calling, challenged, coded};
+use super::super::{shaped, Lines};
+
+fn admitted(session: &Admitted) -> Lines {
+    shaped(&Outcome::Admitting(Answer::Admission(session.clone())))
+}
+
+fn coded(code: &SignInCode) -> Lines {
+    shaped(&Outcome::Admitting(Answer::SignInCode(code.clone())))
+}
+
+fn calling(caller: &Calling) -> Lines {
+    shaped(&Outcome::Admitting(Answer::Caller(caller.clone())))
+}
+
+fn challenged(issued: &Challenged) -> Lines {
+    shaped(&Outcome::Admitting(Answer::Challenge(issued.clone())))
+}
 
 fn at() -> Instant {
     Instant::from_seconds(1_791_180_000)
@@ -86,4 +104,22 @@ fn a_challenge_is_said_without_the_challenge() {
     let said = challenged(&issued).text();
     assert!(said.contains("stands until"), "{said}");
     assert!(!said.contains("c4ll3ng3"), "{said}");
+}
+
+#[test]
+fn what_the_web_api_composes_from_is_said_line_by_line() {
+    let standing = StackStanding {
+        stack: Some("f3a1c2d4".to_owned()),
+        switched_off: vec!["LEMONFIBER_REACH_REGISTRY".to_owned()],
+        told: true,
+        waiting: false,
+        members_mint: true,
+    };
+    let said = shaped(&Outcome::Standing(standing)).text();
+    assert!(said.contains("Stack f3a1c2d4."), "{said}");
+    assert!(said.contains("LEMONFIBER_REACH_REGISTRY is off."), "{said}");
+    assert!(said.contains("A way to be told: yes."), "{said}");
+    assert!(said.contains("A push waiting: no."), "{said}");
+    let none = shaped(&Outcome::Standing(StackStanding::default())).text();
+    assert!(none.contains("No stack identifier is kept here."), "{none}");
 }

@@ -79,3 +79,26 @@ fn a_refusal_with_no_wait_says_none() {
         .filter(|problem| problem.status() != 429)
         .all(|problem| problem.retry_after.is_none()));
 }
+
+#[test]
+fn what_a_request_carried_and_what_was_offered_are_debugged_without_their_secrets() {
+    let carried = super::Carried {
+        offered: Some("s3cr3t".to_owned()),
+        arrived: None,
+    };
+    let said = format!("{carried:?}");
+    assert!(
+        said.contains("withheld") && !said.contains("s3cr3t"),
+        "{said}"
+    );
+    let offered = super::Offered {
+        name: Some("ana".to_owned()),
+        claim: Some("cl41m".to_owned()),
+        peer: None,
+    };
+    let said = format!("{offered:?}");
+    assert!(
+        said.contains("claiming: true") && !said.contains("cl41m"),
+        "{said}"
+    );
+}

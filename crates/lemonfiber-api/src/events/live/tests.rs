@@ -226,3 +226,24 @@ async fn sources_gathered_together_in_waves_hand_over_what_each_says_early() {
     assert_eq!(said.len(), 1);
     assert!(said.iter().all(|one| one.said().contains("202")));
 }
+
+/// Several sources gathered as one are wanted with nobody listening once any of them is.
+#[tokio::test]
+async fn sources_gathered_together_are_wanted_unheard_once_any_is() {
+    use super::Gathers as _;
+    let quiet = || {
+        std::sync::Arc::new(Counting {
+            wanted: false.into(),
+            gathered: 0.into(),
+        })
+    };
+    let wanting = std::sync::Arc::new(Counting {
+        wanted: true.into(),
+        gathered: 0.into(),
+    });
+    let none = crate::events::extending::Together(vec![quiet(), quiet()]);
+    let one = crate::events::extending::Together(vec![quiet(), wanting]);
+
+    assert!(!none.wanted_unheard().await);
+    assert!(one.wanted_unheard().await);
+}

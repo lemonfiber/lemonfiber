@@ -22,8 +22,6 @@ pub struct Offered {
     /// Who they say they are; absent from the operator, who signs in with the machine's
     /// own password.
     pub name: Option<String>,
-    /// What was typed: at a claim, the password they chose.
-    pub password: String,
     /// The claim token an invitation's join link carries, where this is a claim.
     pub claim: Option<String>,
     /// The address the request came from, where it came over a socket.
@@ -34,14 +32,19 @@ impl std::fmt::Debug for Offered {
     fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         out.debug_struct("Offered")
             .field("name", &self.name)
+            .field("claiming", &self.claim.is_some())
             .field("peer", &self.peer)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
-/// The session `offered` opens.
+/// What the asker is asked for the password they offer.
+pub const PASSWORD: &str = "password";
+
+/// The session `offered` opens, with the password the asker gives.
 pub(super) async fn signed_in(ctx: &Ctx, offered: &Offered) -> Result<Admitted, Box<Problem>> {
-    if offered.claim.is_some() && offered.password.chars().count() < crate::admission::LEAST {
+    let password = ctx.asking.secret(PASSWORD);
+    if offered.claim.is_some() && password.chars().count() < crate::admission::LEAST {
         return Err(short_choice());
     }
     let admitting = &ctx.admitting;
@@ -53,8 +56,8 @@ pub(super) async fn signed_in(ctx: &Ctx, offered: &Offered) -> Result<Admitted, 
         .map_err(held)?;
     let random = ctx.seams.random.as_ref();
     let (who, door) = match offered.claim.as_deref() {
-        Some(token) => claimed(ctx, offered, token, &ticket, random).await?,
-        None => whoever(ctx, offered, &ticket, random)
+        Some(token) => claimed(ctx, offered, &password, token, &ticket, random).await?,
+        None => whoever(ctx, offered.name.as_deref(), &password, &ticket, random)
             .await
             .ok_or_else(not_the_password)?,
     };
@@ -75,13 +78,14 @@ pub(super) async fn signed_in(ctx: &Ctx, offered: &Offered) -> Result<Admitted, 
 /// the household, each only where the ticket leaves its door open.
 async fn whoever(
     ctx: &Ctx,
-    offered: &Offered,
+    name: Option<&str>,
+    password: &str,
     ticket: &Ticket,
     random: &dyn Random,
 ) -> Option<(Opened, Door)> {
     if ticket.operator {
         if let Some(held) = super::credential_now(ctx).await {
-            let typed = offered.password.clone();
+            let typed = password.to_owned();
             let proved = tokio::task::spawn_blocking(move || held.verifies(&typed).then_some(held))
                 .await
                 .ok()
@@ -92,12 +96,12 @@ async fn whoever(
         }
     }
     let door = ticket.member.clone()?;
-    let name = offered.name.as_deref()?;
-    if offered.password.is_empty() {
+    let name = name?;
+    if password.is_empty() {
         return None;
     }
     let household = opened(ctx).await?;
-    member_signed_in(ctx, household.as_ref(), name, &offered.password, random)
+    member_signed_in(ctx, household.as_ref(), name, password, random)
         .await
         .map(|opened| (opened, door))
 }
@@ -106,6 +110,7 @@ async fn whoever(
 async fn claimed(
     ctx: &Ctx,
     offered: &Offered,
+    password: &str,
     token: &str,
     ticket: &Ticket,
     random: &dyn Random,
@@ -126,23 +131,17 @@ async fn claimed(
     }
     let device = device(random).ok_or_else(unconfirmed)?;
     let set = household
-        .claim(&member.name, &offered.password, &device)
+        .claim(&member.name, password, &device)
         .await
         .map_err(|_| unconfirmed())?;
     if !set {
         return Err(not_open());
     }
     ctx.admitting.household.claim_spent(ctx, &member.id);
-    member_signed_in(
-        ctx,
-        household.as_ref(),
-        &member.name,
-        &offered.password,
-        random,
-    )
-    .await
-    .map(|opened| (opened, door))
-    .ok_or_else(unconfirmed)
+    member_signed_in(ctx, household.as_ref(), &member.name, password, random)
+        .await
+        .map(|opened| (opened, door))
+        .ok_or_else(unconfirmed)
 }
 
 /// A fresh name for one sign-in at the media server.
@@ -206,13 +205,8 @@ pub(crate) async fn proves_the_member(
     };
     let attempts = &ctx.admitting.attempts;
     let ticket = attempts.taken(peer, Some(&name), now).await?;
-    let offered = Offered {
-        name: Some(name),
-        password: password.to_owned(),
-        claim: None,
-        peer,
-    };
-    let proved = match whoever(ctx, &offered, &ticket, ctx.seams.random.as_ref()).await {
+    let random = ctx.seams.random.as_ref();
+    let proved = match whoever(ctx, Some(&name), password, &ticket, random).await {
         Some((Opened::Member(signed), door)) if signed.id == id => Some(door),
         _ => None,
     };

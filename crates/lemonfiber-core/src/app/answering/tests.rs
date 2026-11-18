@@ -124,7 +124,50 @@ fn dispatched() -> Vec<(Command, Kind)> {
             }),
             kind::SERVED,
         ),
+        (Command::Standing, kind::STANDING),
+        (
+            Command::Admission(crate::app::admitting::Asked::Password(
+                crate::app::admitting::Offered {
+                    name: None,
+                    claim: None,
+                    peer: None,
+                },
+            )),
+            kind::ADMISSION,
+        ),
+        (
+            Command::Admission(crate::app::admitting::Asked::Caller(
+                crate::app::admitting::Carried {
+                    offered: None,
+                    arrived: None,
+                },
+            )),
+            kind::CALLER,
+        ),
+        (
+            Command::DeviceKeys(crate::device_keys::run::Asked::Challenge {
+                name: "pixel".to_owned(),
+                session: "a-session".to_owned(),
+            }),
+            kind::DEVICE_CHALLENGE,
+        ),
     ]
+}
+
+/// A code asked for answers with the code, or with a session once it is approved.
+#[test]
+fn a_code_answers_with_the_code_or_the_session_it_opens() {
+    let coded = Command::Admission(crate::app::admitting::Asked::Code(
+        crate::app::admitting::Coded {
+            session: None,
+            from: None,
+            waiting: None,
+        },
+    ));
+    assert_eq!(
+        answered_under(&coded),
+        &[kind::SIGN_IN_CODE, kind::ADMISSION]
+    );
 }
 
 /// Each question an author asks of a plugin's source, and the kind it answers with.
