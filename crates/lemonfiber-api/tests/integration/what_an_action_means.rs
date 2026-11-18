@@ -51,7 +51,6 @@ fn routed(random: Chance) -> axum::Router {
             ctx: Arc::new(ctx().with_random(Arc::new(random))),
             token: Arc::new(token),
             bound: lemonfiber_api::guard::Binding::here(8471),
-            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: Jobs::default(),
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),

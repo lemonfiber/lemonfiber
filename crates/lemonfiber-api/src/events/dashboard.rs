@@ -91,9 +91,9 @@ impl Gathers for Dashboard {
         gathered(self, joined, Some(early)).await
     }
 
-    fn wanted_unheard(&self) -> bool {
-        lemonfiber_core::push::run::any_waiting(&self.ctx)
-            || lemonfiber_core::notify::fanning::any_configured(&self.ctx)
+    async fn wanted_unheard(&self) -> bool {
+        let standing = crate::standing::standing(&self.ctx).await;
+        standing.waiting || standing.told
     }
 }
 

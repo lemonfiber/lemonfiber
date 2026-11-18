@@ -203,3 +203,24 @@ fn folding_keeps_the_order_they_were_first_seen() {
 fn folding_nothing_is_nothing() {
     assert!(folded(Vec::new()).is_empty());
 }
+
+#[test]
+fn a_problem_says_the_wait_its_code_declares_until_it_knows_the_time_left() {
+    let declared = Problem::new(
+        crate::codes::wish::NOT_CHECKED,
+        "Not checked yet",
+        "The title could not be checked.",
+        Remedy::new("Try again"),
+    );
+    assert_eq!(declared.retry_after, Some(5));
+    let waiting = declared.waiting(std::time::Duration::from_millis(64_500));
+    assert_eq!(waiting.retry_after, Some(64));
+    assert_eq!(a_problem().retry_after, None);
+    let said = serde_json::to_value(&waiting).ok();
+    assert_eq!(
+        said.as_ref().and_then(|said| said.get("retry_after")),
+        Some(&serde_json::json!(64))
+    );
+    let silent = serde_json::to_value(a_problem()).ok();
+    assert!(silent.is_some_and(|said| said.get("retry_after").is_none()));
+}

@@ -7,15 +7,14 @@ use std::time::Duration;
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
-use lemonfiber_api::admission::keyring::Keyring;
-use lemonfiber_api::admission::{Admitting, HouseholdAtHand};
 use lemonfiber_api::events::live::{Listening, Live};
 use lemonfiber_api::events::wire::BEAT_SAID;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Arrived, Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
 use lemonfiber_api::router::{routes, Serving};
-use lemonfiber_core::keys::run::{at, used_at};
+use lemonfiber_core::app::admitting::AtHand;
+use lemonfiber_core::app::Ctx;
 use lemonfiber_core::model::kind;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 use serde_json::Value;
@@ -74,38 +73,33 @@ pub(crate) struct Surface {
 impl Surface {
     /// The surface over `world`.
     pub(crate) async fn over(world: World) -> Option<Self> {
-        let household = Arc::new(world.ctx.clone());
-        Self::over_household(world, household).await
+        let ctx = world.ctx.clone();
+        Self::serving(world, ctx).await
     }
 
     /// The surface over `world`, asking `household` who somebody is.
-    pub(crate) async fn over_household(
-        world: World,
-        household: Arc<dyn HouseholdAtHand>,
-    ) -> Option<Self> {
+    pub(crate) async fn over_household(world: World, household: Arc<dyn AtHand>) -> Option<Self> {
+        let ctx = world.ctx.clone().with_household(household);
+        Self::serving(world, ctx).await
+    }
+
+    /// The surface over `world`, dispatching through `ctx`.
+    async fn serving(world: World, ctx: Ctx) -> Option<Self> {
         let token = Arc::new(Token::mint(&Chance::repeating(RUN.to_vec()))?);
         let clock = Stopped::at(AT);
         let live = Arc::new(Live::opening(clock.as_ref()));
         let listening = live.listening(None).await;
-        let ctx = Arc::new(world.ctx.clone());
-        let admitting = Arc::new(Admitting {
-            kept: world.ctx.settings.admission.clone(),
-            household: Some(household),
-            keys: Keyring::at(at(&world.ctx), used_at(&world.ctx)),
-            ..Admitting::default()
-        });
+        let ctx = Arc::new(ctx);
         let serving = Serving::for_run(
             Arc::clone(&ctx),
             Arc::clone(&token),
             Binding::here(PORT),
             Jobs::default(),
-            Arc::clone(&admitting),
             Arc::clone(&live),
         );
         let streaming = Arc::new(Streaming {
             token: Arc::clone(&token),
             bound: Binding::here(PORT),
-            admitting,
             live: Arc::clone(&live),
             clock,
             reading: ctx,

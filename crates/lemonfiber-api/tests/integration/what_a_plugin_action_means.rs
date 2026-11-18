@@ -82,7 +82,6 @@ async fn redeemed(ctx: Ctx, action: &str, body: &str) -> (u16, serde_json::Value
             ctx: Arc::new(ctx),
             token: Arc::new(token),
             bound: lemonfiber_api::guard::Binding::here(8475),
-            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: jobs.clone(),
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),

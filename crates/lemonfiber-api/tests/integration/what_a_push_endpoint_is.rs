@@ -24,10 +24,7 @@ fn a_machine(named: &str) -> (axum::Router, String) {
     }
     ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission.to_path_buf()),
-        ..Admitting::default()
-    });
+    let admitting = unhoused();
     let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
     (router, token.as_str().to_owned())
 }
@@ -246,14 +243,11 @@ async fn a_hanging_endpoint_leaves_the_reads_time_unchanged() {
 #[tokio::test]
 async fn a_key_may_not_keep_push_endpoints() {
     let keys = crate::what_a_key_admits::keeping_keys("push");
-    let admitting = Arc::new(Admitting {
-        keys: lemonfiber_api::admission::Keyring::at(
-            Some(keys.kept.clone()),
-            Some(keys.used.clone()),
-        ),
-        ..Admitting::default()
-    });
-    let (router, _) = surface(world(None, Chance::cycling()), &admitting);
+    let admitting = unhoused();
+    let (router, _) = surface(
+        keeping_at(world(None, Chance::cycling()), &keys.kept),
+        &admitting,
+    );
     let body = registering("pixel", "https://push.example/abc");
     for (method, path, body) in [
         ("GET", "/api/push-endpoints", "{}"),

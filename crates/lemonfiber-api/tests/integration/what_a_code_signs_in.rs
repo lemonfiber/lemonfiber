@@ -184,6 +184,7 @@ async fn one_source_flooding_meets_its_own_limit_while_another_is_still_given_co
     assert_eq!(flooded.status, StatusCode::TOO_MANY_REQUESTS);
     assert!(flooded.body.contains(TOO_MANY_CODES.as_str()));
     assert_eq!(flooded.left.as_deref(), Some("600"));
+    assert_eq!(waited(&flooded).as_deref(), Some("600"), "{}", flooded.body);
     assert_eq!(other.status, StatusCode::OK, "{}", other.body);
 }
 
@@ -270,13 +271,13 @@ struct Fading {
 }
 
 #[async_trait::async_trait]
-impl HouseholdAtHand for Fading {
-    async fn now(&self) -> Option<Arc<dyn Household>> {
+impl AtHand for Fading {
+    async fn now(&self, _: &Ctx) -> Option<Arc<dyn Household>> {
         (!self.gone.load(Ordering::SeqCst))
             .then(|| Arc::clone(&self.household) as Arc<dyn Household>)
     }
 
-    fn vouches_for(&self, _: &str) -> bool {
+    fn vouches_for(&self, _: &Ctx, _: &str) -> bool {
         self.vouching.load(Ordering::SeqCst)
     }
 }
@@ -293,11 +294,7 @@ async fn finished_after(named: &str, fade: impl Fn(&Fading)) -> Answer {
     });
     let kept = keeping(named);
     let path = Some(kept.path().to_path_buf());
-    let admitting = Arc::new(Admitting {
-        kept: path.clone(),
-        household: Some(Arc::clone(&fading) as Arc<dyn HouseholdAtHand>),
-        ..Admitting::default()
-    });
+    let admitting = Arc::new(Admitting::over(Arc::clone(&fading) as Arc<dyn AtHand>));
     let (router, _) = surface(world(path, Chance::turning(1)), &admitting);
     let handle = a_handle(router.clone(), a_device(7), None).await;
     fade(&fading);

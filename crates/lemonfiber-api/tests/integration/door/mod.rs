@@ -13,16 +13,14 @@ pub(crate) use std::time::{Duration, SystemTime};
 pub(crate) use axum::body::{to_bytes, Body};
 pub(crate) use axum::extract::FromRequestParts as _;
 pub(crate) use axum::http::{header, HeaderMap, HeaderValue, Request, StatusCode};
-pub(crate) use lemonfiber_api::admission::sessions::Opened;
-pub(crate) use lemonfiber_api::admission::{
-    Admitting, Caller, HouseholdAtHand, Knocking, RETRY_AFTER, SESSION,
-};
+pub(crate) use lemonfiber_api::admission::{Caller, Knocking, RETRY_AFTER, SESSION};
 pub(crate) use lemonfiber_api::events::live::Live;
 pub(crate) use lemonfiber_api::events::Streaming;
 pub(crate) use lemonfiber_api::guard::{Binding, Token, TOKEN_HEADER};
 pub(crate) use lemonfiber_api::jobs::Jobs;
 pub(crate) use lemonfiber_api::router::{routes, Serving};
 pub(crate) use lemonfiber_core::admission::{self as credential, Credential};
+pub(crate) use lemonfiber_core::app::admitting::{Admitting, AtHand, Opened, Stacked};
 pub(crate) use lemonfiber_core::app::Ctx;
 pub(crate) use lemonfiber_core::config::Settings;
 pub(crate) use lemonfiber_core::ports::service::{Household, Member, Signed};
@@ -98,6 +96,95 @@ pub(crate) fn world(admission: Option<PathBuf>, random: Chance) -> Ctx {
         .with_random(Arc::new(random))
 }
 
+/// A household nobody can be found in, as a machine with no stack has.
+pub(crate) struct Nowhere;
+
+#[async_trait::async_trait]
+impl AtHand for Nowhere {
+    async fn now(&self, _: &Ctx) -> Option<Arc<dyn Household>> {
+        None
+    }
+
+    fn vouches_for(&self, _: &Ctx, _: &str) -> bool {
+        false
+    }
+}
+
+/// The register a surface admits from, and the world it asks in.
+pub(crate) struct Register {
+    /// The world the surface dispatches through, holding the register.
+    ctx: Ctx,
+}
+
+impl std::ops::Deref for Register {
+    type Target = Admitting;
+
+    fn deref(&self) -> &Admitting {
+        &self.ctx.admitting
+    }
+}
+
+impl Register {
+    /// The register `admitting`, asked in `ctx`.
+    pub(crate) fn over(ctx: &Ctx, admitting: &Arc<Admitting>) -> Self {
+        Self {
+            ctx: admitted_by(ctx.clone(), admitting),
+        }
+    }
+
+    /// The register itself, to share with another surface.
+    pub(crate) fn held(&self) -> &Arc<Admitting> {
+        &self.ctx.admitting
+    }
+
+    /// Who `headers` prove a request to be, as the guard asks it.
+    pub(crate) async fn carried(
+        &self,
+        headers: &HeaderMap,
+        token: &Token,
+        arrived: Option<lemonfiber_api::guard::Arrived>,
+    ) -> Knocking {
+        lemonfiber_api::admission::knocking(&self.ctx, headers, token, arrived).await
+    }
+
+    /// The operator's credential as it is kept now.
+    pub(crate) fn credential(&self) -> Option<Credential> {
+        self.ctx
+            .settings
+            .admission
+            .as_deref()
+            .and_then(credential::at)
+    }
+}
+
+/// A register asking nobody who somebody is.
+pub(crate) fn unhoused() -> Arc<Admitting> {
+    Arc::new(Admitting::over(Arc::new(Nowhere)))
+}
+
+/// A register asking `household` who somebody is.
+pub(crate) fn housed(household: Arc<dyn Household>) -> Arc<Admitting> {
+    Arc::new(Admitting::over(Arc::new(household)))
+}
+
+/// `ctx`, keeping its keys in `kept` and their uses beside it.
+pub(crate) fn keeping_at(mut ctx: Ctx, kept: &Path) -> Ctx {
+    ctx.settings.env_file = Some(kept.with_file_name(".env"));
+    ctx
+}
+
+/// `ctx`, admitting through `admitting`.
+pub(crate) fn admitted_by(mut ctx: Ctx, admitting: &Arc<Admitting>) -> Ctx {
+    ctx.admitting = Arc::clone(admitting);
+    ctx
+}
+
+/// `ctx`, its clock stopped at the moment the door's requests are sent at.
+fn at_the_doors_moment(mut ctx: Ctx) -> Ctx {
+    ctx.seams.clock = Stopped::at(NOW);
+    ctx
+}
+
 /// The whole surface over that world, and the register it admits from.
 pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Arc<Token>) {
     let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
@@ -105,11 +192,10 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
     };
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
     let serving = Serving {
-        ctx: Arc::new(ctx),
+        ctx: Arc::new(admitted_by(ctx, admitting)),
         token: Arc::clone(&token),
         bound: bound(),
         jobs: Jobs::default(),
-        admitting: Arc::clone(admitting),
         live: Arc::clone(&live),
         kept: Arc::default(),
         answered: Arc::default(),
@@ -117,7 +203,6 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&token),
         bound: bound(),
-        admitting: Arc::clone(admitting),
         live,
         clock: Stopped::at(NOW),
         reading: Arc::clone(&serving.ctx),
@@ -131,8 +216,8 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
 /// and can therefore be merged outside the guard — which is why it checks admission
 /// a second time, and why that check cannot be reached through the assembled
 /// surface, where the outer guard answers first.
-pub(crate) fn stream_alone(admitting: &Arc<Admitting>) -> axum::Router {
-    stream_reading(admitting, crate::idle::ctx())
+pub(crate) fn stream_alone(register: &Register) -> axum::Router {
+    stream_reading(register.held(), register.ctx.clone())
 }
 
 /// The same, with a member's own stream read against `reading`.
@@ -144,24 +229,19 @@ pub(crate) fn stream_reading(admitting: &Arc<Admitting>, reading: Ctx) -> axum::
     lemonfiber_api::events::routes(Arc::new(Streaming {
         token,
         bound: bound(),
-        admitting: Arc::clone(admitting),
         live,
         clock: Stopped::at(NOW),
-        reading: Arc::new(reading),
+        reading: Arc::new(at_the_doors_moment(admitted_by(reading, admitting))),
     }))
 }
 
 /// A surface keeping the password at `kept`, sharing one register with the test.
-pub(crate) fn door(
-    kept: Option<&Path>,
-    random: Chance,
-) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        kept: kept.map(Path::to_path_buf),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(world(admitting.kept.clone(), random), &admitting);
-    (router, token, admitting)
+pub(crate) fn door(kept: Option<&Path>, random: Chance) -> (axum::Router, Arc<Token>, Register) {
+    let admitting = unhoused();
+    let ctx = world(kept.map(Path::to_path_buf), random);
+    let register = Register::over(&ctx, &admitting);
+    let (router, token) = surface(ctx, &admitting);
+    (router, token, register)
 }
 
 /// What one request was answered with: the status, the body, and how long is left.
@@ -172,6 +252,15 @@ pub(crate) struct Answer {
     pub(crate) body: String,
     /// The wait it named, where it named one.
     pub(crate) left: Option<String>,
+}
+
+/// The wait an answer's problem names, as its body carries it.
+pub(crate) fn waited(answer: &Answer) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(&answer.body)
+        .ok()?
+        .pointer("/data/retry_after")?
+        .as_u64()
+        .map(|seconds| seconds.to_string())
 }
 
 /// One request, and what it was answered with.
@@ -362,14 +451,12 @@ pub(crate) fn door_with(
     kept: Option<&Path>,
     household: Arc<Recognising>,
     random: Chance,
-) -> (axum::Router, Arc<Token>, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        kept: kept.map(Path::to_path_buf),
-        household: Some(Arc::new(household as Arc<dyn Household>)),
-        ..Admitting::default()
-    });
-    let (router, token) = surface(world(admitting.kept.clone(), random), &admitting);
-    (router, token, admitting)
+) -> (axum::Router, Arc<Token>, Register) {
+    let admitting = housed(household);
+    let ctx = world(kept.map(Path::to_path_buf), random);
+    let register = Register::over(&ctx, &admitting);
+    let (router, token) = surface(ctx, &admitting);
+    (router, token, register)
 }
 
 /// What the stack's media server answers a name and password it recognises with.
@@ -428,13 +515,10 @@ pub(crate) fn seeded(ctx: &Ctx) {
 }
 
 /// The surface over that stack, admitting from the household the stack holds.
-pub(crate) fn door_over(ctx: &Ctx) -> (axum::Router, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        household: Some(Arc::new(ctx.clone()) as Arc<dyn HouseholdAtHand>),
-        ..Admitting::default()
-    });
+pub(crate) fn door_over(ctx: &Ctx) -> (axum::Router, Register) {
+    let admitting = Arc::new(Admitting::over(Arc::new(Stacked)));
     let (router, _) = surface(ctx.clone(), &admitting);
-    (router, admitting)
+    (router, Register::over(ctx, &admitting))
 }
 
 /// A name and a password, as a member sends them.

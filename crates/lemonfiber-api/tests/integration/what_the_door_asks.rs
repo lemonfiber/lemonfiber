@@ -111,7 +111,11 @@ async fn somebody_made_to_wait_is_told_how_long_and_is_told_it_twice() {
     );
     // In the header a client reads and in the sentence a person reads, because both
     // of them are here: the page shows one and the client behind it waits on the other.
-    assert!(answer.left.is_some_and(|left| left.parse::<u64>().is_ok()));
+    assert!(answer
+        .left
+        .as_ref()
+        .is_some_and(|left| left.parse::<u64>().is_ok()));
+    assert_eq!(waited(&answer), answer.left, "{}", answer.body);
 }
 
 #[tokio::test]
@@ -376,7 +380,7 @@ async fn the_token_printed_at_the_machine_answers_as_the_machine() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(token.as_str())), &token, None, moment())
+            .carried(&carrying(Some(token.as_str())), &token, None)
             .await,
         Knocking::Known(Caller::Machine),
         "the token printed at this machine named somebody other than the machine"
@@ -402,7 +406,7 @@ async fn a_session_the_password_bought_answers_as_the_operator() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Known(Caller::Operator),
         "a session bought with the password named somebody other than the operator"
@@ -417,9 +421,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
     let (_, token, admitting) = door(Some(path.path()), Chance::cycling());
 
     assert_eq!(
-        admitting
-            .carried(&carrying(None), &token, None, moment())
-            .await,
+        admitting.carried(&carrying(None), &token, None).await,
         Knocking::Nobody,
         "a request carrying no secret was admitted as somebody"
     );
@@ -428,8 +430,7 @@ async fn nothing_and_a_wrong_secret_are_the_same_silence() {
             .carried(
                 &carrying(Some("not a secret this run minted")),
                 &token,
-                None,
-                moment()
+                None
             )
             .await,
         Knocking::Nobody,
@@ -462,7 +463,7 @@ async fn a_member_the_household_knows_is_let_in_as_that_member() {
     };
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Known(Caller::Member("a7f3".to_owned())),
         "a session the household bought named somebody other than that member"
@@ -567,7 +568,7 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Known(Caller::Member("a7f3".to_owned())),
         "the session was not answering as the member who bought it"
@@ -577,7 +578,7 @@ async fn a_member_taken_off_the_server_is_refused_at_their_next_call() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Nobody,
         "a session outlived the account it was bought with"
@@ -610,7 +611,7 @@ async fn a_member_whose_password_changed_is_refused_at_their_next_call() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Nobody,
         "a session outlived the password it was opened with"
@@ -648,7 +649,7 @@ async fn a_household_that_cannot_be_asked_is_not_a_household_that_said_no() {
 
     assert_eq!(
         admitting
-            .carried(&carrying(Some(&opened)), &elsewhere, None, moment())
+            .carried(&carrying(Some(&opened)), &elsewhere, None)
             .await,
         Knocking::Unconfirmed,
         "a household that could not be asked was read as one that answered no"

@@ -1,66 +1,74 @@
-//! Who a request proved itself to be, and what the guard learned when it knocked.
-
-use std::time::Duration;
+//! Who a request proved itself to be, as the guard and every route past it read it.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::Response;
+use lemonfiber_core::app::admitting::{self, Calling};
+use lemonfiber_core::keys::Scope;
 
-use super::Keyed;
 use crate::refusal::Refusal;
 
 /// What the guard learned when somebody knocked.
-///
-/// Three answers rather than two, and the third is the whole point of the type.
-/// **Nobody** is a secret this run does not admit, or an identity the household no
-/// longer holds — both are settled facts and both refuse. **Unconfirmed** is neither
-/// of those: the question was asked and could not be answered, so nobody has been
-/// identified, which is a different thing from having identified nobody. A guard
-/// that answered both with the same silence would tell a household their accounts
-/// were gone on the day their media server was restarting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Knocking {
     /// Proved to be this caller.
     Known(Caller),
-    /// Proved nothing this run admits, or proved an identity that no longer stands.
+    /// Proved nothing this run admits, or an identity that no longer stands.
     Nobody,
     /// Could not be established, which is not the same as nobody.
     Unconfirmed,
-    /// A key arrived while the wrong answers so far have earned a wait, and was not
-    /// looked at. How long is left.
-    Held(Duration),
-    /// A key arrived from another machine over a connection its pin does not verify,
-    /// and was not looked at.
+    /// A key arrived while wrong answers have earned a wait; how many seconds are left.
+    Held(u64),
+    /// A key arrived from another machine over a connection its pin does not verify.
     Exposed,
 }
 
+impl From<Calling> for Knocking {
+    fn from(calling: Calling) -> Self {
+        match calling {
+            Calling::Known { caller } => Self::Known(caller.into()),
+            Calling::Nobody => Self::Nobody,
+            Calling::Unconfirmed => Self::Unconfirmed,
+            Calling::Held { retry_after } => Self::Held(retry_after),
+            Calling::Exposed => Self::Exposed,
+        }
+    }
+}
+
+/// A key a request carried, as far as what it may do turns on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Keyed {
+    /// What the operator called it.
+    pub name: String,
+    /// What it admits.
+    pub scope: Scope,
+}
+
 /// Who a request proved itself to be.
-///
-/// Who, rather than only whether: a surface that must refuse one person what it
-/// offers another cannot be built on an indistinguishable *yes*. It would have to
-/// decide for itself which person is looking, and a control withheld on that basis
-/// is withheld by whoever drew the screen.
-///
-/// So the question the guard answers is the subject rather than the verdict. What
-/// each caller may then do is decided where it is known — never here, and never by
-/// a client reading this and drawing its own conclusion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Caller {
-    /// Somebody at this machine's terminal, carrying the token printed there.
+    /// Whoever holds the per-run token this machine's terminal was given.
     Machine,
-    /// Somebody who proved the password this machine keeps.
+    /// The operator, on a session opened with the machine's password.
     Operator,
-    /// Somebody the media server holds an account for, by the id it files them
-    /// under. What they may then do is the core's answer and is decided where it is
-    /// known — never from this, and never by a client reading it.
+    /// A household member, by the id the media server files them under.
     Member(String),
-    /// A program holding a key the operator minted for it.
+    /// A program, on a key.
     Key(Keyed),
 }
 
+impl From<admitting::Caller> for Caller {
+    fn from(caller: admitting::Caller) -> Self {
+        match caller {
+            admitting::Caller::Operator => Self::Operator,
+            admitting::Caller::Member { id } => Self::Member(id),
+            admitting::Caller::Key { name, scope } => Self::Key(Keyed { name, scope }),
+        }
+    }
+}
+
 impl Caller {
-    /// The household member this caller acts as, where it acts as one: a member's own
-    /// session, or a key scoped to them.
+    /// The household member this caller acts as, where it acts as one.
     #[must_use]
     pub fn member(&self) -> Option<&str> {
         match self {
@@ -71,14 +79,6 @@ impl Caller {
     }
 }
 
-/// Who is asking, taken from what the guard admitted.
-///
-/// One impl rather than a branch per handler: the guard puts the subject on the
-/// request, and a handler that needs it says so in its signature. Absent means the
-/// request reached a handler without the guard having named anybody, which past the
-/// guard happens only at the one door that opens without a secret — so it is
-/// answered as what it is, a request carrying nothing this run admits, rather than
-/// served as though somebody had proved something.
 impl<S: Send + Sync> FromRequestParts<S> for Caller {
     type Rejection = Response;
 

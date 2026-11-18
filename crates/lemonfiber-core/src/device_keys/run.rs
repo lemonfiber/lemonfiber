@@ -12,6 +12,7 @@
 //! is no longer the one kept is revoked the moment the record is next opened, so a
 //! password changed by any means cuts off every phone before anything is asked of one.
 
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use crate::app::{Ctx, Outcome};
@@ -30,10 +31,10 @@ use refused::{
 pub use refused::{challenge_not_standing, no_challenge, signature_wrong};
 
 /// What was asked of the device keys.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Asked {
-    /// Register a device key under a name, with the platform's attestation. The
-    /// operator's password has proved them by the time this is asked.
+    /// Register a device key under a name, with the platform's attestation, once the
+    /// operator's password it carries proves them.
     Register {
         /// What to call it.
         name: String,
@@ -41,6 +42,10 @@ pub enum Asked {
         public_key: String,
         /// The platform's attestation of where it lives, where one was given.
         attestation: Option<Attestation>,
+        /// The operator's password, proving them in the same request.
+        password: String,
+        /// Where the request came from, where it came over a socket.
+        from: Option<IpAddr>,
     },
     /// List the device keys.
     List,
@@ -49,9 +54,40 @@ pub enum Asked {
         /// The device key's name.
         name: String,
     },
+    /// Issue a challenge for the device key holding a name to sign.
+    Challenge {
+        /// The device key's name.
+        name: String,
+        /// The session the challenge is issued to, and only it may spend it.
+        session: String,
+    },
 }
 
 /// The operation every journal entry about a device key is written under.
+impl std::fmt::Debug for Asked {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Register {
+                name,
+                attestation,
+                from,
+                ..
+            } => out
+                .debug_struct("Register")
+                .field("name", name)
+                .field("attestation", attestation)
+                .field("from", from)
+                .finish_non_exhaustive(),
+            Self::List => out.write_str("List"),
+            Self::Revoke { name } => out.debug_struct("Revoke").field("name", name).finish(),
+            Self::Challenge { name, .. } => out
+                .debug_struct("Challenge")
+                .field("name", name)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 pub(crate) const OPERATION: &str = "device-key";
 
 /// Where this machine keeps its device keys, or nothing where it keeps no configuration.
@@ -71,12 +107,56 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             name,
             public_key,
             attestation,
-        } => register(ctx, &name, &public_key, attestation.as_ref())
-            .await
-            .map(Outcome::DeviceKey),
+            password,
+            from,
+        } => {
+            let now = ctx.seams.clock.now();
+            match crate::app::admitting::proves_the_operator(ctx, &password, from, now).await {
+                Ok(true) => register(ctx, &name, &public_key, attestation.as_ref())
+                    .await
+                    .map(Outcome::DeviceKey),
+                Ok(false) => Err(crate::app::admitting::not_the_password()),
+                Err(left) => Err(crate::app::admitting::held(left)),
+            }
+        }
         Asked::List => list(ctx).await.map(Outcome::DeviceKeys),
-        Asked::Revoke { name } => revoke(ctx, &name).await.map(Outcome::DeviceKeys),
+        Asked::Revoke { name } => {
+            ctx.admitting.challenges.forgotten(&name).await;
+            revoke(ctx, &name).await.map(Outcome::DeviceKeys)
+        }
+        Asked::Challenge { name, session } => challenged(ctx, &name, &session)
+            .await
+            .map(|issued| Outcome::Admitting(crate::app::admitting::Answer::Challenge(issued))),
     }
+}
+
+/// A challenge for the device key holding `name` to sign, issued to `session`.
+///
+/// # Errors
+///
+/// A [`Problem`] where no active device key holds the name, or this machine supplies no
+/// randomness to draw one from.
+pub async fn challenged(
+    ctx: &Ctx,
+    name: &str,
+    session: &str,
+) -> Result<super::Challenged, Box<Problem>> {
+    standing(ctx, name).await?;
+    let issued = ctx
+        .admitting
+        .challenges
+        .issued(
+            ctx.seams.random.as_ref(),
+            session,
+            name,
+            ctx.seams.clock.now(),
+        )
+        .await
+        .ok_or_else(|| Box::new(no_challenge()))?;
+    Ok(super::Challenged {
+        challenge: issued.challenge,
+        expires: Instant::of(issued.expires),
+    })
 }
 
 /// Register a device key, once its attestation vouches for it.

@@ -248,4 +248,15 @@ codes! {
             remedy: "Try again.",
         },
     }
+    /// Raised when this machine would not supply the bytes a session's secret is made of.
+    NO_SESSION = "ADMIT-19" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "The password was right and no session was begun, because a session's secret \
+            is unpredictable bytes this machine supplies and it would not supply them.",
+        remedy: "Try again, and if it happens twice the operating system's own random source \
+            is at fault.",
+        household: fault,
+    }
 }

@@ -27,17 +27,13 @@ use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
 use lemonfiber_core::app::Command;
-use lemonfiber_core::device_keys;
-use lemonfiber_core::device_keys::proof::Mint;
-use lemonfiber_core::error::Problem;
-use lemonfiber_core::keys::run::members_may_mint;
-use lemonfiber_core::keys::run::Asked;
+use lemonfiber_core::keys::run::{Asked, Proof, Proving};
 use lemonfiber_core::keys::Minter;
 use serde::Deserialize;
 
-use crate::admission::{Caller, Door};
+use crate::admission::Caller;
 use crate::guard::{Arrived, Presented};
-use crate::read::{carried_out, went_wrong};
+use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
 
@@ -162,96 +158,26 @@ async fn minted(
     let Ok(Json(given)) = given else {
         return Refusal::NotAKeyRequest.answered();
     };
-    let mint = Mint {
-        name: &given.name,
-        scope: &given.scope,
-        purpose: &given.purpose,
-        claim: given.claim,
-    };
-    let proof = proof(&given);
-    if let (Some(Proof::Device(device)), Minter::Operator) = (&proof, &by) {
-        if let Err(refused) =
-            proved_by_device(&serving, &presented, arrived.from, device, &mint).await
-        {
-            return refused;
-        }
-    }
-    let proved_by = match &proof {
-        Some(Proof::Device(device)) => Some(device.name.clone()),
-        Some(Proof::Password(_)) | None => None,
+    let Some(proof) = proof(&given, &presented) else {
+        return Refusal::NotAKeyRequest.answered();
     };
     let asked = Asked::Mint {
         name: given.name,
         scope: given.scope,
         purpose: given.purpose,
-        by: by.clone(),
+        by,
         claim: given.claim,
-        proved_by,
+        proving: Some(Box::new(Proving {
+            proof,
+            from: Some(arrived.from),
+        })),
     };
-    let password = match (proof, &by) {
-        (None, _) => return Refusal::NotAKeyRequest.answered(),
-        (Some(Proof::Device(_)), Minter::Member { .. }) => {
-            return Refusal::NotYours.saying("Device keys are the operator's, and only theirs.")
-        }
-        (Some(Proof::Device(_)), Minter::Operator) => {
-            return carried_out(&serving.ctx, Command::Keys(asked)).await;
-        }
-        (Some(Proof::Password(password)), _) => password,
-    };
-    // A member the operator has not allowed is told so before their password is put to
-    // the media server: the answer does not turn on it, and asking would open a sign-in
-    // there for nothing.
-    if matches!(by, Minter::Member { .. }) && !members_may_mint(&serving.ctx) {
-        return carried_out(&serving.ctx, Command::Keys(asked)).await;
-    }
-    let now = serving.ctx.seams.clock.now();
-    let proved = match &by {
-        Minter::Operator => {
-            serving
-                .admitting
-                .proves_the_operator(&password, Some(arrived.from), now)
-                .await
-        }
-        Minter::Member { id } => {
-            serving
-                .admitting
-                .proves_the_member(
-                    id,
-                    &password,
-                    Some(arrived.from),
-                    now,
-                    serving.ctx.seams.random.as_ref(),
-                )
-                .await
-        }
-    };
-    match proved {
-        Ok(true) => carried_out(&serving.ctx, Command::Keys(asked)).await,
-        Ok(false) => Refusal::NotThePassword.answered(),
-        Err(left) => crate::admission::waiting(left.as_secs().max(1)),
-    }
+    carried_out(&serving.ctx, Command::Keys(asked)).await
 }
 
-/// What proves the operator, or the member, for a mint.
-enum Proof {
-    /// The password, given again.
-    Password(String),
-    /// A device key's signature over a challenge.
-    Device(Device),
-}
-
-/// A device key's proof, as a mint carries it.
-struct Device {
-    /// The device key's name.
-    name: String,
-    /// The challenge it signed.
-    challenge: String,
-    /// Its signature.
-    signature: String,
-}
-
-/// The one proof a mint carries, or nothing where it carries none or both.
-fn proof(given: &Minting) -> Option<Proof> {
+/// What the body offers as proof: the password alone, or a device key's signature over a
+/// challenge issued to the session the request carries.
+fn proof(given: &Minting, presented: &Presented) -> Option<Proof> {
     match (
         &given.password,
         &given.device,
@@ -259,64 +185,14 @@ fn proof(given: &Minting) -> Option<Proof> {
         &given.signature,
     ) {
         (Some(password), None, None, None) => Some(Proof::Password(password.clone())),
-        (None, Some(name), Some(challenge), Some(signature)) => Some(Proof::Device(Device {
+        (None, Some(name), Some(challenge), Some(signature)) => Some(Proof::Device {
             name: name.clone(),
             challenge: challenge.clone(),
             signature: signature.clone(),
-        })),
+            session: presented.0.clone(),
+        }),
         _ => None,
     }
-}
-
-/// Whether `device` proves the operator for `mint`, asked with the credential `presented`
-/// from `from`: nothing to check further where it does, and the refusal where not.
-///
-/// An unregistered or revoked device key is refused before the challenge is looked at,
-/// and costs no attempt. A challenge that does not stand is spent and costs none either:
-/// it was issued, or it was not, and either way it is no guess at anything. A signature
-/// that does not verify is counted as a wrong password is, and alerts the operator.
-async fn proved_by_device(
-    serving: &Serving,
-    presented: &Presented,
-    from: std::net::IpAddr,
-    device: &Device,
-    mint: &Mint<'_>,
-) -> Result<(), Response> {
-    let ctx = &serving.ctx;
-    let record = device_keys::run::standing(ctx, &device.name)
-        .await
-        .map_err(refused)?;
-    let now = ctx.seams.clock.now();
-    let attempts = &serving.admitting.attempts;
-    let ticket = attempts
-        .taken(Some(from), None, now)
-        .await
-        .map_err(|left| crate::admission::waiting(left.as_secs().max(1)))?;
-    let stood = serving
-        .admitting
-        .challenges
-        .spent(&device.challenge, &presented.0, &device.name, now)
-        .await;
-    if !stood {
-        attempts.forgiven(&ticket).await;
-        return Err(went_wrong(&device_keys::run::challenge_not_standing()));
-    }
-    let signed = record
-        .key()
-        .is_some_and(|key| mint.proved(&device.challenge, &device.signature, &key));
-    if !signed {
-        device_keys::run::misproved(ctx, &record).await;
-        return Err(went_wrong(&device_keys::run::signature_wrong()));
-    }
-    attempts.right(&ticket, Door::Operator, now).await;
-    device_keys::run::used(ctx, &device.name)
-        .await
-        .map_err(refused)
-}
-
-/// The answer a refusal of the core's is given as.
-fn refused(problem: impl AsRef<Problem>) -> Response {
-    went_wrong(problem.as_ref())
 }
 
 /// A key minted as a claim, collected with that claim, its secret shown this once.
@@ -337,29 +213,11 @@ async fn collected(
     let Ok(Json(given)) = given else {
         return Refusal::NotAKeyRequest.answered();
     };
-    let now = serving.ctx.seams.clock.now();
-    let ticket = match serving
-        .admitting
-        .attempts
-        .taken_at_a_key(arrived.from, now)
-        .await
-    {
-        Ok(ticket) => ticket,
-        Err(left) => return crate::admission::waiting(left.as_secs().max(1)),
-    };
     let asked = Asked::Collect {
         claim: given.claim,
-        from: Some(arrived.from.to_canonical().to_string()),
+        from: Some(arrived.from),
     };
-    let answered = carried_out(&serving.ctx, Command::Keys(asked)).await;
-    if answered.status().is_success() {
-        serving
-            .admitting
-            .attempts
-            .right(&ticket, Door::Key, now)
-            .await;
-    }
-    answered
+    carried_out(&serving.ctx, Command::Keys(asked)).await
 }
 
 /// A key revoked, by its name.

@@ -67,6 +67,7 @@ pub fn spoken(problem: &Problem) -> Problem {
         detail: None,
         cause: None,
         steps: Vec::new(),
+        retry_after: problem.retry_after,
     }
 }
 

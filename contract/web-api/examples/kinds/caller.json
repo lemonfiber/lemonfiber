@@ -1,0 +1,10 @@
+{
+  "api_version": 1,
+  "data": {
+    "caller": {
+      "as": "operator"
+    },
+    "standing": "known"
+  },
+  "kind": "caller"
+}

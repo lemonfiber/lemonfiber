@@ -35,30 +35,12 @@ pub enum Refusal {
     NotAdmitted,
     /// It said it came from somewhere this server is not.
     Elsewhere,
-    /// It proved who it is, and this is not theirs.
-    NotYours,
-    /// Whether it is still anybody could not be established.
-    Unconfirmed,
-    /// The password offered at the door was not this machine's.
-    NotThePassword,
-    /// The door has had too many wrong passwords lately.
-    TooManyAttempts,
     /// What was offered at the door is not a password.
     NotAPassword,
     /// A key arrived from another machine over a connection its pin does not verify.
     KeyInTheClear,
     /// A key asked for something its scope does not reach.
     NotForAKey,
-    /// A claim named an invitation that is not open.
-    NotOpen,
-    /// The password chosen at a claim is too short.
-    ShortChoice,
-    /// A sign-in by a code named a handle that waits on nothing for this caller.
-    NotWaiting,
-    /// One source asked for as many codes to sign in by as it may.
-    TooManyCodes,
-    /// A code was asked of a household whose members sign in with a password.
-    SignsInByPassword,
     /// What was sent to sign in by a code is not a request for one.
     NotACodeRequest,
     /// A read was given a parameter its answer has nowhere to put.
@@ -140,21 +122,12 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 47] = [
+    pub const EVERY: [Self; 38] = [
         Self::NotAdmitted,
         Self::Elsewhere,
-        Self::NotYours,
-        Self::Unconfirmed,
-        Self::NotThePassword,
-        Self::TooManyAttempts,
         Self::NotAPassword,
         Self::KeyInTheClear,
         Self::NotForAKey,
-        Self::NotOpen,
-        Self::ShortChoice,
-        Self::NotWaiting,
-        Self::TooManyCodes,
-        Self::SignsInByPassword,
         Self::NotACodeRequest,
         Self::Unwanted,
         Self::Repeated,
@@ -196,18 +169,9 @@ impl Refusal {
         match self {
             Self::NotAdmitted => admit::NOT_ADMITTED,
             Self::Elsewhere => admit::ELSEWHERE,
-            Self::NotYours => admit::NOT_YOURS,
-            Self::Unconfirmed => admit::UNCONFIRMED,
-            Self::NotThePassword => admit::NOT_THE_PASSWORD,
-            Self::TooManyAttempts => admit::TOO_MANY_ATTEMPTS,
             Self::NotAPassword => admit::NOT_A_PASSWORD,
             Self::KeyInTheClear => admit::KEY_IN_THE_CLEAR,
             Self::NotForAKey => admit::NOT_FOR_A_KEY,
-            Self::NotOpen => admit::NOT_OPEN,
-            Self::ShortChoice => admit::SHORT_CHOICE,
-            Self::NotWaiting => admit::CODE_NOT_WAITING,
-            Self::TooManyCodes => admit::TOO_MANY_CODES,
-            Self::SignsInByPassword => admit::SIGNS_IN_BY_PASSWORD,
             Self::NotACodeRequest => admit::NOT_A_CODE_REQUEST,
             Self::Unwanted => read::UNWANTED,
             Self::Repeated => read::REPEATED,
@@ -267,28 +231,7 @@ impl Refusal {
             // would tell them what to keep guessing at.
             Self::NotAdmitted => "This request carried no token, session or key this run admits.",
             Self::Elsewhere => "This request said it came from somewhere this server is not.",
-            // Said plainly: this answers somebody who proved who they are, so there is
-            // nothing left to guess, and a household member reading it is owed the
-            // actual reason rather than a silence that reads as a fault.
-            Self::NotYours => "This is not something this account may ask for.",
-            // Neither of the refusals above, and it must not be said as either. The
-            // account has not been turned away or found missing — it has not been asked
-            // about — so the thing to fix is the media server, not the account.
-            Self::Unconfirmed => {
-                "This account could not be checked with the media server, so nobody \
-                 was identified. Nothing about the account has changed."
-            }
-            // One sentence for a wrong password and for a right one where nothing is
-            // set: to whoever is knocking they are the same fact, and saying which
-            // would tell somebody guessing whether there is anything here to guess at.
-            Self::NotThePassword => "That is not the password for this machine.",
-            Self::TooManyAttempts => "Too many wrong passwords and keys. Try again later.",
             Self::NotAPassword => "The body of this request is not a password.",
-            Self::NotOpen => "This invitation can no longer be claimed.",
-            Self::ShortChoice => "That password is too short to choose.",
-            Self::NotWaiting => "This sign-in by a code can no longer be finished.",
-            Self::TooManyCodes => "Too many sign-in codes asked for. Try again later.",
-            Self::SignsInByPassword => "This household signs in with a name and password.",
             Self::NotACodeRequest => "The body of this request is not a sign-in by a code.",
             // Said before the key was looked at, so it says nothing about whether the key
             // was right: only that it came the wrong way.
@@ -377,9 +320,6 @@ impl Refusal {
                 "Sign in again, or open lemonfiber from the address it printed when it started",
             ),
             Self::Elsewhere => Remedy::new("Reach lemonfiber at the address it is listening on"),
-            Self::NotYours => Remedy::new("Ask whoever looks after this machine if you need it"),
-            Self::Unconfirmed => Remedy::new("Try again once the media server is running"),
-            Self::NotThePassword => Remedy::new("Check the password and try again"),
             Self::KeyInTheClear => Remedy::new(
                 "Connect over https, pinning the certificate the key was minted with, and \
                  revoke the key if it may have been read",
@@ -388,25 +328,10 @@ impl Refusal {
                 "Ask whoever looks after this machine, or call only what the contract lists \
                  as callable by a key",
             ),
-            Self::TooManyAttempts => {
-                Remedy::new("Wait as long as the refusal says, then try once more")
-                    .with_detail("Retry-After")
-            }
             Self::NotAPassword => Remedy::new("Send the password as the body's password"),
-            Self::NotOpen => Remedy::new("Ask whoever invited you for a new invitation"),
-            Self::NotWaiting => Remedy::new("Ask for a new code and approve it before it lapses"),
-            Self::TooManyCodes => {
-                Remedy::new("Wait as long as the refusal says, or finish a code already shown")
-                    .with_detail("Retry-After")
-            }
-            Self::SignsInByPassword => Remedy::new("Sign in with the member's name and password"),
             Self::NotACodeRequest => {
                 Remedy::new("Send {} to ask for a code, or the handle as waiting to finish one")
             }
-            Self::ShortChoice => Remedy::new(format!(
-                "Choose a password of at least {} characters",
-                lemonfiber_core::admission::LEAST
-            )),
             Self::Unwanted => Remedy::new("Ask again, naming only what this read takes"),
             Self::Repeated => Remedy::new("Ask again, naming it once"),
             Self::NoSuchRead => Remedy::new("Ask for one of the reads the contract names"),
@@ -477,6 +402,19 @@ impl Refusal {
     pub fn answer(self, problem: Problem) -> Response<Body> {
         crate::spoken::refused(self.status(), problem)
     }
+}
+
+/// A caller who proved who they are, refused what is not theirs, saying `why` where there
+/// is more to say than that.
+pub(crate) fn not_yours(why: Option<&str>) -> Response<Body> {
+    let refused = *lemonfiber_core::app::admitting::not_yours();
+    let summary = why.map_or(refused.summary.clone(), str::to_owned);
+    crate::read::went_wrong(&Problem { summary, ..refused })
+}
+
+/// A caller whose standing the media server could not be asked about.
+pub(crate) fn unconfirmed() -> Response<Body> {
+    crate::read::went_wrong(&lemonfiber_core::app::admitting::unconfirmed())
 }
 
 mod meaning;

@@ -25,7 +25,7 @@ use crate::refusal::Refusal;
 /// Whether the secret is one this run admits is settled before this is called,
 /// because there are now two that answer — the token printed at start and a session
 /// opened by proving the password — and asking which of them it was is
-/// [`crate::admission::Admitting`]'s business rather than this one's. What is left
+/// [`crate::admission::knocking`]'s business rather than this one's. What is left
 /// here is the shape of the decision: a secret this run knows, and a request that
 /// says it came from where this server is.
 ///
@@ -81,7 +81,7 @@ pub fn operator_only(caller: &crate::admission::Caller) -> Option<Response<Body>
     caller
         .member()
         .is_some()
-        .then(|| Refusal::NotYours.answered())
+        .then(|| crate::refusal::not_yours(None))
 }
 
 /// Every response this surface produces, wearing the headers all of them carry.

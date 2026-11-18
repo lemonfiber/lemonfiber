@@ -60,7 +60,7 @@ pub trait Gathers: Send + Sync {
     }
 
     /// Whether this source is worth gathering with nobody listening.
-    fn wanted_unheard(&self) -> bool {
+    async fn wanted_unheard(&self) -> bool {
         false
     }
 }
@@ -234,7 +234,7 @@ impl Live {
     /// A listener that opened while nothing was waiting leaves its arrival stored,
     /// so one that opens between the count and the wait is not missed.
     async fn heard(&self, source: &dyn Gathers) {
-        while self.said.receiver_count() == 0 && !source.wanted_unheard() {
+        while self.said.receiver_count() == 0 && !source.wanted_unheard().await {
             self.arrived.notified().await;
         }
     }

@@ -5,8 +5,6 @@
 
 use std::path::PathBuf;
 
-use lemonfiber_api::admission::Keyring;
-
 use crate::door::*;
 use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};
 use lemonfiber_fixtures::http::Answer as Reply;
@@ -21,14 +19,7 @@ fn minting_machine(named: &str) -> (axum::Router, String, PathBuf) {
     }
     ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission.to_path_buf()),
-        keys: Keyring::at(
-            lemonfiber_core::keys::run::at(&ctx),
-            lemonfiber_core::keys::run::used_at(&ctx),
-        ),
-        ..Admitting::default()
-    });
+    let admitting = unhoused();
     let env_at = env.to_path_buf();
     let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
     (router, token.as_str().to_owned(), env_at)
@@ -214,14 +205,7 @@ async fn holding(
         .is_ok());
     }
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        keys: Keyring::at(
-            lemonfiber_core::keys::run::at(&ctx),
-            lemonfiber_core::keys::run::used_at(&ctx),
-        ),
-        household: Some(Arc::new(ctx.clone()) as Arc<dyn HouseholdAtHand>),
-        ..Admitting::default()
-    });
+    let admitting = Arc::new(Admitting::over(Arc::new(Stacked)));
     let (router, _) = surface(ctx, &admitting);
     let opened = asked(
         router.clone(),
@@ -398,13 +382,7 @@ async fn a_machine_keeping_no_password_mints_nothing_over_the_web() {
     }
     ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
-    let admitting = Arc::new(Admitting {
-        keys: Keyring::at(
-            lemonfiber_core::keys::run::at(&ctx),
-            lemonfiber_core::keys::run::used_at(&ctx),
-        ),
-        ..Admitting::default()
-    });
+    let admitting = unhoused();
     let (router, token) = surface(ctx, &admitting);
     let (refused, _) = sent(
         router,

@@ -29,7 +29,7 @@ const MINUTE: u64 = 60;
 /// Whether any back-end is configured, so the stack is read for alerts with nobody
 /// watching it.
 #[must_use]
-pub fn any_configured(ctx: &Ctx) -> bool {
+pub(crate) fn any_configured(ctx: &Ctx) -> bool {
     configured_at(ctx).is_some()
 }
 

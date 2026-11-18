@@ -301,6 +301,8 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::Logs(_)
         | Outcome::InFlight(_)
         | Outcome::Served(_)
+        | Outcome::Standing(_)
+        | Outcome::Admitting(_)
         | Outcome::Bundle(_) => ExitCode::SUCCESS,
     }
 }

@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "members_mint": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "stack": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "switched_off": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "told": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "waiting": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

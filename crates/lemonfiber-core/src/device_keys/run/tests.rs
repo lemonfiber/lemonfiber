@@ -615,10 +615,26 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
     let (ctx, _) = a_machine("asked");
     trusting(&ctx, &[recorded_app(&ctx)]);
     let (attestation, key) = recorded();
+    let wrong = super::Asked::Register {
+        name: "pixel".to_owned(),
+        public_key: key.clone(),
+        attestation: Some(attestation.clone()),
+        password: "not the password".to_owned(),
+        from: None,
+    };
+    assert_eq!(
+        super::asked(&ctx, wrong)
+            .await
+            .err()
+            .map(|problem| problem.code),
+        Some(crate::error::codes::admit::NOT_THE_PASSWORD)
+    );
     let registering = super::Asked::Register {
         name: "pixel".to_owned(),
         public_key: key,
         attestation: Some(attestation),
+        password: lemonfiber_fixtures::passwords::a_password(),
+        from: None,
     };
     assert!(matches!(
         super::asked(&ctx, registering).await,
@@ -628,6 +644,15 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
         super::asked(&ctx, super::Asked::List).await,
         Ok(crate::app::Outcome::DeviceKeys(_))
     ));
+    let challenging = super::Asked::Challenge {
+        name: "pixel".to_owned(),
+        session: "a-session".to_owned(),
+    };
+    let Ok(crate::app::Outcome::Admitting(crate::app::admitting::Answer::Challenge(issued))) =
+        super::asked(&ctx, challenging).await
+    else {
+        unreachable!("a standing device key is challenged")
+    };
     let revoking = super::Asked::Revoke {
         name: "pixel".to_owned(),
     };
@@ -635,6 +660,29 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
         super::asked(&ctx, revoking).await,
         Ok(crate::app::Outcome::DeviceKeys(_))
     ));
+    let now = ctx.seams.clock.now();
+    assert!(
+        !ctx.admitting
+            .challenges
+            .spent(&issued.challenge, "a-session", "pixel", now)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn a_device_key_nobody_registered_is_not_challenged() {
+    let (ctx, _) = a_machine("unchallenged");
+    let challenging = super::Asked::Challenge {
+        name: "pixel".to_owned(),
+        session: "a-session".to_owned(),
+    };
+    assert_eq!(
+        super::asked(&ctx, challenging)
+            .await
+            .err()
+            .map(|problem| problem.code),
+        Some(super::refused::not_registered("pixel").code)
+    );
 }
 
 #[tokio::test]

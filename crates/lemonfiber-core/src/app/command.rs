@@ -488,6 +488,11 @@ pub enum Command {
     },
     /// Whether a walkthrough is worth offering this stack, and which one.
     WalkthroughOffer,
+    /// What the web API composes its routes and its answers from.
+    Standing,
+    /// Who comes in through the web API: a sign-in, or who the session or key a request
+    /// carried proves it to be.
+    Admission(super::admitting::Asked),
     /// Read what the services wrote to their logs, each line said through the narrator
     /// as it arrives.
     Logs(ReadingLogs),

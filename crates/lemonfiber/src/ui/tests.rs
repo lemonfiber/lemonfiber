@@ -6,7 +6,6 @@ use axum::body::Body;
 use axum::extract::Request;
 use axum::http::{HeaderValue, StatusCode};
 use axum::Router;
-use lemonfiber_api::admission::Admitting;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::Binding;
@@ -359,13 +358,11 @@ fn as_served(random: &Chance) -> Option<Router> {
     let live = Arc::new(Live::opening(
         lemonfiber_fixtures::ports::Stopped::at(0).as_ref(),
     ));
-    let admitting = Arc::new(Admitting::default());
     let serving = Serving {
         ctx: Arc::new(ctx(Some(enough()))),
         token: Arc::clone(&token),
         bound: Binding::here(bound().port()),
         jobs: Jobs::default(),
-        admitting: Arc::clone(&admitting),
         live: Arc::clone(&live),
         kept: Arc::default(),
         answered: Arc::default(),
@@ -373,7 +370,6 @@ fn as_served(random: &Chance) -> Option<Router> {
     let streaming = Arc::new(Streaming {
         token,
         bound: Binding::here(bound().port()),
-        admitting,
         live,
         clock: Arc::clone(&serving.ctx.seams.clock),
         reading: Arc::clone(&serving.ctx),

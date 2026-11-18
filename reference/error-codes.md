@@ -38,6 +38,7 @@ that it is a fault of the stack.
 | `ADMIT-16` | `TOO_MANY_CODES` | warning | 1 | 429 | 0.18.0 | Raised when one source has asked for as many codes to sign in by as it may. | Too many sign-in codes were asked for, so the house is waiting a while. Wait a little, then try once more. |
 | `ADMIT-17` | `SIGNS_IN_BY_PASSWORD` | error | 1 | 409 | 0.18.0 | Raised when a code to sign in by is asked of a household whose members sign in with a password. | This house signs in with your name and password. Enter your name and password instead. |
 | `ADMIT-18` | `NOT_A_CODE_REQUEST` | error | 1 | 400 | 0.18.0 | Raised when what was sent to ask for or finish a sign-in by a code cannot be read. | That sign-in couldn't be read. Try again. |
+| `ADMIT-19` | `NO_SESSION` | error | 1 | 500 | 0.18.0 | Raised when this machine would not supply the bytes a session's secret is made of. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `ASK` — putting a request to the web surface
 

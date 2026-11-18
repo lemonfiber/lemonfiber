@@ -78,7 +78,6 @@ impl Serving {
         let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
         let streaming = Token::mint(&given()).map(|token| {
             Arc::new(Streaming {
-                admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
                 token: Arc::new(token),
                 bound: lemonfiber_api::guard::Binding::here(8471),
                 live: Arc::clone(&live),
@@ -701,20 +700,20 @@ async fn a_wait_from_before_a_gap_is_never_handed_to_a_client_that_comes_back() 
 async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     let named = "listener-session-voided";
     let kept = crate::door::keeping(named);
-    let admitting = Arc::new(lemonfiber_api::admission::Admitting {
-        kept: Some(kept.to_path_buf()),
-        ..lemonfiber_api::admission::Admitting::default()
-    });
+    let mut reading = crate::idle::ctx();
+    reading.settings.admission = Some(kept.to_path_buf());
     let clock = Stopped::at(0);
-    let Some(credential) = admitting.credential() else {
+    reading.seams.clock = clock.clone();
+    let Some(credential) = lemonfiber_core::admission::at(&kept) else {
         unreachable!("the password was just kept");
     };
-    let Some(admitted) = admitting
+    let Some(admitted) = reading
+        .admitting
         .sessions
         .opened(
             &crate::door::not_the_token(),
             clock.now(),
-            lemonfiber_api::admission::sessions::Opened::Operator(credential),
+            lemonfiber_core::app::admitting::Opened::Operator(credential),
         )
         .await
     else {
@@ -725,12 +724,11 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     };
     let live = Arc::new(Live::opening(clock.as_ref()));
     let streaming = Arc::new(Streaming {
-        admitting,
         token: Arc::new(token),
         bound: lemonfiber_api::guard::Binding::here(8471),
         live: Arc::clone(&live),
         clock,
-        reading: Arc::new(crate::idle::ctx()),
+        reading: Arc::new(reading),
     });
     let answer = stream(State(streaming), None, saying(&welcome(&admitted.token))).await;
     assert_eq!(answer.status(), StatusCode::OK);

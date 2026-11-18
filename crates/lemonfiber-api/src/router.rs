@@ -18,7 +18,6 @@ use axum::Router;
 use lemonfiber_core::app::Ctx;
 
 use crate::actions::again::Answered;
-use crate::admission::Admitting;
 use crate::admission::Knocking;
 use crate::events::live::Live;
 use crate::events::Streaming;
@@ -45,11 +44,6 @@ pub struct Serving {
     /// The work this run started, which the actions that take minutes are named
     /// and left to run under.
     pub jobs: Jobs,
-    /// Who this run has let in, and what it counts against whoever is guessing.
-    ///
-    /// Shared with the stream and with the one door that opens without a token, so
-    /// there is one register of who is admitted rather than one per tree.
-    pub admitting: Arc<Admitting>,
     /// The one stream, for the work whose output arrives while it runs.
     ///
     /// The same stream the events route serves from its own state, shared rather
@@ -75,7 +69,6 @@ impl Serving {
         token: Arc<Token>,
         bound: Binding,
         jobs: Jobs,
-        admitting: Arc<Admitting>,
         live: Arc<Live>,
     ) -> Self {
         Self {
@@ -83,7 +76,6 @@ impl Serving {
             token,
             bound,
             jobs,
-            admitting,
             live,
             kept: Arc::default(),
             answered: Arc::default(),
@@ -157,16 +149,13 @@ const DOORS: [&str; 4] = [
 
 /// Let a request through, or turn it away before a handler runs.
 async fn guarded(State(serving): State<Serving>, request: Request, next: Next) -> Response {
-    let now = serving.ctx.seams.clock.now();
     // The one path that opens without a token, because a caller holding a password
     // and nothing else carries none by definition. The other half of the guard still
     // applies to it below, which is what stops a page the operator happens to be
     // visiting from posting guesses at it.
     let arrived = request.extensions().get::<Arrived>().copied();
-    let knocking = serving
-        .admitting
-        .carried(request.headers(), &serving.token, arrived, now)
-        .await;
+    let knocking =
+        crate::admission::knocking(&serving.ctx, request.headers(), &serving.token, arrived).await;
     // Said as what it is, rather than folded into the silence below. The sign-in door
     // stays open to all of them, since none is about the password offered there: a
     // media server coming back is all it takes for somebody it could not vouch for.
@@ -229,9 +218,11 @@ pub(crate) fn refused(knocking: &Knocking) -> Option<Response> {
     match knocking {
         Knocking::Unconfirmed => Some(for_audience(
             Audience::Household,
-            Refusal::Unconfirmed.answered(),
+            crate::refusal::unconfirmed(),
         )),
-        Knocking::Held(left) => Some(crate::admission::waiting(left.as_secs().max(1))),
+        Knocking::Held(seconds) => Some(crate::read::went_wrong(
+            &lemonfiber_core::app::admitting::held(std::time::Duration::from_secs(*seconds)),
+        )),
         Knocking::Exposed => Some(Refusal::KeyInTheClear.answered()),
         Knocking::Known(_) | Knocking::Nobody => None,
     }

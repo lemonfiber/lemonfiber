@@ -4,7 +4,7 @@
 
 use crate::door;
 use door::*;
-use lemonfiber_api::admission::remembered::Remembered;
+use lemonfiber_core::app::admitting::Remembered;
 use lemonfiber_fixtures::http::Answer as Reply;
 
 /// The claim token an invitation's join link carries.
@@ -99,12 +99,7 @@ async fn a_claim_on_an_open_invitation_sets_the_password_and_opens_a_session() {
     };
     assert_eq!(
         admitting
-            .carried(
-                &carrying(Some(&session(&answer.body))),
-                &token,
-                None,
-                moment()
-            )
+            .carried(&carrying(Some(&session(&answer.body))), &token, None)
             .await,
         Knocking::Known(Caller::Member("a7f3".to_owned()))
     );
@@ -225,9 +220,10 @@ async fn a_password_the_media_server_will_not_take_keeps_the_claim() {
 #[tokio::test]
 async fn a_household_keeping_no_record_offers_no_claim() {
     let at: Arc<dyn Household> = Recognising::knowing("a7f3");
+    let ctx = crate::idle::ctx();
 
-    assert!(!at.offers_claim("a7f3", CLAIM).await);
-    at.claim_spent("a7f3");
+    assert!(!at.offers_claim(&ctx, "a7f3", CLAIM).await);
+    at.claim_spent(&ctx, "a7f3");
 }
 
 /// A household kept for a while asks the stack's own record about a claim each time.
@@ -237,9 +233,9 @@ async fn a_household_kept_for_a_while_asks_the_record_about_a_claim() {
         "claim-remembered",
         holding(&unclaimed(), media::answered(&true)),
     );
-    let kept = Remembered::over(Arc::new(ctx.clone()));
+    let kept = Remembered::over(Arc::new(Stacked));
 
-    assert!(kept.offers_claim("a7f3", CLAIM).await);
-    kept.claim_spent("a7f3");
-    assert!(!kept.offers_claim("a7f3", CLAIM).await);
+    assert!(kept.offers_claim(&ctx, "a7f3", CLAIM).await);
+    kept.claim_spent(&ctx, "a7f3");
+    assert!(!kept.offers_claim(&ctx, "a7f3", CLAIM).await);
 }

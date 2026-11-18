@@ -248,6 +248,13 @@ fn every_verdict() -> Vec<(Command, Rehearsal)> {
 fn reads() -> Vec<Command> {
     vec![
         Command::WalkthroughOffer,
+        Command::Standing,
+        Command::Admission(crate::app::admitting::Asked::Caller(
+            crate::app::admitting::Carried {
+                offered: None,
+                arrived: None,
+            },
+        )),
         Command::Logs(crate::app::ReadingLogs {
             forms: Vec::new(),
             services: Vec::new(),
@@ -321,6 +328,17 @@ fn reads() -> Vec<Command> {
 fn refused_for_good() -> Vec<(Command, Rehearsal)> {
     vec![
         (Command::Password, Rehearsal::Cannot(A_PASSWORD_IS_TYPED)),
+        (
+            Command::Admission(crate::app::admitting::Asked::Password(
+                crate::app::admitting::Offered {
+                    name: None,
+                    password: String::new(),
+                    claim: None,
+                    peer: None,
+                },
+            )),
+            Rehearsal::Cannot(A_PASSWORD_IS_TYPED),
+        ),
         (tracing(true), Rehearsal::Cannot(A_SEARCH_IS_THE_ANSWER)),
         (
             examining(true),
@@ -686,8 +704,10 @@ fn only_what_needs_no_stack_skips_the_settling() {
         .map(|(command, _)| format!("{command:?}"))
         .collect();
     assert!(
-        skipping.iter().all(|named| named.starts_with("Authoring(")),
+        skipping.iter().all(|named| named.starts_with("Authoring(")
+            || named == "Standing"
+            || named.starts_with("Admission(")),
         "{skipping:?}"
     );
-    assert_eq!(skipping.len(), 5, "{skipping:?}");
+    assert_eq!(skipping.len(), 8, "{skipping:?}");
 }

@@ -1,7 +1,8 @@
 use super::{declared, served_at, Standing};
 use crate::admission::Caller;
 use crate::read::published::{Ruled, BESIDE};
-use lemonfiber_core::config::{Reaching, Settings, REACH_REGISTRY_KEY};
+use lemonfiber_core::app::standing::StackStanding;
+use lemonfiber_core::config::{Settings, REACH_REGISTRY_KEY};
 use lemonfiber_core::keys::Scope;
 
 /// A key named for the integration that holds it, scoped to `scope`.
@@ -27,14 +28,12 @@ fn every_caller() -> [Caller; 6] {
     ]
 }
 
-/// A context where `refused` is switched off, or nothing is.
-fn reaching(refused: Option<&'static str>) -> lemonfiber_core::app::Ctx {
-    lemonfiber_testing::a_context()
-        .settings(Settings {
-            reaching: refused.map_or_else(Reaching::default, Reaching::without),
-            ..Settings::default()
-        })
-        .build()
+/// A machine standing with `refused` switched off, or nothing.
+fn reaching(refused: Option<&'static str>) -> StackStanding {
+    StackStanding {
+        switched_off: refused.map(str::to_owned).into_iter().collect(),
+        ..StackStanding::default()
+    }
 }
 
 /// Every path the surface serves a request at, as a capability is named.
@@ -218,8 +217,8 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
 
 /// Every credential is told the same identifier, the one pairing material carries, so
 /// a member's key and the operator's are known to reach one stack.
-#[test]
-fn every_credential_is_told_the_stack_it_reaches() {
+#[tokio::test]
+async fn every_credential_is_told_the_stack_it_reaches() {
     let kept_scratch = lemonfiber_fixtures::scratch::Scratch::new("capabilities-stack");
     let kept = kept_scratch.to_path_buf();
     let ctx = lemonfiber_testing::a_context()
@@ -232,8 +231,9 @@ fn every_credential_is_told_the_stack_it_reaches() {
         .with_random(std::sync::Arc::new(
             lemonfiber_fixtures::support::FixedRandom(Some((0..16).collect())),
         ));
-    let operator = declared(&ctx, &Caller::Operator).stack;
-    let member = declared(&ctx, &Caller::Member("ana".to_owned())).stack;
+    let standing = crate::standing::standing(&ctx).await;
+    let operator = declared(&standing, &Caller::Operator).stack;
+    let member = declared(&standing, &Caller::Member("ana".to_owned())).stack;
     assert!(operator.as_deref().is_some_and(|stack| !stack.is_empty()));
     assert_eq!(operator, member);
 }

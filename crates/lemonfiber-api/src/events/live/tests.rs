@@ -71,7 +71,7 @@ impl super::Gathers for Counting {
         Vec::new()
     }
 
-    fn wanted_unheard(&self) -> bool {
+    async fn wanted_unheard(&self) -> bool {
         self.wanted.load(std::sync::atomic::Ordering::SeqCst)
     }
 }

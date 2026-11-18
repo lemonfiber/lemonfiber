@@ -33,8 +33,6 @@ use std::time::Duration;
 
 use axum::Router;
 use lemonfiber::cli::RawUi;
-use lemonfiber_api::admission::remembered::Remembered;
-use lemonfiber_api::admission::{Admitting, HouseholdAtHand, Keyring};
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::saying::Saying;
 use lemonfiber_api::events::stepping::Stepping;
@@ -47,7 +45,6 @@ use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::companion::served::{Served, ServedReport};
 use lemonfiber_core::error::{Problem, Remedy, State as Standing};
 use lemonfiber_core::frontend::Source;
-use lemonfiber_core::keys::run as keys;
 use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::ports::asking::Asking;
 use lemonfiber_core::PRODUCT;
@@ -294,19 +291,13 @@ enum Ending {
     Revoked,
 }
 
-/// The one register, shared by the door, the guard over everything else and the
-/// stream: two would be a run somebody could be admitted to half of. It reads the
-/// password and the keys afresh at every asking, so the serving loop asks again without
-/// anything having to tell it, and opens the household again once it is a few seconds old.
-fn register(ctx: &Arc<Ctx>) -> Arc<Admitting> {
-    Arc::new(Admitting {
-        kept: ctx.settings.admission.clone(),
-        household: Some(Arc::new(Remembered::over(
-            Arc::clone(ctx) as Arc<dyn HouseholdAtHand>
-        ))),
-        keys: Keyring::at(keys::at(ctx), keys::used_at(ctx)),
-        ..Admitting::default()
-    })
+/// Whether the operator's password is kept, read afresh at every asking.
+fn password_kept(ctx: &Ctx) -> bool {
+    ctx.settings
+        .admission
+        .as_deref()
+        .and_then(lemonfiber_core::admission::at)
+        .is_some()
 }
 
 /// How the web surface is served on `port`, settled through the dispatcher, and the
@@ -378,7 +369,6 @@ async fn serving(
     // polling a drive until this process stops.
     tokio::spawn(jobs.clone().sweeping(LEASE));
     tokio::spawn(untuning(Arc::clone(&ctx)));
-    let admitting = register(&ctx);
     let app = app(embedded, asked.assets.clone());
     if let Err(problem) = encrypted::port_settled(asked.tls, asked.port) {
         return complain(&problem);
@@ -387,7 +377,7 @@ async fn serving(
     let mut reach = asked.reach;
     let mut browsing = asked.browser;
     loop {
-        let offered = permitted(reach, admitting.credential().is_some());
+        let offered = permitted(reach, password_kept(&ctx));
         if offered == Offered::Refused {
             return complain(&Box::new(unauthenticated()));
         }
@@ -430,13 +420,11 @@ async fn serving(
             Arc::clone(&token),
             bound.clone(),
             jobs.clone(),
-            Arc::clone(&admitting),
             Arc::clone(&live),
         );
         let streaming = Arc::new(Streaming {
             token: Arc::clone(&token),
             bound,
-            admitting: Arc::clone(&admitting),
             live: Arc::clone(&live),
             clock: Arc::clone(&ctx.seams.clock),
             reading: Arc::clone(&ctx),
@@ -448,7 +436,7 @@ async fn serving(
             offered,
             tls: encrypting.as_ref().map(|on| on.acceptor.clone()),
         };
-        match holding(held, &live, &admitting, &mut until, look).await {
+        match holding(held, &live, &ctx, &mut until, look).await {
             Ending::Stopped => return ExitCode::SUCCESS,
             Ending::Revoked => {
                 for line in reverted() {

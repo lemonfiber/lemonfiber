@@ -14,19 +14,18 @@
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+
 use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
 use lemonfiber_core::app::Command;
-use lemonfiber_core::device_keys::run::{self, no_challenge, Asked};
-use lemonfiber_core::device_keys::{Attestation, Challenged};
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::device_keys::run::Asked;
+use lemonfiber_core::device_keys::Attestation;
 use serde::Deserialize;
 
 use crate::admission::Caller;
 use crate::guard::{Arrived, Presented};
-use crate::read::{carried_out, enveloped, went_wrong};
+use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
 
@@ -104,23 +103,14 @@ async fn registered(
     let Ok(Json(given)) = given else {
         return Refusal::NotAKeyRequest.answered();
     };
-    let now = serving.ctx.seams.clock.now();
-    match serving
-        .admitting
-        .proves_the_operator(&given.password, Some(arrived.from), now)
-        .await
-    {
-        Ok(true) => {
-            let asked = Asked::Register {
-                name: given.name,
-                public_key: given.public_key,
-                attestation: given.attestation,
-            };
-            carried_out(&serving.ctx, Command::DeviceKeys(asked)).await
-        }
-        Ok(false) => Refusal::NotThePassword.answered(),
-        Err(left) => crate::admission::waiting(left.as_secs().max(1)),
-    }
+    let asked = Asked::Register {
+        name: given.name,
+        public_key: given.public_key,
+        attestation: given.attestation,
+        password: given.password,
+        from: Some(arrived.from),
+    };
+    carried_out(&serving.ctx, Command::DeviceKeys(asked)).await
 }
 
 /// A device key revoked, by its name, and every challenge standing for it spent.
@@ -132,7 +122,6 @@ async fn revoked(
     if let Err(refused) = operator(&caller) {
         return *refused;
     }
-    serving.admitting.challenges.forgotten(&name).await;
     carried_out(&serving.ctx, Command::DeviceKeys(Asked::Revoke { name })).await
 }
 
@@ -146,27 +135,11 @@ async fn challenged(
     if let Err(refused) = operator(&caller) {
         return *refused;
     }
-    if let Err(refused) = run::standing(&serving.ctx, &name).await {
-        return went_wrong(&refused);
-    }
-    let ctx = &serving.ctx;
-    let now = ctx.seams.clock.now();
-    let issued = serving
-        .admitting
-        .challenges
-        .issued(ctx.seams.random.as_ref(), &token, &name, now)
-        .await;
-    let challenged = issued.map(|issued| Challenged {
-        challenge: issued.challenge,
-        expires: lemonfiber_core::instant::Instant::of(issued.expires),
-    });
-    match challenged {
-        Some(challenged) => enveloped(
-            StatusCode::OK,
-            Envelope::new(kind::DEVICE_CHALLENGE, challenged).to_json(),
-        ),
-        None => went_wrong(&no_challenge()),
-    }
+    let asked = Asked::Challenge {
+        name,
+        session: token,
+    };
+    carried_out(&serving.ctx, Command::DeviceKeys(asked)).await
 }
 
 /// Nothing where this caller is the operator, by a session or by this run's own token,
@@ -174,9 +147,9 @@ async fn challenged(
 pub(crate) fn operator(caller: &Caller) -> Result<(), Box<Response>> {
     match caller {
         Caller::Operator | Caller::Machine => Ok(()),
-        Caller::Member(_) => Err(Box::new(
-            Refusal::NotYours.saying("Device keys are the operator's, and only theirs."),
-        )),
+        Caller::Member(_) => Err(Box::new(crate::refusal::not_yours(Some(
+            "Device keys are the operator's, and only theirs.",
+        )))),
         Caller::Key(_) => Err(Box::new(Refusal::NotForAKey.saying(
             "A key may not register, list or revoke device keys, whatever its scope.",
         ))),

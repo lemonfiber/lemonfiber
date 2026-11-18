@@ -63,26 +63,12 @@ pub struct Streaming {
     pub token: Arc<Token>,
     /// Where this server is listening, as much of it as every request must name.
     pub bound: Binding,
-    /// Who this run has let in, so a listener holding a session is heard too.
-    ///
-    /// The same register the rest of the surface reads. Two would be a run somebody
-    /// could be admitted to half of, which is the reason this shares the token
-    /// rather than minting a second one.
-    pub admitting: Arc<crate::admission::Admitting>,
     /// The one gather, and everyone already listening to it.
     pub live: Arc<Live>,
-    /// The clock the rest of the surface reads.
-    ///
-    /// Carried for the reason the token and the register are. This guard decides
-    /// whether a session has ended, and the guard above every other route decides
-    /// the same thing from the context's clock — two readings of *when it is* can
-    /// disagree at the moment a session expires, and the route that disagreed would
-    /// be the one nobody tested. Held rather than asked of the platform here.
+    /// The clock the rest of the surface reads, which a member's own stream is timed by.
     pub clock: Arc<dyn Clock>,
-    /// The world a household member's own stream reads in.
-    ///
-    /// The operator's stream says what the one gather says; a member's is read for them
-    /// alone, so it needs the context a read runs against.
+    /// The context the rest of the surface dispatches through: who a listener is, and
+    /// the world a household member's own stream reads in.
     pub reading: Arc<Ctx>,
 }
 
@@ -112,12 +98,9 @@ pub async fn stream(
     // `State` from counting as request input, and reads the server's own paths as
     // a caller's.
     let State(streaming) = state;
-    let now = streaming.clock.now();
     let arrived = arrived.map(|axum::Extension(arrived)| arrived);
-    let knocking = streaming
-        .admitting
-        .carried(&headers, &streaming.token, arrived, now)
-        .await;
+    let knocking =
+        crate::admission::knocking(&streaming.reading, &headers, &streaming.token, arrived).await;
     if let Some(refused) = crate::router::refused(&knocking) {
         return refused;
     }
@@ -133,9 +116,8 @@ pub async fn stream(
         .and_then(|seen| seen.to_str().ok())
         .map(str::to_owned);
     let mut staying = Staying {
-        admitting: Arc::clone(&streaming.admitting),
+        ctx: Arc::clone(&streaming.reading),
         token: Arc::clone(&streaming.token),
-        clock: Arc::clone(&streaming.clock),
         headers,
         vouched: None,
         arrived,
@@ -208,12 +190,10 @@ impl Drop for Gathering {
 /// among it: a stream holding on to what it listens to would keep that open after
 /// everything else had let it go, and would never hear that it had ended.
 pub struct Staying {
-    /// The register the rest of the surface asks.
-    admitting: Arc<crate::admission::Admitting>,
+    /// The context the rest of the surface dispatches through.
+    ctx: Arc<Ctx>,
     /// This run's token.
     token: Arc<Token>,
-    /// The clock the rest of the surface reads.
-    clock: Arc<dyn Clock>,
     /// What the client carried when it opened the stream.
     headers: HeaderMap,
     /// Until when the last yes stands, where there has been one.
@@ -233,23 +213,22 @@ impl Staying {
         if self.vouched.is_some_and(|until| asked < until) {
             return true;
         }
-        let now = self.clock.now();
-        let still = match self
-            .admitting
-            .carried(&self.headers, &self.token, self.arrived, now)
-            .await
-        {
-            // Still the person it was opened for: an operator's stream is never carried
-            // on for somebody it would refuse, and a member's ends if whoever carries
-            // its credential is no longer that member.
-            Knocking::Known(caller) => match &self.member {
-                None => crate::serve::operator_only(&caller).is_none(),
-                Some(member) => caller.member() == Some(member.as_str()),
-            },
-            Knocking::Nobody | Knocking::Unconfirmed | Knocking::Held(_) | Knocking::Exposed => {
-                false
-            }
-        };
+        let still =
+            match crate::admission::knocking(&self.ctx, &self.headers, &self.token, self.arrived)
+                .await
+            {
+                // Still the person it was opened for: an operator's stream is never carried
+                // on for somebody it would refuse, and a member's ends if whoever carries
+                // its credential is no longer that member.
+                Knocking::Known(caller) => match &self.member {
+                    None => crate::serve::operator_only(&caller).is_none(),
+                    Some(member) => caller.member() == Some(member.as_str()),
+                },
+                Knocking::Nobody
+                | Knocking::Unconfirmed
+                | Knocking::Held(_)
+                | Knocking::Exposed => false,
+            };
         self.vouched = still.then(|| asked + RECHECKED_EVERY);
         still
     }

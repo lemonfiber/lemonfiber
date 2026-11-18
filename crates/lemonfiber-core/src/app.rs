@@ -14,6 +14,7 @@ use crate::autostart::run as autostart;
 use crate::backup::run as backup;
 use crate::bandwidth::run as bandwidth;
 use crate::bundle::run as bundle;
+use crate::companion::served;
 use crate::door::run as door;
 use crate::error::codes::life::{
     ABSENT_THERE, ALREADY_WORKING, NEVER_SETTLED, REGISTRY_REFUSED, STILL_NEEDED,
@@ -35,6 +36,7 @@ use crate::walkthrough::run as walkthrough;
 use crate::wiring::run as wiring;
 
 pub mod accepted;
+pub mod admitting;
 pub(crate) mod adopt;
 pub mod answering;
 pub mod appetite;
@@ -91,6 +93,7 @@ pub(crate) mod screen;
 mod settled;
 pub mod setup;
 pub(crate) mod showing;
+pub mod standing;
 pub mod support;
 pub mod switched;
 pub(crate) mod targets;
@@ -489,10 +492,10 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // watched rather than read afterwards.
         Command::Walkthrough { item } => walked(ctx, item).await,
         Command::WalkthroughOffer => worth_offering(ctx).await.map(Outcome::WalkthroughOffer),
+        Command::Standing => Ok(Outcome::Standing(standing::standing(ctx))),
+        Command::Admission(asked) => admitting::admitted(ctx, asked).await,
         Command::Logs(asked) => engine::read_logs(ctx, &asked).await.map(Outcome::Logs),
-        Command::Served(served) => crate::companion::served::serving(ctx, served)
-            .await
-            .map(Outcome::Served),
+        Command::Served(asked) => served::serving(ctx, asked).await.map(Outcome::Served),
         Command::InFlight { forms } => Ok(Outcome::InFlight(in_flight_report(ctx, &forms).await)),
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),

@@ -1,0 +1,33 @@
+{
+  "fields": {
+    "caller": {
+      "type": [
+        "ref:Caller"
+      ],
+      "required": true
+    },
+    "retry_after": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "standing": {
+      "type": [
+        "const:\"exposed\"",
+        "const:\"held\"",
+        "const:\"known\"",
+        "const:\"nobody\"",
+        "const:\"unconfirmed\""
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"exposed\"",
+    "\"held\"",
+    "\"known\"",
+    "\"nobody\"",
+    "\"unconfirmed\""
+  ]
+}

@@ -30,6 +30,12 @@
       ],
       "required": true
     },
+    "retry_after": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
     "severity": {
       "type": [
         "ref:ProblemSeverity"

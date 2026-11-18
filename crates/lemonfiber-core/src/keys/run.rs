@@ -9,6 +9,7 @@
 //! themselves, whatever surface asked.
 
 use std::collections::BTreeSet;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use crate::app::{Ctx, Outcome};
@@ -41,16 +42,16 @@ pub enum Asked {
         /// Whether to mint it as a claim, collected once by the program it is for,
         /// rather than handing over its secret now.
         claim: bool,
-        /// The device key whose signature proved the operator for this mint, where one
-        /// did rather than the password.
-        proved_by: Option<String>,
+        /// What proves who asked, where it was asked over the web API rather than at this
+        /// machine's terminal.
+        proving: Option<Box<Proving>>,
     },
     /// Collect a key minted as a claim, with that claim.
     Collect {
         /// The claim, as the key link carried it.
         claim: String,
         /// The address the collecting request came from, where it is known.
-        from: Option<String>,
+        from: Option<IpAddr>,
     },
     /// List the keys, without their secrets: every one to the operator, and to a
     /// member only those scoped to them.
@@ -100,27 +101,51 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             scope,
             purpose,
             by,
-            claim: false,
-            proved_by,
-        } => mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
-            .await
-            .map(Outcome::Minted),
-        Asked::Mint {
-            name,
-            scope,
-            purpose,
-            by,
-            claim: true,
-            proved_by,
-        } => claimed::mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
-            .await
-            .map(Outcome::KeyClaim),
-        Asked::Collect { claim, from } => claimed::collect(ctx, &claim, from)
-            .await
-            .map(Outcome::Minted),
+            claim,
+            proving,
+        } => {
+            let proved_by = match proving {
+                Some(proving) => {
+                    let signed = crate::device_keys::proof::Mint {
+                        name: &name,
+                        scope: &scope,
+                        purpose: &purpose,
+                        claim,
+                    };
+                    proving::proved(ctx, &by, &signed, *proving).await?
+                }
+                None => None,
+            };
+            if claim {
+                claimed::mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
+                    .await
+                    .map(Outcome::KeyClaim)
+            } else {
+                mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
+                    .await
+                    .map(Outcome::Minted)
+            }
+        }
+        Asked::Collect { claim, from } => collected(ctx, &claim, from).await,
         Asked::List { by } => list(ctx, &by).await.map(Outcome::Keys),
         Asked::Revoke { name, by } => revoke(ctx, &name, &by).await.map(Outcome::Keys),
     }
+}
+
+/// The key a claim collects, counted as an answer from `from` like a key presented.
+async fn collected(ctx: &Ctx, claim: &str, from: Option<IpAddr>) -> Result<Outcome, Box<Problem>> {
+    let now = ctx.seams.clock.now();
+    let attempts = &ctx.admitting.attempts;
+    let ticket = attempts
+        .taken_at_a_key(from, now)
+        .await
+        .map_err(crate::app::admitting::held)?;
+    let from = from.map(|from| from.to_canonical().to_string());
+    let minted = claimed::collect(ctx, claim, from).await?;
+    attempts
+        .right(&ticket, crate::app::admitting::Door::Key, now)
+        .await;
+    Ok(Outcome::Minted(minted))
 }
 
 /// Mint a key, and answer with its secret and what a client elsewhere needs beside it.
@@ -326,7 +351,7 @@ fn seen_by(kept: Kept, by: &Minter) -> Kept {
 /// Off unless the setting reads as on, and off where there is no configuration to read
 /// it from.
 #[must_use]
-pub fn members_may_mint(ctx: &Ctx) -> bool {
+pub(crate) fn members_may_mint(ctx: &Ctx) -> bool {
     ctx.settings
         .env_file
         .as_deref()
@@ -538,7 +563,10 @@ fn journalled(ctx: &Ctx, record: &Record, kind: Kind) -> Result<(), Box<Problem>
 
 mod claimed;
 mod heard;
+mod proving;
 mod refused;
+
+pub use proving::{Proof, Proving};
 
 use heard::{heard, Heard};
 

@@ -114,13 +114,23 @@ impl Gathers for Together {
         each(&self.0, joined, Some(early)).await
     }
 
-    fn wanted_unheard(&self) -> bool {
-        self.0.iter().any(|source| source.wanted_unheard())
+    async fn wanted_unheard(&self) -> bool {
+        any_wanted_unheard(&self.0).await
     }
 }
 
 /// What each source says, in the order given, each handing what it has early to
 /// `early` where there is one.
+/// Whether any of `sources` is worth gathering with nobody listening.
+async fn any_wanted_unheard(sources: &[Arc<dyn Gathers>]) -> bool {
+    for source in sources {
+        if source.wanted_unheard().await {
+            return true;
+        }
+    }
+    false
+}
+
 async fn each(sources: &[Arc<dyn Gathers>], joined: bool, early: Option<&Early>) -> Vec<Rendered> {
     let mut said = Vec::new();
     for source in sources {

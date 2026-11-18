@@ -56,7 +56,6 @@ fn routed(jobs: Jobs) -> axum::Router {
             ctx: Arc::new(world()),
             token: Arc::new(token),
             bound: lemonfiber_api::guard::Binding::here(8473),
-            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs,
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),

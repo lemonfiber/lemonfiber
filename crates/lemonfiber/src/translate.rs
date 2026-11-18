@@ -436,7 +436,7 @@ pub(crate) fn keyed(asked: RawKey) -> Command {
             purpose,
             by: Minter::Operator,
             claim,
-            proved_by: None,
+            proving: None,
         },
         KeyCommand::List => Keyed::List {
             by: Minter::Operator,

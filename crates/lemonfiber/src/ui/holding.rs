@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use lemonfiber_api::admission::Admitting;
 use lemonfiber_api::events::live::Live;
+use lemonfiber_core::app::Ctx;
 use tokio::net::TcpListener;
 
 use super::reach::Offered;
@@ -33,7 +33,7 @@ pub(super) struct Held {
 pub(super) async fn holding(
     held: Held,
     live: &Live,
-    admitting: &Arc<Admitting>,
+    ctx: &Arc<Ctx>,
     until: &mut Until,
     look: Duration,
 ) -> Ending {
@@ -56,7 +56,7 @@ pub(super) async fn holding(
     }
     let ending = tokio::select! {
         () = &mut *until => Ending::Stopped,
-        () = revoked(Arc::clone(admitting), offered, look) => Ending::Revoked,
+        () = revoked(Arc::clone(ctx), offered, look) => Ending::Revoked,
     };
     let _ = stopping.send(true);
     // Every stream ends with the binding it was opened on. A stream is a request that
@@ -75,11 +75,11 @@ pub(super) async fn holding(
 /// Never, where it rests on none: a surface answering this machine alone is offered
 /// to nobody a password would have kept out, so there is nothing for its going to
 /// take away.
-async fn revoked(admitting: Arc<Admitting>, offered: Offered, look: Duration) {
+async fn revoked(ctx: Arc<Ctx>, offered: Offered, look: Duration) {
     match offered {
         Offered::Machine | Offered::Refused => std::future::pending().await,
         Offered::Network => {
-            while admitting.credential().is_some() {
+            while super::password_kept(&ctx) {
                 tokio::time::sleep(look).await;
             }
         }

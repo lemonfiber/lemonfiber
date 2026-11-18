@@ -24,7 +24,7 @@ fn asking_the_keys_rehearses_as_each_request_is() {
         purpose: "other".to_owned(),
         by: Minter::Operator,
         claim: false,
-        proved_by: None,
+        proving: None,
     }));
     assert!(matches!(mint.rehearsal, Rehearsal::Cannot(_)));
     let collect = asked(&Command::Keys(Keyed::Collect {
@@ -90,4 +90,16 @@ fn asking_the_back_ends_rehearses_as_each_request_is() {
         assert_eq!(rehearsed.named, named);
         assert!(matches!(rehearsed.rehearsal, Rehearsal::Reports));
     }
+}
+
+/// Asking the device keys for a challenge cannot be rehearsed, because a challenge is
+/// spent by the signature made over it.
+#[test]
+fn a_challenge_for_a_device_key_cannot_be_rehearsed() {
+    use crate::device_keys::run::Asked as Devices;
+    let challenge = asked(&Command::DeviceKeys(Devices::Challenge {
+        name: "pixel".to_owned(),
+        session: "a-session".to_owned(),
+    }));
+    assert!(matches!(challenge.rehearsal, Rehearsal::Cannot(_)));
 }

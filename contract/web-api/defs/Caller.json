@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Who is calling.",
+  "oneOf": [
+    {
+      "description": "The operator, on a session opened with the machine's password.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "operator"
+        }
+      },
+      "required": [
+        "as"
+      ]
+    },
+    {
+      "description": "A household member, on a session of their own.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "member"
+        },
+        "id": {
+          "description": "The id the media server files them under.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "as",
+        "id"
+      ]
+    },
+    {
+      "description": "A program, on a key the operator or a member minted for it.",
+      "type": "object",
+      "properties": {
+        "as": {
+          "type": "string",
+          "const": "key"
+        },
+        "name": {
+          "description": "The key's name.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "What it admits: `read`, `act` or `member:<name>`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "as",
+        "name",
+        "scope"
+      ]
+    }
+  ]
+}

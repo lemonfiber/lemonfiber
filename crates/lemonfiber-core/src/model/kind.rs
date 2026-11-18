@@ -65,6 +65,8 @@ kinds! {
     BOOT = "boot",
     /// What a support bundle would hold, or where one went.
     BUNDLE = "bundle",
+    /// Who the session or key a web API request carried proves it to be.
+    CALLER = "caller",
     /// What this stack can do, as the credential that asked may do it.
     CAPABILITIES = "capabilities",
     /// What each service in the stack is for, and what became of the ones that went.
@@ -216,6 +218,8 @@ kinds! {
     START = "start",
     /// How the stack runs without lemonfiber.
     STACK = "stack",
+    /// What the web API composes its routes and its answers from.
+    STANDING = "standing",
     /// Where a message goes: every back-end alerts are delivered to.
     NOTIFY = "notify",
     /// The ways a member may be told that something they asked for is ready.

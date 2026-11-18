@@ -75,7 +75,8 @@ const A_RECORDING_IS_THE_RUN: &str = "a recording is what the plugin's services 
      run to what is recorded and writes nothing";
 
 /// Why setting the password cannot be rehearsed.
-const A_PASSWORD_IS_TYPED: &str = "a password is what the operator types, and a rehearsal \
+pub(super) const A_PASSWORD_IS_TYPED: &str =
+    "a password is what the operator types, and a rehearsal \
      would take one and throw it away";
 
 /// What a rehearsal means for one command.
@@ -245,6 +246,11 @@ const fn viewed(viewing: &Viewing) -> Asked {
     }
 }
 
+/// What a certificate replacement reports, replacing nothing.
+const fn certified() -> Asked {
+    reports("companion certificate", CERTIFICATE)
+}
+
 /// What each command is: the name an operator knows it by, what a rehearsal of it
 /// comes to, and what it takes away while it runs.
 ///
@@ -278,9 +284,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),
         // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
         // replaced.
-        Command::Companion(Pairing::Certificate { .. }) => {
-            reports("companion certificate", CERTIFICATE)
-        }
+        Command::Companion(Pairing::Certificate { .. }) => certified(),
         Command::Explain { .. } => reads("explain"),
         Command::Glossary => reads("glossary"),
         Command::Clients => reads("clients"),
@@ -296,12 +300,10 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Hosting(Keeping::Read) => reads("hosting"),
         Command::Setup(SetupAction::Where) => reads("setup --status"),
         Command::Support(Gathering { write: false, .. }) => reads("support"),
-        // Its own doc comment is the verdict: it replaces nothing, and what it answers
-        // with is the command for whichever tool owns the copy that is running. It was
-        // refusing the flag it did not need to refuse, which costs an operator a run
-        // and teaches them the flag is unreliable. The one thing a rehearsal holds
-        // back is the note it keeps of having asked, so that a question does not move
-        // the day the next real run is due to ask on.
+        // It replaces nothing, and what it answers with is the command for whichever
+        // tool owns the copy that is running. The one thing a rehearsal holds back is
+        // the note it keeps of having asked, so that a question does not move the day
+        // the next real run is due to ask on.
         Command::SelfUpdate { .. } => reads("update self"),
 
         // A search asks an indexer, and the answer exists only once it has been
@@ -318,6 +320,8 @@ pub const fn asked(command: &Command) -> Asked {
         // doing anything.
         Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
         Command::WalkthroughOffer => reads("walkthrough offer"),
+        Command::Standing => reads("standing"),
+        Command::Admission(asked) => keyed::admitting(asked),
         Command::Logs(_) => reads("logs"),
         Command::InFlight { .. } => reads("in flight"),
         Command::Served(_) => reads("ui"),
@@ -470,7 +474,10 @@ pub use withheld::carried;
 /// settle the stack and say its warnings again on every tick.
 #[must_use]
 pub const fn unsettled(command: &Command) -> bool {
-    matches!(command, Command::Authoring(_))
+    matches!(
+        command,
+        Command::Authoring(_) | Command::Standing | Command::Admission(_)
+    )
 }
 
 /// What reading a plugin's own source reads and writes: recording writes what it takes,

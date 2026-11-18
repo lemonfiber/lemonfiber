@@ -271,7 +271,7 @@ pub(super) fn waiting_at(ctx: &Ctx) -> Option<PathBuf> {
 /// Whether any endpoint is waiting to be woken, so the stack is worth reading with nobody
 /// listening.
 #[must_use]
-pub fn any_waiting(ctx: &Ctx) -> bool {
+pub(crate) fn any_waiting(ctx: &Ctx) -> bool {
     waiting_at(ctx).is_some()
 }
 

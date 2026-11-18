@@ -23,6 +23,7 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
+use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::{switched, Command, Ctx};
 use lemonfiber_core::keys::Scope as KeyScope;
 use lemonfiber_core::model::{kind, Envelope};
@@ -110,21 +111,22 @@ pub fn routes() -> Router<Serving> {
         CAPABILITIES,
         get(
             |State(serving): State<Serving>, caller: Caller| async move {
-                answered(&serving.ctx, &caller)
+                answered(&serving.ctx, &caller).await
             },
         ),
     )
 }
 
 /// The capabilities, in the envelope every read answers with.
-fn answered(ctx: &Ctx, caller: &Caller) -> Response {
-    let said = Envelope::new(kind::CAPABILITIES, &declared(ctx, caller)).to_json();
+async fn answered(ctx: &Ctx, caller: &Caller) -> Response {
+    let standing = crate::standing::standing(ctx).await;
+    let said = Envelope::new(kind::CAPABILITIES, &declared(&standing, caller)).to_json();
     enveloped(StatusCode::OK, said)
 }
 
-/// What this stack can do, as `caller` may do it.
+/// What this stack can do as `standing` says it stands, as `caller` may do it.
 #[must_use]
-pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
+pub fn declared(standing: &StackStanding, caller: &Caller) -> Capabilities {
     let actions = crate::actions::OFFERED.iter().map(|action| {
         (
             served_at(action),
@@ -141,7 +143,7 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
     });
     let mut capabilities: BTreeMap<String, Standing> = actions
         .chain(reads)
-        .filter_map(|(path, door, command)| Some((path, standing(ctx, caller, door, command?))))
+        .filter_map(|(path, door, command)| Some((path, offered(standing, caller, door, command?))))
         .collect();
     let beside: Vec<(String, Standing)> = BESIDE
         .iter()
@@ -158,7 +160,7 @@ pub fn declared(ctx: &Ctx, caller: &Caller) -> Capabilities {
         .collect();
     capabilities.extend(beside);
     Capabilities {
-        stack: lemonfiber_core::companion::identified(ctx),
+        stack: standing.stack.clone(),
         scope: Scope::of(caller),
         capabilities,
     }
@@ -170,11 +172,13 @@ fn served_at(action: &str) -> String {
 }
 
 /// What one request comes to for `caller`: what [`may`] answers for its command at the
-/// door it arrives at, and whether a setting it needs is off.
-fn standing(ctx: &Ctx, caller: &Caller, door: Door, command: Command) -> Standing {
+/// door it arrives at, and whether a setting it needs is off as `standing` says.
+fn offered(standing: &StackStanding, caller: &Caller, door: Door, command: Command) -> Standing {
     match may(caller, door, command) {
         Permitted::Nothing | Permitted::NotForAKey(_) => Standing::Unpermitted,
-        Permitted::This(command) => match switched::off(ctx, &command) {
+        Permitted::This(command) => match switched::needed(&command)
+            .filter(|setting| standing.switched_off.iter().any(|off| off == setting))
+        {
             Some(_) => Standing::Unconfigured,
             None => Standing::Available,
         },
