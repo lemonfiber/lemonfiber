@@ -8,9 +8,9 @@
 //! - **Never the manifest:** the stack the bundle declares is handed over whole, beside
 //!   this tree, and no root or service file of a stack directory is carried.
 //! - **Each assembled part's starting configuration:** from its copy in the bundle, which
-//!   holds its tree and nothing beside it. A part the bundle installs is not carried: the
-//!   plugin path writes its starting files where none is yet, and its adapter owns them
-//!   from then on.
+//!   holds its tree and nothing beside it. A part the bundle installs and a plugin it
+//!   offers are not carried: the plugin path writes their starting files, each secret they
+//!   name filled in, where none is yet, and a file already there is never written again.
 //! - **The licence the stack is published under:** the catalogue's.
 //! - **What a claim names:** every recording the manifest's claims are proven against,
 //!   from the copy of the part whose recording it is. A recording a claim names and no
@@ -64,7 +64,7 @@ fn runtime(
     }
     for one in held
         .iter()
-        .filter(|one| one.pin.stage != Some(lemonfiber_bundle::Stage::Installed))
+        .filter(|one| one.pin.stage == Some(lemonfiber_bundle::Stage::Assembled))
     {
         let id = &one.pin.id;
         from(&copies.join(id), &Path::new(CONFIG).join(id), &mut carried);

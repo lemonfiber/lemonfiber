@@ -1,4 +1,5 @@
-//! Every recording a claim names is carried, from the part's copy where the copy holds it.
+//! What the stack carries: every recording a claim names, from the part's copy where the copy
+//! holds it, and the starting files of no plugin the plugin path installs.
 
 use std::path::Path;
 
@@ -42,6 +43,36 @@ fn every_recording_a_claim_names_is_carried_and_a_parts_copy_is_the_one_carried(
                 carried.map(include_dir::File::contents),
                 Some(copy.as_slice()),
                 "{fixture} is carried from somewhere other than {id}'s copy"
+            );
+        }
+    }
+}
+
+#[test]
+fn no_plugin_the_plugin_path_installs_has_its_starting_files_carried_with_a_secret_unfilled() {
+    let installed: Vec<&str> = lemonfiber_bundled::PINNED
+        .iter()
+        .filter(|pinned| pinned.stage != Some(lemonfiber_bundled::Stage::Assembled))
+        .map(|pinned| pinned.first_party.plugin)
+        .collect();
+    assert!(installed.contains(&"nzbget"), "{installed:?}");
+
+    for plugin in &installed {
+        assert!(
+            lemonfiber_bundled::CARRIED
+                .get_dir(Path::new("config").join(plugin))
+                .is_none(),
+            "{plugin}'s starting files are carried, so the plugin path finds them already there"
+        );
+    }
+    let mut waiting = vec![&lemonfiber_bundled::CARRIED];
+    while let Some(dir) = waiting.pop() {
+        waiting.extend(dir.dirs());
+        for file in dir.files() {
+            assert!(
+                !String::from_utf8_lossy(file.contents()).contains("{{secret:"),
+                "{} is carried with a secret's placeholder unfilled",
+                file.path().display()
             );
         }
     }
