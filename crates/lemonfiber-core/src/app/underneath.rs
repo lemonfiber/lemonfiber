@@ -42,7 +42,7 @@ pub(crate) async fn stack(ctx: &Ctx) -> Result<StackReport, Box<Problem>> {
     let forms = crate::autostart::run::load(ctx).forms().to_vec();
     let mut rehearsing = ctx.clone();
     rehearsing.dry_run = true;
-    let start = super::engine::invocation(&rehearsing, &forms, &Action::Up)?;
+    let start = super::engine::invocation(&rehearsing, &forms, &Action::Up).await?;
     let exceptions = super::engine::offline(ctx, &forms)
         .await?
         .map(|offline| {

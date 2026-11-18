@@ -18,6 +18,7 @@ page is about the adapter: `adapters::docker::Daemon`, on `bollard`.
 | `exec` | `POST /containers/{id}/exec` | The leak test runs the same command in two namespaces |
 | `located` | `POST /containers/create` | See below — there is no route that stats a host path |
 | `Program::run` | `POST /containers/create`, `/attach`, `/start`, `/wait`, `DELETE /containers/{id}` | A proof's container belongs to no Compose project (ADR-0048) |
+| `Networks::networks`, `created`, `removed` | `GET /networks`, `POST /networks/create`, `GET /networks/{name}`, `POST /networks/{name}/disconnect`, `DELETE /networks/{name}` | Every network of the project is created by the core and named external in the project, so one model of the networks serves every engine (ARCH-R439) |
 | `Serving::serve`, `standing`, `log`, `removed` | `GET /info`, `POST /networks/create`, `POST /containers/create`, `/start`, `GET /containers/{id}/json`, `/logs`, `DELETE /containers/{id}`, `DELETE /networks/{name}` | A recording's container and network belong to no Compose project (ADR-0049) |
 
 ### A proof's container

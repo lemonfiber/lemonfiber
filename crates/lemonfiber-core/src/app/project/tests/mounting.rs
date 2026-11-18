@@ -63,14 +63,14 @@ fn a_mount_source_not_there_is_made_and_journalled_parent_first() {
     assert_eq!(self::made(&ctx).len(), before, "nothing made twice");
 }
 
-#[test]
-fn a_start_makes_each_mount_source_and_a_run_starting_nothing_makes_none() {
+#[tokio::test]
+async fn a_start_makes_each_mount_source_and_a_run_starting_nothing_makes_none() {
     let (ctx, project) = machine("mount-started");
     let _ = std::fs::remove_dir_all(project.join("config").join("jellyfin").join("cache"));
 
-    assert!(preparing(&ctx, false));
+    assert!(preparing(&ctx, false).await);
     let before = cache(&project).exists();
-    assert!(preparing(&ctx, true));
+    assert!(preparing(&ctx, true).await);
 
     assert!(!before);
     assert!(cache(&project).is_dir());
@@ -162,8 +162,8 @@ fn a_mount_source_that_cannot_be_made_stops_the_start_naming_it() {
 }
 
 #[cfg(unix)]
-#[test]
-fn a_start_whose_mount_source_cannot_be_made_is_refused() {
+#[tokio::test]
+async fn a_start_whose_mount_source_cannot_be_made_is_refused() {
     use std::os::unix::fs::PermissionsExt as _;
 
     let (ctx, project) = machine("mount-start-unmade");
@@ -172,7 +172,7 @@ fn a_start_whose_mount_source_cannot_be_made_is_refused() {
     let _ = std::fs::create_dir_all(&tree);
     let _ = std::fs::set_permissions(&tree, std::fs::Permissions::from_mode(0o555));
 
-    let started = preparing(&ctx, true);
+    let started = preparing(&ctx, true).await;
     let _ = std::fs::set_permissions(&tree, std::fs::Permissions::from_mode(0o755));
 
     assert!(!started);

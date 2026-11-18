@@ -162,16 +162,8 @@ fn every_stack_image_is_written_by_its_digest_alone() {
 #[test]
 fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
     let project = project(&carried(), &crate::test_support::adapted::installed_parts());
-    let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
-    let declared = document.get("networks").cloned().unwrap_or_default();
     assert!(project.text.contains(&PROXY_ON_PROXY.to_string()));
-    assert!(declared.as_mapping().is_some_and(|networks| {
-        networks.values().any(|one| {
-            one.get("ipam")
-                .and_then(|ipam| ipam.get("config")?.get(0)?.get("ip_range"))
-                .is_some()
-        })
-    }));
+    assert!(fixes_addresses(&project));
     let caddy = entry(&project, "caddy");
     assert!(caddy
         .get("networks")
@@ -181,19 +173,32 @@ fn the_guard_and_the_proxy_hold_their_fixed_addresses_on_fixed_subnets() {
             .any(|one| one.get("ipv4_address").is_some())));
 }
 
-/// Whether any network the project declares holds fixed addresses.
+/// Whether any network the project declares holds fixed addresses, as lemonfiber creates
+/// it through the engine.
 fn fixes_addresses(project: &Project) -> bool {
+    project
+        .topology
+        .networks
+        .values()
+        .any(|network| super::document::shaped(network).ip_range.is_some())
+}
+
+#[test]
+fn every_network_is_written_as_one_lemonfiber_created_under_its_engine_name() {
+    let project = project(&carried(), &[]);
     let document: Yaml = serde_norway::from_str(&project.text).unwrap_or_default();
-    document
+    let declared = document
         .get("networks")
         .and_then(Yaml::as_mapping)
-        .is_some_and(|networks| {
-            networks.values().any(|one| {
-                one.get("ipam")
-                    .and_then(|ipam| ipam.get("config")?.get(0)?.get("ip_range"))
-                    .is_some()
-            })
-        })
+        .cloned()
+        .unwrap_or_default();
+    assert!(!declared.is_empty());
+    for (name, network) in &declared {
+        let name = name.as_str().unwrap_or_default();
+        assert_eq!(network.get("external").and_then(Yaml::as_bool), Some(true));
+        assert_eq!(text(network, "name"), format!("{}_{name}", crate::PRODUCT));
+        assert!(network.get("ipam").is_none() && network.get("internal").is_none());
+    }
 }
 
 #[test]
@@ -727,6 +732,7 @@ fn sequence(entry: &Yaml, key: &str) -> Vec<String> {
 mod fenced;
 mod fronted;
 mod inside;
+mod inward;
 mod pass;
 mod replaced;
 mod sources;
@@ -736,6 +742,7 @@ fn inside_the_guard() -> Network {
     Network {
         via: Some("network.egress-guard".into()),
         fenced: false,
+        internal: false,
         egress_for: None,
     }
 }
@@ -754,6 +761,7 @@ fn a_service_inside_a_network_an_adapter_fills_is_written_inside_the_upstream_it
     downloader.fields.network = Some(Network {
         via: Some(guard.to_owned()),
         fenced: false,
+        internal: false,
         egress_for: None,
     });
     let project = project(

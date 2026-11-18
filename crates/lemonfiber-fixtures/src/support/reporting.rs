@@ -68,6 +68,9 @@ pub struct Reporting {
     hangs: bool,
     /// The engine listed beside it and asked everything else, where it stands beside one.
     over: Option<Arc<dyn Engine>>,
+    /// The service whose container is another one from the listing counted here on,
+    /// where one is created again.
+    recreated: Option<(usize, String)>,
 }
 
 /// A question an engine can be asked besides what it holds.
@@ -101,7 +104,8 @@ pub struct Tunnel {
 }
 
 impl Reporting {
-    /// An engine reporting the named services in one state.
+    /// An engine reporting the named services in one state, each running the image of the
+    /// id `image-` and its name.
     #[must_use]
     pub fn holding(services: &[&str], lifecycle: Lifecycle, health: Health) -> Self {
         Self {
@@ -116,6 +120,9 @@ impl Reporting {
                     published: Vec::new(),
                     mounts: Vec::new(),
                     exit: None,
+                    entry: None,
+                    networks: Vec::new(),
+                    image_id: format!("image-{service}"),
                 })
                 .collect(),
             reachable: true,
@@ -213,10 +220,36 @@ impl Reporting {
         self
     }
 
+    /// The same engine, the container of `service` labelled with the digest `entry`, where
+    /// one is given, and on the networks named `networks`.
+    #[must_use]
+    pub fn labelled(mut self, service: &str, entry: Option<&str>, networks: &[&str]) -> Self {
+        for container in self
+            .containers
+            .iter_mut()
+            .filter(|container| container.service == service)
+        {
+            container.entry = entry.map(str::to_owned);
+            container.networks = networks
+                .iter()
+                .map(|network| (*network).to_owned())
+                .collect();
+        }
+        self
+    }
+
     /// The same engine, unsettled until it has been asked `listings` times.
     #[must_use]
     pub fn settling_after(mut self, listings: usize) -> Self {
         self.settles_after = Some(listings);
+        self
+    }
+
+    /// The same engine, holding another container for `service` from its listing after
+    /// the first `listings` on.
+    #[must_use]
+    pub fn recreating_after(mut self, listings: usize, service: &str) -> Self {
+        self.recreated = Some((listings, service.to_owned()));
         self
     }
 

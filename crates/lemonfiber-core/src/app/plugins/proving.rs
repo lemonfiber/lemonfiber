@@ -72,7 +72,7 @@ pub(crate) async fn started(
     ctx: &Ctx,
     installed: &Installed,
     stack: &Path,
-    stamp: Instant,
+    (stamp, displaced): (Instant, &[String]),
 ) -> Result<(), Box<Problem>> {
     let services: Vec<String> = installed
         .services
@@ -80,7 +80,7 @@ pub(crate) async fn started(
         .map(|placed| placed.service.clone())
         .collect();
     let start = Action::Start(services.clone());
-    let answered = match crate::app::engine::before(ctx, &start, &services) {
+    let answered = match readied(ctx, (installed, stack), (&start, &services), displaced).await {
         Ok(()) => match ctx
             .seams
             .runner
@@ -122,7 +122,7 @@ pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
         .map(|placed| placed.service.clone())
         .collect();
     let start = Action::Start(services.clone());
-    if let Err(refused) = crate::app::engine::before(ctx, &start, &services) {
+    if let Err(refused) = readied(ctx, (installed, stack), (&start, &services), &[]).await {
         return Some(refused.summary);
     }
     match ctx
@@ -138,6 +138,27 @@ pub(crate) async fn up(ctx: &Ctx, installed: &Installed, stack: &Path) -> Option
         )),
         Err(why) => Some(why.to_string()),
     }
+}
+
+/// Let go of what `start` of `installed`'s `services` addresses, bring every container of
+/// the project onto its service's networks, and take away first each one the start creates
+/// again, those of `displaced` among them.
+///
+/// # Errors
+///
+/// Where what the start addresses could not be let go of, or a container it creates again
+/// could not be taken away.
+async fn readied(
+    ctx: &Ctx,
+    (installed, stack): (&Installed, &Path),
+    (start, services): (&Action, &[String]),
+    displaced: &[String],
+) -> Result<(), Box<Problem>> {
+    crate::app::engine::before(ctx, start, services)?;
+    crate::app::project::renewed(ctx, services, displaced, |gone| {
+        invocation(ctx, installed, stack, &Action::Remove(gone))
+    })
+    .await
 }
 
 /// Take the plugin's containers back off the machine.

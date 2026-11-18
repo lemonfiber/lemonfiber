@@ -2,7 +2,8 @@
 //! needs to run there as lemonfiber does: the profiles to start, those of the stack's last
 //! start, which hold the services of the first-party plugins too, and the own profile of
 //! every other installed plugin joining a form that start ran, and the files to read, the
-//! project and the operator's overlay after it where they wrote one.
+//! project, the labels beside it, and the operator's overlay after them where they wrote
+//! one.
 //!
 //! lemonfiber names its own environment file, its files and its profiles on every
 //! invocation, so Compose never reads this one for lemonfiber. It is what `docker compose
@@ -79,17 +80,23 @@ fn written(ctx: &Ctx, stack: &BTreeSet<String>, text: &str) -> Result<(), Failur
         .filter(|profile| !crate::plugin::is_a_plugins(profile) || declared.contains(*profile))
         .cloned()
         .collect();
-    let read = std::iter::once(PathBuf::from(crate::project::FILE)).chain(
-        ctx.settings
-            .overlays
-            .iter()
-            .filter(|overlay| overlay.is_file())
-            .cloned(),
-    );
-    let read = std::env::join_paths(read).map_or_else(
-        |_| crate::project::FILE.to_owned(),
-        |joined| joined.to_string_lossy().into_owned(),
-    );
+    let directory = super::directory(ctx).ok_or(Failure::NowhereToWrite)?;
+    super::converging::labelled(ctx, &directory, text).map_err(|reason| Failure::NotWritten {
+        path: directory.join(crate::project::LABELS),
+        reason,
+    })?;
+    let own = [crate::project::FILE, crate::project::LABELS].map(PathBuf::from);
+    let overlays = ctx
+        .settings
+        .overlays
+        .iter()
+        .filter(|overlay| overlay.is_file())
+        .cloned();
+    let read = std::env::join_paths(own.iter().cloned().chain(overlays))
+        .or_else(|_| std::env::join_paths(&own))
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     let text = format!("{KEY}={}\n{FILES}={read}\n", profiles.join(","));
     super::materialised_as(ctx, FILE, &text, super::Pass::Write).map(|_| ())
 }

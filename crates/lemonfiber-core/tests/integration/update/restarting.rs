@@ -53,7 +53,7 @@ async fn a_service_that_does_not_come_back_halts_the_run_and_says_what_did_not_m
     assert!(
         !machine
             .last()
-            .ends_with(&["up".to_owned(), "--detach".to_owned()]),
+            .ends_with(&["--detach".to_owned(), "--no-recreate".to_owned()]),
         "a halted run started the rest of the stack anyway: {:?}",
         machine.last()
     );

@@ -68,7 +68,7 @@ pub(super) async fn apply(
     // Built while nothing has been touched, so a stack that cannot be resolved or
     // written stops the run before the first service is stopped rather than after a
     // backup has been taken and half of them have moved.
-    let taking = steps(ctx, taking)?;
+    let taking = steps(ctx, taking).await?;
 
     // Asked before anything stops, because stopping is what would interrupt them.
     let active = named(&engine::in_flight(ctx, &[]).await);
@@ -180,6 +180,8 @@ struct Step {
     change: Change,
     /// The Compose invocation that starts that one service.
     argv: Vec<String>,
+    /// What its start takes away before it runs.
+    renewal: engine::Renewal,
 }
 
 /// Each change with the invocation that takes it, or why none could be built.
@@ -187,15 +189,18 @@ struct Step {
 /// # Errors
 ///
 /// Returns the [`Problem`] for a stack that cannot be resolved or written.
-fn steps(ctx: &Ctx, taking: Vec<Change>) -> Result<Vec<Step>, Box<Problem>> {
-    taking
-        .into_iter()
-        .map(|change| {
-            let started = Action::Start(vec![change.service.clone()]);
-            let argv = engine::invocation(ctx, &[], &started)?.command;
-            Ok(Step { change, argv })
-        })
-        .collect()
+async fn steps(ctx: &Ctx, taking: Vec<Change>) -> Result<Vec<Step>, Box<Problem>> {
+    let mut steps = Vec::with_capacity(taking.len());
+    for change in taking {
+        let started = Action::Start(vec![change.service.clone()]);
+        let invocation = engine::invocation(ctx, &[], &started).await?;
+        steps.push(Step {
+            change,
+            argv: invocation.command,
+            renewal: invocation.renewal,
+        });
+    }
+    Ok(steps)
 }
 
 /// Stop, capture, and move — the three that must happen in that order.
@@ -255,7 +260,7 @@ async fn fetched(ctx: &Ctx, taking: &[Step]) {
         .iter()
         .map(|step| step.change.service.clone())
         .collect();
-    if let Ok(invocation) = engine::invocation(ctx, &[], &Action::Pull(services)) {
+    if let Ok(invocation) = engine::invocation(ctx, &[], &Action::Pull(services)).await {
         let _ = ctx.seams.runner.run(&invocation.command).await;
     }
 }
@@ -270,8 +275,9 @@ async fn fetched(ctx: &Ctx, taking: &[Step]) {
 /// was established service by service for everything this run moved, and the rest is
 /// on the versions it was already running.
 async fn whole(ctx: &Ctx, action: &Action) -> Result<Vec<crate::model::StackEdit>, Box<Problem>> {
-    let invocation = engine::invocation(ctx, &[], action)?;
+    let invocation = engine::invocation(ctx, &[], action).await?;
     engine::before(ctx, action, &invocation.addressed)?;
+    invocation.renewal.carried_out(ctx).await?;
     ctx.seams
         .runner
         .run(&invocation.command)
@@ -333,10 +339,22 @@ async fn staged(ctx: &Ctx, manifest: &Manifest, taking: &[Step]) -> (Vec<Applied
     (applied, halted)
 }
 
+/// Let go of what a start of `service` addresses, and take away first each container
+/// `step`'s start creates again.
+///
+/// # Errors
+///
+/// Where what the start addresses could not be let go of, or a container it creates again
+/// could not be taken away.
+async fn readied(ctx: &Ctx, step: &Step, service: &[String]) -> Result<(), Box<Problem>> {
+    engine::before(ctx, &Action::Start(service.to_vec()), service)?;
+    step.renewal.carried_out(ctx).await.map(drop)
+}
+
 /// Move one service onto its pin, and find out whether it came back.
 async fn one(ctx: &Ctx, manifest: &Manifest, step: &Step) -> (Ending, Option<String>) {
     let service = std::slice::from_ref(&step.change.service);
-    if let Err(refused) = engine::before(ctx, &Action::Start(service.to_vec()), service) {
+    if let Err(refused) = readied(ctx, step, service).await {
         return (Ending::NotFetched, Some(refused.summary));
     }
     match ctx.seams.runner.run(&step.argv).await {

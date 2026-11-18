@@ -18,20 +18,29 @@ async fn installing_writes_the_service_s_directory_and_the_entry_that_mounts_it(
     assert!(!document(&ctx).is_empty());
 }
 
-/// What lands on disk is the container the record derives, not a second rendering
-/// of it. Two renderings are free to disagree, and the one Compose reads is the
-/// one on disk — so a plugin could be shown one entry and run another.
+/// What lands on disk is the container the record derives, over the networks the install
+/// made, not a second rendering of it. Two renderings are free to disagree, and the one
+/// Compose reads is the one on disk — so a plugin could be shown one entry and run another.
 #[tokio::test]
 async fn the_document_on_disk_is_the_container_the_record_derives() {
     let mut ctx = ctx("derives");
     ctx.stack = crate::test_support::unguarded_embedded();
     let shown = report(installing(&ctx, &source("derives", MANIFEST)).await);
+    let answered = crate::app::project::networks_answered(&ctx);
+    let reading = crate::project::Reading {
+        networks: &answered,
+        ..crate::project::Reading::bare()
+    };
     let recorded = shown
         .and_then(|one| one.install)
-        .map(|one| crate::project::entries(&one.would, &crate::project::Reading::bare()))
+        .map(|one| crate::project::entries(&one.would, &reading))
         .unwrap_or_default();
 
     let written = document(&ctx);
+    assert!(
+        !answered.is_empty(),
+        "the install made its networks before writing"
+    );
     assert_eq!(written, entry_in(&recorded));
     assert!(written.contains("profiles:\n    - plugin-komga\n"));
 }

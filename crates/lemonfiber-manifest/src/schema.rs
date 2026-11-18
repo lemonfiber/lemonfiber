@@ -362,6 +362,14 @@ impl Service {
     pub fn fenced(&self) -> bool {
         self.network.as_ref().is_some_and(|network| network.fenced)
     }
+
+    /// Whether this service's `network` says it is held inside the stack.
+    #[must_use]
+    pub fn internal(&self) -> bool {
+        self.network
+            .as_ref()
+            .is_some_and(|network| network.internal)
+    }
 }
 
 /// The majors an image pinned by `tag` runs: the first number of the tag, or nothing

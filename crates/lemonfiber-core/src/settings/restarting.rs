@@ -47,11 +47,14 @@ pub(crate) async fn restarted(ctx: &Ctx, services: &[String]) -> Option<String> 
         return None;
     }
     let action = Action::Start(kept);
-    let invocation = match crate::app::engine::invocation(ctx, &[], &action) {
+    let invocation = match crate::app::engine::invocation(ctx, &[], &action).await {
         Ok(invocation) => invocation,
         Err(problem) => return Some(problem.summary),
     };
     if let Err(refused) = crate::app::engine::before(ctx, &action, &invocation.addressed) {
+        return Some(refused.summary);
+    }
+    if let Err(refused) = invocation.renewal.carried_out(ctx).await {
         return Some(refused.summary);
     }
     let said = match ctx.seams.runner.run(&invocation.command).await {

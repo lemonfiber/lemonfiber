@@ -23,7 +23,7 @@ mod held;
 mod locations;
 mod target;
 
-pub use held::{EngineVolumes, Image, Images, Network, Networks};
+pub use held::{Endpoint, EngineVolumes, Image, Images, Joining, Network, Networks, Shape, Wanted};
 pub use locations::{Locations, Mount, Presence};
 pub use target::{chosen, Choice, Origin, Reach, Target, DEFAULT_CONTEXT};
 
@@ -80,6 +80,10 @@ pub struct Published {
     pub private: u16,
 }
 
+/// The label lemonfiber puts on each container it starts, naming the digest of the entry it
+/// was created from.
+pub const ENTRY_LABEL: &str = "lemonfiber.entry";
+
 /// One container, correlated back to the service that declared it.
 ///
 /// Correlation uses Compose's own labels, which the Engine API exposes, rather
@@ -115,6 +119,12 @@ pub struct Container {
     /// service should not be shown a fault, and one whose service died should
     /// not be shown a tidy `stopped`.
     pub exit: Option<i32>,
+    /// The digest of the entry it was created from, as lemonfiber labelled it, where it did.
+    pub entry: Option<String>,
+    /// The engine's name for each network it is on.
+    pub networks: Vec<String>,
+    /// The engine's id for the image it runs.
+    pub image_id: String,
 }
 
 /// One host path mounted into a container, and where it lands inside it.

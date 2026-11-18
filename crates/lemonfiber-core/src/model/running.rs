@@ -127,6 +127,16 @@ pub struct LifecycleReport {
     /// named and left by a rehearsal. Empty for every other action.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub swept: Vec<String>,
+    /// Every network of the project the engine held none of, by the engine's name: created
+    /// before a start, or named and left uncreated by a rehearsal. Empty for every other
+    /// action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub networks_created: Vec<String>,
+    /// Every network of the project the engine held in another shape than the project
+    /// gives it, by the engine's name: taken away and created again before a start, with
+    /// every service on it, or named and left by a rehearsal. Empty for every other action.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub networks_recreated: Vec<String>,
     /// Why the pass service is left out of the project a start writes, where the stream
     /// guard is filled and it is. Absent for every other action.
     #[serde(default, skip_serializing_if = "Option::is_none")]

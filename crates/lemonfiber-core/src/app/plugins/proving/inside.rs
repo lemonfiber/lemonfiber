@@ -85,13 +85,13 @@ pub(super) async fn answering(
 }
 
 /// The id of the running container holding `placed`'s network namespace: its fence's
-/// where it is fenced, its own otherwise.
+/// where it is fenced or held inside the stack, its own otherwise.
 async fn joined(ctx: &Ctx, placed: &Placed) -> Result<String, String> {
     let holder = if placed
         .fields
         .network
         .as_ref()
-        .is_some_and(|network| network.fenced)
+        .is_some_and(|network| network.fenced || network.internal)
     {
         crate::fence::of(&placed.service)
     } else {

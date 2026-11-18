@@ -187,23 +187,17 @@ fn within(address: Ipv4Addr, (first, prefix): (Ipv4Addr, u8)) -> bool {
 /// holds.
 const DEFAULT_POOLS: usize = 31;
 
-/// Every network the document declares, with the subnet it names where it names one.
-fn declared_subnets(document: &Value) -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
-    document
-        .get("networks")
-        .and_then(Value::as_mapping)
+/// Every network of the project with every part the bundle installs installed, with the
+/// subnet lemonfiber creates it with where it gives one.
+fn given_subnets() -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
+    let Ok(manifest) = Manifest::from_toml(STACK) else {
+        unreachable!("the embedded stack parses; the manifest crate asserts it separately");
+    };
+    let parts = lemonfiber_testing::adapted::installed_parts();
+    lemonfiber_core::project::topology(&manifest, &parts, &Chosen::read(None), false)
+        .networks
         .into_iter()
-        .flatten()
-        .map(|(name, declared)| {
-            let subnet = declared
-                .get("ipam")
-                .and_then(|ipam| ipam.get("config")?.get(0)?.get("subnet")?.as_str())
-                .and_then(|subnet| {
-                    let (first, prefix) = subnet.split_once('/')?;
-                    Some((first.parse().ok()?, prefix.parse().ok()?))
-                });
-            (name.as_str().unwrap_or_default().to_owned(), subnet)
-        })
+        .map(|(name, network)| (name, network.subnet))
         .collect()
 }
 
@@ -211,7 +205,7 @@ fn declared_subnets(document: &Value) -> Vec<(String, Option<(Ipv4Addr, u8)>)> {
 /// in the range lemonfiber holds, and no two of them meet.
 #[test]
 fn the_engine_draws_no_network_from_its_own_pools_and_no_two_subnets_meet() {
-    let declared = declared_subnets(&document(&installed()));
+    let declared = given_subnets();
     let drawn: Vec<&String> = declared
         .iter()
         .filter(|(_, subnet)| subnet.is_none())

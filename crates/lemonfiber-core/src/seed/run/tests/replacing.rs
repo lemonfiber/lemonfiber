@@ -87,6 +87,7 @@ fn standing_in_for(filler: &Filler, capability: &str) -> Installed {
     placed.fields.network = filler.fenced.then_some(Network {
         via: None,
         fenced: true,
+        internal: false,
         egress_for: None,
     });
     if capability == lemonfiber_contract::capabilities::library::curate::CAPABILITY {

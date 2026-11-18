@@ -160,13 +160,43 @@ codes! {
         severity: Error,
         status: 409,
         since: "0.18.0",
-        meaning: "The service declares itself fenced: it runs inside a fence lemonfiber \
-            writes beside it, which refuses every connection it opens to a private address or \
-            to the host. No fence can be written for it here, so it was not started: starting \
-            it unfenced would let whatever page it fetches reach every private address.",
+        meaning: "The service declares itself fenced or held inside the stack: it runs \
+            inside a fence lemonfiber writes beside it, which refuses every connection it opens \
+            to a private address or to the host, or, holding it inside the stack, to anything \
+            outside the stack's own networks. No fence can be written for it here, so it was \
+            not started: starting it unfenced would let it reach what its fence refuses.",
         remedy: "The message names why. Where the engine's host was not asked its addresses, \
             check the container engine is running and the fence's image can be fetched, then \
             start again.",
+        household: fault,
+    }
+    /// Raised where a network of the project could not be listed, created or taken away
+    /// before a start.
+    NETWORK_NOT_MADE = "STACK-16" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "lemonfiber creates every network of the project through the container \
+            engine before a start, and keeps one the engine already holds in the shape the \
+            project gives it. A network could not be listed, created, or taken away to be \
+            created again in that shape, so nothing was started: a service started now would \
+            start on a network the project does not describe, or on none.",
+        remedy: "Check the container engine is running, then start again. The message names \
+            the network and why.",
+        household: fault,
+    }
+    /// Raised where a container a start creates again could not be taken away first.
+    CONTAINER_NOT_RENEWED = "STACK-17" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "lemonfiber decides which containers a start creates again and takes each \
+            away before the start, so the program running the project creates it from the \
+            project as written. One could not be taken away, so nothing was started: starting \
+            now would leave it running as it was created, outside the fence or on the image \
+            the project no longer names.",
+        remedy: "Check the container engine is running, then start again. The message names \
+            the services and why.",
         household: fault,
     }
 }

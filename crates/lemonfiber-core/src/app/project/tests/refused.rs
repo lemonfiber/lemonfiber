@@ -27,9 +27,13 @@ fn secrets_blocked(ctx: &Ctx) {
 }
 
 /// Prepare the project for a run that starts nothing, as a teardown does.
-fn preparing(ctx: &Ctx) -> bool {
-    manifest()
-        .is_some_and(|manifest| super::super::prepared(ctx, &manifest, &plan(), false).is_ok())
+async fn preparing(ctx: &Ctx) -> bool {
+    let Some(manifest) = manifest() else {
+        return false;
+    };
+    super::super::prepared(ctx, &manifest, &plan(), false)
+        .await
+        .is_ok()
 }
 
 /// Write the project as a change to what is installed does.
@@ -39,20 +43,20 @@ fn rewriting(ctx: &Ctx) -> bool {
     })
 }
 
-#[test]
-fn a_run_whose_project_cannot_be_written_is_refused() {
+#[tokio::test]
+async fn a_run_whose_project_cannot_be_written_is_refused() {
     let (ctx, project) = machine("unwritable-start");
     blocked(&project.join(crate::project::FILE));
 
-    assert!(!preparing(&ctx));
+    assert!(!preparing(&ctx).await);
 }
 
-#[test]
-fn a_run_whose_secrets_cannot_be_written_is_refused() {
+#[tokio::test]
+async fn a_run_whose_secrets_cannot_be_written_is_refused() {
     let (ctx, _) = machine("unfiled-start");
     secrets_blocked(&ctx);
 
-    assert!(!preparing(&ctx));
+    assert!(!preparing(&ctx).await);
 }
 
 #[test]

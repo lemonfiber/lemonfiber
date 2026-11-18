@@ -8,55 +8,75 @@ use lemonfiber_manifest::container::{Constant, Posture, UserMode, Value};
 use super::entry::{literal, Unit};
 use super::inputs::Inputs;
 use super::{Reading, UNFENCED};
-use crate::fence::Unfenced;
+use crate::fence::{Rules, Unfenced};
 use crate::topology::{Placed, Topology};
 
 /// What the project writes for its fenced services.
 pub(super) struct Fencing<'a> {
     /// Each fenced service no fence can be written for, and why.
     unfenced: BTreeMap<String, Unfenced>,
-    /// Each fenced service a fence is written for, and the fence's id.
-    fences: Vec<(String, String)>,
-    /// The fence's environment: the host's addresses it refuses.
-    handed: BTreeMap<String, Value>,
+    /// Each fence written.
+    fences: Vec<Fence>,
     /// The image a fence runs, where one is pinned.
     image: Option<&'a str>,
 }
 
+/// One fence written beside its service.
+struct Fence {
+    /// The service it holds.
+    service: String,
+    /// Its id.
+    id: String,
+    /// The rules it holds its service to.
+    rules: Rules,
+    /// Its environment: the host's addresses it refuses, and the networks it passes where
+    /// it holds its service inside the stack.
+    handed: BTreeMap<String, Value>,
+}
+
 impl<'a> Fencing<'a> {
-    /// What `inputs`' fenced services come to, as `reading` answers what a fence needs.
-    pub(super) fn of(inputs: &Inputs, reading: &Reading<'a>) -> Self {
-        let unfenced: BTreeMap<String, Unfenced> = inputs
-            .fenced
-            .iter()
-            .filter_map(|(service, fence)| {
-                let why = if fence.is_none() {
-                    Unfenced::Taken
-                } else if reading.fence.is_none() {
-                    Unfenced::Unpinned
-                } else if !reading.nftables {
-                    Unfenced::Unheld
-                } else if reading.host.is_empty() {
-                    Unfenced::Unaddressed
-                } else {
-                    return None;
-                };
-                Some((service.clone(), why))
-            })
-            .collect();
-        let fences = inputs
-            .fenced
-            .iter()
-            .filter(|(service, _)| !unfenced.contains_key(service))
-            .filter_map(|(service, fence)| Some((service.clone(), fence.clone()?)))
-            .collect();
+    /// What `inputs`' fenced services come to, placed as `topology` places them, as
+    /// `reading` answers what a fence needs.
+    pub(super) fn of(inputs: &Inputs, topology: &Topology, reading: &Reading<'a>) -> Self {
+        let mut unfenced = BTreeMap::new();
+        let mut fences = Vec::new();
+        for fenced in &inputs.fenced {
+            let networks = fenced
+                .fence
+                .as_deref()
+                .and_then(|fence| answered(fence, topology, reading));
+            let why = if fenced.fence.is_none() {
+                Some(Unfenced::Taken)
+            } else if reading.fence.is_none() {
+                Some(Unfenced::Unpinned)
+            } else if !reading.nftables {
+                Some(Unfenced::Unheld)
+            } else if reading.host.is_empty() {
+                Some(Unfenced::Unaddressed)
+            } else if fenced.rules == Rules::Inward && networks.is_none() {
+                Some(Unfenced::Unread)
+            } else {
+                None
+            };
+            if let (None, Some(id)) = (&why, &fenced.fence) {
+                fences.push(Fence {
+                    service: fenced.service.clone(),
+                    id: id.clone(),
+                    rules: fenced.rules,
+                    handed: handed(
+                        fenced.rules,
+                        reading,
+                        networks.as_deref(),
+                        &named(id, topology),
+                    ),
+                });
+            } else {
+                unfenced.insert(fenced.service.clone(), why.unwrap_or(Unfenced::Taken));
+            }
+        }
         Self {
             unfenced,
             fences,
-            handed: BTreeMap::from([(
-                crate::fence::HOST_ADDRESSES.to_owned(),
-                Value::Constant(Constant::Text(crate::fence::addresses(reading.host))),
-            )]),
             image: reading.fence,
         }
     }
@@ -75,13 +95,13 @@ impl<'a> Fencing<'a> {
     pub(super) fn units(&self, units: &[Unit<'_>]) -> Vec<Unit<'_>> {
         self.fences
             .iter()
-            .filter_map(|(service, fence)| {
+            .filter_map(|fence| {
                 let profile = units
                     .iter()
-                    .find(|unit| unit.id == service)?
+                    .find(|unit| unit.id == fence.service)?
                     .profile
                     .clone();
-                Some(self.fence(fence, profile, self.image?))
+                Some(fence.unit(profile, self.image?))
             })
             .collect()
     }
@@ -102,12 +122,15 @@ impl<'a> Fencing<'a> {
             .map(|(service, why)| (service.clone(), *why))
             .collect()
     }
+}
 
-    /// The fence `id`, running `image` in `profile` with the host's addresses handed it,
-    /// confined but for the one capability it alone is given.
-    fn fence<'u>(&'u self, id: &'u str, profile: String, image: &str) -> Unit<'u> {
+impl Fence {
+    /// The fence, running `image` in `profile` with what it is handed, confined but for the
+    /// one capability it alone is given.
+    fn unit(&self, profile: String, image: &str) -> Unit<'_> {
+        let inward = self.rules == Rules::Inward;
         Unit {
-            id,
+            id: &self.id,
             profile,
             image: literal(image),
             published: Vec::new(),
@@ -124,11 +147,98 @@ impl<'a> Fencing<'a> {
             mem_limit_mib: Some(crate::fence::MEMORY_MIB),
             shape: None,
             secrets_file: None,
-            command: Vec::new(),
+            command: if inward {
+                crate::fence::STACK.map(str::to_owned).to_vec()
+            } else {
+                Vec::new()
+            },
+            dns_search: if inward { &crate::fence::SEARCHED } else { &[] },
             hostname: None,
             granted: &crate::fence::GRANTED,
             reaches_host: false,
             schedule: None,
         }
     }
+}
+
+/// Each network the fence `fence` joins as `topology` places it, as `reading` answers
+/// it, or nothing where the engine answered any of them unreadably or not at all.
+fn answered<'r>(
+    fence: &str,
+    topology: &Topology,
+    reading: &Reading<'r>,
+) -> Option<Vec<&'r crate::fence::Answered>> {
+    topology
+        .placed
+        .get(fence)
+        .and_then(Placed::on)?
+        .keys()
+        .map(|network| reading.networks.get(network))
+        .collect::<Option<Vec<_>>>()
+        .filter(|networks| !networks.is_empty())
+}
+
+/// The name of each service the fence `fence` shares a network with as `topology` places
+/// them, and of each service running inside one of theirs.
+fn named(fence: &str, topology: &Topology) -> String {
+    let joined = topology
+        .placed
+        .get(fence)
+        .and_then(Placed::on)
+        .cloned()
+        .unwrap_or_default();
+    let beside: std::collections::BTreeSet<&str> = topology
+        .placed
+        .iter()
+        .filter(|(id, placed)| {
+            *id != fence
+                && placed
+                    .on()
+                    .is_some_and(|on| on.keys().any(|network| joined.contains_key(network)))
+        })
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let inside = topology
+        .placed
+        .iter()
+        .filter_map(|(id, placed)| match placed {
+            Placed::Inside(host) if beside.contains(host.as_str()) => Some(id.as_str()),
+            _ => None,
+        });
+    beside
+        .iter()
+        .copied()
+        .chain(inside)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// The environment a fence holding to `rules` is handed: the host's addresses, and the
+/// subnet and gateway of each of `networks` and `names` where it holds its service inside
+/// the stack.
+fn handed(
+    rules: Rules,
+    reading: &Reading<'_>,
+    networks: Option<&[&crate::fence::Answered]>,
+    names: &str,
+) -> BTreeMap<String, Value> {
+    let mut handed = BTreeMap::from([(
+        crate::fence::HOST_ADDRESSES.to_owned(),
+        Value::Constant(Constant::Text(crate::fence::addresses(reading.host))),
+    )]);
+    if let (Rules::Inward, Some(networks)) = (rules, networks) {
+        handed.insert(
+            crate::fence::NETWORKS.to_owned(),
+            Value::Constant(Constant::Text(crate::fence::networks(
+                networks.iter().copied(),
+            ))),
+        );
+        handed.insert(
+            crate::fence::NAMES.to_owned(),
+            Value::Constant(Constant::Text(names.to_owned())),
+        );
+    }
+    handed
 }

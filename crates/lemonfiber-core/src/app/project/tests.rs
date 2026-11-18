@@ -5,8 +5,8 @@ use crate::app::Ctx;
 use crate::journal::{Change, Kind};
 use crate::test_support::Holds as _;
 
-#[test]
-fn a_preview_is_not_a_write() {
+#[tokio::test]
+async fn a_preview_is_not_a_write() {
     assert_ne!(Pass::Preview, Pass::Write);
 }
 
@@ -54,8 +54,13 @@ fn plan() -> crate::stack::closure::Plan {
 
 /// Prepare the project of the stack this build carries for a run, starting where
 /// `starting`.
-fn preparing(ctx: &Ctx, starting: bool) -> bool {
-    manifest().is_some_and(|manifest| super::prepared(ctx, &manifest, &plan(), starting).is_ok())
+async fn preparing(ctx: &Ctx, starting: bool) -> bool {
+    let Some(manifest) = manifest() else {
+        return false;
+    };
+    super::prepared(ctx, &manifest, &plan(), starting)
+        .await
+        .is_ok()
 }
 
 /// Move what the machine's stack keeps in its configuration tree into its mount tree.
@@ -173,8 +178,8 @@ fn an_overlay_that_cannot_be_journalled_is_refused() {
     assert!(super::overlaid(&ctx).is_err());
 }
 
-#[test]
-fn a_start_whose_move_cannot_be_journalled_is_refused() {
+#[tokio::test]
+async fn a_start_whose_move_cannot_be_journalled_is_refused() {
     let (ctx, project) = machine("unjournalled-start");
     let journal = crate::app::targets::layout(&ctx)
         .map(|paths| paths.journal())
@@ -182,7 +187,7 @@ fn a_start_whose_move_cannot_be_journalled_is_refused() {
     let _ = std::fs::create_dir_all(&journal);
     let (from, to) = cache(&project);
 
-    assert!(!preparing(&ctx, true));
+    assert!(!preparing(&ctx, true).await);
 
     assert!(from.is_dir());
     assert!(!to.exists());

@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "internal": {
+      "type": [
+        "boolean"
+      ],
+      "required": false
+    },
     "via": {
       "type": [
         "null|string"

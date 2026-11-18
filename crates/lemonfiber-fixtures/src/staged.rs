@@ -200,6 +200,9 @@ impl Machine {
             published: Vec::new(),
             mounts: Vec::new(),
             exit: None,
+            entry: None,
+            networks: Vec::new(),
+            image_id: String::new(),
         }
     }
 
@@ -232,6 +235,9 @@ fn run(fake: &Machine, argv: &[String]) -> Result<Output, RunFailure> {
             .ok()
             .and_then(|mut said| said.take())
             .unwrap_or_else(|| Ok(spoke("")));
+    }
+    if argv.iter().any(|word| word == "rm") {
+        return Ok(spoke(""));
     }
     let Some(service) = fenced(argv) else {
         let nth = fake.stack_actions.lock().map_or(1, |mut asked| {

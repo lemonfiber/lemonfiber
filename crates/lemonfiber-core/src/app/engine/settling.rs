@@ -9,6 +9,7 @@
 use std::fmt::Write as _;
 
 use super::super::Ctx;
+use super::recreated::Containers;
 use super::waiting;
 use crate::docker::{condition, survey_beside, unsettled, Service};
 use crate::error::Problem;
@@ -261,15 +262,17 @@ pub(crate) async fn standing(ctx: &Ctx, service: &str) -> String {
 /// Shared rather than written twice, because anything that starts services owes the
 /// operator the same wait: bringing a form up and switching to one differ in what
 /// they start and not at all in what "started" has to mean before it is said. What is
-/// waited for is what the start `addressed`, and whatever else has a container.
+/// waited for is what the start `addressed`, and whatever else has a container, and then
+/// each service whose container is another than `before` held, until it answers.
 pub(crate) async fn settled_into(
     ctx: &Ctx,
     manifest: &lemonfiber_manifest::Manifest,
     report: &mut LifecycleReport,
-    addressed: &[String],
+    (addressed, before): (&[String], &Containers),
 ) -> Result<(), Box<Problem>> {
     let profiles: Vec<String> = report.plan.profiles.iter().cloned().collect();
     let settled = settle(ctx, manifest, &profiles, addressed).await?;
+    super::recreated::answered(ctx, manifest, before).await;
     report.condition = Some(condition(&settled));
     report.services = settled;
     let project =

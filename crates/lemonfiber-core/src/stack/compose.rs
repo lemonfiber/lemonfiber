@@ -74,10 +74,15 @@ impl Action {
     /// do not, a start is told never to pull rather than being left to Compose's
     /// default of fetching whatever is missing — the setting has to reach the one
     /// command that would otherwise do it silently, or it is a setting that means
-    /// nothing.
+    /// nothing. A start creates only the containers that are missing: lemonfiber takes
+    /// away first each one it creates again.
     pub(crate) fn argv(&self, registry: bool) -> Vec<String> {
         let starting = || {
-            let mut argv = vec!["up".to_owned(), "--detach".to_owned()];
+            let mut argv = vec![
+                "up".to_owned(),
+                "--detach".to_owned(),
+                "--no-recreate".to_owned(),
+            ];
             if !registry {
                 argv.push("--pull".to_owned());
                 argv.push("never".to_owned());
@@ -175,6 +180,11 @@ pub fn build(
 
     argv.push("--file".to_owned());
     argv.push(stack.join(crate::project::FILE).display().to_string());
+
+    if matches!(action, Action::Up | Action::Start(_)) {
+        argv.push("--file".to_owned());
+        argv.push(stack.join(crate::project::LABELS).display().to_string());
+    }
 
     for overlay in &settings.overlays {
         argv.push("--file".to_owned());

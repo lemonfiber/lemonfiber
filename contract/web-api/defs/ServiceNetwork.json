@@ -14,6 +14,10 @@
       "description": "Whether it fetches whatever address it is handed, and so runs inside a fence that\nrefuses every private address.",
       "type": "boolean"
     },
+    "internal": {
+      "description": "Whether it is held inside the stack, behind a fence passing only what is inside its\nown networks.",
+      "type": "boolean"
+    },
     "via": {
       "description": "The capability whose filler's network it runs inside.",
       "type": [

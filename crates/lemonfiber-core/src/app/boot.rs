@@ -466,6 +466,8 @@ pub(crate) fn nothing_started(reason: &str) -> LifecycleReport {
         guards: Vec::new(),
         installing: Vec::new(),
         swept: Vec::new(),
+        networks_created: Vec::new(),
+        networks_recreated: Vec::new(),
         passing: None,
         fencing: None,
         unfenced: Vec::new(),

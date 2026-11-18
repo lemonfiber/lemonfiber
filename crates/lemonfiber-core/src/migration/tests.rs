@@ -20,6 +20,9 @@ pub(crate) fn container(project: &str, service: &str, ports: &[u16]) -> Containe
             .collect(),
         mounts: Vec::new(),
         exit: None,
+        entry: None,
+        networks: Vec::new(),
+        image_id: String::new(),
     }
 }
 

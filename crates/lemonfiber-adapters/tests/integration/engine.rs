@@ -18,7 +18,9 @@ use crate::fake;
 const LISTING: &str = concat!(
     r#"[{"Id":"id-sonarr","#,
     r#""Labels":{"com.docker.compose.project":"lemonfiber","#,
-    r#""com.docker.compose.service":"sonarr"},"#,
+    r#""com.docker.compose.service":"sonarr","lemonfiber.entry":"digest-sonarr"},"#,
+    r#""ImageID":"sha256:sonarr","#,
+    r#""NetworkSettings":{"Networks":{"lemonfiber_b":{},"lemonfiber_a":{}}},"#,
     r#""State":"running","Status":"Up 2 minutes (healthy)","#,
     r#""Health":{"Status":"healthy"}},"#,
     r#"{"Id":"id-gluetun","#,

@@ -100,6 +100,7 @@ pub(crate) fn unit<'a>(
         shape: placed.shape,
         secrets_file: secrets_file(placed, reading),
         command: fields.args.clone(),
+        dns_search: &[],
         hostname: fields.container_hostname.as_deref(),
         granted: &[],
         reaches_host: !placed.speaks.is_empty(),

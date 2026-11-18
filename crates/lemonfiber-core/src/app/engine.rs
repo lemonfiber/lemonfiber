@@ -7,10 +7,13 @@ use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{LifecycleReport, StackEdit};
 use crate::stack::closure::{everything, resolve, Plan};
-use crate::stack::compose::{build, Action};
+use crate::stack::compose::Action;
 use beside::{beside_readied, Beside};
+pub(crate) use composing::Renewal;
+use composing::{compose, Composed};
 
 mod beside;
+mod composing;
 mod declared;
 pub(crate) use declared::{catalogue, forms, provenance, version};
 mod diagnosis;
@@ -27,6 +30,7 @@ pub(crate) use offered::{answering, restarted, switched, up};
 pub(crate) use parting::ran;
 mod preview;
 pub(crate) use preview::preview;
+mod recreated;
 mod remote;
 mod settling;
 mod status;
@@ -48,6 +52,7 @@ pub(crate) use installing::left_out;
 pub use installing::{offline, unstarted, InstallOffered, Offline, REFUSALS as INSTALL_REFUSALS};
 pub(crate) use installing::{plugins as plugins_of, without_waiting};
 pub use lock::{claimed, released, Claim};
+pub use recreated::Containers;
 pub use streaming::{logs, pull_progress, start_progress, started};
 // Reached only by the tests that drive the decision directly rather than through a
 // whole run — which is the right level for it, since which checks name a service is a
@@ -103,86 +108,12 @@ pub(crate) fn before(ctx: &Ctx, action: &Action, addressed: &[String]) -> Result
 /// What writing the project, or the check before a start, refused.
 pub(crate) async fn started_alone(ctx: &Ctx, services: &[String]) -> Result<bool, Box<Problem>> {
     let action = Action::Start(services.to_vec());
-    let Composed { command, .. } = compose(ctx, &[], &action)?;
+    let Composed {
+        command, renewal, ..
+    } = Box::pin(compose(ctx, &[], &action)).await?;
     before(ctx, &action, services)?;
+    renewal.carried_out(ctx).await?;
     Ok(matches!(ctx.seams.runner.run(&command).await, Ok(output) if output.succeeded()))
-}
-
-/// What resolving the forms into a runnable Compose command produced.
-///
-/// Named fields rather than a tuple because callers want different parts of it: a
-/// pull takes the command alone, a lifecycle command takes four of the five, and a
-/// switch is the one that needs the stack directory — building a second invocation
-/// means telling Compose again where the project is.
-struct Composed {
-    /// The stack's manifest, already read and validated.
-    manifest: lemonfiber_manifest::Manifest,
-    /// What the named forms came to.
-    plan: Plan,
-    /// The argument vector for the action that was asked for.
-    command: Vec<String>,
-    /// Where the materialised stack lives, which is where Compose reads it from.
-    stack: std::path::PathBuf,
-    /// Stack files the operator had edited, preserved rather than overwritten.
-    stack_edits: Vec<StackEdit>,
-    /// The project the command runs.
-    project: crate::project::Project,
-}
-
-/// Resolve the named forms to their plan and the `docker compose` argument vector
-/// for `action`, materialising the stack so Compose can read it.
-///
-/// The shared prelude of every lifecycle command and of a streamed pull, so the two
-/// build the exact same invocation for the same forms and their setup failures — an
-/// unreadable manifest, a form that resolves to nothing, a stack that cannot be
-/// written — read the same wherever they surface.
-fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box<Problem>> {
-    // First, because it is the one refusal that has to reach every path that builds
-    // an invocation. An engine the reads cannot use must not become one the writes
-    // do, and an invocation is exactly what a write is made of.
-    remote::usable(ctx)?;
-    if fetching::refused(ctx, action) {
-        return Err(Box::new(fetching::refusal()));
-    }
-    let (manifest, mut plan) = resolved(ctx, forms)?;
-    let record = ctx
-        .settings
-        .env_file
-        .as_deref()
-        .map(|env| env.with_file_name(crate::config::paths::MATERIALISED));
-    // The one write on this path, and one a rehearsal must not make. Every lifecycle
-    // command materialises the stack before it can build an invocation over it, and the
-    // gate against running Compose sits below this — so without this a rehearsal that
-    // ran nothing would already have written the whole stack out and rewritten the
-    // record of what it wrote. The walk is the same walk either way; a rehearsal takes it
-    // without the writing, which is where the edits it reports come from.
-    let written = if ctx.dry_run {
-        super::materialise::would_materialise
-    } else {
-        super::materialise::materialise
-    };
-    let (stack, mut edits) = written(
-        ctx.seams.confined.as_ref(),
-        ctx.stack,
-        ctx.settings.stack_dir.as_deref(),
-        record.as_deref(),
-        &ctx.settings.unmanaged,
-    )
-    .map_err(|err| Box::new(err.problem()))?;
-    let prepared = super::project::prepared(ctx, &manifest, &plan, starts(action))?;
-    edits.extend(prepared.edits);
-    plan.profiles.extend(prepared.hosting);
-    let project = prepared.project;
-    super::project::overlaid(ctx)?;
-    let command = build(&plan, &ctx.settings, &stack, action, ctx.environment);
-    Ok(Composed {
-        manifest,
-        plan,
-        command,
-        stack,
-        stack_edits: edits,
-        project,
-    })
 }
 
 /// The Compose invocation for `action` over the named forms, and the operator's own
@@ -203,16 +134,17 @@ fn compose(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Composed, Box
 ///
 /// Returns the [`Problem`] a surface should render when the stack cannot be read,
 /// resolved, or written.
-pub(crate) fn invocation(
+pub(crate) async fn invocation(
     ctx: &Ctx,
     forms: &[String],
     action: &Action,
 ) -> Result<Invocation, Box<Problem>> {
-    let composed = compose(ctx, forms, action)?;
+    let composed = Box::pin(compose(ctx, forms, action)).await?;
     Ok(Invocation {
         addressed: addressed(action, &composed.plan),
         command: composed.command,
         stack_edits: composed.stack_edits,
+        renewal: composed.renewal,
     })
 }
 
@@ -224,6 +156,8 @@ pub(crate) struct Invocation {
     pub stack_edits: Vec<StackEdit>,
     /// The services the command is aimed at.
     pub addressed: Vec<String>,
+    /// What a start takes away before the command runs.
+    pub renewal: Renewal,
 }
 
 /// Whether this action brings services up, whichever way it was addressed.
@@ -311,8 +245,10 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         command,
         stack_edits,
         project,
+        networking,
+        renewal,
         ..
-    } = compose(ctx, forms, action)?;
+    } = Box::pin(compose(ctx, forms, action)).await?;
 
     // Asked before anything is run, and only of a teardown. Bringing a form up or
     // restarting part of one takes nothing away from anybody; stopping is the one
@@ -368,7 +304,14 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         },
         guards,
         installing,
-        swept: sweep.networks.clone(),
+        swept: networking
+            .swept
+            .iter()
+            .chain(&sweep.networks)
+            .cloned()
+            .collect(),
+        networks_created: networking.created,
+        networks_recreated: networking.recreated,
         passing: beside.passing,
         fencing: beside.fencing,
         unfenced: if starts(action) {
@@ -390,6 +333,7 @@ async fn readied(ctx: &Ctx, forms: &[String], action: &Action) -> Result<Readied
         report,
         sweep,
         copies,
+        renewal,
     })
 }
 
@@ -405,6 +349,8 @@ struct Readied {
     sweep: super::project::Sweep,
     /// The volumes a start copies before it runs.
     copies: super::project::Copies,
+    /// What a start takes away before it runs.
+    renewal: Renewal,
 }
 
 /// Resolve forms, build the command, and run it unless this is a rehearsal.
@@ -442,6 +388,7 @@ async fn worked(
         mut report,
         sweep,
         copies,
+        renewal,
     } = readied(ctx, forms, action).await?;
     offered::answered(action, &mut report, offer)?;
 
@@ -471,6 +418,7 @@ async fn worked(
     // and a stop the operator asked for must not.
     let addressed = addressed(action, &report.plan);
     before(ctx, action, &addressed)?;
+    let held = renewal.carried_out(ctx).await?;
     let output = if matches!(action, Action::Pull(_)) || starts(action) {
         streaming::narrated(ctx, &command, starts(action)).await
     } else {
@@ -479,6 +427,12 @@ async fn worked(
     .map_err(|err| Box::new(err.problem()))?;
     report.status = output.status;
     halted::after(ctx, action, &addressed).await;
+    let down = (action == &Action::Down && output.succeeded())
+        .then(|| super::project::topology(ctx, &manifest).ok())
+        .flatten();
+    if let Some(topology) = down {
+        super::project::networks_taken_down(ctx, &topology).await;
+    }
 
     // What the operator has just asked for, written down before anything is waited
     // on. A start whose services never settle has still started them, and a boot
@@ -492,7 +446,7 @@ async fn worked(
     // that failed is not waited on, and still says where what it addressed stands.
     if starts(action) {
         if output.succeeded() {
-            settled_into(ctx, &manifest, &mut report, &addressed).await?;
+            settled_into(ctx, &manifest, &mut report, (&addressed, &held)).await?;
         } else {
             fell_short_into(ctx, &manifest, &mut report).await;
         }

@@ -25,7 +25,7 @@ async fn starting_a_form_reports_what_it_would_run_and_runs_nothing() {
             vec!["media".to_owned(), "notify".to_owned()],
             true,
             None,
-            Some("--detach".to_owned())
+            Some("--no-recreate".to_owned())
         )),
         "a rehearsal reports the command and never ran it"
     );

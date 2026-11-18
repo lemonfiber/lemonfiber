@@ -4,7 +4,9 @@
 use super::fake;
 use lemonfiber_adapters::Daemon;
 use lemonfiber_fixtures::scratch::Scratch;
-use lemonfiber_ports::docker::{EngineVolumes as _, Failure, Networks as _};
+use lemonfiber_ports::docker::{
+    Endpoint, EngineVolumes as _, Failure, Images as _, Joining, Networks as _,
+};
 
 /// Two networks the project made, and one Compose did not name.
 #[cfg(unix)]
@@ -135,6 +137,192 @@ async fn a_network_the_engine_will_not_let_go_of_is_said_to_be_refused() {
     refusing.stop().await;
     kept.stop().await;
     unknown.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_network_is_created_and_one_the_engine_will_not_create_is_said_to_be_refused() {
+    let shape = lemonfiber_ports::docker::Shape {
+        subnet: Some("10.80.0.8/29".to_owned()),
+        ip_range: None,
+        internal: true,
+        masquerade: true,
+    };
+    let wanted = || lemonfiber_ports::docker::Wanted {
+        name: "lemonfiber_own__sonarr",
+        project: "lemonfiber",
+        declared: "own__sonarr",
+        shape: &shape,
+    };
+    let making = fake::engine(
+        "network-made",
+        vec![(
+            "networks/create",
+            fake::Reply::Body(201, r#"{"Id":"n1","Warning":""}"#.to_owned()),
+        )],
+    );
+    let refusing = fake::engine(
+        "network-unmade",
+        vec![(
+            "networks/create",
+            fake::Reply::Body(
+                403,
+                r#"{"message":"Pool overlaps with other one on this address space"}"#.to_owned(),
+            ),
+        )],
+    );
+
+    let made = Daemon::at(&making.socket).created(wanted()).await;
+    let refused = Daemon::at(&refusing.socket).created(wanted()).await;
+
+    assert!(made.is_ok(), "{made:?}");
+    assert!(refused.is_err(), "{refused:?}");
+    making.stop().await;
+    refusing.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_container_is_connected_and_disconnected_and_a_refusal_is_said() {
+    let aliases = ["sonarr".to_owned(), "shows".to_owned()];
+    let joining = Joining {
+        network: "lemonfiber_own__sonarr",
+        container: "c1",
+        aliases: &aliases,
+        address: Some("10.80.0.4"),
+    };
+    let mut joined = fake::engine(
+        "network-joined",
+        vec![
+            ("connect", fake::Reply::Body(200, String::new())),
+            ("disconnect", fake::Reply::Body(200, String::new())),
+        ],
+    );
+    let refusing = fake::engine(
+        "network-unjoined",
+        vec![
+            (
+                "connect",
+                fake::Reply::Body(500, r#"{"message":"no such container"}"#.to_owned()),
+            ),
+            (
+                "disconnect",
+                fake::Reply::Body(500, r#"{"message":"no such container"}"#.to_owned()),
+            ),
+        ],
+    );
+
+    let connected = Daemon::at(&joined.socket).connected(joining).await;
+    let disconnected = Daemon::at(&joined.socket)
+        .disconnected("lemonfiber_own__sonarr", "c1")
+        .await;
+    let refused = Daemon::at(&refusing.socket).connected(joining).await;
+    let unrefused = Daemon::at(&refusing.socket)
+        .disconnected("lemonfiber_own__sonarr", "c1")
+        .await;
+
+    assert!(connected.is_ok(), "{connected:?}");
+    assert!(disconnected.is_ok(), "{disconnected:?}");
+    assert!(refused.is_err(), "{refused:?}");
+    assert!(unrefused.is_err(), "{unrefused:?}");
+    let asked = joined.asked_for();
+    assert!(
+        asked
+            .iter()
+            .any(|path| path.ends_with("networks/lemonfiber_own__sonarr/connect")),
+        "{asked:?}"
+    );
+    joined.stop().await;
+    refusing.stop().await;
+}
+
+/// A container on two networks, as the engine inspects it.
+#[cfg(unix)]
+const INSPECTED: &str = concat!(
+    r#"{"Id":"c1abcdef0123456789","Name":"/lemonfiber-web-1","NetworkSettings":{"Networks":{"#,
+    r#""lemonfiber_a":{"IPAMConfig":{"IPv4Address":"10.80.0.5"},"#,
+    r#""Aliases":["lemonfiber-web-1","web","site","c1abcdef0123"]},"#,
+    r#""lemonfiber_b":{"IPAMConfig":{"IPv4Address":""},"Aliases":null}}}}"#
+);
+
+#[cfg(unix)]
+#[tokio::test]
+async fn how_a_container_stands_on_each_network_is_read_apart_from_its_own_names() {
+    let holding = fake::engine(
+        "endpoints-read",
+        vec![(
+            "containers/c1/json",
+            fake::Reply::Body(200, INSPECTED.to_owned()),
+        )],
+    );
+    let refusing = fake::engine(
+        "endpoints-refused",
+        vec![(
+            "containers/c1/json",
+            fake::Reply::Body(404, r#"{"message":"No such container: c1"}"#.to_owned()),
+        )],
+    );
+
+    let read = Daemon::at(&holding.socket).endpoints("c1").await;
+    let refused = Daemon::at(&refusing.socket).endpoints("c1").await;
+
+    let mut read = read.unwrap_or_default();
+    read.sort_by(|one, other| one.network.cmp(&other.network));
+    assert_eq!(
+        read,
+        [
+            Endpoint {
+                network: "lemonfiber_a".to_owned(),
+                address: Some("10.80.0.5".to_owned()),
+                aliases: vec!["web".to_owned(), "site".to_owned()],
+            },
+            Endpoint {
+                network: "lemonfiber_b".to_owned(),
+                address: None,
+                aliases: Vec::new(),
+            },
+        ]
+    );
+    assert!(refused.is_err(), "{refused:?}");
+    holding.stop().await;
+    refusing.stop().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_image_a_reference_names_is_identified_and_one_it_names_none_of_is_none() {
+    let holding = fake::engine(
+        "image-identified",
+        vec![(
+            "images/sonarr:4/json",
+            fake::Reply::Body(200, r#"{"Id":"sha256:sonarr"}"#.to_owned()),
+        )],
+    );
+    let lacking = fake::engine(
+        "image-absent",
+        vec![(
+            "images/sonarr:4/json",
+            fake::Reply::Body(404, r#"{"message":"No such image: sonarr:4"}"#.to_owned()),
+        )],
+    );
+    let refusing = fake::engine(
+        "image-refused",
+        vec![(
+            "images/sonarr:4/json",
+            fake::Reply::Body(500, r#"{"message":"engine is busy"}"#.to_owned()),
+        )],
+    );
+
+    let identified = Daemon::at(&holding.socket).identified("sonarr:4").await;
+    let absent = Daemon::at(&lacking.socket).identified("sonarr:4").await;
+    let refused = Daemon::at(&refusing.socket).identified("sonarr:4").await;
+
+    assert_eq!(identified.ok(), Some(Some("sha256:sonarr".to_owned())));
+    assert_eq!(absent.ok(), Some(None));
+    assert!(refused.is_err(), "{refused:?}");
+    holding.stop().await;
+    lacking.stop().await;
+    refusing.stop().await;
 }
 
 /// A volume as the engine describes one.

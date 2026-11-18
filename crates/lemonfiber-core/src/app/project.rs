@@ -3,13 +3,16 @@
 //! materialised file. Every Compose invocation reads it, with the operator's overlay
 //! merged over it and nothing else.
 
+mod converging;
 mod copying;
 mod fencing;
 mod host;
 mod linking;
 mod mounting;
 mod moving;
+mod networking;
 pub(crate) mod passing;
+mod preparing;
 mod profiled;
 mod rendering;
 mod retiring;
@@ -35,6 +38,7 @@ use crate::stack::Failure;
 use crate::topology::Topology;
 use crate::wiring::Chosen;
 
+pub(crate) use converging::renewed;
 pub(crate) use copying::{pending as copies, Copies};
 pub(crate) use fencing::asked_inside;
 #[cfg(test)]
@@ -42,7 +46,11 @@ pub(crate) use fencing::{ASKED as FENCE_ASKED, PROBED as FENCE_PROBED};
 pub(crate) use host::{asked as host_asked, Asked};
 pub(crate) use linking::unlinked;
 pub(crate) use moving::{beneath as moved_beneath, moved};
+pub(crate) use networking::{
+    ensured as networks_ensured, taken_down as networks_taken_down, Networking,
+};
 pub(crate) use passing::readied as pass_readied;
+pub(crate) use preparing::prepared;
 pub(crate) use rendering::unrendered;
 pub(crate) use retiring::{retired, still_there};
 pub(crate) use secrets::written as secrets_written;
@@ -116,74 +124,6 @@ pub(crate) fn current(ctx: &Ctx, manifest: &Manifest, installed: &[Installed]) -
     )
 }
 
-/// The project a lifecycle command runs, and what writing it came to.
-pub(crate) struct Prepared {
-    /// The project.
-    pub(crate) project: Project,
-    /// An operator's edit to it, kept and reported, where there is one.
-    pub(crate) edits: Vec<StackEdit>,
-    /// The profiles of the services the planned ones run inside.
-    pub(crate) hosting: BTreeSet<String>,
-}
-
-/// Generate the project for `manifest` and what is installed here, and write it as a
-/// lifecycle command running `plan` does: previewed by a rehearsal, and otherwise written
-/// with each service's secrets file and the stack's own Compose files retired and, where
-/// `starting`, with the profiles of the start beside it, each service's state moved
-/// into its mount tree and each mount source not there yet made. Where `DATA_ROOT` is
-/// refused, a start is refused and anything else leaves the project on disk as it stands.
-///
-/// # Errors
-///
-/// Where the register cannot be read, the project, a secrets file or the journal cannot
-/// be written, or a start is asked over a refused `DATA_ROOT`.
-pub(crate) fn prepared(
-    ctx: &Ctx,
-    manifest: &Manifest,
-    plan: &crate::stack::closure::Plan,
-    starting: bool,
-) -> Result<Prepared, Box<Problem>> {
-    let register = super::plugins::read(ctx)?;
-    let installed = register.installed();
-    let project = current(ctx, manifest, installed);
-    let pass = if ctx.dry_run {
-        Pass::Preview
-    } else {
-        Pass::Write
-    };
-    let hosting = hosting(manifest, installed, &project, &plan.services);
-    if let Err(refused) = rooted(ctx) {
-        return if starting {
-            Err(refused)
-        } else {
-            Ok(Prepared {
-                project,
-                edits: Vec::new(),
-                hosting,
-            })
-        };
-    }
-    let profiles: Option<BTreeSet<String>> =
-        starting.then(|| plan.profiles.iter().chain(&hosting).cloned().collect());
-    let edits = materialised_with(ctx, &project.text, pass, profiles.as_ref())
-        .map_err(|failure| Box::new(failure.problem()))?
-        .into_iter()
-        .collect();
-    if !ctx.dry_run {
-        retired(ctx, installed);
-        secrets_written(ctx, manifest, installed).map_err(|failure| Box::new(failure.problem()))?;
-        if starting {
-            moved(ctx, manifest)?;
-            mounting::made(ctx, manifest, installed)?;
-        }
-    }
-    Ok(Prepared {
-        project,
-        edits,
-        hosting,
-    })
-}
-
 /// The networks this machine's project places every service on.
 ///
 /// # Errors
@@ -216,6 +156,15 @@ pub(crate) fn render_group(ctx: &Ctx) -> Option<u32> {
 pub(crate) fn host_addresses(ctx: &Ctx) -> Vec<std::net::IpAddr> {
     held_as(ctx, crate::fence::HELD)
         .map(|held| crate::fence::kept(&held))
+        .unwrap_or_default()
+}
+
+/// Each network of the project, by declared name, as the engine last answered it.
+pub(crate) fn networks_answered(
+    ctx: &Ctx,
+) -> std::collections::BTreeMap<String, crate::fence::Answered> {
+    held_as(ctx, crate::fence::NETWORKS_HELD)
+        .map(|held| crate::fence::answered(&held))
         .unwrap_or_default()
 }
 

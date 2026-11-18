@@ -136,6 +136,7 @@ pub(super) async fn install(
 
         let asked = super::planned::asked(ctx, &would).await;
         super::planned::fenced(ctx, &would, &asked)?;
+        let networking = super::planned::networked(ctx, &stack_manifest, &would).await?;
         let planned = super::planned::writes(ctx, &would, stack, Some(&crate::plugin::root(path)))?;
         writing::unlinked(ctx, &would, stack)?;
         super::minting::minted(ctx, &would, &read.manifest, stamp, trusted)?;
@@ -145,7 +146,7 @@ pub(super) async fn install(
         // Started before it is registered, which is why the invocation carries this
         // plugin rather than reading it back: the register is what layers a plugin's
         // document into the stack, and it is deliberately not written yet.
-        proving::started(ctx, &would, stack, stamp).await?;
+        proving::started(ctx, &would, stack, (stamp, &networking.displaced)).await?;
         let source = crate::plugin::root(path);
         secured = proving::asked(ctx, &read.manifest, &would, stack, &source, &mut stated).await;
         against = Some(proving::AGAINST);

@@ -7538,6 +7538,20 @@
             },
             "type": "array"
           },
+          "networks_created": {
+            "description": "Every network of the project the engine held none of, by the engine's name: created\nbefore a start, or named and left uncreated by a rehearsal. Empty for every other\naction.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "networks_recreated": {
+            "description": "Every network of the project the engine held in another shape than the project\ngives it, by the engine's name: taken away and created again before a start, with\nevery service on it, or named and left by a rehearsal. Empty for every other action.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "offer": {
             "description": "The offer a restart answers: the services it would restart, named so that a\nrestart carrying it back is carried out against those services or refused.\nAbsent for every other action.",
             "type": [
@@ -16847,6 +16861,10 @@
           },
           "fenced": {
             "description": "Whether it fetches whatever address it is handed, and so runs inside a fence that\nrefuses every private address.",
+            "type": "boolean"
+          },
+          "internal": {
+            "description": "Whether it is held inside the stack, behind a fence passing only what is inside its\nown networks.",
             "type": "boolean"
           },
           "via": {

@@ -155,6 +155,10 @@ pub struct Network {
     /// refuses every private address.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fenced: bool,
+    /// Whether it is held inside the stack, behind a fence passing only what is inside its
+    /// own networks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub internal: bool,
     /// The service of its own plugin it carries out of the machine, holding nothing, where
     /// it is that service's egress.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -21,6 +21,7 @@ pub(crate) struct Resolved {
     name: String,
     pass: Option<String>,
     host: Vec<std::net::IpAddr>,
+    networks: BTreeMap<String, crate::fence::Answered>,
     nftables: bool,
 }
 
@@ -52,6 +53,7 @@ impl Resolved {
             name: ctx.settings.project.clone(),
             pass: crate::app::project::pinned(ctx),
             host: crate::app::project::host_addresses(ctx),
+            networks: crate::app::project::networks_answered(ctx),
             nftables: crate::app::project::nftables_held(ctx),
             files: files_of(ctx),
             nfs: ctx.settings.nfs.clone(),
@@ -155,6 +157,7 @@ impl Resolved {
             pass: self.pass.as_deref(),
             fence: lemonfiber_bundled::FENCE,
             host: &self.host,
+            networks: &self.networks,
             nftables: self.nftables,
             held: &|name| self.recorded.holds_secret(name),
             owner: self.owner,
