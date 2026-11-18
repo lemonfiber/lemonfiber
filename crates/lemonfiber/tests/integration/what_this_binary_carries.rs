@@ -117,7 +117,7 @@ fn what_the_project_mounts_is_carried_and_the_stack_s_repository_is_not() {
     let parts: Vec<String> = lemonfiber_bundle::read(&assets.join("plugins"))
         .map(|(_, held)| {
             held.into_iter()
-                .filter(|one| one.pin.stage != Some(lemonfiber_bundle::Stage::Installed))
+                .filter(|one| one.pin.stage == Some(lemonfiber_bundle::Stage::Assembled))
                 .map(|one| one.pin.id)
                 .collect()
         })
@@ -172,8 +172,8 @@ fn carried_under(under: &str) -> std::collections::BTreeSet<String> {
 
 /// Every assembled part's starting configuration is its copy's in the bundle, file for
 /// file and byte for byte, and nothing beside it: a file a run left in a checkout, a key or
-/// an invitation among them, never travels. A part the bundle installs carries none: the
-/// plugin path writes its starting files.
+/// an invitation among them, never travels. A part the bundle installs and a plugin it
+/// offers carry none: the plugin path writes their starting files.
 #[test]
 fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
     let copies = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -189,7 +189,7 @@ fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
             &mut held,
         );
         let held: std::collections::BTreeSet<String> =
-            if pinned.stage == Some(lemonfiber_bundled::Stage::Installed) {
+            if pinned.stage != Some(lemonfiber_bundled::Stage::Assembled) {
                 std::collections::BTreeSet::new()
             } else {
                 held.into_iter().collect()
