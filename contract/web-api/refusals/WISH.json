@@ -24,6 +24,11 @@
     "status": 404,
     "description": "Said where a title a member may ask for has no picture to show them."
   },
+  "WISH-15": {
+    "name": "NOT_CHECKED",
+    "status": 503,
+    "description": "Said where a title the member's own search just found could not be looked up again for their ask, so it was neither asked for nor called unknown."
+  },
   "WISH-2": {
     "name": "NOT_A_PLACE",
     "status": 400,

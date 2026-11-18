@@ -29,6 +29,7 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
         kind,
         unit,
         seasons,
+        found,
         ..
     } = given;
     let missing = |argument: &str| Refused::Missing {
@@ -48,6 +49,7 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
         return Ok(Command::Wish(Wishing::Ask {
             member,
             wish: Wish { id, kind, seasons },
+            found,
         }));
     }
     let unrecognised = |argument: &str, offered: String| Refused::Unrecognised {
@@ -82,5 +84,6 @@ pub(super) fn asked_for(given: Arguments) -> Result<Command, Refused> {
         member,
         unit,
         reference: id,
+        found,
     }))
 }

@@ -246,7 +246,8 @@ pub(crate) fn household(whom: RawWhom, action: Option<HouseholdCommand>) -> Resu
             kind,
             unit,
             seasons,
-        } => asking(name, id, kind, unit, seasons),
+            found,
+        } => asking(name, id, kind, unit, seasons, found),
     }
 }
 
@@ -262,6 +263,7 @@ fn asking(
     kind: Wished,
     within: Option<Within>,
     seasons: Vec<u32>,
+    found: Option<String>,
 ) -> Result<Command, u8> {
     let screened = match kind {
         Wished::Tv => Some(Kind::Tv),
@@ -276,6 +278,7 @@ fn asking(
         return Ok(Command::Wish(Wishing::Ask {
             member,
             wish: Wish { id, kind, seasons },
+            found,
         }));
     }
     if !seasons.is_empty() {
@@ -292,6 +295,7 @@ fn asking(
         member,
         unit,
         reference: id,
+        found,
     }))
 }
 

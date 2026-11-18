@@ -11,6 +11,7 @@ use super::{Answer, Answered, Asked, Claim, Key, Slot, HEADER, LONGEST};
 use crate::actions::Arguments;
 use crate::admission::Caller;
 use crate::jobs::Job;
+use crate::read::Reply;
 use crate::refusal::Refusal;
 
 /// How long an attempt is remembered here: a window of the operator's choosing.
@@ -73,7 +74,7 @@ async fn answered(register: &Answered, who: &Caller, text: &str, now: SystemTime
             .claim(who, key(text), restarting(), (now, bounds()))
             .await,
     ) {
-        let _ = slot.set(Answer::Now(StatusCode::OK, None));
+        let _ = slot.set(Answer::Now(Reply::of(StatusCode::OK, None)));
     }
 }
 
@@ -135,7 +136,7 @@ fn what_an_attempt_asked_for_differs_by_action_and_by_argument() {
 
 #[tokio::test]
 async fn an_answer_is_replied_as_the_first_send_was() {
-    let now = Answer::Now(StatusCode::CONFLICT, Some("{}".to_owned())).reply();
+    let now = Answer::Now(Reply::of(StatusCode::CONFLICT, Some("{}".to_owned()))).reply();
     assert_eq!(now.status(), StatusCode::CONFLICT);
     let body = to_bytes(now.into_body(), usize::MAX)
         .await
@@ -229,11 +230,17 @@ async fn a_second_send_waits_for_the_answer_the_first_puts_in_its_slot() {
     let waiting = tokio::spawn(async move { again.wait().await.clone() });
     tokio::task::yield_now().await;
     assert!(!waiting.is_finished());
-    let _ = sent.set(Answer::Now(StatusCode::OK, Some("done".to_owned())));
+    let _ = sent.set(Answer::Now(Reply::of(
+        StatusCode::OK,
+        Some("done".to_owned()),
+    )));
     let heard = waiting.await.ok();
     assert_eq!(
         heard,
-        Some(Answer::Now(StatusCode::OK, Some("done".to_owned())))
+        Some(Answer::Now(Reply::of(
+            StatusCode::OK,
+            Some("done".to_owned())
+        )))
     );
 }
 
@@ -304,11 +311,15 @@ async fn work_that_finished_is_put_in_the_first_sends_slot_and_kept() {
     let Some((true, sent)) = sent else {
         unreachable!("a first send");
     };
-    let work = tokio::spawn(async { Answer::Now(StatusCode::OK, Some("done".to_owned())) });
+    let work =
+        tokio::spawn(async { Answer::Now(Reply::of(StatusCode::OK, Some("done".to_owned()))) });
     register.settle(&sent, work).await;
     assert_eq!(
         sent.get(),
-        Some(&Answer::Now(StatusCode::OK, Some("done".to_owned())))
+        Some(&Answer::Now(Reply::of(
+            StatusCode::OK,
+            Some("done".to_owned())
+        )))
     );
     assert!(!first(&register, &Caller::Machine, "a", moment()).await);
 }

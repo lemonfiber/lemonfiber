@@ -76,6 +76,7 @@ fn everything(confirm: bool) -> Arguments {
         dry_run: true.into(),
         inputs: Vec::new(),
         backends: Vec::new(),
+        found: None,
     }
 }
 
@@ -352,7 +353,7 @@ fn an_ask_is_refused_by_what_it_lacks_and_a_kind_that_is_neither() {
     );
     assert!(matches!(
         super::wishing::asked_for(titled(Some("movies"))),
-        Ok(Command::Wish(Wishing::Ask { member, wish }))
+        Ok(Command::Wish(Wishing::Ask { member, wish, found: None }))
             if member.is_empty() && wish.kind == Kind::Movies && wish.seasons.is_empty()
     ));
 }

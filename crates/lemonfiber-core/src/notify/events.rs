@@ -64,7 +64,7 @@ pub fn intake(ctx: &Ctx, presented: &str, event: &Event) -> Result<String, Box<P
             kept.keys
                 .into_iter()
                 .fold(None, |found, (service, digest)| {
-                    if same(&digest, &presented) {
+                    if crate::keys::same(&digest, &presented) {
                         Some(service)
                     } else {
                         found
@@ -119,16 +119,6 @@ const fn notification(event: &Event) -> crate::alert::Notification {
         Happened::Failed | Happened::Health => crate::alert::Notification::Problem,
         Happened::Imported | Happened::Added => crate::alert::Notification::Completion,
     }
-}
-
-/// Whether two digests are the same, in time that depends on their length alone.
-fn same(kept: &str, presented: &str) -> bool {
-    kept.len() == presented.len()
-        && kept
-            .bytes()
-            .zip(presented.bytes())
-            .fold(0_u8, |differs, (left, right)| differs | (left ^ right))
-            == 0
 }
 
 /// `said` cut short, with no credential in it.

@@ -241,10 +241,7 @@ impl Carrying {
     /// Carry it out, or hand it to the runtime under its name.
     async fn out(self, serving: &Serving) -> Answer {
         match self.job {
-            None => {
-                let (status, body) = rendered(&self.ctx, self.command, self.audience).await;
-                Answer::Now(status, body)
-            }
+            None => Answer::Now(rendered(&self.ctx, self.command, self.audience).await),
             Some(job) => {
                 let ctx = said_by(serving, &self.ctx, &job);
                 serving

@@ -131,6 +131,11 @@ pub(crate) const TAKEN: &[Taken] = &[
         given: |arguments| arguments.unit.is_some(),
     },
     Taken {
+        name: "found",
+        takers: TAKES_WISH,
+        given: |arguments| arguments.found.is_some(),
+    },
+    Taken {
         name: "position",
         takers: TAKES_PROGRESS,
         given: |arguments| arguments.position.is_some(),

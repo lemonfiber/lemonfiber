@@ -85,6 +85,7 @@ pub(super) async fn found(
             break;
         }
     }
+    super::found::vouched(ctx, &reached.member.id, &mut titles);
     Ok(AskableReport {
         member: reached.member.name,
         term: term.to_owned(),
@@ -133,6 +134,7 @@ fn askable(found: Found) -> Askable {
         by: None,
         year: found.year,
         cover: None,
+        found: None,
     }
 }
 

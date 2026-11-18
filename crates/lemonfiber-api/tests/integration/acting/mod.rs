@@ -154,6 +154,7 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         position: takes(TAKES_PROGRESS).then_some(POSITION),
         kind: takes(TAKES_WISH).then(|| WISHED_KIND.to_owned()),
         unit: None,
+        found: takes(TAKES_WISH).then(|| FOUND.to_owned()),
         seasons: if takes(TAKES_WISH) {
             vec![SEASON]
         } else {
@@ -183,6 +184,9 @@ pub(crate) const POSITION: u64 = 1234;
 
 /// The kind of title a member asks for, as a page of their search names it.
 pub(crate) const WISHED_KIND: &str = "tv";
+
+/// The token a page of a member's search vouched for the title with.
+pub(crate) const FOUND: &str = "1794186000.6f1d0c2a9b8e7d6c5b4a39281706f5e4";
 
 /// A capability a choice of filler is about.
 pub(crate) const CAPABILITY: &str = "indexer.search";

@@ -57,7 +57,8 @@ impl Kept {
         if let Some(answer) = held.get(member) {
             return enveloped(answer.status, answer.body.clone());
         }
-        let (status, body) = rendered(ctx, command, Audience::Household).await;
+        let crate::read::Reply { status, body, .. } =
+            rendered(ctx, command, Audience::Household).await;
         if let Some(until) = now.checked_add(KEPT_FOR) {
             held.insert(
                 member.to_owned(),

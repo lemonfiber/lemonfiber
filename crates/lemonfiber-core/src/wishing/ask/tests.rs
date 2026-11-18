@@ -20,6 +20,7 @@ use crate::wishing::tests::{
 mod beside;
 mod owner;
 mod planning;
+mod vouching;
 
 /// `ctx` on a disk with no room left for anything new.
 fn without_room(ctx: Ctx) -> Ctx {

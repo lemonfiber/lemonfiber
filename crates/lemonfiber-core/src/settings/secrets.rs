@@ -89,6 +89,14 @@ impl Secrets {
             .map(|key| keyed::fingerprint(key, value))
     }
 
+    /// `message` signed for `purpose` under this store's key, or nothing where the store has
+    /// no key yet.
+    pub(crate) fn signed(&self, purpose: &str, message: &str) -> Option<String> {
+        self.key
+            .as_deref()
+            .map(|key| keyed::signed(key, purpose, message))
+    }
+
     /// `recorded`, a fingerprint an earlier release wrote unkeyed for `name`, keyed from
     /// the value or the earlier value the store holds that it fingerprints, or the mark no
     /// value matches where neither does.

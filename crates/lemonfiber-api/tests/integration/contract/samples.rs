@@ -591,6 +591,7 @@ fn a_search() -> lemonfiber_core::model::AskableReport {
             year: Some(2011),
             cover: None,
             stands: Stands::Askable,
+            found: Some("1794186000.6f1d0c2a9b8e7d6c5b4a39281706f5e4".to_owned()),
         }],
         next: Some("eyJwYWdlIjoyLCJzaG93biI6WyIxMzk5Il19".to_owned()),
         asking: MemberAsking {

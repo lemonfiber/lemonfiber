@@ -233,16 +233,21 @@ pub(crate) fn their_wish(id: &str, wishing: &Wishing) -> Wishing {
         Wishing::Kinds { .. } => Wishing::Kinds {
             member: id.to_owned(),
         },
-        Wishing::Ask { wish, .. } => Wishing::Ask {
+        Wishing::Ask { wish, found, .. } => Wishing::Ask {
             member: id.to_owned(),
             wish,
+            found,
         },
         Wishing::Collect {
-            unit, reference, ..
+            unit,
+            reference,
+            found,
+            ..
         } => Wishing::Collect {
             member: id.to_owned(),
             unit,
             reference,
+            found,
         },
     }
 }

@@ -180,3 +180,28 @@ fn what_a_run_wrote_reaches_the_operator_alone() {
         assert!(lines(&housed).is_empty());
     }
 }
+
+/// A refusal whose code says how long to wait carries `Retry-After`, and one that says
+/// nothing carries none.
+#[test]
+fn a_refusal_carries_retry_after_only_where_its_code_declares_a_wait() {
+    let waits = refused(
+        StatusCode::SERVICE_UNAVAILABLE,
+        Problem::new(
+            lemonfiber_core::error::codes::wish::NOT_CHECKED,
+            "Not checked.",
+            "Not checked.",
+            Remedy::new("Try again."),
+        ),
+    );
+    let silent = refused(StatusCode::BAD_GATEWAY, silent());
+
+    assert_eq!(
+        waits
+            .headers()
+            .get(header::RETRY_AFTER)
+            .and_then(|seconds| seconds.to_str().ok()),
+        Some("5")
+    );
+    assert!(silent.headers().get(header::RETRY_AFTER).is_none());
+}

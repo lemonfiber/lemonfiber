@@ -17,6 +17,13 @@
         "null"
       ]
     },
+    "found": {
+      "description": "The token vouching that this member's search offered it, for their ask to hand\nback, where the core could sign one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "id": {
       "description": "The id it is asked for by.",
       "type": "string"

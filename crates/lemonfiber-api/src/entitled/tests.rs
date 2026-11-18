@@ -399,6 +399,7 @@ fn an_ask(member: &str) -> Command {
             kind: lemonfiber_core::ports::media::Kind::Tv,
             seasons: vec![2],
         },
+        found: None,
     })
 }
 
@@ -410,6 +411,7 @@ fn a_collection(member: &str) -> Command {
             lemonfiber_core::ports::service::MusicUnit::Album,
         ),
         reference: "mbid-1".to_owned(),
+        found: None,
     })
 }
 

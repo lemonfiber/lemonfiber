@@ -33,7 +33,7 @@ use tokio::task::JoinHandle;
 use super::Arguments;
 use crate::admission::Caller;
 use crate::jobs::{accepted, Job};
-use crate::read::enveloped;
+use crate::read::Reply;
 use crate::refusal::Refusal;
 
 /// The header a key travels in.
@@ -104,8 +104,8 @@ impl Asked {
 /// What an attempt was answered with, kept so a second send is answered the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Answer {
-    /// Carried out, at this status, with this envelope.
-    Now(StatusCode, Option<String>),
+    /// Carried out, answered with this.
+    Now(Reply),
     /// Refused before it had an answer, at this status, with this problem.
     Refused(StatusCode, Problem),
     /// Handed to the runtime under this name, for the action named.
@@ -123,7 +123,7 @@ impl Answer {
     #[must_use]
     pub fn reply(&self) -> Response {
         match self {
-            Self::Now(status, body) => enveloped(*status, body.clone()),
+            Self::Now(answered) => answered.response(),
             Self::Refused(status, problem) => crate::spoken::refused(*status, problem.clone()),
             Self::Later(job, action) => accepted(job, action),
         }

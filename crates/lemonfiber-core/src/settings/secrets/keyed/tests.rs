@@ -1,6 +1,6 @@
 use lemonfiber_fixtures::ports::Chance;
 
-use super::{fingerprint, is_keyed, minted, KEY_BYTES};
+use super::{fingerprint, is_keyed, minted, signed, KEY_BYTES};
 
 /// A value, built so no literal password sits in a source file.
 fn value() -> String {
@@ -40,4 +40,18 @@ fn a_machine_that_will_not_draw_the_whole_key_mints_none() {
     assert_eq!(minted(&Chance::exactly(None)), None);
     assert_eq!(minted(&Chance::exactly(Some(vec![1; 8]))), None);
     assert!(!is_keyed(&crate::credential::fingerprint(&value())));
+}
+
+#[test]
+fn a_signature_is_stable_under_one_key_and_says_nothing_across_purposes_or_keys() {
+    let key = minted(&Chance::cycling()).unwrap_or_default();
+    let other = format!("{key}0");
+    let one = signed(&key, "found", "message");
+
+    assert_eq!(one.len(), 32);
+    assert_eq!(one, signed(&key, "found", "message"));
+    assert_ne!(one, signed(&key, "found", "another"));
+    assert_ne!(one, signed(&key, "elsewhere", "message"));
+    assert_ne!(one, signed(&other, "found", "message"));
+    assert!(!fingerprint(&key, "message").contains(&one[..16]));
 }

@@ -40,6 +40,25 @@ pub(super) fn fingerprint(key: &str, value: &str) -> String {
     format!("{MARK}{shown}")
 }
 
+/// Hex digits of the MAC a signature keeps: a hundred and twenty-eight bits.
+const SIGNED: usize = 32;
+
+/// `message` signed for `purpose` under a key drawn from `key` for that purpose alone, so
+/// no signature made for one purpose, nor any fingerprint, says anything about another.
+pub(super) fn signed(key: &str, purpose: &str, message: &str) -> String {
+    let drawn = hmac::sign(
+        &hmac::Key::new(hmac::HMAC_SHA256, key.as_bytes()),
+        purpose.as_bytes(),
+    );
+    let tag = hmac::sign(
+        &hmac::Key::new(hmac::HMAC_SHA256, drawn.as_ref()),
+        message.as_bytes(),
+    );
+    let mut shown = crate::secret::render(tag.as_ref());
+    shown.truncate(SIGNED);
+    shown
+}
+
 /// Whether `fingerprint` is keyed, rather than one an earlier release recorded unkeyed.
 pub(crate) fn is_keyed(fingerprint: &str) -> bool {
     fingerprint.starts_with(MARK)

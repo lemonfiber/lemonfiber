@@ -482,6 +482,7 @@ fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
                     kind: wished,
                     unit: None,
                     seasons: vec![2, 3],
+                    found: None,
                 })
             ),
             Ok(Command::Wish(Wishing::Ask {
@@ -491,6 +492,7 @@ fn a_search_and_an_ask_are_made_as_somebody_in_the_house() {
                     kind,
                     seasons: vec![2, 3],
                 },
+                found: None,
             }))
         );
     }
@@ -552,6 +554,7 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
                 kind,
                 unit,
                 seasons,
+                found: None,
             }),
         )
     };
@@ -561,6 +564,7 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
             member: "ana".to_owned(),
             unit: Unit::Books(BookUnit::Book),
             reference: "mbid-1".to_owned(),
+            found: None,
         }))
     );
     assert_eq!(
@@ -569,6 +573,7 @@ fn music_and_books_are_searched_and_asked_for_by_unit_their_medium_s_first_by_de
             member: "ana".to_owned(),
             unit: Unit::Music(MusicUnit::Artist),
             reference: "mbid-1".to_owned(),
+            found: None,
         }))
     );
     assert_eq!(ask(Wished::Music, None, vec![1]), Err(USAGE));
