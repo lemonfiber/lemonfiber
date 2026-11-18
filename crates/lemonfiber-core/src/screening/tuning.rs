@@ -8,6 +8,11 @@
 //! and each renewal asks both again, so a programme that moves outside a member's limits
 //! stops being renewed.
 //!
+//! **A pass lapses with the programme it was admitted on.** It is good for
+//! [`LIFETIME`] at most, and only until the programme on the channel then ends, so the
+//! next programme is asked about before it is served; where a limit holds the member back
+//! and that programme has no known end, for [`UNENDED`] alone.
+//!
 //! **A pass is issued only for bytes the guard asks about.** Each path the server
 //! answers is held to the live-stream paths it declared, and a path none covers is given
 //! no location and no pass.
@@ -27,6 +32,10 @@ use crate::ports::service::{joined, Channel, Failure, Member};
 use crate::rating::Limits;
 
 pub(super) use guide::guide;
+
+/// How long a pass is good for where a limit holds the member back and the programme it
+/// was admitted on has no known end, in seconds.
+pub(crate) const UNENDED: u64 = crate::instant::MINUTE;
 
 use super::door::{self, Door};
 use super::tuned::{self, Open};
@@ -124,21 +133,53 @@ fn admitted(limits: &Limits, channels: Vec<Channel>) -> Vec<Channel> {
         .collect()
 }
 
-/// Refused unless `channel` is one `member` may watch now.
-async fn allowed(server: &Media, member: &Member, channel: &str) -> Result<(), Box<Problem>> {
+/// A channel a member was admitted to now, and whether a limit holds them back.
+struct Admitted {
+    channel: Channel,
+    restricted: bool,
+}
+
+impl Admitted {
+    /// When a pass issued `now` lapses: [`LIFETIME`] on, or when the programme on the
+    /// channel ends where that is sooner, and [`UNENDED`] on where a limit holds the
+    /// member back and no end of that programme is known.
+    fn lapsing(&self, now: u64) -> u64 {
+        let longest = now.saturating_add(LIFETIME);
+        let ends = self
+            .channel
+            .now
+            .as_ref()
+            .and_then(|programme| programme.ends)
+            .map(crate::instant::Instant::seconds)
+            .filter(|ends| *ends > now);
+        match ends {
+            Some(ends) => ends.min(longest),
+            None if self.restricted => now.saturating_add(UNENDED),
+            None => longest,
+        }
+    }
+}
+
+/// The channel `channel`, refused unless it is one `member` may watch now.
+async fn allowed(server: &Media, member: &Member, channel: &str) -> Result<Admitted, Box<Problem>> {
     let reachable = reachable(server, member).await?;
     if reachable.is_empty() {
         return Err(no_live_tv());
     }
-    let admitted = admitted(&limits(server, member).await?, reachable);
-    if admitted.iter().any(|one| one.id == channel) {
-        Ok(())
-    } else {
-        Err(refused(
-            NOT_ON_THEIR_SHELF,
-            "That channel is not one this member may watch now",
-        ))
-    }
+    let limits = limits(server, member).await?;
+    admitted(&limits, reachable)
+        .into_iter()
+        .find(|one| one.id == channel)
+        .map(|channel| Admitted {
+            channel,
+            restricted: limits.restricted(),
+        })
+        .ok_or_else(|| {
+            refused(
+                NOT_ON_THEIR_SHELF,
+                "That channel is not one this member may watch now",
+            )
+        })
 }
 
 /// The live stream `member` holds that names `stream`.
@@ -158,7 +199,7 @@ async fn opened(
     member: &Member,
     channel: &str,
 ) -> Result<TunedReport, Box<Problem>> {
-    allowed(server, member, channel).await?;
+    let admitted = allowed(server, member, channel).await?;
     let unlocated = |why| unlocated(channel, member, why);
     let ready = match ready(ctx, server).await {
         Ok(ready) => ready,
@@ -172,7 +213,7 @@ async fn opened(
         Ok(None) | Err(Failure::Unsupported { .. }) => return Err(no_live_tv()),
         Err(_) => return Err(unanswered()),
     };
-    let issued = ctx.seconds().saturating_add(LIFETIME);
+    let issued = admitted.lapsing(ctx.seconds());
     let open = Open {
         member: member.id.clone(),
         channel: channel.to_owned(),
@@ -199,14 +240,15 @@ async fn opened(
 }
 
 /// The passes the live stream `open` the core opened for `member` was answered with,
-/// held good for another [`LIFETIME`], where the channel is still one they may watch now.
+/// held good as long again as a pass issued now is, where the channel is still one they
+/// may watch now.
 async fn renewed(
     ctx: &Ctx,
     server: &Media,
     member: &Member,
     open: Open,
 ) -> Result<TunedReport, Box<Problem>> {
-    allowed(server, member, &open.channel).await?;
+    let admitted = allowed(server, member, &open.channel).await?;
     let ready = match ready(ctx, server).await {
         Ok(ready) => ready,
         Err(why) => return Ok(unlocated(&open.channel, member, why)),
@@ -214,7 +256,7 @@ async fn renewed(
     if ctx.dry_run {
         return Ok(rehearsed(&open.channel, member, ready));
     }
-    let lapses = ctx.seconds().saturating_add(LIFETIME);
+    let lapses = admitted.lapsing(ctx.seconds());
     let passes: Vec<String> = [&open.direct, &open.transcoded]
         .into_iter()
         .flatten()

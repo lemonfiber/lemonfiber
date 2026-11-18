@@ -55,12 +55,25 @@ fn declaring(
     opened: Answer,
     more: Vec<(&'static str, Answer)>,
 ) -> (Ctx, Arc<Transport>) {
-    let mut routes = vec![
+    let mut routes: Vec<(&'static str, Vec<Answer>)> = more
+        .into_iter()
+        .map(|(path, answer)| (path, vec![answer]))
+        .collect();
+    routes.extend([
         (media::serve("declared"), declared),
         (media::serve("tune"), vec![opened]),
         (media::serve("untune"), vec![media::taken()]),
-    ];
-    routes.extend(more.into_iter().map(|(path, answer)| (path, vec![answer])));
+    ]);
+    at_the_door(tag, keyed, routes)
+}
+
+/// Ada's household at a standing door, keyed where `keyed`, the media server answering
+/// each of `routes` in turn.
+fn at_the_door(
+    tag: &str,
+    keyed: bool,
+    routes: Vec<(&'static str, Vec<Answer>)>,
+) -> (Ctx, Arc<Transport>) {
     let transport = answering_in_turn(Some(12), Unrated::LetThrough, &evening(), routes);
     let mut ctx = ctx_over(Arc::clone(&transport), tag);
     let project = crate::app::project::directory(&ctx).unwrap_or_default();
@@ -325,4 +338,84 @@ async fn a_leaver_with_no_media_server_to_ask_closes_nothing() {
     };
     crate::screening::leaving(&ctx, &manifest, "a7f3").await;
     assert!(kept(&ctx).is_empty());
+}
+
+/// `kids` showing a programme certified `certificate`, ending at `ends`.
+fn kids_until(certificate: &str, ends: u64) -> Vec<crate::ports::service::Channel> {
+    vec![crate::ports::service::Channel {
+        id: "kids".to_owned(),
+        name: "kids".to_owned(),
+        number: None,
+        now: Some(crate::ports::service::Programme {
+            title: "On kids".to_owned(),
+            certificate: Some(certificate.to_owned()),
+            ends: Some(crate::instant::Instant::from_seconds(ends)),
+        }),
+    }]
+}
+
+#[tokio::test]
+async fn a_pass_lapses_when_its_programme_ends_and_a_renewal_into_one_outside_the_limits_is_refused(
+) {
+    let (probe, _) = standing(
+        "ends-probe",
+        true,
+        media::answered(&Some(opening())),
+        Vec::new(),
+    );
+    let ends = probe.seconds() + 120;
+    let (ctx, transport) = at_the_door(
+        "ends",
+        true,
+        vec![
+            (
+                media::serve("channels"),
+                vec![
+                    media::answered(&kids_until("U", ends)),
+                    media::answered(&kids_until("18", ends + 3_600)),
+                ],
+            ),
+            (
+                media::serve("declared"),
+                vec![media::answered(&enforceable())],
+            ),
+            (
+                media::serve("tune"),
+                vec![media::answered(&Some(opening()))],
+            ),
+            (media::serve("untune"), vec![media::taken()]),
+        ],
+    );
+
+    let Some(opened) = tuning(&ctx, Live::Open("kids".to_owned())).await else {
+        unreachable!("the channel opens on the programme Ada may watch");
+    };
+    assert_eq!(opened.lapses, Some(ends));
+    assert_eq!(kept(&ctx).first().map(|open| open.issued), Some(ends));
+
+    let stream = "0123456789abcdef0123456789abcdef".to_owned();
+    let renewal = asked(&ctx, "Ada", Live::Renew(stream)).await;
+    assert_eq!(code(renewal).as_deref(), Some("PLAY-2"));
+    assert!(was_asked(&transport, "channels"));
+}
+
+#[tokio::test]
+async fn a_restricted_members_pass_on_a_programme_with_no_known_end_lives_a_minute() {
+    let (ctx, _) = standing(
+        "unended",
+        true,
+        media::answered(&Some(opening())),
+        Vec::new(),
+    );
+
+    let Some(opened) = tuning(&ctx, Live::Open("kids".to_owned())).await else {
+        unreachable!("the channel opens");
+    };
+    let lapses = opened.lapses.unwrap_or_default();
+    let now = ctx.seconds();
+    assert!(
+        lapses <= now + crate::screening::tuning::UNENDED
+            && lapses + 5 >= now + crate::screening::tuning::UNENDED,
+        "{lapses} against {now}"
+    );
 }

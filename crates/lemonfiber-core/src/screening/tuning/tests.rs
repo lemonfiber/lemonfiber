@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{channels, located, passed, tuned, Ready};
+use super::{channels, located, passed, tuned, Admitted, Ready, UNENDED};
 use crate::app::{Ctx, Live};
 use crate::pass::{Key, LivePath, Paths, Renewals, Watching, KEY_BYTES, LIFETIME};
 use crate::ports::service::{Certificate, Channel, Programme, Unrated};
@@ -60,7 +60,8 @@ fn limited_to(
     answering_in_turn(age_limit, unrated, watchable, in_turn)
 }
 
-/// The same server, answering each of `more` in turn, the last repeating.
+/// The same server, answering each of `more` in turn, the last repeating, ahead of
+/// everything above.
 fn answering_in_turn(
     age_limit: Option<u32>,
     unrated: Unrated,
@@ -77,12 +78,12 @@ fn answering_in_turn(
             age,
         })
         .collect();
-    let mut routes = vec![
+    let mut routes = more;
+    routes.extend([
         (media::identity("household"), vec![media::answered(&[ada])]),
         (media::identity("ratings"), vec![media::answered(&table)]),
         (media::serve("channels"), vec![media::answered(&watchable)]),
-    ];
-    routes.extend(more);
+    ]);
     Transport::by_path_in_turn(routes)
 }
 
@@ -310,3 +311,41 @@ fn a_path_no_live_stream_path_covers_is_given_no_pass() {
 
 mod guide;
 mod standing;
+
+/// `channel` admitted at a moment `NOW`, its programme ending at `ends` where it does,
+/// for a member a limit holds back where `restricted`.
+fn admitted(ends: Option<u64>, restricted: bool) -> Admitted {
+    let mut channel = showing("kids", Some("U"));
+    if let Some(programme) = channel.now.as_mut() {
+        programme.ends = ends.map(crate::instant::Instant::from_seconds);
+    }
+    Admitted {
+        channel,
+        restricted,
+    }
+}
+
+const NOW: u64 = 1_800_000_000;
+
+#[test]
+fn a_pass_lapses_when_the_programme_it_was_admitted_on_ends_where_that_is_sooner() {
+    for restricted in [true, false] {
+        assert_eq!(
+            admitted(Some(NOW + 120), restricted).lapsing(NOW),
+            NOW + 120
+        );
+        assert_eq!(
+            admitted(Some(NOW + LIFETIME + 1), restricted).lapsing(NOW),
+            NOW + LIFETIME
+        );
+    }
+    assert_eq!(admitted(None, false).lapsing(NOW), NOW + LIFETIME);
+    assert_eq!(admitted(Some(NOW), false).lapsing(NOW), NOW + LIFETIME);
+}
+
+#[test]
+fn a_restricted_members_pass_on_a_programme_with_no_known_end_lapses_in_a_minute() {
+    assert_eq!(admitted(None, true).lapsing(NOW), NOW + UNENDED);
+    assert_eq!(admitted(Some(NOW - 1), true).lapsing(NOW), NOW + UNENDED);
+    assert_eq!(UNENDED, 60);
+}
