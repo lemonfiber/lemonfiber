@@ -3,7 +3,7 @@
 use super::acting::{
     exactly_what, AGE, ALLOWED, ARCHIVE, AT_THE_CAP, CAPABILITY, CARRIES, DOWNLOAD, FOLLOWED,
     HOURS, ITEM, KEPT, LIBRARY, LOGS, MINUTES, MONTHLY, NARROWED, OFFER, PERIOD, POLICY, REASON,
-    REMOVAL, SEASON, SHARE, STAMP, UNRATED, WAITING, WARNED,
+    REMOVAL, SEASON, SHARE, UNRATED, WAITING, WARNED,
 };
 use lemonfiber_api::actions::{named, Arguments, Disturbing, Only, Refused, OFFERED};
 use lemonfiber_core::app::plugins::Asked as Installing;
@@ -26,6 +26,9 @@ use plugins::{
     carries_source, give_approved, give_credential, give_inputs, give_plugin, give_recipe,
     give_source,
 };
+
+mod running;
+use running::{carries_at, carries_now, give_at, give_now};
 
 mod settling;
 use settling::{
@@ -286,18 +289,13 @@ fn carries_service(command: &Command) -> bool {
     matches!(command, Command::Backup { service: Some(_) })
         || matches!(command, Command::Update(asked) if asked.service.is_some())
         || matches!(command, Command::Wiring(Linking::Fill(filling)) if filling.service == "sonarr")
-        || matches!(command, Command::Run { service } if service == "sonarr")
+        || matches!(command, Command::Run { service, .. } if service == "sonarr")
 }
 
 /// Whether the command has the archive it was named in it, as a name rather than a
 /// path — which is the whole of what a browser may ask to be read.
 fn carries_archive(command: &Command) -> bool {
     matches!(command, Command::Restore(Restoring { archive: Kept::Named(name), .. }) if name == ARCHIVE)
-}
-
-/// Whether the command names the run it was given.
-fn carries_at(command: &Command) -> bool {
-    matches!(command, Command::Undo { run: Some(at) } if *at == STAMP)
 }
 
 /// Whether the command has the accepted re-point in it.
@@ -364,10 +362,6 @@ fn give_service(given: &mut Arguments) {
 
 fn give_archive(given: &mut Arguments) {
     given.archive = Some(ARCHIVE.to_owned());
-}
-
-fn give_at(given: &mut Arguments) {
-    given.at = Some(STAMP);
 }
 
 fn give_repoint(given: &mut Arguments) {
@@ -671,7 +665,7 @@ type Sweep = (&'static str, fn(&mut Arguments), fn(&Command) -> bool);
 /// One row per argument rather than one test per argument, because the rule is one
 /// thing: an action may accept an argument only if the command it reaches has
 /// somewhere to put it, and must refuse it by that name otherwise.
-pub(super) const SWEEPS: [Sweep; 63] = [
+pub(super) const SWEEPS: [Sweep; 64] = [
     ("forms", give_forms, carries_forms),
     ("services", give_services, carries_services),
     ("wait", give_wait, carries_wait),
@@ -684,6 +678,7 @@ pub(super) const SWEEPS: [Sweep; 63] = [
     ("media_type", give_media_type, carries_media_type),
     ("archive", give_archive, carries_archive),
     ("at", give_at, carries_at),
+    ("now", give_now, carries_now),
     ("repoint", give_repoint, carries_repoint),
     ("write", give_write, carries_write),
     ("logs", give_logs, carries_logs),

@@ -50,6 +50,7 @@ fn everything(confirm: bool) -> Arguments {
         offer: Some("0f0f0f0f".to_owned()),
         agreed: vec!["vpn.unprotected".to_owned()],
         confirm,
+        now: true.into(),
         item: Some("Sintel".to_owned()),
         term: Some("The Expanse".to_owned()),
         season: Some(2),

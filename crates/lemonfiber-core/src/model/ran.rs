@@ -11,7 +11,8 @@ pub struct RunReport {
     pub service: String,
     /// Whether nothing was run because this was a rehearsal.
     pub rehearsed: bool,
-    /// Whether a time fell due or a run was owed, so it ran or would have.
+    /// Whether a time fell due, a run was owed or one was asked for at once, so it ran or
+    /// would have.
     pub due: bool,
     /// The run, where one went.
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -247,3 +247,22 @@ fn the_command_the_project_starts_the_pass_service_with_is_one_this_parser_reads
         "{read:?}"
     );
 }
+
+fn running(args: &[&str]) -> Option<(String, bool)> {
+    match Cli::try_parse_from(args).ok()?.command? {
+        Request::Run { service, now } => Some((service, now)),
+        _ => None,
+    }
+}
+
+#[test]
+fn a_run_is_asked_for_at_once_by_its_own_flag_and_otherwise_waits_for_a_time() {
+    assert_eq!(
+        running(&["lemonfiber", "run", "configarr", "--now"]),
+        Some(("configarr".to_owned(), true))
+    );
+    assert_eq!(
+        running(&["lemonfiber", "run", "configarr"]),
+        Some(("configarr".to_owned(), false))
+    );
+}

@@ -11,6 +11,14 @@
           "null"
         ]
       }
+    },
+    {
+      "name": "now",
+      "type": {
+        "default": false,
+        "description": "Whether a run-and-exit service runs at once, whether or not one of its times fell\ndue.",
+        "type": "boolean"
+      }
     }
   ],
   "consent": [],

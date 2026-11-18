@@ -8,7 +8,7 @@ Part of the [command reference](../commands.md).
 ```text
 Run a run-and-exit service where one of its times fell due since its last run.
 
-What this machine's scheduler calls every minute for each installed run-and-exit service. Where none of its times fell due it exits at once and records nothing; a run still going when a time falls due has that time skipped.
+What this machine's scheduler calls every minute for each installed run-and-exit service. Where none of its times fell due it exits at once and records nothing; a run still going when a time falls due has that time skipped. With `--now` it runs at once, whether or not one of its times fell due.
 
 Usage: lemonfiber run [OPTIONS] <SERVICE>
 
@@ -19,6 +19,9 @@ Arguments:
 Options:
       --json
           Print machine-readable output
+
+      --now
+          Run it at once, whether or not one of its times fell due
 
       --dry-run
           Say what would happen, and change nothing

@@ -283,7 +283,7 @@ async fn main() -> ExitCode {
         // saying "starts eight services" first would name the wrong set twice over.
         Request::Switch(asked) => taken!(switching(&ctx, asked, cli.json).await),
         Request::Restart(asked) => restarting(asked),
-        Request::Run { service } => Command::Run { service },
+        Request::Run { service, now } => Command::Run { service, now },
         // A pull is watched as it happens rather than waited on in silence, so like
         // streaming and watching it runs its own way instead of through dispatch.
         Request::Pull { forms } => return pull(&ctx, &forms, cli.json).await,

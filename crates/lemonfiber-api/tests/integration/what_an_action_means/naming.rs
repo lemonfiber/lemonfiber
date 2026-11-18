@@ -3,7 +3,7 @@
 use super::acting::*;
 use super::{command, naming, nothing, refusal};
 use axum::http::StatusCode;
-use lemonfiber_api::actions::{named, Arguments, Refused, OFFERED};
+use lemonfiber_api::actions::{named, Arguments, Refused, Timing, OFFERED};
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
 
@@ -116,7 +116,8 @@ fn a_run_reaches_the_command_the_scheduler_calls_for_the_service_it_names() {
     assert_eq!(
         command("run", one),
         Some(Command::Run {
-            service: "configarr".to_owned()
+            service: "configarr".to_owned(),
+            now: false,
         })
     );
     assert_eq!(
@@ -124,6 +125,22 @@ fn a_run_reaches_the_command_the_scheduler_calls_for_the_service_it_names() {
         Some(Refused::Missing {
             action: "run".to_owned(),
             argument: "service".to_owned()
+        })
+    );
+}
+
+#[test]
+fn a_run_asked_for_now_reaches_the_command_running_the_service_at_once() {
+    let now = Arguments {
+        service: Some("configarr".to_owned()),
+        now: Timing::AtOnce,
+        ..Arguments::default()
+    };
+    assert_eq!(
+        command("run", now),
+        Some(Command::Run {
+            service: "configarr".to_owned(),
+            now: true,
         })
     );
 }

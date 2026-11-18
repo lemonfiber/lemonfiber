@@ -18,10 +18,10 @@ pub use takers::{
     TAKES_AGREED, TAKES_AGREEMENT, TAKES_ALLOWANCE, TAKES_APPROVED, TAKES_ARCHIVE, TAKES_BACKENDS,
     TAKES_BUNDLING, TAKES_CAPABILITY, TAKES_CHECK, TAKES_CONSENT, TAKES_CREDENTIAL, TAKES_DEVICE,
     TAKES_DISRUPTION, TAKES_DOWNLOAD, TAKES_FORMS, TAKES_ITEM, TAKES_KEPT, TAKES_KEY, TAKES_NAME,
-    TAKES_NARROWING, TAKES_PASS, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET, TAKES_PROGRESS,
-    TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE, TAKES_SERVICES,
-    TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_STREAM, TAKES_TERM, TAKES_TIER, TAKES_TITLE,
-    TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
+    TAKES_NARROWING, TAKES_NOW, TAKES_PASS, TAKES_PLUGIN, TAKES_POLICY, TAKES_PRESET,
+    TAKES_PROGRESS, TAKES_REASON, TAKES_RECIPE, TAKES_REQUEST, TAKES_RUN, TAKES_SERVICE,
+    TAKES_SERVICES, TAKES_SETTINGS, TAKES_SHARING, TAKES_SOURCE, TAKES_STREAM, TAKES_TERM,
+    TAKES_TIER, TAKES_TITLE, TAKES_VALUE, TAKES_VALUES, TAKES_WAITING, TAKES_WISH,
 };
 pub(crate) use unwanted::{unwanted, TAKEN};
 
@@ -125,6 +125,10 @@ pub struct Arguments {
     pub agreed: Vec<String>,
     /// Whether a cost the action would incur was agreed to in advance.
     pub confirm: bool,
+    /// Whether a run-and-exit service runs at once, whether or not one of its times fell
+    /// due.
+    #[schemars(with = "bool", extend("default" = false))]
+    pub now: Timing,
     /// The one thing to add end to end, as it would be said.
     pub item: Option<String>,
     /// What to follow, named as a person would say it.
@@ -281,6 +285,7 @@ impl Arguments {
             disruptive: Disturbing::Included,
             offer: Some("00000000".to_owned()),
             confirm: true,
+            now: Timing::AtOnce,
             agreed: vec!["vpn.unprotected".to_owned()],
             item: Some("Sintel".to_owned()),
             term: Some("Sintel".to_owned()),
@@ -359,6 +364,35 @@ impl Running {
     #[must_use]
     pub const fn rehearses(self) -> bool {
         matches!(self, Self::AsARehearsal)
+    }
+}
+
+/// Whether a run-and-exit service runs when one of its times falls due, or at once.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(from = "bool")]
+pub enum Timing {
+    /// When one of its times falls due or a run is owed.
+    #[default]
+    WhenDue,
+    /// At once, whether or not one of its times fell due.
+    AtOnce,
+}
+
+impl From<bool> for Timing {
+    fn from(asked: bool) -> Self {
+        if asked {
+            Self::AtOnce
+        } else {
+            Self::WhenDue
+        }
+    }
+}
+
+impl Timing {
+    /// Whether the run this reaches is asked for at once.
+    #[must_use]
+    pub const fn at_once(self) -> bool {
+        matches!(self, Self::AtOnce)
     }
 }
 
