@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use lemonfiber_contract::capabilities::stream::guard;
 use lemonfiber_manifest::Manifest;
-use lemonfiber_ports::registry::Tagged;
+use lemonfiber_ports::registry::{is_digest, Image, Tagged, Unanswerable};
 
 use super::super::Ctx;
 use crate::config::store;
@@ -44,32 +44,69 @@ pub(crate) async fn readied(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
     if let Err(why) = made(ctx, &directory) {
         return Some(why);
     }
-    kept(&directory.join(PINNED), &format!("{}\n", pin?)).err()
+    kept(&directory.join(PINNED), &pin?).err()
 }
 
-/// The pin of this release's own image, asked of the registry it is published to.
+/// What the pass service is left without, where no image of this build is pinned.
+const IMAGELESS: &str = "the pass service has no image to run";
+
+/// What the project keeps of this release's own image, asked of the registry it is
+/// published to, where that image was built from the commit this build was made from.
 async fn pinning(ctx: &Ctx) -> Result<String, String> {
     let product = crate::PRODUCT;
+    let Some(commit) = ctx.built_from else {
+        return Err(format!(
+            "this build names no commit it was made from, so no image of {product} {RUNNING} \
+             is known to be its own and {IMAGELESS}"
+        ));
+    };
     if !ctx.settings.reaching.allows(REACH_REGISTRY_KEY) {
         return Err(format!(
             "fetching images is switched off, so the image of {product} {RUNNING} the pass \
              service runs is not pinned"
         ));
     }
-    let tagged = Tagged::new(crate::IMAGE, RUNNING);
-    match ctx.seams.registry.digest(&tagged).await {
+    let unpinned = |why: Unanswerable| {
+        format!("the image of {product} {RUNNING} the pass service runs could not be pinned: {why}")
+    };
+    let digest = match ctx
+        .seams
+        .registry
+        .digest(&Tagged::new(crate::IMAGE, RUNNING))
+        .await
+    {
+        Ok(Some(digest)) if is_digest(&digest) => digest,
         Ok(Some(digest)) => {
-            let pin = crate::pass::pin(RUNNING, &digest);
-            crate::pass::pinned(&pin, RUNNING).ok_or_else(|| {
-                format!("the registry named {digest} for {product} {RUNNING}, which is no digest")
-            })
+            return Err(format!(
+                "the registry named {digest} for {product} {RUNNING}, which is no digest"
+            ))
         }
+        Ok(None) => {
+            return Err(format!(
+                "no image of {product} {RUNNING} is published, so {IMAGELESS}"
+            ))
+        }
+        Err(why) => return Err(unpinned(why)),
+    };
+    match ctx
+        .seams
+        .registry
+        .revision(&Image::new(crate::IMAGE, &digest))
+        .await
+    {
+        Ok(Some(revision)) if revision == commit => Ok(crate::pass::held(
+            &crate::pass::pin(RUNNING, &digest),
+            commit,
+        )),
+        Ok(Some(revision)) => Err(format!(
+            "the image of {product} {RUNNING} is built from {revision} and this build from \
+             {commit}, so no image of this build is published and {IMAGELESS}"
+        )),
         Ok(None) => Err(format!(
-            "no image of {product} {RUNNING} is published, so the pass service has no image to run"
+            "the image of {product} {RUNNING} names no commit it was built from, so no image \
+             of this build is known to be published and {IMAGELESS}"
         )),
-        Err(why) => Err(format!(
-            "the image of {product} {RUNNING} the pass service runs could not be pinned: {why}"
-        )),
+        Err(why) => Err(unpinned(why)),
     }
 }
 

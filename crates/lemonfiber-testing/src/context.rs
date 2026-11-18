@@ -274,6 +274,7 @@ impl Context {
         };
         Ctx {
             held: Arc::new(self.held),
+            built_from: Some(lemonfiber_fixtures::registered::REVISION),
             ..Ctx::new(seams, self.stack, self.settings, self.environment)
         }
     }

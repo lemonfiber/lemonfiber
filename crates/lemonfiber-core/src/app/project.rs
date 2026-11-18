@@ -139,10 +139,12 @@ pub(crate) fn topology(ctx: &Ctx, manifest: &Manifest) -> Result<Topology, Box<P
     ))
 }
 
-/// The image the pass service runs, where one is pinned for this release.
+/// The image the pass service runs, where one is pinned for this release by a build made
+/// from this build's commit.
 pub(crate) fn pinned(ctx: &Ctx) -> Option<String> {
+    let commit = ctx.built_from?;
     held_as(ctx, crate::pass::PINNED)
-        .and_then(|held| crate::pass::pinned(&held, crate::stack::RUNNING))
+        .and_then(|held| crate::pass::pinned(&held, crate::stack::RUNNING, commit))
 }
 
 /// The group owning the render devices of the engine's host, as the engine last answered

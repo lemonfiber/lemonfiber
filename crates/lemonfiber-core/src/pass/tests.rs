@@ -1,3 +1,4 @@
+use lemonfiber_fixtures::registered::{ELSEWHERE, REVISION};
 use lemonfiber_sidecar::pass::{Key, LivePath, Paths, Renewals, KEY_BYTES, LIFETIME};
 
 use super::{Confirmed, InQuery, ItemPath, Session, Watching, NONCE_BYTES};
@@ -142,26 +143,53 @@ fn a_pin_is_this_releases_own_image_at_its_digest() {
 }
 
 #[test]
-fn a_pin_is_held_only_for_the_release_it_names_and_only_by_a_digest() {
+fn a_pin_is_held_only_for_the_release_and_the_build_it_names_and_only_by_a_digest() {
     let pin = super::pin("0.18.0", DIGEST);
+    let held = |pin: &str| super::held(pin, REVISION);
     assert_eq!(
-        super::pinned(&format!("{pin}\n"), "0.18.0"),
+        super::pinned(&held(&pin), "0.18.0", REVISION),
         Some(pin.clone())
     );
-    assert_eq!(super::pinned(&pin, "0.18.1"), None);
-    assert_eq!(super::pinned(&pin, "0.18"), None);
+    assert_eq!(super::pinned(&held(&pin), "0.18.1", REVISION), None);
+    assert_eq!(super::pinned(&held(&pin), "0.18", REVISION), None);
     assert_eq!(
-        super::pinned(&super::pin("0.18.0", "sha256:abc"), "0.18.0"),
+        super::pinned(
+            &held(&super::pin("0.18.0", "sha256:abc")),
+            "0.18.0",
+            REVISION
+        ),
         None
     );
     assert_eq!(
         super::pinned(
-            &format!("example.invalid/lemonfiber:0.18.0@{DIGEST}"),
-            "0.18.0"
+            &held(&format!("example.invalid/lemonfiber:0.18.0@{DIGEST}")),
+            "0.18.0",
+            REVISION
         ),
         None
     );
-    assert_eq!(super::pinned(&format!("{pin} extra"), "0.18.0"), None);
+    assert_eq!(
+        super::pinned(&held(&format!("{pin} extra")), "0.18.0", REVISION),
+        None
+    );
+}
+
+#[test]
+fn a_pin_kept_by_a_build_of_another_commit_or_of_none_is_not_held() {
+    let pin = super::pin("0.18.0", DIGEST);
+    assert_eq!(
+        super::pinned(&super::held(&pin, ELSEWHERE), "0.18.0", REVISION),
+        None
+    );
+    assert_eq!(super::pinned(&format!("{pin}\n"), "0.18.0", REVISION), None);
+    assert_eq!(
+        super::pinned(
+            &format!("{}more\n", super::held(&pin, REVISION)),
+            "0.18.0",
+            REVISION
+        ),
+        None
+    );
 }
 
 #[test]

@@ -25,7 +25,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use base64::Engine as _;
 use lemonfiber_ports::http::{Http, Method, Request, Response};
-use lemonfiber_ports::registry::{is_digest, Image, Offered, Registry, Tagged, Unanswerable};
+use lemonfiber_ports::registry::{
+    is_digest, Image, Offered, Registry, Tagged, Unanswerable, REVISION,
+};
 
 /// Where the signature's own bytes sit on a layer.
 const SIGNATURE: &str = "dev.cosignproject.cosign/signature";
@@ -109,6 +111,120 @@ impl Registry for Oci {
     async fn digest(&self, tagged: &Tagged) -> Result<Option<String>, Unanswerable> {
         pinning(self.reaching.as_ref(), tagged).await
     }
+
+    async fn revision(&self, image: &Image) -> Result<Option<String>, Unanswerable> {
+        revising(self.reaching.as_ref(), image).await
+    }
+}
+
+/// The commit one image says it was built from, asked over one transport: the one every
+/// platform's image carries, where the digest names an index.
+async fn revising(reaching: &dyn Http, image: &Image) -> Result<Option<String>, Unanswerable> {
+    let (host, path) = addressed(&image.repository);
+    let unanswerable = |why: String| Unanswerable::about(image, &why);
+    let mut held = None;
+    let manifests = format!("https://{host}/v2/{path}/manifests");
+    let named = json(
+        reaching,
+        &host,
+        &format!("{manifests}/{}", image.digest),
+        INDEXES,
+        &mut held,
+    )
+    .await
+    .map_err(unanswerable)?;
+    let Some(listed) = named.get("manifests").and_then(serde_json::Value::as_array) else {
+        return labelled(reaching, &host, &path, &named, &mut held)
+            .await
+            .map_err(unanswerable);
+    };
+    let mut revisions = Vec::new();
+    for platform in listed.iter().filter(|listed| runs(listed)) {
+        let digest = platform
+            .get("digest")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| unanswerable("an image its index lists names no digest".to_owned()))?;
+        let manifest = json(
+            reaching,
+            &host,
+            &format!("{manifests}/{digest}"),
+            MANIFESTS,
+            &mut held,
+        )
+        .await
+        .map_err(unanswerable)?;
+        revisions.push(
+            labelled(reaching, &host, &path, &manifest, &mut held)
+                .await
+                .map_err(unanswerable)?,
+        );
+    }
+    Ok(agreed(revisions))
+}
+
+/// Whether an entry of an image index is an image a platform runs, rather than what an
+/// image builder lists beside them for no platform.
+fn runs(listed: &serde_json::Value) -> bool {
+    listed
+        .get("platform")
+        .and_then(|platform| platform.get("os"))
+        .and_then(serde_json::Value::as_str)
+        != Some("unknown")
+}
+
+/// The one revision every one of `revisions` is, where there is at least one and none
+/// is missing or another.
+fn agreed(revisions: Vec<Option<String>>) -> Option<String> {
+    let mut each = revisions.into_iter();
+    let first = each.next().flatten()?;
+    each.all(|other| other.as_ref() == Some(&first))
+        .then_some(first)
+}
+
+/// The commit the image `manifest` describes says it was built from, read out of the
+/// configuration it names in the repository at `path` on `host`.
+async fn labelled(
+    reaching: &dyn Http,
+    host: &str,
+    path: &str,
+    manifest: &serde_json::Value,
+    held: &mut Option<String>,
+) -> Result<Option<String>, String> {
+    let digest = manifest
+        .get("config")
+        .and_then(|config| config.get("digest"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or("its manifest names no configuration")?;
+    let configuration = json(
+        reaching,
+        host,
+        &format!("https://{host}/v2/{path}/blobs/{digest}"),
+        ANYTHING,
+        held,
+    )
+    .await?;
+    Ok(configuration
+        .get("config")
+        .and_then(|config| config.get("Labels"))
+        .and_then(|labels| labels.get(REVISION))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned))
+}
+
+/// What `url` on the registry at `host` answers as JSON, or why it answered nothing that
+/// reads.
+async fn json(
+    reaching: &dyn Http,
+    host: &str,
+    url: &str,
+    accept: &str,
+    held: &mut Option<String>,
+) -> Result<serde_json::Value, String> {
+    let answer = authorised(reaching, host, url, accept, held).await?;
+    if !answer.is_success() {
+        return Err(format!("{url} answered {}", answer.status));
+    }
+    serde_json::from_str(&answer.body).map_err(|why| format!("{url} answered no JSON: {why}"))
 }
 
 /// The digest a registry publishes one tag at, asked over one transport.

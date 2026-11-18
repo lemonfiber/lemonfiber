@@ -136,6 +136,11 @@ pub struct Ctx {
     /// A field rather than a constant read in place, so a test can sign an index with a
     /// key it made.
     pub catalogue_key: Option<Box<crate::plugin::Key>>,
+    /// The commit this build was made from, or nothing where it names none.
+    ///
+    /// The one this build was stamped with. A field rather than a constant read in
+    /// place, so a test can be a build made from any commit, or from none.
+    pub built_from: Option<&'static str>,
     /// What lives exactly as long as this context and its clones: the directories a
     /// test's context reads and writes, removed when the last clone drops.
     pub held: Arc<dyn std::any::Any + Send + Sync>,
@@ -211,6 +216,7 @@ impl Ctx {
             // half of this and not something a default could stand in for.
             archives: None,
             catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
+            built_from: crate::stack::BUILT_FROM,
             held: Arc::new(()),
         }
     }

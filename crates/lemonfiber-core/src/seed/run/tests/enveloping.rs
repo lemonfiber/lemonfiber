@@ -95,9 +95,12 @@ fn passing(project: &std::path::Path) {
     let _ = std::fs::create_dir_all(project);
     let _ = std::fs::write(
         project.join(PINNED),
-        crate::pass::pin(
-            crate::stack::RUNNING,
-            "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        crate::pass::held(
+            &crate::pass::pin(
+                crate::stack::RUNNING,
+                "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            ),
+            lemonfiber_fixtures::registered::REVISION,
         ),
     );
 }
