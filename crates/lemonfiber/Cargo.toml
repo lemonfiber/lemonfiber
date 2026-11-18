@@ -87,7 +87,7 @@ toml = { workspace = true }
 serde = { workspace = true }
 # A household member's request in a live arm, sent through the web API as a member's
 # program sends it.
-lemonfiber-sdk = { git = "https://github.com/lemonfiber/sdk-rust", rev = "eec81499f413207f2b52effdac9dac4204196df5" }
+lemonfiber-sdk = { git = "https://github.com/lemonfiber/sdk-rust", rev = "92bc56f630faf81cfe314882bacbd5e3568fffc3" }
 # Reading the NAS templates, which are Compose files, so what each one runs and mounts
 # is checked as a document rather than matched as text. Already in the tree via the
 # core's reading of the stack.

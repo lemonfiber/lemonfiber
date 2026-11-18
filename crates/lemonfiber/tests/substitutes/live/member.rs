@@ -5,9 +5,10 @@ use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use lemonfiber_sdk::contract::actions::Ask;
+use lemonfiber_sdk::contract::actions::AskAction;
 use lemonfiber_sdk::contract::reads;
-use lemonfiber_sdk::{Address, Client, Credential};
+use lemonfiber_sdk::contract::refusals::NOT_CHECKED;
+use lemonfiber_sdk::{Address, Client, Credential, Error};
 
 use super::core::{strings_under, Core};
 
@@ -19,6 +20,9 @@ const LOOKING: Duration = Duration::from_millis(500);
 
 /// What the member's key is minted as being for.
 const PURPOSE: &str = "other";
+
+/// How many times an ask the core could not check yet is asked again.
+const CHECKED_AGAIN: u32 = 3;
 
 /// The web surface, served for as long as this is held.
 pub struct Served {
@@ -109,28 +113,56 @@ pub fn asked(
         .enable_all()
         .build()
         .map_err(|why| why.to_string())?;
-    let (id, unit) = match asked.title {
-        super::Title::Catalogued(id) => (id.to_owned(), None),
-        super::Title::Found { unit, term, named } => (
-            runtime.block_on(found(&client, member, asked.kind, unit, term, named))?,
-            Some(unit.to_owned()),
-        ),
+    let (id, unit, found) = match asked.title {
+        super::Title::Catalogued(id) => (id.to_owned(), None, None),
+        super::Title::Found { unit, term, named } => {
+            let (id, token) =
+                runtime.block_on(found(&client, member, asked.kind, unit, term, named))?;
+            (id, Some(unit.to_owned()), token)
+        }
     };
-    let ask = Ask {
+    let ask = AskAction {
         id: Some(id),
         kind: Some(asked.kind.to_owned()),
         seasons: (!seasons.is_empty()).then_some(seasons),
         unit,
-        ..Ask::default()
+        found,
+        ..AskAction::default()
     };
-    runtime
-        .block_on(client.act(&ask))
-        .map(|acted| println!("asked: {acted:?}"))
-        .map_err(|why| format!("{why:?}"))
+    runtime.block_on(acted(&client, &ask))
+}
+
+/// Ask, and ask again after the wait the core names while it could not yet check the
+/// title the search found.
+///
+/// # Errors
+///
+/// Where the ask is refused for any other reason, or still unchecked after
+/// [`CHECKED_AGAIN`] more.
+async fn acted(client: &Client, ask: &AskAction) -> Result<(), String> {
+    let mut left = CHECKED_AGAIN;
+    loop {
+        match client.act(ask).await {
+            Err(Error::Refused(refusal))
+                if left > 0
+                    && refusal
+                        .code
+                        .is_some_and(|code| code.code == NOT_CHECKED.code) =>
+            {
+                left -= 1;
+                tokio::time::sleep(Duration::from_secs(refusal.retry_after.unwrap_or(1))).await;
+            }
+            answered => {
+                return answered
+                    .map(|acted| println!("asked: {acted:?}"))
+                    .map_err(|why| format!("{why:?}"));
+            }
+        }
+    }
 }
 
 /// The id of the candidate called `named` that `member`'s search for `term`, as a `unit`
-/// of `kind`, finds first.
+/// of `kind`, finds first, with the token that proves the search found it.
 ///
 /// # Errors
 ///
@@ -142,13 +174,13 @@ async fn found(
     unit: &str,
     term: &str,
     named: &str,
-) -> Result<String, String> {
-    let search = reads::Askable {
+) -> Result<(String, Option<String>), String> {
+    let search = reads::AskableRead {
         member: Some(member.to_owned()),
         term: Some(term.to_owned()),
         kind: Some(kind.to_owned()),
         unit: Some(unit.to_owned()),
-        ..reads::Askable::default()
+        ..reads::AskableRead::default()
     };
     let page = client
         .read(&search)
@@ -158,6 +190,6 @@ async fn found(
     page.titles
         .iter()
         .find(|one| one.title.contains(named))
-        .map(|one| one.id.clone())
+        .map(|one| (one.id.clone(), one.found.clone()))
         .ok_or_else(|| format!("no {named} among what {term} finds: {page:?}"))
 }
