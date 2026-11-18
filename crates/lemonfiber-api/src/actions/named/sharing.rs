@@ -40,16 +40,16 @@ pub(super) fn about_the_line(action: &str) -> bool {
 pub(super) fn asked_for(action: &str, given: Arguments) -> Command {
     match action {
         PAUSING => {
-            return Command::Downloads {
+            return Command::Downloads(lemonfiber_core::app::Downloading {
                 asked: Pausing::Pause,
                 offer: given.offer,
-            }
+            })
         }
         RESUMING => {
-            return Command::Downloads {
+            return Command::Downloads(lemonfiber_core::app::Downloading {
                 asked: Pausing::Resume,
                 offer: given.offer,
-            }
+            })
         }
         _ => {}
     }

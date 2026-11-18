@@ -451,10 +451,10 @@ fn always_reported() -> Vec<Command> {
             down: Some("20".to_owned()),
             ..BandwidthAsked::default()
         }),
-        Command::Downloads {
+        Command::Downloads(crate::app::Downloading {
             asked: crate::bandwidth::pausing::Pausing::Pause,
             offer: None,
-        },
+        }),
         Command::Uninstall(Removing {
             tier: crate::uninstall::Tier::Configuration,
             confirm: true,

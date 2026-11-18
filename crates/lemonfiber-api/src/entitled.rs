@@ -144,7 +144,7 @@ pub const fn callable_by_a_key(command: &Command) -> bool {
         Command::Restart(_)
             | Command::Doctor(Diagnosing { accept: None, .. })
             | Command::Update(_)
-            | Command::Downloads { .. }
+            | Command::Downloads(_)
     )
 }
 

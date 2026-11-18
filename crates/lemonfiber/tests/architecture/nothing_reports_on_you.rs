@@ -142,7 +142,7 @@ const NAMED: &[(&str, Reach, &str)] = &[
 /// is the other half of the question: nothing carries it anywhere.
 const MINTING: &[(&str, &str)] = &[
     (
-        "crates/lemonfiber-api/src/admission/claiming.rs",
+        "crates/lemonfiber-core/src/app/admitting/signing_in.rs",
         "the device name one household member's sign-in, or claim, is given at the media \
          server. Drawn fresh for every sign-in, held in memory with nothing but that sign-in's session, sent \
          only to the media server on this machine, and never written down or reused — so it \
@@ -154,6 +154,12 @@ const MINTING: &[(&str, &str)] = &[
         "the token every web request must carry, and the name a long job is redeemed by. Minted \
          per run, held in memory, and never written down — a second run of the surface issues \
          another",
+    ),
+    (
+        "crates/lemonfiber-core/src/app/admitting/sessions.rs",
+        "a session's secret, drawn fresh for every sign-in, handed only to whoever signed \
+         in, held in memory for the session's life and never written down, so it names one \
+         session and nothing about the installation, and the next sign-in carries another",
     ),
     (
         "crates/lemonfiber-core/src/keys.rs",

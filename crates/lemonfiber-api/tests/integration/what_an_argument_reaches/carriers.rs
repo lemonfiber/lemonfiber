@@ -251,7 +251,7 @@ fn carries_offer(command: &Command) -> bool {
         // And the actions a key may call, where the offer is what the call is checked
         // against: dropped, a moved restart, pause or update would go ahead unseen.
         Command::Restart(Restarting { offer, .. })
-        | Command::Downloads { offer, .. }
+        | Command::Downloads(lemonfiber_core::app::Downloading { offer, .. })
         | Command::Update(lemonfiber_core::update::run::Asked { offer, .. }) => {
             offer.as_deref() == Some(OFFER)
         }

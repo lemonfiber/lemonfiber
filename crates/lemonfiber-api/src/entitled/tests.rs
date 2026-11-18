@@ -230,10 +230,10 @@ fn an_act_key_calls_exactly_what_a_key_may_call() {
         may(&acting, Door::Acting, a_restart()),
         Permitted::This(a_restart())
     );
-    let downloads = Command::Downloads {
+    let downloads = Command::Downloads(lemonfiber_core::app::Downloading {
         asked: lemonfiber_core::bandwidth::Pausing::Pause,
         offer: None,
-    };
+    });
     assert_eq!(
         may(&acting, Door::Acting, downloads.clone()),
         Permitted::This(downloads)

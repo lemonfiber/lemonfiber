@@ -247,7 +247,7 @@ const fn viewed(viewing: &Viewing) -> Asked {
 }
 
 /// What a certificate replacement reports, replacing nothing.
-const fn certified() -> Asked {
+const fn reissued() -> Asked {
     reports("companion certificate", CERTIFICATE)
 }
 
@@ -284,7 +284,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Companion(Pairing::Pair) => cannot("companion pair", MATERIAL_IS_MATERIAL),
         // Unconfirmed it already is the rehearsal: what replacing costs, and nothing
         // replaced.
-        Command::Companion(Pairing::Certificate { .. }) => certified(),
+        Command::Companion(Pairing::Certificate { .. }) => reissued(),
         Command::Explain { .. } => reads("explain"),
         Command::Glossary => reads("glossary"),
         Command::Clients => reads("clients"),
@@ -365,7 +365,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Space(_) => reports("space", &[kind::SPACE]),
         Command::StopSeeding(_) => reports("stop-seeding", &[kind::STOP_SEEDING]),
         Command::Bandwidth(_) => reports("bandwidth", &[kind::BANDWIDTH]),
-        Command::Downloads { .. } => reports("downloads", &[kind::PAUSING]),
+        Command::Downloads(_) => reports("downloads", &[kind::PAUSING]),
         Command::Keys(asked) => keyed::keyed(asked),
         Command::DeviceKeys(asked) => keyed::devices(asked),
         Command::PushEndpoints(asked) => keyed::pushing(asked),

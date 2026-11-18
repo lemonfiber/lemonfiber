@@ -106,10 +106,10 @@ pub(crate) mod watcher;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Diagnosing, Doorway, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, Live,
-    MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs, Reclaiming, Removing,
-    Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom, Wishing,
-    HOSTABLE,
+    Diagnosing, Doorway, Downloading, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo,
+    Linking, Live, MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs, Reclaiming,
+    Removing, Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom,
+    Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -482,7 +482,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // And the same shape over the line rather than the disk: asked nothing it
         // reads, asked for a limit it declares one and tells every client.
         Command::Bandwidth(asked) => bandwidth::shared(ctx, &asked).await,
-        Command::Downloads { asked, offer } => bandwidth::pausing::paused(ctx, asked, offer).await,
+        Command::Downloads(asked) => bandwidth::pausing::paused(ctx, asked).await,
         Command::Keys(asked) => crate::keys::run::asked(ctx, asked).await,
         Command::DeviceKeys(asked) => crate::device_keys::run::asked(ctx, asked).await,
         Command::PushEndpoints(asked) => crate::push::run::asked(ctx, asked),

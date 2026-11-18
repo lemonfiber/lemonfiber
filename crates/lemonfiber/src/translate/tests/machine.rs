@@ -588,19 +588,19 @@ fn a_pause_and_a_resume_each_reach_every_download_client() {
             action: DownloadsCommand::Pause,
             offer: None,
         }),
-        Command::Downloads {
+        Command::Downloads(lemonfiber_core::app::Downloading {
             asked: Pausing::Pause,
             offer: None,
-        }
+        })
     );
     assert_eq!(
         super::super::pausing(&RawDownloads {
             action: DownloadsCommand::Resume,
             offer: Some("1a2b3c4d".to_owned()),
         }),
-        Command::Downloads {
+        Command::Downloads(lemonfiber_core::app::Downloading {
             asked: Pausing::Resume,
             offer: Some("1a2b3c4d".to_owned()),
-        }
+        })
     );
 }

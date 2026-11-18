@@ -37,11 +37,9 @@ fn every_answer_about_a_caller_reads_as_the_guard_reads_it() {
 
 #[test]
 fn a_typed_password_is_what_the_core_is_told_when_it_asks() {
-    let ctx = typed(
-        &lemonfiber_testing::a_context().build(),
-        "chosen".to_owned(),
-    );
+    let password = lemonfiber_fixtures::passwords::a_password();
+    let ctx = typed(&lemonfiber_testing::a_context().build(), password.clone());
     assert!(ctx.asking.present());
-    assert_eq!(ctx.asking.secret("password"), "chosen");
+    assert_eq!(ctx.asking.secret("password"), password);
     assert_eq!(ctx.asking.ask("anything"), "");
 }

@@ -20,15 +20,13 @@ use crate::config::store::Failure;
 use crate::error::{Diagnose, Problem};
 use crate::instant::Instant;
 use crate::journal::{Change, Kind};
-use crate::keys::names_a_key;
 
 use super::identity::{self, AppIdentity};
-use super::{Attestation, Kept, Listed, Listing, PublicKey, Record, Registered, FILE};
+use super::{Attestation, Kept, Listed, Listing, Record, FILE};
 use heard::{heard, Heard, Revoked};
-use refused::{
-    bad_name, key_taken, name_taken, no_attestation, not_p256, not_registered, nowhere, unproved,
-};
 pub use refused::{challenge_not_standing, no_challenge, signature_wrong};
+use refused::{not_registered, nowhere};
+pub use registering::{challenged, register};
 
 /// What was asked of the device keys.
 #[derive(Clone, PartialEq, Eq)]
@@ -126,99 +124,6 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             .await
             .map(|issued| Outcome::Admitting(crate::app::admitting::Answer::Challenge(issued))),
     }
-}
-
-/// A challenge for the device key holding `name` to sign, issued to `session`.
-///
-/// # Errors
-///
-/// A [`Problem`] where no active device key holds the name, or this machine supplies no
-/// randomness to draw one from.
-pub async fn challenged(
-    ctx: &Ctx,
-    name: &str,
-    session: &str,
-) -> Result<super::Challenged, Box<Problem>> {
-    standing(ctx, name).await?;
-    let issued = ctx
-        .admitting
-        .challenges
-        .issued(
-            ctx.seams.random.as_ref(),
-            session,
-            name,
-            ctx.seams.clock.now(),
-        )
-        .await
-        .ok_or_else(|| Box::new(no_challenge()))?;
-    Ok(super::Challenged {
-        challenge: issued.challenge,
-        expires: Instant::of(issued.expires),
-    })
-}
-
-/// Register a device key, once its attestation vouches for it.
-///
-/// # Errors
-///
-/// A [`Problem`] where the name cannot name one or is taken, the public half is not a
-/// P-256 key or is registered already, the attestation is missing, does not verify,
-/// places the key in software or names an app this stack does not trust, or the record
-/// or the journal cannot be read or written.
-pub async fn register(
-    ctx: &Ctx,
-    name: &str,
-    public_key: &str,
-    attestation: Option<&Attestation>,
-) -> Result<Registered, Box<Problem>> {
-    if !names_a_key(name) {
-        return Err(Box::new(bad_name(name)));
-    }
-    let key = PublicKey::read(public_key).ok_or_else(|| Box::new(not_p256()))?;
-    let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let under = password(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let Some(attestation) = attestation else {
-        return Err(refused(ctx, name, no_attestation()).await);
-    };
-    let trusted = trusted(ctx).map_err(|failure| Box::new(failure.problem()))?;
-    let now = ctx.seams.clock.now();
-    let attested = match attestation.verified(&key, &trusted, now) {
-        Ok(attested) => attested,
-        Err(why) => return Err(refused(ctx, name, unproved(&why)).await),
-    };
-    let record = Record {
-        name: name.to_owned(),
-        public_key: key.written(),
-        fingerprint: key.fingerprint(),
-        backing: attested.backing,
-        app: attested.app.written(),
-        registered: Instant::of(now),
-        under,
-        used: None,
-        revoked: None,
-    };
-    let added = record.clone();
-    changed(ctx, &path, move |ctx, kept| {
-        if let Some(held) = kept.named(&added.name) {
-            return Err(Box::new(name_taken(held)));
-        }
-        if let Some(held) = kept.holding(&added.fingerprint) {
-            return Err(Box::new(key_taken(held)));
-        }
-        journalled(
-            ctx,
-            &added.name,
-            Kind::DeviceKeyRegistered {
-                name: added.name.clone(),
-                backing: added.backing.written().to_owned(),
-            },
-        )?;
-        kept.keys.push(added.clone());
-        Ok(())
-    })
-    .await?;
-    heard(ctx, &record, &Heard::Registered).await;
-    Ok(Registered::from(&record))
 }
 
 /// Every device key this machine has registered.
@@ -575,6 +480,7 @@ fn journalled(ctx: &Ctx, name: &str, kind: Kind) -> Result<(), Box<Problem>> {
 
 mod heard;
 mod refused;
+mod registering;
 
 #[cfg(test)]
 mod tests;

@@ -16,6 +16,7 @@ mod bandwidth;
 mod credentials;
 mod diagnosing;
 mod doorway;
+mod downloading;
 mod filling;
 mod gathering;
 mod hosting;
@@ -43,6 +44,7 @@ pub use bandwidth::BandwidthAsked;
 pub use credentials::Asking;
 pub use diagnosing::Diagnosing;
 pub use doorway::Doorway;
+pub use downloading::Downloading;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
@@ -450,14 +452,7 @@ pub enum Command {
     /// setting and does not apply it looks exactly like one that did.
     Bandwidth(BandwidthAsked),
     /// Pause every download client the stack runs, or let them all fetch again.
-    Downloads {
-        /// Which of the two.
-        asked: crate::bandwidth::Pausing,
-        /// The offer a rehearsal answered, where the request carries one back: no client
-        /// is told anything where the clients, or what each said it was doing, have
-        /// moved. None acts as without one.
-        offer: Option<String>,
-    },
+    Downloads(Downloading),
     /// Mint, list or revoke the keys another program reaches the web surface with.
     Keys(crate::keys::run::Asked),
     /// Register, list or revoke the keys a phone proves the operator with.
