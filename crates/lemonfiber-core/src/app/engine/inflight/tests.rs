@@ -65,6 +65,31 @@ async fn both_clients_say_what_they_are_working_on() {
 }
 
 /// Naming a finished download would be warning about work stopping cannot undo.
+/// What is in flight is read through the dispatcher as the same answer, under its own kind.
+#[tokio::test]
+async fn what_is_in_flight_is_read_through_dispatch() {
+    let fake = usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
+    let env = env_without_password("in-flight-dispatched");
+    let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
+
+    let direct = in_flight(&ctx, &named(&["dl"])).await;
+    let read = crate::app::dispatch(
+        crate::app::Command::InFlight {
+            forms: named(&["dl"]),
+        },
+        &ctx,
+    )
+    .await;
+
+    assert!(!direct.is_empty());
+    assert_eq!(
+        read,
+        Ok(crate::app::Outcome::InFlight(super::InFlightReport {
+            downloads: direct
+        }))
+    );
+}
+
 #[tokio::test]
 async fn a_download_that_has_finished_is_not_in_flight() {
     let fake = usenet::beside_torrents(&[torrent::finished()], &[]);

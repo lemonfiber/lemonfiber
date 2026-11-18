@@ -579,7 +579,6 @@ that it is a fault of the stack.
 | `SETUP-3` | `NOT_REMOVED` | error | 1 | 500 | 0.2.0 | Raised when a directory from an interrupted apply could not be removed. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SETUP-4` | `NEEDS_SERVICE` | error | 1 | 500 | 0.2.0 | Raised when reversing needs the service that made a change. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SETUP-5` | `DOES_NOT_APPLY` | error | 1 | 400 | 0.2.0 | Raised when an answer is not meaningful on the platform setup is running on. | A fault of the stack: not working right now, with whoever runs the house told. |
-| `SETUP-6` | `ALREADY_UNDERWAY` | error | 1 | 500 | 0.2.0 | Raised when setup is asked to gather answers for a wizard already past it. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SETUP-7` | `ALREADY_SET_UP` | error | 1 | 400 | 0.9.0 | Raised when setup is answered on a machine that is already set up. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SETUP-8` | `NOTHING_TO_RECOVER` | error | 1 | 400 | 0.9.0 | Raised when a recovery is asked for and no apply stopped part-way. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SETUP-9` | `NOT_PUT_BACK` | warning | 1 | 500 | 0.9.0 | Raised when a reversal would write over a setting the operator has since chosen. | A fault of the stack: not working right now, with whoever runs the house told. |
@@ -736,4 +735,4 @@ that it is a fault of the stack.
 
 ## Retired
 
-Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`, `STACK-3`, `WISH-14`.
+Published once, raised by nothing, and never given to another problem: `CONFIG-7`, `QUOTA-3`, `SETUP-6`, `STACK-3`, `WISH-14`.

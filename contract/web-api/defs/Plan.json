@@ -28,6 +28,20 @@
         "type": "string"
       }
     },
+    "installing": {
+      "description": "Each part this build carries that the forms hold and this machine has never run,\noffered as an install from the build before a start writes anything; answered by\n[`Self::offer`]. Empty on every plan but a preview's.",
+      "type": "array",
+      "items": {
+        "$ref": "UpInstallOffered.json"
+      }
+    },
+    "offer": {
+      "description": "The offer a start answers to take every install in [`Self::installing`], where it\ncould be read.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "profiles": {
       "description": "The profiles to activate, sorted so the command is reproducible.",
       "type": "array",

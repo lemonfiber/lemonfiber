@@ -1,13 +1,9 @@
 //! Driving the setup wizard to a working configuration.
 //!
-//! The wizard decides what to ask; a [`Prompt`] answers it, and this walks the two
-//! together — asking each question the wizard presents here, in order, until every
-//! one is answered, then applying what was gathered once the operator confirms it.
-//!
-//! The asking is a port, so the whole walk is driven in a test by a prompt that
-//! answers from a script, with no terminal; a real one reads a line and renders.
-//! Starting the stack and recovering an interrupted apply join this once there is
-//! a surface to show their progress.
+//! The wizard decides what to ask; every surface walks it one step at a time through
+//! [`SetupAction`], and this holds what those steps share: the egress guard the VPN
+//! step asks of, the progress file between steps, and the apply and recovery that
+//! turn the answers into configuration.
 
 mod answering;
 mod guarding;
@@ -15,26 +11,21 @@ mod proving;
 
 pub use answering::{setup, SetupAction};
 pub(crate) use guarding::checking;
-pub use guarding::{Asking, Guard};
-use proving::{resolve_credentials, resolve_location, resolve_provider, resolve_vpn};
+pub use guarding::{asked, Asking, Guard};
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::alert::Appetite;
 use crate::app::apply::{self, Applying};
 use crate::config::paths::Paths;
-use crate::config::{store, Protocols};
+use crate::config::store;
 use crate::error::codes::setup::{
-    ALREADY_SET_UP, ALREADY_UNDERWAY, DOES_NOT_APPLY, GUARD_UNANSWERED, NOTHING_TO_RECOVER,
-    NOT_REVIEWED,
+    ALREADY_SET_UP, DOES_NOT_APPLY, GUARD_UNANSWERED, NOTHING_TO_RECOVER, NOT_REVIEWED,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy};
-use crate::ports::filesystem::FileSystem;
-use crate::prerequisites::{prerequisites, PrerequisiteMap};
-use crate::validate::{Validation, Validator};
+use crate::model::SetUp;
 use crate::wizard::{
-    described, Answer, Choice, Library, Phase, Plan, Progress, Recovery, Rejected, Resolution,
-    Step, Vpn, Wizard,
+    described, offer_setup, Choice, Phase, Progress, Recovery, Rejected, Resolution, Status, Vpn,
+    Wizard,
 };
 
 /// Every refusal answering, applying or recovering setup answers with, which a client
@@ -46,189 +37,6 @@ pub const REFUSALS: [Code; 5] = [
     NOTHING_TO_RECOVER,
     GUARD_UNANSWERED,
 ];
-
-/// How the operator is asked the questions the wizard cannot answer itself.
-///
-/// One method per question the wizard asks. A platform-aware implementation offers
-/// only the choices that apply where it runs, so an answer the wizard would reject
-/// is never gathered. Faked in tests; a real one reads and renders.
-pub trait Prompt {
-    /// Which download protocols to use: Usenet, torrents, both, or neither.
-    fn protocols(&self) -> Protocols;
-    /// Show the operator the accounts their protocol choice needs, before any is
-    /// asked for — derived from what they chose, and nothing they declined.
-    fn prerequisites(&self, map: &PrerequisiteMap);
-    /// Whether a VPN will carry the torrent traffic. Asked only where torrents
-    /// were chosen, and after the checklist has said what one is for.
-    fn vpn(&self) -> bool;
-    /// One question of the egress guard a VPN carries the torrents through, as
-    /// [`Guard::asked`] puts it: one of the values offered, a setting's value, or a
-    /// secret read without echo and never printed back; nothing to leave it unanswered.
-    fn guard(&self, asking: &Asking<'_>) -> Option<String>;
-    /// Torrents were chosen and nothing will carry them: state what that exposes
-    /// and ask whether to go on anyway (`true`) or reconsider (`false`). Going on
-    /// is always available — this warns, it never refuses.
-    fn unprotected(&self) -> bool;
-    /// Where the library and downloads are kept.
-    fn data_location(&self) -> PathBuf;
-    /// The chosen location was just tested and it hardlinks — report the good
-    /// result, so the operator sees the test happen rather than a silent pause.
-    /// `inferred_from` is the parent the test actually ran against where the
-    /// location did not exist yet, so an answer proven on a parent is shown as
-    /// inferred rather than as the chosen path's own proven capability.
-    fn hardlinks(&self, path: &Path, inferred_from: Option<&Path>);
-    /// The chosen location cannot be used for instant, space-free imports: state
-    /// what was found and its consequence, and ask whether to use it anyway
-    /// (`true`) or name another location (`false`). The storage *mode* is never
-    /// asked — it follows from what the location can do; only the location is the
-    /// operator's to choose.
-    fn storage_warning(&self, path: &Path, warning: &StorageWarning) -> bool;
-    /// Ask for the indexer's URL and API key, or nothing where the operator has
-    /// none to give now. The key is read without echo and never printed back — the
-    /// review shows it redacted.
-    fn credential(&self) -> Option<(String, String)>;
-    /// The credential was proven — report the capability observed while proving it,
-    /// so the operator sees the test succeed rather than a silent pass.
-    fn credential_valid(&self, observed: &str);
-    /// The credential could not be proven: show what the live test came to, told
-    /// apart by cause, and ask whether to try again, proceed with it unverified, or
-    /// leave it unset for now.
-    fn credential_failed(&self, outcome: &Validation) -> CredentialChoice;
-    /// Ask for the Usenet provider's host, port, login and TLS, or nothing where
-    /// the operator has none to give now. The password is read without echo and
-    /// never printed back — the review shows it redacted. Its live test reports
-    /// through [`Prompt::credential_valid`] and [`Prompt::credential_failed`], the
-    /// same as the indexer's.
-    fn usenet_provider(&self) -> Option<ProviderEntry>;
-    /// The user and group the containers run as, asked only where ownership shows;
-    /// `None` where the operator declines and the image's own default is kept.
-    fn service_user(&self) -> Option<(u32, u32)>;
-    /// Whether to run the media server, and how.
-    fn library(&self) -> Library;
-    /// Whether others in the home will use it.
-    fn household(&self) -> bool;
-    /// How much the operator wants to be told about — one question, three presets,
-    /// never a checklist of every event.
-    fn notifications(&self) -> Appetite;
-    /// Whether the stack starts on boot.
-    fn autostart(&self) -> bool;
-    /// Whether the operator, shown the plan, confirms it.
-    fn confirm(&self, plan: &Plan) -> bool;
-}
-
-/// Why a chosen data location is less than ideal, put to the operator so the
-/// decision to use it anyway is theirs and informed — never a silent downgrade.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StorageWarning {
-    /// The location works, but cannot hardlink: imports will copy. `limitation`
-    /// names the filesystem reason where lemonfiber can state it — exFAT, a
-    /// network share — and is absent where the type explains nothing.
-    CopyOnly {
-        /// The named reason the filesystem cannot link, where there is one.
-        limitation: Option<String>,
-    },
-    /// The location could not be tested for hardlinks at all — it is not there
-    /// yet and neither is any parent, or it could not be written — with the
-    /// platform's own words for why.
-    Untested {
-        /// Why the test could not be run.
-        reason: String,
-    },
-}
-
-/// A Usenet provider login as the operator enters it, before it is proven — the
-/// same fields the wizard keeps, without the `validated` the test decides.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProviderEntry {
-    /// The provider's hostname.
-    pub host: String,
-    /// The port it answers NNTP on.
-    pub port: u16,
-    /// The account username.
-    pub user: String,
-    /// The account password.
-    pub pass: String,
-    /// Whether to connect over TLS.
-    pub tls: bool,
-}
-
-/// What the operator does with a credential the live test could not prove.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CredentialChoice {
-    /// Enter it again and test it afresh.
-    Retry,
-    /// Keep it as it is, unverified, and go on — it is their machine to do so.
-    Proceed,
-    /// Leave it unset for now.
-    Skip,
-}
-
-/// How a run of setup ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Outcome {
-    /// The reviewed answers were applied.
-    Applied,
-    /// The operator saw the plan and chose not to apply it.
-    Abandoned,
-}
-
-impl From<Outcome> for crate::model::SetupOutcome {
-    fn from(outcome: Outcome) -> Self {
-        match outcome {
-            Outcome::Applied => Self::Applied,
-            Outcome::Abandoned => Self::Abandoned,
-        }
-    }
-}
-
-/// Gather answers through `prompt`, and — if the operator confirms the plan they
-/// make — apply them.
-///
-/// # Errors
-///
-/// Returns a [`Problem`] where the wizard is past gathering (a run to review,
-/// apply, or recover is not this), where an answer does not apply on this platform
-/// (a prompt that offered a choice the wizard rejects), or where applying the
-/// confirmed answers fails — the marker left for recovery in that case.
-pub async fn run(
-    wizard: &mut Wizard,
-    (prompt, guard): (&dyn Prompt, Option<&Guard>),
-    filesystem: &dyn FileSystem,
-    validator: &dyn Validator,
-    applying: &Applying<'_>,
-) -> Result<Outcome, Box<Problem>> {
-    // Only a wizard still gathering is driven here. One that has been reviewed,
-    // is part-way through an interrupted apply, or is already applied must be
-    // routed by its caller — resumed, recovered, or pointed at reconfiguration —
-    // because re-applying it would write over the very journal a recovery reads.
-    if wizard.phase() != Phase::InProgress {
-        return Err(Box::new(already_underway()));
-    }
-    if guarded(wizard, guard).is_err() {
-        save(wizard, applying.paths);
-    }
-    gather(
-        wizard,
-        (prompt, guard),
-        filesystem,
-        validator,
-        applying.paths,
-    )
-    .await?;
-
-    if !prompt.confirm(&wizard.plan()) {
-        return Ok(Outcome::Abandoned);
-    }
-
-    // A gathering wizard whose questions are all answered moves into review, and
-    // from there apply carries the lifecycle on. The two preconditions the move
-    // needs — the phase and a complete set of answers — are the guard above and
-    // gathering itself, so it always takes here.
-    wizard.transition(Phase::Reviewing);
-    apply::apply(wizard, applying)?;
-    clear_progress(applying.paths);
-    Ok(Outcome::Applied)
-}
 
 /// The service filling `network.egress-guard` in the stack `ctx` sets up, where one does:
 /// what setup's VPN step asks of it.
@@ -263,6 +71,22 @@ pub(crate) fn guarded(wizard: &mut Wizard, guard: Option<&Guard>) -> Result<(), 
     checking(guard, given)
         .map(drop)
         .inspect_err(|_| wizard.reask_vpn())
+}
+
+/// Whether the machine `paths` lays out is set up, given the progress a previous run
+/// saved there.
+///
+/// A run to pick up beats a machine that looks configured, and is asked first for that
+/// reason: an apply that stopped part-way has written settings that the configured-yet
+/// question reads as a finished install.
+pub(crate) fn set_up(saved: Option<&Progress>, paths: &Paths) -> SetUp {
+    if Status::of(saved).unfinished() {
+        SetUp::PartWay
+    } else if offer_setup(paths.env_file().exists()) {
+        SetUp::None
+    } else {
+        SetUp::Done
+    }
 }
 
 /// The setup progress saved at `path`, or nothing where none is there or it does
@@ -381,104 +205,6 @@ pub fn written_so_far(paths: &Paths) -> Vec<String> {
     }
 }
 
-/// Ask each question the wizard presents here and has no answer for yet, in order.
-///
-/// A question that does not apply on this platform, or that a resumed run already
-/// answered, is passed over rather than asked again.
-/// How one question is put to a prompt: the answer it gives for that step.
-///
-/// The data location is asked apart from the rest ([`How::Location`]) because its
-/// answer is not merely read: the chosen place is tested for hardlinks, and a
-/// place that cannot link is put back to the operator to accept or replace before
-/// it is recorded.
-enum How {
-    /// Read the answer straight from the prompt.
-    Sync(fn(&dyn Prompt) -> Answer),
-    /// Ask whether a VPN carries the torrents, and where none does, put what that
-    /// means to the operator before recording that they accepted it.
-    Vpn,
-    /// Ask for a data location and prove what it can do before recording it.
-    Location,
-    /// Ask for a credential and prove it against its live service before keeping it.
-    Credential,
-    /// Ask for a Usenet provider and prove its login before keeping it.
-    Provider,
-}
-
-async fn gather(
-    wizard: &mut Wizard,
-    (prompt, guard): (&dyn Prompt, Option<&Guard>),
-    filesystem: &dyn FileSystem,
-    validator: &dyn Validator,
-    paths: &Paths,
-) -> Result<(), Box<Problem>> {
-    // Each question is paired with how to ask it, so the walk is one loop: ask,
-    // record, and save before moving on, so quitting mid-setup resumes at the
-    // question reached rather than restarting. One loop keeps the recording a
-    // single `?` rather than one tucked inside each conditional.
-    let questions: [(Step, How); 10] = [
-        (
-            Step::Protocols,
-            How::Sync(|prompt| Answer::Protocols(prompt.protocols())),
-        ),
-        (Step::Vpn, How::Vpn),
-        (Step::DataLocation, How::Location),
-        (Step::Credentials, How::Credential),
-        (Step::Provider, How::Provider),
-        (
-            Step::ServiceUser,
-            How::Sync(|prompt| Answer::ServiceUser(prompt.service_user())),
-        ),
-        (
-            Step::Library,
-            How::Sync(|prompt| Answer::Library(prompt.library())),
-        ),
-        (
-            Step::Household,
-            How::Sync(|prompt| Answer::Household(prompt.household())),
-        ),
-        (
-            Step::Notifications,
-            How::Sync(|prompt| Answer::Notifications(prompt.notifications())),
-        ),
-        (
-            Step::Autostart,
-            How::Sync(|prompt| Answer::Autostart(prompt.autostart())),
-        ),
-    ];
-
-    for (step, how) in questions {
-        if !wants(wizard, step) {
-            continue;
-        }
-        let answer = match how {
-            How::Sync(ask) => ask(prompt),
-            How::Vpn => resolve_vpn(prompt, guard),
-            How::Location => Answer::DataLocation(resolve_location(prompt, filesystem).await),
-            How::Credential => resolve_credentials(prompt, validator).await,
-            How::Provider => resolve_provider(prompt, validator).await,
-        };
-
-        // The accounts a protocol needs are shown the moment the protocol is
-        // chosen — derived from that answer, ahead of the questions that follow —
-        // so the operator learns what they must go and obtain while there is still
-        // a run to come back to. Matched off the answer's own variant, so the
-        // choice's value is in hand without reaching back for an optional field.
-        if let Answer::Protocols(protocols) = &answer {
-            prompt.prerequisites(&prerequisites(*protocols));
-        }
-
-        if let Answer::Vpn(Vpn::Carrying(given)) = &answer {
-            checking(guard, given)?;
-        }
-        wizard
-            .answer(answer)
-            .map_err(|rejected| Box::new(does_not_apply(rejected)))?;
-        save(wizard, paths);
-    }
-    Ok(())
-}
-
 /// Save where the wizard has reached, so quitting mid-setup resumes rather than
 /// restarts.
 ///
@@ -504,11 +230,6 @@ fn clear_progress(paths: &Paths) {
     let _ = std::fs::remove_file(paths.setup_progress());
 }
 
-/// Whether a question applies here and is still unanswered — one to ask.
-fn wants(wizard: &Wizard, step: Step) -> bool {
-    wizard.applies(step) && !wizard.is_answered(step)
-}
-
 /// The problem of an answer that does not apply where setup is running.
 ///
 /// Setup only asks what applies here, so a rejection means a prompt offered a
@@ -521,16 +242,6 @@ fn does_not_apply(rejected: Rejected) -> Problem {
         Remedy::new("Answer with a choice this platform offers"),
     )
     .with_detail(format!("{rejected:?}"))
-}
-
-/// The problem of running setup on a wizard that is no longer gathering answers.
-fn already_underway() -> Problem {
-    Problem::new(
-        ALREADY_UNDERWAY,
-        "Setup is past the point of gathering answers",
-        "This wizard has already been reviewed, is part-way through applying, or is finished, so running it again here would write over what a recovery needs. Nothing has been changed.",
-        Remedy::new("Resume or recover the setup in progress, or reconfigure a finished one"),
-    )
 }
 
 #[cfg(test)]

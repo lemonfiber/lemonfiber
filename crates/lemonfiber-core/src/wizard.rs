@@ -30,7 +30,8 @@ mod recovery;
 mod steps;
 
 pub use answers::{
-    Answer, Answers, Credentials, Guarded, Indexer, Library, Provider, Rejected, Usenet, Vpn,
+    Answer, Answers, ContainerUser, Credentials, Guarded, Indexer, Library, Provider, Rejected,
+    Usenet, Vpn,
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
 pub use recovery::{described, Choice, Recovery, Resolution, Status};
@@ -85,10 +86,10 @@ impl Wizard {
         {
             self.progress.answers.library = None;
         }
-        if matches!(self.progress.answers.service_user, Some(Some(_)))
+        if matches!(self.progress.answers.service_user, ContainerUser::Set(..))
             && !self.environment.ownership_is_real()
         {
-            self.progress.answers.service_user = None;
+            self.progress.answers.service_user = ContainerUser::Unanswered;
         }
         if !self.applies(self.progress.at) {
             if let Some(rehomed) = self.neighbour(self.progress.at, Direction::Forward) {
@@ -169,7 +170,7 @@ impl Wizard {
                 if user.is_some() && !self.environment.ownership_is_real() {
                     return Err(Rejected::ServiceUserNotApplicable);
                 }
-                self.progress.answers.service_user = Some(user);
+                self.progress.answers.service_user = user.into();
             }
             Answer::Library(Library::Native) if !self.environment.offers_native_media_server() => {
                 return Err(Rejected::NativeMediaServerUnavailable);
@@ -249,7 +250,7 @@ impl Wizard {
             Step::DataLocation => answers.data_location.is_some(),
             Step::Credentials => !matches!(answers.credentials, Credentials::Unanswered),
             Step::Provider => !matches!(answers.usenet, Usenet::Unanswered),
-            Step::ServiceUser => answers.service_user.is_some(),
+            Step::ServiceUser => !matches!(answers.service_user, ContainerUser::Unanswered),
             Step::Library => answers.library.is_some(),
             Step::Household => answers.household.is_some(),
             Step::Notifications => answers.notifications.is_some(),
@@ -344,7 +345,7 @@ impl Wizard {
                 ));
             }
         }
-        if let Some(Some((uid, gid))) = answers.service_user {
+        if let ContainerUser::Set(uid, gid) = answers.service_user {
             settings.push((PUID_KEY.to_owned(), uid.to_string()));
             settings.push((PGID_KEY.to_owned(), gid.to_string()));
         }

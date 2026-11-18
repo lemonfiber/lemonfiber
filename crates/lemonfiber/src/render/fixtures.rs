@@ -239,6 +239,8 @@ pub(crate) fn a_plan(name: &str, dropped: Vec<Dropped>) -> Plan {
         footprint: lemonfiber_core::stack::closure::Footprint::default(),
         running: lemonfiber_core::stack::closure::Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     }
 }
 

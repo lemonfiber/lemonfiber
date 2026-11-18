@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "not": {
+      "type": [
+        "ref:Reason"
+      ],
+      "required": true
+    },
+    "offer": {
+      "type": [
+        "ref:Shape"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

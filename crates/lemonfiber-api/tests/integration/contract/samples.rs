@@ -3,6 +3,7 @@
 
 mod authoring;
 mod built;
+mod dispatched;
 mod healing;
 mod installed;
 mod keys;
@@ -32,7 +33,7 @@ use watching::{a_play, a_tune, the_channels, the_guide};
 /// One sample of every outcome, so each kind's description can be held against
 /// the document that kind actually writes.
 ///
-/// Gathered from six lists, one for each part of what the product does.
+/// Gathered from the lists of each part of what the product does.
 pub(crate) fn samples() -> Vec<Outcome> {
     let mut every = running();
     every.extend(diagnosing());
@@ -40,6 +41,7 @@ pub(crate) fn samples() -> Vec<Outcome> {
     every.extend(keeping());
     every.extend(notifying::samples());
     every.extend(authoring::samples());
+    every.extend(dispatched::samples());
     every
 }
 

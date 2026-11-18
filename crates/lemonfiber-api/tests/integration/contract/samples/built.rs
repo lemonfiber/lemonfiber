@@ -534,6 +534,8 @@ pub(super) fn a_setup_part_way() -> WizardReport {
             origin: lemonfiber_core::origin::Origin::Operator,
         }],
         written: Vec::new(),
+        setup: lemonfiber_core::model::SetUp::PartWay,
+        storage: None,
         proof: Some(lemonfiber_core::validate::Validation::Valid {
             observed: "the indexer answered with its capabilities".to_owned(),
         }),
@@ -640,6 +642,8 @@ pub(super) fn plan() -> Plan {
         footprint: lemonfiber_core::stack::closure::Footprint::default(),
         running: lemonfiber_core::stack::closure::Running::Unasked,
         vanished: Vec::new(),
+        installing: Vec::new(),
+        offer: None,
     }
 }
 

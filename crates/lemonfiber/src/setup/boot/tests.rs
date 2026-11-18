@@ -1,4 +1,4 @@
-use super::{afterwards, condition, gating, overall, preflight, start, wire, Wired};
+use super::{afterwards, condition, found, gating, overall, preflight, start, wire, Wired};
 use crate::exit::{shown, success};
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::config::Protocols;
@@ -82,6 +82,14 @@ static QUIET: lemonfiber_core::stack::Carried = lemonfiber_core::stack::Carried 
 /// What [`QUIET`] writes beside its manifest.
 static QUIET_FILES: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/quiet-stack");
+
+/// An answer that is not a diagnosis found nothing, which leaves the environment
+/// undetermined, and an undetermined environment stops setup.
+#[test]
+fn an_answer_that_is_no_diagnosis_leaves_the_environment_undetermined() {
+    let read = Outcome::Logs(lemonfiber_core::app::LogsReport { lines: 0 });
+    assert_eq!(overall(&gating(found(read))), Overall::Unknown);
+}
 
 #[test]
 fn only_a_lifecycle_says_what_the_stack_settled_to() {

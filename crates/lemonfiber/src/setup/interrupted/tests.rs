@@ -11,6 +11,11 @@ use lemonfiber_core::wizard::{Answer, Choice, Library, Phase, Vpn, Wizard};
 use super::{about_to, ask_recovery_choice, recover_setup};
 use crate::setup::tests::{ctx, working_ctx, Scripted};
 
+/// What the interrupted run wrote, read back the way setup's first step reads it.
+fn written(paths: &Paths) -> Vec<String> {
+    lemonfiber_core::app::setup::written_so_far(paths)
+}
+
 /// A scratch install unique to this test.
 fn scratch(name: &str) -> (lemonfiber_fixtures::scratch::Scratch, Paths) {
     let dir = lemonfiber_fixtures::scratch::Scratch::unmade(name);
@@ -132,7 +137,7 @@ async fn an_interrupted_apply_with_nobody_there_is_left_recoverable() {
         keeping(ctx(), &paths),
         &paths,
         &Scripted::saying(false, &[]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
     assert_ne!(shown(code), success());
@@ -150,7 +155,7 @@ async fn an_apply_that_wrote_nothing_says_so_rather_than_showing_an_empty_list()
         keeping(ctx(), &paths),
         &paths,
         &Scripted::saying(false, &[]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
 
@@ -164,7 +169,7 @@ async fn resuming_finishes_applying_from_where_it_stopped() {
         keeping(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &["1"]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
     // Finished, so nothing is left to resume — and *from where it stopped*, so
@@ -188,7 +193,7 @@ async fn rolling_back_undoes_what_was_written_and_applies_again() {
         keeping(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &["2"]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
     // Applied again rather than abandoned: the answers are still the answers, so
@@ -208,7 +213,7 @@ async fn starting_over_undoes_it_and_forgets_the_answers() {
         keeping(ctx(), &paths),
         &paths,
         &Scripted::saying(true, &["3"]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
     assert_eq!(shown(code), success());
@@ -230,36 +235,10 @@ async fn an_apply_that_cannot_be_carried_forward_says_why() {
         keeping(working_ctx(), &paths),
         &paths,
         &Scripted::saying(true, &["1"]),
-        progress_at(&paths),
+        written(&paths),
     )
     .await;
     assert_ne!(shown(code), success());
-}
-
-#[tokio::test(start_paused = true)]
-async fn an_apply_that_left_no_answers_begins_afresh() {
-    // A stopped apply always leaves its answers; if they are somehow gone there
-    // is nothing to resume from, so a fresh run is the honest fallback.
-    let (_scratch, paths) = scratch("no-answers");
-    let code = recover_setup(
-        keeping(ctx(), &paths),
-        &paths,
-        &Scripted::saying(false, &[]),
-        None,
-    )
-    .await;
-    // Afresh, and a fresh run with nobody there is told which flags it needs
-    // rather than reporting success over a walk nobody answered.
-    assert_ne!(shown(code), success());
-    assert!(
-        !paths.env_file().exists(),
-        "a run nobody answered wrote settings anyway"
-    );
-}
-
-/// What the interrupted run recorded, read back the way setup reads it.
-fn progress_at(paths: &Paths) -> Option<lemonfiber_core::wizard::Progress> {
-    lemonfiber_core::app::setup::progress_at(&paths.setup_progress())
 }
 
 #[tokio::test(start_paused = true)]
@@ -276,7 +255,7 @@ async fn an_undo_that_cannot_be_written_is_reported_rather_than_assumed() {
             keeping(ctx(), &paths),
             &paths,
             &Scripted::saying(true, &[answer]),
-            progress_at(&paths),
+            written(&paths),
         )
         .await;
         assert_ne!(shown(code), success(), "answering {answer}");

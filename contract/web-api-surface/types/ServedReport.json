@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "fingerprint": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "named": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "unrecorded": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

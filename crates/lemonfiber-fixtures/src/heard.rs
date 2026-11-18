@@ -3,6 +3,7 @@
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use lemonfiber_ports::docker::LogLine;
 use lemonfiber_ports::narration::Narrator;
 
 /// What a narrator watching something answers as each line is said.
@@ -15,6 +16,8 @@ pub struct Heard {
     said: Mutex<Vec<String>>,
     /// What a pull wrote.
     pulled: Mutex<Vec<String>>,
+    /// What each service wrote to its log, as it was handed on.
+    logged: Mutex<Vec<String>>,
     /// What it asks as each line is said, where it watches something.
     watching: Option<Watched>,
     /// What that answered for each line said.
@@ -63,6 +66,15 @@ impl Heard {
             .map(|pulled| pulled.clone())
             .unwrap_or_default()
     }
+
+    /// Every log line handed on so far.
+    #[must_use]
+    pub fn log_lines(&self) -> Vec<String> {
+        self.logged
+            .lock()
+            .map(|logged| logged.clone())
+            .unwrap_or_default()
+    }
 }
 
 #[async_trait]
@@ -73,6 +85,10 @@ impl Narrator for Heard {
 
     async fn pulled(&self, line: &str) {
         crate::noted(&self.pulled, line.to_owned());
+    }
+
+    async fn logged(&self, line: &LogLine) {
+        crate::noted(&self.logged, line.line.clone());
     }
 }
 

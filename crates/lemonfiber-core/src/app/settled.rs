@@ -9,10 +9,9 @@ use crate::config::env::EnvFile;
 use crate::config::store;
 use crate::config::Protocols;
 use crate::error::{Diagnose as _, Problem};
-use crate::model::{ServiceUser, SetUp, SettledReport, UserFrom};
+use crate::model::{ServiceUser, SettledReport, UserFrom};
 use crate::plugin::adapting::as_adapter;
 use crate::project::entry::{operated_ids, OperatedIds};
-use crate::wizard::Status;
 
 /// What setup settled, and whether this stack is set up.
 ///
@@ -25,13 +24,7 @@ pub(crate) async fn settled(ctx: &Ctx) -> Result<SettledReport, Box<Problem>> {
     };
     let env_file = paths.env_file();
     let saved = super::setup::progress_at(&paths.setup_progress());
-    let setup = if Status::of(saved.as_ref()).unfinished() {
-        SetUp::PartWay
-    } else if env_file.exists() {
-        SetUp::Done
-    } else {
-        SetUp::None
-    };
+    let setup = super::setup::set_up(saved.as_ref(), &paths);
     let file = store::read(&env_file)
         .map(|file| crate::settings::legacy::overlaid(ctx, file))
         .unwrap_or_default();

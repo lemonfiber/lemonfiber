@@ -117,7 +117,7 @@ async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
     crate::ui::run(
         ctx,
         asked,
-        &crate::keyboard::Keyboard,
+        std::sync::Arc::new(crate::keyboard::Keyboard),
         crate::EMBEDDED_APP,
         Box::pin(std::future::pending()),
     )

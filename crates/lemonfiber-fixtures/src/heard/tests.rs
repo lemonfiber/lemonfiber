@@ -1,3 +1,4 @@
+use lemonfiber_ports::docker::{LogLine, Stream};
 use lemonfiber_ports::narration::Narrator;
 
 use super::Heard;
@@ -20,5 +21,23 @@ async fn every_line_of_a_pull_is_kept_apart_from_what_was_said() {
     heard.say("waiting").await;
 
     assert_eq!(heard.pull_lines(), vec!["library Pulling".to_owned()]);
+    assert_eq!(heard.said(), vec!["waiting".to_owned()]);
+}
+
+#[tokio::test]
+async fn every_log_line_is_kept_apart_from_what_was_said() {
+    let heard = Heard::default();
+
+    heard
+        .logged(&LogLine {
+            service: "jellyfin".to_owned(),
+            stream: Stream::Stdout,
+            stamped: None,
+            line: "started".to_owned(),
+        })
+        .await;
+    heard.say("waiting").await;
+
+    assert_eq!(heard.log_lines(), vec!["started".to_owned()]);
     assert_eq!(heard.said(), vec!["waiting".to_owned()]);
 }

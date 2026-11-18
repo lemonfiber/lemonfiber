@@ -201,7 +201,9 @@ pub(super) fn certified(offered: Offered, fingerprint: &str) -> Vec<String> {
 pub(crate) fn reverted() -> Vec<String> {
     vec![
         String::new(),
-        format!("The password for {PRODUCT}'s web interface is gone, so this is no longer offered to your network."),
+        format!(
+            "The password for {PRODUCT}'s web interface is gone, so this is no longer offered to your network."
+        ),
         "Nothing on the network was let in from the moment it went — every request is \
          checked against the password as it stands, and there is none."
             .to_owned(),

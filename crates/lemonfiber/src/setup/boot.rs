@@ -7,13 +7,13 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{diagnose, dispatch, unforwarded, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, unforwarded, Command, Ctx, Diagnosing, Outcome};
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{autostart, overall, Category, Finding, Narrowing, Overall};
 use lemonfiber_core::model::DoctorReport;
 use lemonfiber_core::PRODUCT;
 
-use crate::engine::pull_showing;
+use crate::engine::{dispatched, pull_showing};
 use crate::exit::{complain, settled, PREFLIGHT};
 use crate::render::render;
 
@@ -36,12 +36,12 @@ const STARTER_FORM: &str = "tv";
 /// or undetermined result stops setup before a single question is asked; a healthy
 /// one passes without a word.
 pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
-    // Asked for as a report rather than through the command enum: a dispatched
-    // diagnosis comes back as an outcome that has to be destructured, with an arm
-    // for every answer it could never be.
-    let report = diagnose(ctx, &Narrowing::Category(Category::Environment), false)
-        .await
-        .map_err(|problem| complain(&problem))?;
+    let asked = Command::Doctor(Diagnosing {
+        narrowing: Narrowing::Category(Category::Environment),
+        disruptive: false,
+        accept: None,
+    });
+    let found = found(dispatched(asked, ctx).await?);
 
     // Whether this machine would bring the stack back after a restart is in this
     // family and is not this question. It answers `enabled-unverified` wherever a
@@ -50,7 +50,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
     // Left in, somebody who had answered yes to autostart could not run setup again.
     // Re-summed rather than judged on the verdict that came back, because a word about
     // findings that are no longer here is not a word about these.
-    let findings = gating(report.findings);
+    let findings = gating(found);
     let report = DoctorReport {
         rehearsed: false,
         overall: overall(&findings),
@@ -63,6 +63,15 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
         return Err(ExitCode::from(PREFLIGHT));
     }
     Ok(())
+}
+
+/// What a diagnosis found, and nothing where the answer is not one, which leaves the
+/// environment undetermined.
+fn found(answered: Outcome) -> Vec<Finding> {
+    match answered {
+        Outcome::Doctor(report) => report.findings,
+        _ => Vec::new(),
+    }
 }
 
 /// The findings that decide whether setup can go on at all.
@@ -88,28 +97,29 @@ fn gating(findings: Vec<Finding>) -> Vec<Finding> {
 /// never arrived. What came up is then wired, so a first run ends with services
 /// that already know each other rather than with one more command to find.
 pub(super) async fn start(ctx: &Ctx, surface: &dyn Surface) -> ExitCode {
+    started(ctx, surface)
+        .await
+        .unwrap_or_else(std::convert::identity)
+}
+
+/// What starting came to, or the exit a refused pull or start was said with.
+async fn started(ctx: &Ctx, surface: &dyn Surface) -> Result<ExitCode, ExitCode> {
     let forms = vec![STARTER_FORM.to_owned()];
-    if let Err(code) = pull_showing(ctx, &forms, false).await {
-        return code;
-    }
+    pull_showing(ctx, &forms, false).await?;
 
     let offer = crate::installing::answered(ctx, &forms, surface.interactive(), &|asked| {
         surface.line(asked)
     })
     .await;
-    match dispatch(Command::Up { forms, offer }, ctx).await {
-        Ok(outcome) => {
-            render(&outcome, false);
-            wire(ctx, condition(&outcome)).await;
-            for line in afterwards(ctx).await {
-                say!("{line}");
-            }
-            // The offer is the last thing setup does, and it needs to know what the stack
-            // actually settled to — which is right here, and nowhere else afterwards.
-            first_content::offer(ctx, surface, condition(&outcome), settled(&outcome)).await
-        }
-        Err(problem) => complain(&problem),
+    let outcome = dispatched(Command::Up { forms, offer }, ctx).await?;
+    render(&outcome, false);
+    wire(ctx, condition(&outcome)).await;
+    for line in afterwards(ctx).await {
+        say!("{line}");
     }
+    // The offer is the last thing setup does, and it needs to know what the stack
+    // actually settled to — which is right here, and nowhere else afterwards.
+    Ok(first_content::offer(ctx, surface, condition(&outcome), settled(&outcome)).await)
 }
 
 /// Connect the services that came up to each other, as `seed` does, and say how each

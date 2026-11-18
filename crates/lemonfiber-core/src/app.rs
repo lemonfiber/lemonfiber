@@ -70,6 +70,7 @@ pub(crate) mod materialise;
 pub mod members;
 pub(crate) mod music;
 pub(crate) mod outbox;
+pub mod password;
 pub(crate) mod playing;
 pub mod plugins;
 pub(crate) mod preflight;
@@ -103,8 +104,9 @@ pub(crate) mod watcher;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Doorway, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo, Linking, Live,
-    MigrateAction, PlayFrom, QualityAction, Queueing, Reclaiming, Removing, Restarting, Restoring,
-    Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
+    MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs, Reclaiming, Removing,
+    Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom, Wishing,
+    HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -116,8 +118,9 @@ pub use setup::SetupAction;
 // The log-following reads a surface streams from live outside dispatch, so they are the
 // engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{
-    claimed, diagnose, in_flight, logs, offline, pull_progress, released, start_progress, started,
-    unstarted, Claim, Containers, InstallOffered, Interrupted, Offline, Waiting, INSTALL_REFUSALS,
+    claimed, diagnose, in_flight_report, logs, offline, pull_progress, released, start_progress,
+    started, unstarted, Claim, Containers, InFlightReport, InstallOffered, LogsReport, Offline,
+    Unfinished, Waiting, INSTALL_REFUSALS,
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
@@ -311,7 +314,7 @@ async fn mended(
 /// for and this command cannot give one.
 pub async fn dispatch(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
     rehearsal::permitted(&command, ctx)?;
-    if !matches!(command, Command::Authoring(_)) {
+    if !rehearsal::unsettled(&command) {
         stack_first(&command, ctx).await;
         // Last, so that the sentence nearest the acting is the one about what acting
         // costs: what a failed restart left is news from a run nobody saw; this is
@@ -457,6 +460,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
         Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),
         Command::Authoring(asked) => authoring::answered(ctx, asked).await,
+        Command::Password => password::set(ctx).await,
         // The one read here that cannot fail, and the requirement is that it cannot:
         // an availability check another command could be blocked by would be one this
         // product had made a precondition of itself.
@@ -484,6 +488,12 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // Said onto whatever the surface is listening with, which is how a walk is
         // watched rather than read afterwards.
         Command::Walkthrough { item } => walked(ctx, item).await,
+        Command::WalkthroughOffer => worth_offering(ctx).await.map(Outcome::WalkthroughOffer),
+        Command::Logs(asked) => engine::read_logs(ctx, &asked).await.map(Outcome::Logs),
+        Command::Served(served) => crate::companion::served::serving(ctx, served)
+            .await
+            .map(Outcome::Served),
+        Command::InFlight { forms } => Ok(Outcome::InFlight(in_flight_report(ctx, &forms).await)),
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Uninstall(how) => uninstall::uninstall(ctx, how).await.map(Outcome::Uninstall),

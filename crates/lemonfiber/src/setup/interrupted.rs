@@ -11,19 +11,19 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{dispatch, setup as core_setup, Command, Ctx, SetupAction};
+use lemonfiber_core::app::{dispatch, Command, Ctx, SetupAction};
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::wizard::{Choice, Progress};
+use lemonfiber_core::wizard::Choice;
 use lemonfiber_core::PRODUCT;
 
 use super::boot::start;
-use super::{fresh_setup, Surface};
+use super::Surface;
 use crate::context::settings_at;
 use crate::exit::{complain, USAGE};
-use crate::prompt::SetupFlags;
 use crate::say::{complain, say};
 
-/// Offer the operator a way out of a setup whose apply stopped part-way.
+/// Offer the operator a way out of a setup whose apply stopped part-way, having
+/// written `written`.
 ///
 /// It is shown what the interrupted run wrote and given the three ways forward the
 /// wizard keeps recoverable: finish it, undo and redo it, or undo and forget it.
@@ -33,19 +33,9 @@ pub(super) async fn recover_setup(
     mut ctx: Ctx,
     paths: &Paths,
     surface: &dyn Surface,
-    progress: Option<Progress>,
+    written: Vec<String>,
 ) -> ExitCode {
-    // A stopped apply always leaves its answers; if they are somehow gone there is
-    // nothing to resume from, so a fresh run is the honest fallback — interactive,
-    // since recovery carries no flags.
-    if progress.is_none() {
-        return Box::pin(fresh_setup(ctx, paths, surface, SetupFlags::none())).await;
-    }
-
     say!("A previous setup was interrupted part-way through applying.");
-    // The same list a browser is shown before it is offered the same three ways
-    // out, in the same words, because both read it from the one place.
-    let written = core_setup::written_so_far(paths);
     if written.is_empty() {
         say!("It had not written anything yet.");
     } else {

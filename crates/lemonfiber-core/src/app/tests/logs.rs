@@ -169,3 +169,29 @@ async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
         Some(crate::error::codes::stack::STACK_UNREADABLE)
     );
 }
+
+/// Reading the logs through the dispatcher hands every line to the narrator as it
+/// arrives, in the timeline's order, and answers with how many there were.
+#[tokio::test]
+async fn reading_logs_through_dispatch_says_each_line_and_counts_them() {
+    let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy)
+        .saying_at("seerr", "2026-08-21T19:00:02.000000000Z", "second")
+        .saying_at("jellyfin", "2026-08-21T19:00:01.000000000Z", "first");
+    let listening = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx =
+        watching(engine).with_narrator(Arc::clone(&listening) as Arc<dyn crate::ports::Narrator>);
+
+    let read = super::super::dispatch(
+        Command::Logs(crate::app::ReadingLogs {
+            forms: vec!["library".to_owned()],
+            services: Vec::new(),
+            tail: 20,
+            follow: false,
+        }),
+        &ctx,
+    )
+    .await;
+
+    assert_eq!(read, Ok(Outcome::Logs(crate::app::LogsReport { lines: 2 })));
+    assert_eq!(listening.log_lines(), ["first", "second"]);
+}

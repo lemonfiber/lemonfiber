@@ -49,16 +49,6 @@ codes! {
         remedy: "Answer with a choice this platform offers.",
         household: fault,
     }
-    /// Raised when setup is asked to gather answers for a wizard already past it.
-    ALREADY_UNDERWAY = "SETUP-6" {
-        severity: Error,
-        status: 500,
-        since: "0.2.0",
-        meaning: "Setup is past the point of gathering answers — it has been reviewed, is \
-            applying, or is finished. Nothing has been changed.",
-        remedy: "Resume or recover the setup in progress, or reconfigure a finished one.",
-        household: fault,
-    }
     /// Raised when setup is answered on a machine that is already set up.
     ALREADY_SET_UP = "SETUP-7" {
         severity: Error,

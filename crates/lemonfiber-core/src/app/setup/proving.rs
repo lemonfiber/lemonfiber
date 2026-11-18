@@ -6,175 +6,103 @@
 //! provider are tried against the live service, because a key that does not work
 //! is worth finding out now rather than at the first download.
 //!
-//! Kept apart from the walk for that reason: the walk is "ask each question in
-//! order", and this is "and do not take the answer on trust". The two go wrong
+//! Kept apart from the walk for that reason: the walk is "record the answer and move
+//! on", and this is "and do not take the answer on trust". The two go wrong
 //! differently, and they are read for different reasons.
 
 use std::path::{Path, PathBuf};
 
+use crate::model::StorageFinding;
 use crate::ports::filesystem::FileSystem;
 use crate::storage::{self, Linked};
 use crate::validate::{pasted, Credential, Validation, Validator};
-use crate::wizard::{Answer, Indexer, Provider, Vpn};
+use crate::wizard::{Answer, Indexer, Provider};
 
-use super::{CredentialChoice, Guard, Prompt, ProviderEntry, StorageWarning};
-
-/// Ask whether a VPN carries the torrents, and where none does, make sure the
-/// operator chose that knowingly.
-///
-/// Torrents put the home address in front of every peer in a swarm, which is the
-/// one consequence of a protocol choice the operator cannot discover for
-/// themselves afterwards. So a "no" is not taken at face value: what it exposes is
-/// stated, and going on has to be said a second time.
-///
-/// It never refuses. Declining the warning returns to the question rather than
-/// ending setup, and answering that a VPN carries it is always available — so the
-/// loop cannot wedge, and an operator who genuinely wants an unprotected run gets
-/// one. Warned and recorded, so a later diagnosis reads it as a decision rather
-/// than an oversight.
-///
-/// Where one does, `guard` is asked what it needs to carry it, question by question.
-pub(crate) fn resolve_vpn(prompt: &dyn Prompt, guard: Option<&Guard>) -> Answer {
-    loop {
-        if prompt.vpn() {
-            let given = guard
-                .map(|guard| guard.asked(&mut |asking| prompt.guard(asking)))
-                .unwrap_or_default();
-            return Answer::Vpn(Vpn::Carrying(given));
-        }
-        if prompt.unprotected() {
-            return Answer::Vpn(Vpn::Absent);
-        }
-    }
+/// What proving an answer came to: the credential's live test, or the data location's.
+#[derive(Debug, Default)]
+pub(super) struct Proof {
+    /// What the service said of the credential given.
+    pub(super) credential: Option<Validation>,
+    /// What testing the data location given found.
+    pub(super) storage: Option<StorageFinding>,
 }
 
-/// Ask for a data location and test what it can do, until one is settled on.
+/// The answer as setup may record it, and what proving it came to.
 ///
-/// A location that hardlinks is taken as chosen; one that cannot — or one that
-/// could not be tested — is put back to the operator with what was found, to use
-/// anyway or replace. The loop ends only when they accept a location, so it can
-/// never wedge: the way out is always to say yes to the one in hand.
-pub(crate) async fn resolve_location(prompt: &dyn Prompt, filesystem: &dyn FileSystem) -> PathBuf {
-    loop {
-        let chosen = prompt.data_location();
-        match assess(filesystem, &chosen).await {
-            Assessment::Links { inferred_from } => {
-                prompt.hardlinks(&chosen, inferred_from.as_deref());
-                return chosen;
-            }
-            Assessment::Warned(warning) => {
-                if prompt.storage_warning(&chosen, &warning) {
-                    return chosen;
-                }
-            }
-        }
-    }
-}
-
-/// Ask for a credential and prove it against its live service, until one is
-/// settled on — proven, taken unverified, or left for now.
+/// A credential is trimmed, so the value tested is the value stored, and tested against
+/// its live service before it is kept — so `validated` records what a test established
+/// rather than what a caller asserted. A data location is tested for hardlinks.
 ///
-/// Nothing about the credential is kept before the live test has run (a test is
-/// attempted the moment one is entered), and what the test observed is shown so
-/// the operator sees it succeed rather than a silent pass. A test that does not
-/// prove it is told apart by cause and put back to them: try again, keep it
-/// unverified — recorded as such so a later diagnosis can point at it — or leave
-/// it unset. Entering nothing is a supported end, not a failure to answer.
-pub(crate) async fn resolve_credentials(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
-    loop {
-        let Some((url, key)) = prompt.credential() else {
-            return Answer::Credentials(None);
-        };
-        // Trimmed before it is either proven or kept, so the value tested is the value
-        // stored. Trimming only at the point of testing would prove one string and
-        // record another.
-        let (url, key) = (pasted(&url), pasted(&key));
-        // Tested once, the moment it is entered: the service is asked, and what it
-        // answered is all the operator is shown or the answer records.
-        let outcome = validator
-            .validate(&Credential::Indexer {
-                url: url.clone(),
-                key: key.clone(),
-            })
-            .await;
-        if let Validation::Valid { observed } = &outcome {
-            prompt.credential_valid(observed);
-            return Answer::Credentials(Some(Indexer {
-                url,
-                key,
-                validated: true,
-            }));
-        }
-        // Not proven — told apart by cause and put back to the operator to act on.
-        match prompt.credential_failed(&outcome) {
-            CredentialChoice::Retry => {}
-            CredentialChoice::Proceed => {
-                return Answer::Credentials(Some(Indexer {
+/// Neither test refuses. The answer is kept and what the test found comes back beside
+/// it, which leaves whoever asked the ways out: send a different answer, send none, or
+/// go on with this one.
+pub(super) async fn proven(
+    validator: &dyn Validator,
+    filesystem: &dyn FileSystem,
+    answer: Answer,
+) -> (Answer, Proof) {
+    match answer {
+        Answer::Credentials(Some(indexer)) => {
+            let (url, key) = (pasted(&indexer.url), pasted(&indexer.key));
+            let came_to = validator
+                .validate(&Credential::Indexer {
+                    url: url.clone(),
+                    key: key.clone(),
+                })
+                .await;
+            let validated = matches!(came_to, Validation::Valid { .. });
+            (
+                Answer::Credentials(Some(Indexer {
                     url,
                     key,
-                    validated: false,
-                }))
-            }
-            CredentialChoice::Skip => return Answer::Credentials(None),
+                    validated,
+                })),
+                Proof {
+                    credential: Some(came_to),
+                    storage: None,
+                },
+            )
         }
+        Answer::Provider(Some(provider)) => {
+            let provider = Provider {
+                host: pasted(&provider.host),
+                user: pasted(&provider.user),
+                pass: pasted(&provider.pass),
+                ..provider
+            };
+            let came_to = validator
+                .validate(&Credential::Usenet {
+                    host: provider.host.clone(),
+                    port: provider.port,
+                    secure: provider.tls,
+                    user: provider.user.clone(),
+                    pass: provider.pass.clone(),
+                })
+                .await;
+            let validated = matches!(came_to, Validation::Valid { .. });
+            (
+                Answer::Provider(Some(Provider {
+                    validated,
+                    ..provider
+                })),
+                Proof {
+                    credential: Some(came_to),
+                    storage: None,
+                },
+            )
+        }
+        Answer::DataLocation(chosen) => {
+            let found = assessed(filesystem, &chosen).await;
+            (
+                Answer::DataLocation(chosen),
+                Proof {
+                    credential: None,
+                    storage: Some(found),
+                },
+            )
+        }
+        other => (other, Proof::default()),
     }
-}
-
-/// Ask for a Usenet provider and prove its login over NNTP, until one is settled
-/// on — proven, taken unverified, or left for now. The same shape as the indexer,
-/// against a different transport: nothing is kept before the login is attempted,
-/// and a login that does not take is put back to the operator by cause.
-pub(crate) async fn resolve_provider(prompt: &dyn Prompt, validator: &dyn Validator) -> Answer {
-    loop {
-        let Some(entry) = prompt.usenet_provider() else {
-            return Answer::Provider(None);
-        };
-        let entry = ProviderEntry {
-            host: pasted(&entry.host),
-            user: pasted(&entry.user),
-            pass: pasted(&entry.pass),
-            ..entry
-        };
-        let outcome = validator
-            .validate(&Credential::Usenet {
-                host: entry.host.clone(),
-                port: entry.port,
-                secure: entry.tls,
-                user: entry.user.clone(),
-                pass: entry.pass.clone(),
-            })
-            .await;
-        let kept = |validated| {
-            Answer::Provider(Some(Provider {
-                host: entry.host.clone(),
-                port: entry.port,
-                user: entry.user.clone(),
-                pass: entry.pass.clone(),
-                tls: entry.tls,
-                validated,
-            }))
-        };
-        if let Validation::Valid { observed } = &outcome {
-            prompt.credential_valid(observed);
-            return kept(true);
-        }
-        match prompt.credential_failed(&outcome) {
-            CredentialChoice::Retry => {}
-            CredentialChoice::Proceed => return kept(false),
-            CredentialChoice::Skip => return Answer::Provider(None),
-        }
-    }
-}
-
-/// What testing a prospective data location for hardlinks came to.
-enum Assessment {
-    /// The location hardlinks. `inferred_from` is the ancestor the test actually
-    /// ran against where the location itself did not exist yet to be tested — so a
-    /// result read off a parent is never presented as if the chosen path were
-    /// proven. `None` where the chosen path was tested directly.
-    Links { inferred_from: Option<PathBuf> },
-    /// The location is usable only with a caveat the operator must weigh.
-    Warned(StorageWarning),
 }
 
 /// Test a location for hardlinks — empirically, never inferred from its name.
@@ -186,49 +114,43 @@ enum Assessment {
 /// drive mounted there later could differ — so a result read off a parent is
 /// carried back as such rather than dressed up as the chosen path's own. A place
 /// with no reachable parent cannot be tested at all, and says so.
-async fn assess(filesystem: &dyn FileSystem, chosen: &Path) -> Assessment {
+pub(super) async fn assessed(filesystem: &dyn FileSystem, chosen: &Path) -> StorageFinding {
     let Some((base, exact)) = nearest_existing(filesystem, chosen).await else {
-        return Assessment::Warned(StorageWarning::Untested {
+        return StorageFinding::Untested {
             reason: "it could not be reached, and neither could any parent of it".to_owned(),
-        });
+        };
     };
-    // A parent tested in the location's place is the inferred case; the location
-    // itself, where it already exists, is a direct result.
     let inferred_from = (!exact).then(|| base.clone());
 
     match storage::test_link(filesystem, &base).await {
-        Linked::Yes { .. } => Assessment::Links { inferred_from },
+        Linked::Yes { .. } => StorageFinding::Links { inferred_from },
         Linked::No => {
             let facts = filesystem.describe(&base).await;
-            Assessment::Warned(StorageWarning::CopyOnly {
+            StorageFinding::CopyOnly {
                 limitation: facts.kind.limitation().map(str::to_owned),
-            })
+            }
         }
-        Linked::Unwritable { message } => {
-            Assessment::Warned(StorageWarning::Untested { reason: message })
-        }
-        Linked::Unconfirmed => Assessment::Warned(StorageWarning::Untested {
+        Linked::Unwritable { message } => StorageFinding::Untested { reason: message },
+        Linked::Unconfirmed => StorageFinding::Untested {
             reason: "a hardlink was made but could not be confirmed to point at one file"
                 .to_owned(),
-        }),
+        },
     }
 }
 
 /// The deepest ancestor of `path` already on disk, resolved through any symlinks,
 /// and whether it is `path` itself — or nothing where not even the root of it can
 /// be reached.
-///
-/// The flag is how a caller tells a location it tested directly from one whose
-/// answer it had to read off a parent, since the chosen leaf does not exist yet.
 async fn nearest_existing(filesystem: &dyn FileSystem, path: &Path) -> Option<(PathBuf, bool)> {
     let mut exact = true;
     for ancestor in path.ancestors() {
         if let Ok(real) = filesystem.canonicalize(ancestor).await {
             return Some((real, exact));
         }
-        // Past the first step the resolved place is a parent, not the path asked
-        // about, so a link proven there is inferred rather than direct.
         exact = false;
     }
     None
 }
+
+#[cfg(test)]
+mod tests;

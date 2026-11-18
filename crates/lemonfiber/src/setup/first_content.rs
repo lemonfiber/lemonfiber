@@ -11,7 +11,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{dispatch, worth_offering, Command, Ctx};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::walkthrough::{Shape, Why};
 use lemonfiber_core::PRODUCT;
@@ -35,18 +35,29 @@ pub(super) async fn offer(
     if condition != Some(Condition::Active) {
         return settled;
     }
-    match worth_offering(ctx).await {
+    match dispatch(Command::WalkthroughOffer, ctx)
+        .await
+        .map(|outcome| offered(&outcome))
+    {
         // Nothing to search with. Told rather than offered, because being asked and then
         // failing is the product demonstrating it does not know its own state.
-        Ok(Why::Not(reason)) => {
+        Ok(Some(Why::Not(reason))) => {
             say!("\n{}", reason.said());
             say!("  → {}", reason.remedy());
             settled
         }
-        Ok(Why::Offer(shape)) => ask(ctx, surface, shape, settled).await,
+        Ok(Some(Why::Offer(shape))) => ask(ctx, surface, shape, settled).await,
         // The offer is the last thing setup does and the least important; a stack that
         // cannot be read here has already been reported on by everything above.
-        Err(_) => settled,
+        Ok(None) | Err(_) => settled,
+    }
+}
+
+/// What a walkthrough offer came back as, where it came back as one.
+fn offered(outcome: &Outcome) -> Option<Why> {
+    match outcome {
+        Outcome::WalkthroughOffer(why) => Some(*why),
+        _ => None,
     }
 }
 

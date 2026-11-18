@@ -9,7 +9,7 @@
 use std::io::IsTerminal as _;
 use std::path::PathBuf;
 
-use lemonfiber_core::app::setup::Prompt;
+use crate::prompt::Prompt;
 use lemonfiber_core::platform::Environment;
 
 use crate::prompt::{Answers, Terminal};
@@ -19,10 +19,6 @@ use crate::setup::Surface;
 pub(crate) struct Keyboard;
 
 impl Answers for Keyboard {
-    fn present(&self) -> bool {
-        std::io::stdin().is_terminal()
-    }
-
     fn ask(&self, question: &str) -> String {
         crate::say::asked(&format!("{question} "));
         let mut line = String::new();
@@ -50,7 +46,7 @@ impl Answers for Keyboard {
 /// there to answer.
 impl lemonfiber_core::ports::asking::Asking for Keyboard {
     fn present(&self) -> bool {
-        Answers::present(self)
+        std::io::stdin().is_terminal()
     }
 
     fn ask(&self, question: &str) -> String {

@@ -25,6 +25,9 @@ pub trait Narrator: Send + Sync {
 
     /// Hand on one line the container engine wrote while pulling images, as it wrote it.
     async fn pulled(&self, _line: &str) {}
+
+    /// Hand on one line a service wrote to its log, as it arrived.
+    async fn logged(&self, _line: &crate::docker::LogLine) {}
 }
 
 /// The narrator for a run nobody is listening to.

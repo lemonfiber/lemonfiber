@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What testing a data location for hardlinks found.\n\nTested on the location itself where it exists, and otherwise on the deepest parent\nthat does, which is named so that a result read off a parent is never shown as the\nlocation's own.",
+  "oneOf": [
+    {
+      "description": "It hardlinks, so imports are instant and cost no extra disk.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "type": "string",
+          "const": "links"
+        },
+        "inferred_from": {
+          "description": "The parent the test ran on, where the location did not exist yet.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "found"
+      ]
+    },
+    {
+      "description": "It works but cannot hardlink, so every import is a copy.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "type": "string",
+          "const": "copy-only"
+        },
+        "limitation": {
+          "description": "The filesystem's reason, where it has one that can be named.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "found"
+      ]
+    },
+    {
+      "description": "It could not be tested, with the platform's words for why.",
+      "type": "object",
+      "properties": {
+        "found": {
+          "type": "string",
+          "const": "untested"
+        },
+        "reason": {
+          "description": "Why the test could not run.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "found",
+        "reason"
+      ]
+    }
+  ]
+}

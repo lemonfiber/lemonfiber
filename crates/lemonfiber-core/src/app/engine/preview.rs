@@ -18,7 +18,8 @@ use crate::stack::closure::{Plan, Running};
 /// it before acting; an operator can also just ask.
 ///
 /// It also names, among the services it would start, those already running, read
-/// from the engine once. An engine that will not answer is said as such rather than
+/// from the engine once, and the installs from this build a start would offer with the
+/// offer that takes them. An engine that will not answer is said as such rather than
 /// as nothing running.
 ///
 /// # Errors
@@ -29,6 +30,10 @@ use crate::stack::closure::{Plan, Running};
 pub(crate) async fn preview(ctx: &Ctx, forms: &[String]) -> Result<Plan, Box<Problem>> {
     let (_, mut plan) = resolved(ctx, forms)?;
     plan.running = already_running(ctx, &plan.services).await;
+    if let Some(offline) = super::installing::offline(ctx, forms).await? {
+        plan.installing = offline.installs;
+        plan.offer = offline.offer;
+    }
     Ok(plan)
 }
 

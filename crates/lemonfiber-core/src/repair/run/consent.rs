@@ -37,6 +37,8 @@ pub enum Consent {
     },
     /// Carry them out without asking, because this run was told to in advance.
     Standing,
+    /// Put each repair to whoever is present to answer, one at a time, as it comes up.
+    Asked,
 }
 
 impl Consent {
@@ -45,7 +47,7 @@ impl Consent {
     pub const fn stance(&self) -> Stance {
         match self {
             Self::Offer => Stance::ReportOnly,
-            Self::Given { .. } => Stance::Ask,
+            Self::Given { .. } | Self::Asked => Stance::Ask,
             Self::Standing => Stance::Unattended,
         }
     }
@@ -64,7 +66,7 @@ impl Consent {
             Self::Given { offer, .. } if *offer != report.agreement => {
                 Err(Box::new(stale(offer, &report.agreement)))
             }
-            Self::Offer | Self::Given { .. } | Self::Standing => Ok(()),
+            Self::Offer | Self::Given { .. } | Self::Standing | Self::Asked => Ok(()),
         }
     }
 }
@@ -78,7 +80,7 @@ impl Confirm for Consent {
     fn agreed(&self, repair: &Repair) -> bool {
         match self {
             Self::Given { repairs, .. } => repairs.contains(&repair.check),
-            Self::Offer | Self::Standing => false,
+            Self::Offer | Self::Standing | Self::Asked => false,
         }
     }
 
@@ -86,7 +88,7 @@ impl Confirm for Consent {
     fn stands(&self, offered: &[Repair]) -> bool {
         match self {
             Self::Given { offer, .. } => *offer == repair::agreement(offered),
-            Self::Offer | Self::Standing => true,
+            Self::Offer | Self::Standing | Self::Asked => true,
         }
     }
 }

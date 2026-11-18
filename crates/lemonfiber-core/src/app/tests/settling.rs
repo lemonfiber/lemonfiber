@@ -181,9 +181,11 @@ async fn a_service_with_no_container_is_said_to_have_none() {
         refused.as_ref().map(|problem| problem.summary.as_str()),
         Some("jellyfin is not running: the engine holds no container for it")
     );
-    assert!(refused.is_some_and(|problem| problem
-        .meaning
-        .contains("The engine holds no container for jellyfin at all")));
+    assert!(refused.is_some_and(|problem| {
+        problem
+            .meaning
+            .contains("The engine holds no container for jellyfin at all")
+    }));
 }
 
 #[tokio::test]

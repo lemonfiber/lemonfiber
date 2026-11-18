@@ -13,10 +13,8 @@
 use std::sync::Arc;
 
 use lemonfiber_api::guard::Binding;
-use lemonfiber_core::app::Ctx;
-use lemonfiber_core::certificate;
-use lemonfiber_core::companion::answers_to;
-use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
+use lemonfiber_core::companion::served::{uncertified, ServedReport};
+use lemonfiber_core::error::codes::serve::UNSETTLED_PORT;
 use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_core::PRODUCT;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -31,30 +29,28 @@ pub(crate) struct Encrypting {
     pub(crate) fingerprint: String,
 }
 
-/// What this run presents, or nothing where it was not asked to encrypt.
+/// Whether a run asked to encrypt named the port it serves on.
 ///
 /// # Errors
 ///
-/// The [`Problem`] to report where it was asked to and cannot: no port that stays the
-/// same, nowhere to keep a certificate, or a certificate that cannot be read or made.
-pub(crate) fn encrypting(
-    ctx: &Ctx,
-    tls: bool,
-    port: Option<u16>,
-) -> Result<Option<Encrypting>, Box<Problem>> {
-    if !tls {
-        return Ok(None);
-    }
-    if port.is_none() {
+/// The [`Problem`] to report where it was asked to encrypt and named no port.
+pub(crate) fn port_settled(tls: bool, port: Option<u16>) -> Result<(), Box<Problem>> {
+    if tls && port.is_none() {
         return Err(Box::new(unsettled()));
     }
-    let directory = ctx.settings.companion.as_deref().ok_or_else(|| {
-        Box::new(uncertified(
-            "there is no configuration directory to keep one in",
-        ))
-    })?;
-    let kept = certificate::kept_or_made(ctx.seams.confined.as_ref(), directory)
-        .map_err(|why| Box::new(uncertified(&why.to_string())))?;
+    Ok(())
+}
+
+/// What this run presents, from the certificate settling how it is served kept or made,
+/// or nothing where it is not encrypted.
+///
+/// # Errors
+///
+/// The [`Problem`] to report where the certificate kept would not serve.
+pub(crate) fn encrypting(served: &ServedReport) -> Result<Option<Encrypting>, Box<Problem>> {
+    let Some(kept) = served.presented.as_ref() else {
+        return Ok(None);
+    };
     let (certificate, key) = kept.presented();
     let config = rustls::ServerConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
@@ -73,25 +69,17 @@ pub(crate) fn encrypting(
     .ok_or_else(|| Box::new(uncertified("the certificate kept would not serve")))?;
     Ok(Some(Encrypting {
         acceptor: TlsAcceptor::from(Arc::new(config)),
-        fingerprint: kept.fingerprint,
+        fingerprint: kept.fingerprint.clone(),
     }))
 }
 
-/// What a request has to name to be answered by a run on `port`.
-///
-/// Served encrypted on a network, that includes the name pairing material gives a
-/// phone, which is the only name a paired phone reaches it by. Anywhere else a name is
-/// refused.
-pub(crate) async fn bound(ctx: &Ctx, port: u16, network: bool, encrypted: bool) -> Binding {
-    let named = if network && encrypted {
-        answers_to(ctx, port).await
-    } else {
-        None
-    };
+/// What a request has to name to be answered by a run on `port`, as settling how it is
+/// served named it.
+pub(crate) fn bound(served: &ServedReport, port: u16, network: bool) -> Binding {
     Binding {
         port,
         beyond: network,
-        named,
+        named: served.named.clone(),
     }
 }
 
@@ -104,17 +92,6 @@ fn unsettled() -> Problem {
          given — a port chosen afresh every run would be one it stopped reaching the next \
          time this started.",
         Remedy::new("Name the port").with_detail(format!("{PRODUCT} ui --tls --port <port>")),
-    )
-}
-
-/// The certificate to present could not be had.
-fn uncertified(why: &str) -> Problem {
-    Problem::new(
-        NO_CERTIFICATE,
-        format!("{PRODUCT} could not serve encrypted"),
-        format!("It presents a certificate it keeps beside its configuration, and {why}."),
-        Remedy::new("Replace the certificate, knowing every paired phone will need pairing again")
-            .with_detail(format!("{PRODUCT} companion certificate --confirm")),
     )
 }
 

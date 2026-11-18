@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "downloads": {
+      "type": [
+        "array[ref:Unfinished]"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

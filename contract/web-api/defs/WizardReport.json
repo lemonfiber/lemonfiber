@@ -52,6 +52,21 @@
       "description": "Whether this was a rehearsal: what would have happened, with none of it done.\n\nSaid in a field of its own so that a rehearsal is never told from the real run by\nits wording alone.",
       "$ref": "Ran.json"
     },
+    "setup": {
+      "description": "Whether this stack is set up: a previous run left setup part-way, nothing is\nconfigured and no setup has begun, or it is configured.",
+      "$ref": "SetUp.json"
+    },
+    "storage": {
+      "description": "What testing the data location just given found, where one was given.\n\nAbsent for every other answer. A location that does not hardlink is still kept,\nbecause whether to use it anyway is the operator's to decide once they have read\nthis.",
+      "anyOf": [
+        {
+          "$ref": "StorageFinding.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "unanswered": {
       "description": "Every question that applies on this machine and has no answer yet, in the\norder they are put.",
       "type": "array",
@@ -76,6 +91,7 @@
     "ready_for_review",
     "plan",
     "written",
+    "setup",
     "rehearsed",
     "guard"
   ]

@@ -1,0 +1,35 @@
+{
+  "fields": {
+    "found": {
+      "type": [
+        "const:\"copy-only\"",
+        "const:\"links\"",
+        "const:\"untested\""
+      ],
+      "required": true
+    },
+    "inferred_from": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "limitation": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "reason": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"copy-only\"",
+    "\"links\"",
+    "\"untested\""
+  ]
+}

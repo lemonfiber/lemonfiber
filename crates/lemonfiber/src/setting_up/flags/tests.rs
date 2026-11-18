@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use lemonfiber_core::app::setup::{
-    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
-};
+use lemonfiber_core::app::setup::Asking;
+use lemonfiber_core::model::StorageFinding;
+
+use crate::setting_up::{CredentialChoice, Prompt, ProviderEntry};
 use lemonfiber_core::config::Protocols;
 
 use lemonfiber_core::prerequisites::prerequisites;
@@ -74,10 +75,10 @@ fn a_flag_run_answers_from_what_it_was_given() {
     assert!(prompt.household());
     assert!(prompt.autostart());
     // Consent given up front is what stands in for a person confirming.
-    assert!(prompt.confirm(&wizard().plan()));
+    assert!(prompt.confirm(&[]));
     assert!(prompt.storage_warning(
         Path::new("/data"),
-        &StorageWarning::CopyOnly { limitation: None }
+        &StorageFinding::CopyOnly { limitation: None }
     ));
     assert!(matches!(
         prompt.credential_failed(&Validation::Rejected {
@@ -104,11 +105,11 @@ fn a_flag_run_without_consent_keeps_nothing_it_could_not_prove() {
     ));
     assert!(!prompt.storage_warning(
         Path::new("/srv/media"),
-        &StorageWarning::Untested {
+        &StorageFinding::Untested {
             reason: "absent".to_owned()
         }
     ));
-    assert!(!prompt.confirm(&wizard().plan()));
+    assert!(!prompt.confirm(&[]));
     // What was not given falls back to the same defaults the terminal offers.
     assert_eq!(prompt.data_location(), PathBuf::from("/srv/media"));
     assert_eq!(prompt.credential(), None);
@@ -215,7 +216,7 @@ fn a_container_user_is_read_as_a_pair_and_nothing_else() {
 
 #[test]
 fn a_fresh_non_interactive_run_names_every_flag_it_needs() {
-    let missing = SetupFlags::none().missing(&wizard());
+    let missing = SetupFlags::none().missing(&wizard().unanswered());
     for expected in [
         "--protocols",
         "--data-location",
@@ -237,7 +238,7 @@ fn a_fully_flagged_run_needs_nothing_more() {
         .ok()
         .unwrap_or_else(SetupFlags::none);
     assert!(
-        flags.missing(&wizard()).is_empty(),
+        flags.missing(&wizard().unanswered()).is_empty(),
         "every required flag is present, so none is named"
     );
 }
@@ -252,7 +253,7 @@ fn an_indexer_and_container_user_are_optional_not_required() {
         .unwrap_or(SetupFlags::none());
     // Compared whole rather than searched: a workable run is missing nothing at
     // all, and a search over an empty list proves nothing about either one.
-    assert_eq!(flags.missing(&wizard()), Vec::<&str>::new());
+    assert_eq!(flags.missing(&wizard().unanswered()), Vec::<&str>::new());
 }
 
 #[test]

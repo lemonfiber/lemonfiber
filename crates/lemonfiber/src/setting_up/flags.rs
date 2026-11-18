@@ -9,13 +9,14 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::RawSetup;
 use lemonfiber_core::alert::Appetite;
-use lemonfiber_core::app::setup::{
-    Asking, CredentialChoice, Prompt, ProviderEntry, StorageWarning,
-};
+use lemonfiber_core::app::setup::Asking;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Guarded, Library, Plan, Step, Wizard};
+use lemonfiber_core::wizard::{Guarded, Library, Step};
+
+use super::{CredentialChoice, Prompt, ProviderEntry};
 
 /// Read `--protocols` into a protocol choice, or name what was expected.
 ///
@@ -208,9 +209,8 @@ impl SetupFlags {
     /// The flags a non-interactive run still needs: the ones for questions it has
     /// not answered and cannot skip. Empty means it can proceed without a terminal.
     #[must_use]
-    pub fn missing(&self, wizard: &Wizard) -> Vec<&'static str> {
-        let mut missing: Vec<&'static str> = wizard
-            .unanswered()
+    pub fn missing(&self, unanswered: &[Step]) -> Vec<&'static str> {
+        let mut missing: Vec<&'static str> = unanswered
             .iter()
             .filter_map(|step| self.flag_for(*step))
             .collect();
@@ -286,7 +286,7 @@ impl Prompt for Flags {
             .unwrap_or_else(|| self.default_data.clone())
     }
     fn hardlinks(&self, _path: &Path, _inferred_from: Option<&Path>) {}
-    fn storage_warning(&self, _path: &Path, _warning: &StorageWarning) -> bool {
+    fn storage_warning(&self, _path: &Path, _found: &StorageFinding) -> bool {
         // A non-interactive run cannot choose elsewhere, so the standing consent
         // decides: proceed with the location as it is.
         self.flags.yes
@@ -346,7 +346,7 @@ impl Prompt for Flags {
     fn autostart(&self) -> bool {
         self.flags.autostart.unwrap_or(false)
     }
-    fn confirm(&self, _plan: &Plan) -> bool {
+    fn confirm(&self, _plan: &[SettingReport]) -> bool {
         self.flags.yes
     }
 }

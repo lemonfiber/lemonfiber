@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::instant::Instant;
+use crate::wizard::ContainerUser;
 use lemonfiber_fixtures::ports::STAMPED;
 
 #[test]
@@ -263,7 +264,7 @@ fn a_declined_container_user_writes_no_ids() {
     wizard.answer(Answer::ServiceUser(None)).unwrap_or(());
     // The step is answered — recorded as "no id" rather than left open — and
     // that answered-with-nothing still writes neither id.
-    assert_eq!(wizard.answers().service_user, Some(None));
+    assert_eq!(wizard.answers().service_user, ContainerUser::Kept);
     let plan = wizard.plan();
     assert_eq!(setting(&plan, "PUID"), None);
     assert_eq!(setting(&plan, "PGID"), None);

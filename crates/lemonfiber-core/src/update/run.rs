@@ -32,7 +32,7 @@ use crate::plural::s;
 use crate::update::{self, Applied, Change, State as Standing};
 
 use crate::agreement::over;
-use crate::app::engine::{in_flight, Interrupted};
+use crate::app::engine::{in_flight, Unfinished};
 use crate::app::{Ctx, Waiting};
 use crate::error::codes::update::{
     CAPTURE_LEFT_IT_DOWN, NOT_CHECKED, NO_SUCH_SERVICE, STILL_TRANSFERRING, UPDATE_MOVED,
@@ -269,7 +269,7 @@ async fn waiting(ctx: &Ctx, changes: &[Change]) -> Vec<String> {
 }
 
 /// What is in flight, as an operator would read it.
-fn named(active: &[Interrupted]) -> Vec<String> {
+fn named(active: &[Unfinished]) -> Vec<String> {
     active
         .iter()
         .map(|one| format!("{} ({}%)", one.name, one.progress))

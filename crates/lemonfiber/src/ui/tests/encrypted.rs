@@ -81,3 +81,32 @@ async fn a_run_that_cannot_write_down_where_it_serves_still_serves() {
     let ended = started(keeping_pairing(blocked), Asked::default()).await;
     assert_eq!(ended, crate::exit::shown(ExitCode::SUCCESS));
 }
+
+/// Asked to encrypt with nowhere to keep a certificate, it serves nothing rather than
+/// serving in plain text.
+#[tokio::test]
+async fn a_run_asked_to_encrypt_with_nowhere_to_keep_a_certificate_serves_nothing() {
+    let port = a_free_port().await;
+    let ended = started(
+        running(Arc::new(Idle), Some(enough()), Settings::default()),
+        Asked {
+            tls: true,
+            port,
+            ..Asked::default()
+        },
+    )
+    .await;
+    assert_ne!(ended, crate::exit::shown(ExitCode::SUCCESS));
+}
+
+/// An answer to settling how it is served that is not about serving settles nothing.
+#[test]
+fn an_answer_that_is_not_about_serving_settles_nothing() {
+    use lemonfiber_core::app::{LogsReport, Outcome};
+    use lemonfiber_core::companion::served::ServedReport;
+
+    assert_eq!(
+        crate::ui::served_by(Outcome::Logs(LogsReport { lines: 0 })),
+        ServedReport::default()
+    );
+}

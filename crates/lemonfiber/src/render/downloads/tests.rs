@@ -1,10 +1,10 @@
 use super::{fitted, interrupting, protocol, NAMED};
-use lemonfiber_core::app::Interrupted;
+use lemonfiber_core::app::Unfinished;
 use lemonfiber_core::dashboard::Protocol;
 
 /// One download, as the engine reports it.
-fn coming(protocol: Protocol, name: &str, progress: u8) -> Interrupted {
-    Interrupted {
+fn coming(protocol: Protocol, name: &str, progress: u8) -> Unfinished {
+    Unfinished {
         protocol,
         name: name.to_owned(),
         progress,

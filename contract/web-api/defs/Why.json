@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a walkthrough is worth offering to this stack, and which one.",
+  "oneOf": [
+    {
+      "description": "Offer this shape of walk.",
+      "type": "object",
+      "properties": {
+        "offer": {
+          "$ref": "Shape.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "offer"
+      ]
+    },
+    {
+      "description": "Do not offer. What is missing first, said as the reason it would have stopped at.",
+      "type": "object",
+      "properties": {
+        "not": {
+          "$ref": "Reason.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "not"
+      ]
+    }
+  ]
+}

@@ -24,6 +24,18 @@
       ],
       "required": true
     },
+    "installing": {
+      "type": [
+        "array[ref:UpInstallOffered]"
+      ],
+      "required": false
+    },
+    "offer": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "profiles": {
       "type": [
         "array[string]"

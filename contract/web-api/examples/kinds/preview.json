@@ -10,6 +10,37 @@
     "forms": [
       "library"
     ],
+    "installing": [
+      {
+        "offer": "cb268c7ae24e617126b118d0b597d907-d3016a34-90bd3b5a-d94c4247-d202ef8d",
+        "plugin": "audiobookshelf"
+      },
+      {
+        "offer": "11f6c3cad6cd73006eb1d85be236fc25-ffd986db-90bd3b5a-5406ac10-d202ef8d",
+        "plugin": "calibre-web-automated"
+      },
+      {
+        "offer": "d6924d830fdcb2a8f376bdfe5830f414-c1f3bfc7-90bd3b5a-12ef0c0a-d202ef8d",
+        "plugin": "decline"
+      },
+      {
+        "offer": "c89add96d07efdbca36e7d79615f34d7-9179b4de-90bd3b5a-a50794fa-d202ef8d",
+        "plugin": "navidrome"
+      },
+      {
+        "offer": "edc4ebec05eb1a91ab04248c58ceb18b-b6a0cd63-90bd3b5a-17490ba8-d202ef8d",
+        "plugin": "door"
+      },
+      {
+        "offer": "76d0912b63e00c9e49bc190d6eaff7be-c72aec61-90bd3b5a-e84d5697-d202ef8d",
+        "plugin": "request-gate"
+      },
+      {
+        "offer": "77a068ca272eb82af569a11462870f58-2e70d129-90bd3b5a-99edc6e7-d202ef8d",
+        "plugin": "seerr"
+      }
+    ],
+    "offer": "2dc600af",
     "profiles": [
       "media",
       "notify"
