@@ -189,10 +189,10 @@ fn a_part_s_starting_configuration_is_its_copy_s_and_nothing_else() {
             &mut held,
         );
         let held: std::collections::BTreeSet<String> =
-            if pinned.stage != Some(lemonfiber_bundled::Stage::Assembled) {
-                std::collections::BTreeSet::new()
-            } else {
+            if pinned.stage == Some(lemonfiber_bundled::Stage::Assembled) {
                 held.into_iter().collect()
+            } else {
+                std::collections::BTreeSet::new()
             };
         assert_eq!(carried_under(&format!("config/{id}")), held, "{id}");
         for file in &held {
