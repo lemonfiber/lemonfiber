@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "library.curate/v1/openapi.json",
-      "sha256": "c1977de86b463603102246ac5525a4696d79a9da7326c720d0deec447d0a9f57"
+      "sha256": "20ee692b88bc388bef32120f60f2053fdbf6fc88968d300112d4f290a9038d2e"
     },
     {
       "path": "library.curate/v1/operations/identity.json",
@@ -28,6 +28,10 @@
     {
       "path": "library.curate/v1/operations/test_download_clients.json",
       "sha256": "c462e9cab89c47b315cdfff18d42b0b27bb3cf1752c8ebd84f8190c29a3f39e6"
+    },
+    {
+      "path": "library.curate/v1/operations/forget_download_client.json",
+      "sha256": "891bdc641f6c8f1d8f55e2790b010cff174b3a62906f1b621d4ac21d19087fd5"
     },
     {
       "path": "library.curate/v1/operations/register_root_folder.json",
@@ -167,7 +171,7 @@
     },
     {
       "path": "library.curate/v1/conformance.json",
-      "sha256": "2e36d05b6575dc9ccde0dc3c8394bf213d238d2da49c12f18b9ffa875bdc40f8"
+      "sha256": "f1721fc3b675d1b19595ee85d0651c826dfb95d87a0fd00d942f221886f2028c"
     }
   ],
   "major": 1

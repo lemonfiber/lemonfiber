@@ -47,6 +47,10 @@ impl Client for Upstream {
         self.tell(format!("set {id} {field} {value:?}"));
         Ok(())
     }
+    async fn forget_download_client(&self, id: &str) -> Result<(), Failure> {
+        self.tell(format!("forget {id}"));
+        Ok(())
+    }
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
         Ok(Vec::new())
     }

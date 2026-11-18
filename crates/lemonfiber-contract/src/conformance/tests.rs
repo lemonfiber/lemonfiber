@@ -356,3 +356,13 @@ fn a_curator_is_asked_to_upgrade_and_what_it_holds_below_its_cutoff_for_music_at
         );
     }
 }
+
+#[test]
+fn a_curator_is_asked_to_forget_a_download_client_it_does_not_hold_at_minor_five() {
+    let curate = crate::capabilities::library::capability();
+    let case = cases(&curate)
+        .into_iter()
+        .find(|one| one.case == "forget_download_client-answers")
+        .map(|one| (one.since, one.asks));
+    assert_eq!(case, Some((5, serde_json::json!({ "id": "0" }))));
+}

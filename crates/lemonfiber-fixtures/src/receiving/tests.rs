@@ -185,3 +185,27 @@ async fn a_service_dropping_after_a_registration_fails_the_read_back() {
     assert!(clients.download_clients().await.is_ok());
     assert!(clients.download_clients().await.is_err());
 }
+
+/// A service forgets the client it is named by the id it gave, keeps every other, and
+/// answers a client it never held as forgotten too; down, it forgets nothing.
+#[tokio::test]
+async fn a_service_forgets_the_client_it_is_named_and_no_other() {
+    let service = Receiving::with(Mode::Normal, Vec::new());
+    for host in ["old", "kept"] {
+        assert!(service
+            .register_download_client(&client(host))
+            .await
+            .is_ok());
+    }
+
+    assert!(service.forget_download_client("100").await.is_ok());
+    assert!(service.forget_download_client("100").await.is_ok());
+
+    let held = service.download_clients().await.unwrap_or_default();
+    assert_eq!(
+        held.iter().map(|one| one.host.as_str()).collect::<Vec<_>>(),
+        ["kept"]
+    );
+    let down = Receiving::with(Mode::Down, Vec::new());
+    assert!(down.forget_download_client("100").await.is_err());
+}

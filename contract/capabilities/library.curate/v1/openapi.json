@@ -120,6 +120,9 @@
     "/lemonfiber/library.curate/v1/find_items": {
       "$ref": "operations/find_items.json"
     },
+    "/lemonfiber/library.curate/v1/forget_download_client": {
+      "$ref": "operations/forget_download_client.json"
+    },
     "/lemonfiber/library.curate/v1/grab": {
       "$ref": "operations/grab.json"
     },

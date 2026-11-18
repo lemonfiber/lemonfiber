@@ -335,6 +335,7 @@ fn every_operation_publishes_the_minor_it_was_added_at() {
     assert_eq!(
         added,
         vec![
+            ("library.curate@1".to_owned(), "forget_download_client"),
             ("library.curate@1".to_owned(), "cutoff_unmet"),
             ("library.curate@1".to_owned(), "catalogued"),
             ("library.curate@1".to_owned(), "titles"),
