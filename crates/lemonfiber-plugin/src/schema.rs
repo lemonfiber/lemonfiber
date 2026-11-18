@@ -25,7 +25,7 @@ use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 pub use asking::Ask;
 pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
-    Request, Run, LONGEST_ARG, MOST_ARGS, RUN_TIMEOUT,
+    Request, Run, LONGEST_ARG, MOST_ARGS, NAMED_HEADERS, RUN_TIMEOUT,
 };
 pub use health::{Health, HealthKind};
 pub use lemonfiber_manifest::container::{Secret, Shape};

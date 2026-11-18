@@ -46,6 +46,7 @@ fn it_reads_a_recording_as_the_plugins_write_them() {
                 method: String::new(),
                 path: String::new(),
                 accept: None,
+                headers: std::collections::BTreeMap::new(),
             },
             0,
             false,
@@ -58,6 +59,7 @@ fn it_reads_a_recording_as_the_plugins_write_them() {
                 method: "GET".to_owned(),
                 path: "/api/v1/series".to_owned(),
                 accept: None,
+                headers: std::collections::BTreeMap::new(),
             },
             401,
             true

@@ -22,8 +22,9 @@ pub(super) enum Asks {
         method: Method,
         /// The path on that service.
         path: String,
-        /// The one representation the answer is asked for, where the row names one.
-        accept: Option<String>,
+        /// Every header the question puts on the wire: `Accept` where the row asks for a
+        /// representation, then each header a proof names.
+        headers: Vec<(String, String)>,
         /// What the answer has to be.
         expect: Box<Expect>,
     },
@@ -73,7 +74,7 @@ pub(super) fn asked(
         address: address.clone(),
         method,
         path: request.path.clone(),
-        accept: request.accept.clone(),
+        headers: request.sent(),
         expect: Box::new(expect.clone()),
     }
 }
@@ -84,25 +85,21 @@ pub(super) fn asked(
 /// No credential goes with it. A row has nowhere to write one, which keeps asking as
 /// nobody a property of the format rather than a convention.
 pub(super) async fn put(http: &dyn Http, asks: &Asks) -> Result<Vec<String>, String> {
-    let (address, method, path, accept, expect) = match asks {
+    let (address, method, path, headers, expect) = match asks {
         Asks::Nothing(why) => return Err(why.clone()),
         Asks::Service {
             address,
             method,
             path,
-            accept,
+            headers,
             expect,
-        } => (address, method, path, accept, expect),
+        } => (address, method, path, headers, expect),
     };
-    let headers = accept
-        .iter()
-        .map(|one| ("Accept".to_owned(), one.clone()))
-        .collect();
     let answered = http
         .send(&http::Request {
             method: *method,
             url: format!("{}{path}", address.trim_end_matches('/')),
-            headers,
+            headers: headers.clone(),
             body: None,
             pinned: None,
             deadline: None,

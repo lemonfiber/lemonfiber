@@ -384,6 +384,7 @@ impl Asking<'_> {
                 method: ASKED_WITH.to_owned(),
                 path: case.operation.path(),
                 accept: Some(JSON.to_owned()),
+                headers: std::collections::BTreeMap::new(),
             },
             answer: kept(&response),
             answered: case.operation.answered.as_value().clone(),

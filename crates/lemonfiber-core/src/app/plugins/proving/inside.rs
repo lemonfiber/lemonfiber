@@ -39,6 +39,14 @@ pub(super) async fn answering(
     if let Err(unaskable) = super::asking::askable(request, &format!("{service}'s own network")) {
         return unaskable;
     }
+    if !request.headers.is_empty() {
+        return Verdict::Unproven {
+            why: format!(
+                "{service} publishes no port, and the fence that asks it from inside its own \
+                 network sends no header, so a proof naming one was never put"
+            ),
+        };
+    }
     let Some(image) = asked.image else {
         return Verdict::Unproven {
             why: format!(

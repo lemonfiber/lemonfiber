@@ -12,6 +12,7 @@ use crate::app::Ctx;
 use crate::error::Diagnose;
 use crate::error::Problem;
 
+mod again;
 mod aggregators;
 mod applications;
 mod baseline;
@@ -96,6 +97,17 @@ pub(crate) async fn reinstalled(ctx: &Ctx) {
     let _ = remonitor(ctx).await;
 }
 
+/// Wire the stack, and try each connection the pass found not answering once more, after
+/// the rest of it: a service still starting when it was reached is answering by then.
+pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
+    let first = Box::pin(pass(ctx, adopt)).await?;
+    if !first.wirings.iter().any(again::unanswered) {
+        return Ok(first);
+    }
+    let later = Box::pin(pass(ctx, adopt)).await?;
+    Ok(again::retried(first, &later))
+}
+
 /// Wire the stack's services to each other, idempotently, and report what was
 /// wired and what a re-run still owes — or, on a run that only says what it would do,
 /// report the same pass with every write left out.
@@ -134,7 +146,7 @@ pub(crate) async fn reinstalled(ctx: &Ctx) {
 /// server as the request service's identity so the household signs in once, the
 /// curators the request service hands requests to, and those the subtitle finder
 /// watches.
-pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
+async fn pass(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
     let mut manifest = ctx
         .stack
         .checked_manifest(ctx.today())

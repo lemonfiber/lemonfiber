@@ -16,10 +16,14 @@ pub use lemonfiber_conformance::recording::{
 /// What was asked for is part of *which call this is*, not a detail beside it. A
 /// recording taken without `Accept: application/json` from a service that answers XML
 /// without it is a recording of the XML, and running a JSON assertion against it would
-/// fail a probe over a header nobody sent.
+/// fail a probe over a header nobody sent. So are the headers a proof names.
 #[must_use]
 pub fn records(recorded: &Asked, asked: &lemonfiber_plugin::Request) -> bool {
     recorded.method == asked.method
         && recorded.path == asked.path
         && recorded.accept == asked.accept
+        && recorded.headers == asked.headers
 }
+
+#[cfg(test)]
+mod tests;

@@ -30,5 +30,5 @@ requirement = [
   # certificate, has the request service trust it, and gives the gate's egress service the
   # only route off the host; the gate's answers and its one forwarded call are
   # lemonfiber-request-gate's.
-  { id = "C6-R28", state = "partial", evidence = ["crates/lemonfiber-core/src/certificate/fronted.rs", "crates/lemonfiber-core/src/project/fronting.rs", "crates/lemonfiber-core/src/certificate/fronted/tests.rs::the_authority_signs_one_certificate_for_plex_tv_alone_and_the_gate_alone_reads_it", "crates/lemonfiber-core/src/project/tests/fronted.rs::fronted_has_the_gate_answer_to_plex_tv_and_the_request_service_trust_its_authority", "crates/lemonfiber-core/src/topology/tests.rs::an_egress_service_alone_reaches_off_the_host_and_shares_one_network_with_what_it_carries"] },
+  { id = "C6-R28", state = "done", evidence = ["crates/lemonfiber-core/src/certificate/fronted.rs", "crates/lemonfiber-core/src/project/fronting.rs", "crates/lemonfiber-core/src/certificate/fronted/tests.rs::the_authority_signs_one_certificate_for_plex_tv_alone_and_the_gate_alone_reads_it", "crates/lemonfiber-core/src/project/tests/fronted.rs::fronted_has_the_gate_answer_to_plex_tv_and_the_request_service_trust_its_authority", "crates/lemonfiber-core/src/topology/tests.rs::an_egress_service_alone_reaches_off_the_host_and_shares_one_network_with_what_it_carries"] },
 ]

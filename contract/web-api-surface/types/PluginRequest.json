@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "headers": {
+      "type": [
+        "object{string}"
+      ],
+      "required": false
+    },
     "method": {
       "type": [
         "string"
