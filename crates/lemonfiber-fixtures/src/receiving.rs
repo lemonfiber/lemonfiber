@@ -133,6 +133,10 @@ impl Client for Receiving {
         set_client_field(self, id, field, value)
     }
 
+    async fn forget_download_client(&self, id: &str) -> Result<(), Failure> {
+        forget_download_client(self, id)
+    }
+
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
         self.probes
             .lock()
@@ -224,6 +228,18 @@ fn set_client_field(
             value: value.to_owned(),
         });
     }
+    Ok(())
+}
+
+/// How `Receiving` answers `forget_download_client`.
+fn forget_download_client(fake: &Receiving, id: &str) -> Result<(), Failure> {
+    if matches!(fake.mode, Mode::Down) {
+        return Err(down("sonarr"));
+    }
+    fake.clients
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .retain(|held| held.id != id);
     Ok(())
 }
 

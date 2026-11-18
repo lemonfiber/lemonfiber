@@ -13,6 +13,24 @@ use lemonfiber_ports::Client;
 
 use super::{crosses_alike, curate};
 
+/// The download client the script tells the curator about.
+fn fetcher() -> DownloadClient {
+    DownloadClient {
+        name: "fetcher".to_owned(),
+        host: "fetcher".to_owned(),
+        port: 6789,
+        protocol: Protocol("sabnzbd".to_owned()),
+        credential: Credential::UserPass {
+            username: "u".to_owned(),
+            password: "p".to_owned(),
+        },
+        category: Category {
+            field: "tvCategory".to_owned(),
+            value: "tv".to_owned(),
+        },
+    }
+}
+
 /// Every operation of the capability, once, each answer written down.
 async fn script<C>(curator: &C) -> Vec<String>
 where
@@ -27,20 +45,7 @@ where
         + Pipeline
         + Fulfilling,
 {
-    let client = DownloadClient {
-        name: "fetcher".to_owned(),
-        host: "fetcher".to_owned(),
-        port: 6789,
-        protocol: Protocol("sabnzbd".to_owned()),
-        credential: Credential::UserPass {
-            username: "u".to_owned(),
-            password: "p".to_owned(),
-        },
-        category: Category {
-            field: "tvCategory".to_owned(),
-            value: "tv".to_owned(),
-        },
-    };
+    let client = fetcher();
     let folder = RootFolder {
         path: "/films".to_owned(),
         media_type: "movies".to_owned(),
@@ -83,6 +88,7 @@ where
             curator.set_client_field("2", "category", Some("tv")).await
         ),
         format!("{:?}", curator.test_download_clients().await),
+        format!("{:?}", curator.forget_download_client("2").await),
         format!("{:?}", curator.register_root_folder(&folder).await),
         format!("{:?}", curator.root_folders().await),
         format!("{:?}", curator.download_clients().await),
@@ -167,6 +173,7 @@ async fn a_curator_answers_and_is_told_through_its_contract_as_it_is_in_process(
             "update",
             "set",
             "set",
+            "forget",
             "folder",
             "upgrades",
             "upgrades",

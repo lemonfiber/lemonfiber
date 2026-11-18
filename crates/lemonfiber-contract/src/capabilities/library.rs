@@ -107,6 +107,9 @@ const FIELD: &str = "category";
 /// An item no curator holds.
 const NO_ITEM: i64 = 0;
 
+/// A download client no curator holds.
+const NO_CLIENT: &str = "0";
+
 /// The fingerprint a case asks to grab, of a release no curator holds.
 const FINGERPRINT: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -213,6 +216,8 @@ crate::contract! {
             fn set_client_field(str id: &str, str field: &str, opt_str value: Option<&str>) -> () where asks = Asked { id: held(), field: FIELD.to_owned(), value: Some(NAMED.to_owned()) };
             /// Test every download client it holds.
             fn test_download_clients() -> Vec<ClientProbe> where asks = Asked {};
+            /// Remove a download client it holds, by the id it gave it.
+            fn forget_download_client(str id: &str) -> () where since = 5, asks = Asked { id: NO_CLIENT.to_owned() };
             /// Register a folder it files into.
             fn register_root_folder(refer folder: &RootFolder as RootFolder) -> () where asks = Asked {
                 folder: RootFolder {

@@ -202,6 +202,15 @@ pub trait Client: Send + Sync {
         value: Option<&str>,
     ) -> Result<(), Failure>;
 
+    /// Remove a download client the service holds, named by the id the service assigned
+    /// it, answering as removed where it holds none by that id already.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Failure::Unsupported`] where the service cannot remove one, and
+    /// [`Failure`] when it is unreachable or refuses.
+    async fn forget_download_client(&self, id: &str) -> Result<(), Failure>;
+
     /// Ask the service to test every download client it holds, reporting whether
     /// each answered — the service's own verdict, one entry per client keyed by id.
     ///
