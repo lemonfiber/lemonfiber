@@ -63,6 +63,9 @@ fn published_as(
 }
 
 const SLSA: &str = "https://slsa.dev/provenance/v1";
+
+const UNREAD: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 const SPDX: &str = "https://spdx.dev/Document";
 
 fn caddy(digest: &str) -> Image {
@@ -330,4 +333,62 @@ async fn an_attestation_the_index_lists_twice_is_read_once() {
     let built = Oci::new(asked.clone()).built(&caddy(&digest)).await;
     assert_eq!(built.map(|built| built.statements.len()), Ok(1));
     assert_eq!(asked.requests().len(), 3);
+}
+
+#[tokio::test]
+async fn an_attestation_naming_no_layers_a_descriptor_naming_no_size_or_a_body_not_text_is_unreadable(
+) {
+    let layerless = r#"{"schemaVersion":2}"#;
+    let listing = |size: &str| {
+        format!(
+            r#"{{"schemaVersion":2,"manifests":[{{"digest":"{}","platform":{{"os":"linux","architecture":"amd64"}}}},{{"digest":"{}",{size}"annotations":{{"vnd.docker.reference.digest":"{}","vnd.docker.reference.type":"attestation-manifest"}},"platform":{{"os":"unknown","architecture":"unknown"}}}}]}}"#,
+            named("amd64"),
+            named(layerless),
+            named("amd64")
+        )
+    };
+    for (size, said) in [
+        (format!(r#""size":{},"#, layerless.len()), "names no layers"),
+        (String::new(), "declares no size"),
+    ] {
+        let index = listing(&size);
+        let read = read_off(
+            &named(&index),
+            vec![
+                (named(&index), answered(200, &[], &index)),
+                (named(layerless), answered(200, &[], layerless)),
+            ],
+        )
+        .await;
+        assert!(
+            read.as_ref().is_err_and(|why| why.contains(said)),
+            "{read:?}"
+        );
+    }
+    let index = format!(
+        r#"{{"schemaVersion":2,"manifests":[{{"digest":"{}","platform":{{"os":"linux","architecture":"amd64"}}}},{{"digest":"{UNREAD}","size":2,"annotations":{{"vnd.docker.reference.digest":"{}","vnd.docker.reference.type":"attestation-manifest"}},"platform":{{"os":"unknown","architecture":"unknown"}}}}]}}"#,
+        named("amd64"),
+        named("amd64")
+    );
+    let octets = Oci::new(Fake::by_path(vec![
+        (
+            UNREAD,
+            lemonfiber_fixtures::http::Answer::Octets {
+                status: 200,
+                bytes: vec![0xff, 0xfe],
+            },
+        ),
+        (
+            "/manifests/",
+            lemonfiber_fixtures::http::Answer::reply(200, &index),
+        ),
+    ]))
+    .built(&caddy(&named(&index)))
+    .await;
+    assert!(
+        octets
+            .as_ref()
+            .is_err_and(|why| why.reason.contains("not text")),
+        "{octets:?}"
+    );
 }
