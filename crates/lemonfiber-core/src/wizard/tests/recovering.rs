@@ -343,6 +343,7 @@ fn applying_the_plan_records_each_setting_against_what_was_there() {
     assert_eq!(
         wizard.plan().changes(&current, STAMPED),
         vec![
+            set("TZ", None, "Europe/Amsterdam"),
             set("LEMONFIBER_USENET", Some("off"), "on"),
             set("LEMONFIBER_TORRENT", None, "on"),
         ],
@@ -372,6 +373,7 @@ fn a_setting_that_was_present_but_empty_is_captured_as_empty_not_absent() {
     assert_eq!(
         wizard.plan().changes(&current, STAMPED),
         vec![
+            set("TZ", None, "Europe/Amsterdam"),
             set("LEMONFIBER_USENET", Some(""), "on"),
             set("LEMONFIBER_TORRENT", None, "on"),
         ],

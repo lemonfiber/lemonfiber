@@ -250,9 +250,30 @@
         "setting": "gluetun:endpoint-key"
       }
     ],
+    "house": {
+      "locale": "en-US",
+      "zone": "Europe/Amsterdam"
+    },
     "offered": true,
     "phase": "in-progress",
-    "plan": [],
+    "plan": [
+      {
+        "key": "TZ",
+        "origin": {
+          "origin": "operator"
+        },
+        "secret": false,
+        "value": "Europe/Amsterdam"
+      },
+      {
+        "key": "LEMONFIBER_LOCALE",
+        "origin": {
+          "origin": "operator"
+        },
+        "secret": false,
+        "value": "en-US"
+      }
+    ],
     "proof": null,
     "ready_for_review": false,
     "rehearsed": false,

@@ -241,6 +241,7 @@ mod links {
 mod copying;
 mod mounting;
 mod profiled;
+mod published;
 mod refused;
 mod retiring;
 mod rooted;

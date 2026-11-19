@@ -65,8 +65,16 @@ pub const DOMAIN: &str = "domain";
 /// The core-published setting holding the address the household reaches this machine at.
 pub const LAN_HOST: &str = "lan-host";
 
+/// The core-published setting holding the zone the stack runs in, which it also writes
+/// as [`ZONE`].
+pub const TIMEZONE: &str = "timezone";
+
+/// The core-published setting holding the house's language and region as a
+/// `language-REGION` tag.
+pub const LOCALE: &str = "locale";
+
 /// The settings the core publishes to every service.
-pub const PUBLISHED: [&str; 2] = [DOMAIN, LAN_HOST];
+pub const PUBLISHED: [&str; 4] = [DOMAIN, LAN_HOST, TIMEZONE, LOCALE];
 
 /// The egress guard's capability.
 pub const EGRESS_GUARD: &str = "network.egress-guard";

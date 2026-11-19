@@ -8248,6 +8248,13 @@
         ],
         "type": "object"
       },
+      "Locale": {
+        "examples": [
+          "en-US"
+        ],
+        "pattern": "^[a-z]{2,3}-([A-Z]{2}|[0-9]{3})$",
+        "type": "string"
+      },
       "Location": {
         "description": "Where something a service keeps is on this machine, or why that is not said.",
         "oneOf": [
@@ -18094,6 +18101,24 @@
         },
         "type": "object"
       },
+      "SetupHouse": {
+        "description": "Where the house is: the zone the stack runs in and the house's language and region.",
+        "properties": {
+          "locale": {
+            "$ref": "#/components/schemas/Locale",
+            "description": "The house's language and region."
+          },
+          "zone": {
+            "$ref": "#/components/schemas/Zone",
+            "description": "The zone the stack runs in, which it writes as `TZ`."
+          }
+        },
+        "required": [
+          "zone",
+          "locale"
+        ],
+        "type": "object"
+      },
       "SetupOutcome": {
         "description": "How a setup run ended.",
         "oneOf": [
@@ -23337,6 +23362,10 @@
             },
             "type": "array"
           },
+          "house": {
+            "$ref": "#/components/schemas/SetupHouse",
+            "description": "The house's zone and locale: the ones the operator confirmed or gave, or the ones\nproposed from the host's where none are yet."
+          },
           "offered": {
             "description": "Whether this machine has setup left to do. False once configuration\nexists and nothing is part-way through, which is when a surface directs\nthe operator to reconfiguration instead of asking the first question again.",
             "type": "boolean"
@@ -23406,6 +23435,7 @@
           "phase",
           "at",
           "asks",
+          "house",
           "unanswered",
           "ready_for_review",
           "plan",
@@ -23426,7 +23456,7 @@
           },
           {
             "const": "preflight",
-            "description": "Detects the environment: OS, Docker, Compose, daemon reachability. Informs.",
+            "description": "Detects the environment: OS, Docker, Compose, daemon reachability; and proposes\nthe house's zone and locale from the host's, for the operator to confirm or\nchange.",
             "type": "string"
           },
           {
@@ -23490,6 +23520,12 @@
             "type": "string"
           }
         ]
+      },
+      "Zone": {
+        "examples": [
+          "Europe/Amsterdam"
+        ],
+        "type": "string"
       },
       "body-device-keys": {
         "additionalProperties": false,
@@ -23724,6 +23760,19 @@
       "body-setup-answer": {
         "description": "One answer, tagged by the step it belongs to.\n\nRead back as well as built, because a surface that is not in this process\nsubmits one: the tag is the step, so an answer names the question it belongs\nto rather than arriving as a field a reader has to guess the meaning of.",
         "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "The house's zone and locale, as the operator confirmed or gave them.",
+            "properties": {
+              "house": {
+                "$ref": "#/components/schemas/SetupHouse"
+              }
+            },
+            "required": [
+              "house"
+            ],
+            "type": "object"
+          },
           {
             "additionalProperties": false,
             "description": "The protocol choice.",

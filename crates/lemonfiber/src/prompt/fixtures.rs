@@ -99,6 +99,7 @@ pub(crate) fn raw() -> RawSetup {
         household: None,
         notifications: None,
         autostart: None,
+        locale: None,
     }
 }
 

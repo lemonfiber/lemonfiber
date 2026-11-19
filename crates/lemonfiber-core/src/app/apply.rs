@@ -220,6 +220,7 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
         store::set(&env_file, key, value).map_err(Fault::Store)?;
     }
     let mut taken = taken.clone();
+    taken.settings.extend(plan.stored().cloned());
     taken
         .secrets
         .extend(plan.secrets().map(|(name, value)| (name, value.to_owned())));
@@ -358,7 +359,7 @@ fn remembered(paths: &Paths, plan: &Plan, stamp: Instant) {
             Err(_) => return,
         },
     };
-    for (key, value) in plan.settings().iter().filter(|(key, _)| !is_secret(key)) {
+    for (key, value) in plan.written().filter(|(key, _)| !is_secret(key)) {
         baseline.record(SETTINGS, key, value, stamp);
     }
     let _ = store::write(&path, &serde_json::to_string(&baseline).unwrap_or_default());

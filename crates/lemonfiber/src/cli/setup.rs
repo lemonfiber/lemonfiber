@@ -75,4 +75,8 @@ pub struct RawSetup {
     /// Whether to start the stack when the machine boots.
     #[arg(long, value_name = "BOOL")]
     pub autostart: Option<bool>,
+    /// The house's language and region as a `language-REGION` tag, such as `nl-NL`; the
+    /// one the host's `LANG` names where it is not given.
+    #[arg(long, value_name = "TAG")]
+    pub locale: Option<String>,
 }

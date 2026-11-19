@@ -202,6 +202,9 @@ pub struct WizardReport {
     pub at: crate::wizard::Step,
     /// Whether that step asks a question, as opposed to only informing.
     pub asks: bool,
+    /// The house's zone and locale: the ones the operator confirmed or gave, or the ones
+    /// proposed from the host's where none are yet.
+    pub house: crate::wizard::House,
     /// Every question that applies on this machine and has no answer yet, in the
     /// order they are put.
     pub unanswered: Vec<crate::wizard::Step>,

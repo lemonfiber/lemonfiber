@@ -28,7 +28,7 @@
 use crate::config::{
     DATA_ROOT_KEY, FRONT_DOOR_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, MEDIA_SERVER_MODE_KEY,
     PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY, PROVIDER_TLS_KEY,
-    PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_KEY, VPN_PROVIDER_KEY,
+    PROVIDER_USER_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY, VPN_KEY, VPN_PROVIDER_KEY, ZONE_KEY,
 };
 
 // Reached by their own names rather than flattened up here. Three questions about
@@ -77,7 +77,7 @@ pub struct Decision {
 /// appetite is not: setup writes it and nothing changes it afterwards, which is a
 /// decision made once and then unchangeable, which is the trap this catalogue exists to
 /// close. It is listed as owed rather than quietly left out.
-pub(crate) const DECISIONS: [Decision; 16] = [
+pub(crate) const DECISIONS: [Decision; 18] = [
     Decision {
         key: DATA_ROOT_KEY,
         cost: Cost::Consequential,
@@ -157,6 +157,16 @@ pub(crate) const DECISIONS: [Decision; 16] = [
         key: FRONT_DOOR_KEY,
         cost: Cost::Cheap,
         affects: "which service the front door names",
+    },
+    Decision {
+        key: ZONE_KEY,
+        cost: Cost::Cheap,
+        affects: "the zone every service keeps its clock in, and the one a service presenting the house to the outside says it is in. Each service reads it again when it restarts",
+    },
+    Decision {
+        key: crate::locale::SETTING,
+        cost: Cost::Cheap,
+        affects: "the language and region a service presenting the house to the outside says it has. Each service that reads it takes it again when it restarts",
     },
 ];
 

@@ -260,9 +260,18 @@ fn the_vpn_answer_is_written_while_torrents_are_chosen_and_dropped_when_they_are
 
 #[test]
 fn an_unanswered_question_contributes_no_setting() {
-    // A fresh wizard writes nothing; a partly answered one writes only what it
-    // has, never a guessed default for what it does not.
-    assert!(on_native_linux().plan().settings().is_empty());
+    // A fresh wizard writes only the house's zone and locale, which stand as proposed;
+    // a partly answered one writes only what it has, never a guessed default for what it
+    // does not.
+    assert_eq!(
+        on_native_linux()
+            .plan()
+            .settings()
+            .iter()
+            .map(|(key, _)| key.as_str())
+            .collect::<Vec<_>>(),
+        ["TZ", "LEMONFIBER_LOCALE"]
+    );
 
     let mut wizard = on_native_linux();
     wizard
@@ -308,4 +317,33 @@ fn the_library_choice_maps_to_its_mode_or_to_nothing() {
     let mut none = on_native_linux();
     none.answer(Answer::Library(Library::None)).unwrap_or(());
     assert_eq!(setting(&none.plan(), "MEDIA_SERVER_MODE"), None);
+}
+
+#[test]
+fn the_house_s_zone_and_locale_are_planned_as_proposed_until_answered() {
+    let proposed = super::super::House {
+        zone: crate::zone::Zone::proposed(Some("Asia/Tokyo")),
+        locale: crate::locale::Locale::proposed(Some("ja_JP.UTF-8")),
+    };
+    let mut wizard = on_native_linux().proposing(proposed.clone());
+    assert_eq!(wizard.house(), &proposed);
+    assert_eq!(setting(&wizard.plan(), "TZ"), Some("Asia/Tokyo"));
+    assert_eq!(setting(&wizard.plan(), "LEMONFIBER_LOCALE"), Some("ja-JP"));
+    assert!(!wizard.unanswered().contains(&Step::Preflight));
+
+    let given = super::super::House {
+        zone: crate::zone::Zone::proposed(Some("America/Chicago")),
+        locale: crate::locale::Locale::proposed(Some("en_US")),
+    };
+    assert!(wizard.answer(Answer::House(given.clone())).is_ok());
+    assert_eq!(wizard.house(), &given);
+    let plan = wizard.plan();
+    assert_eq!(setting(&plan, "TZ"), Some("America/Chicago"));
+    assert_eq!(setting(&plan, "LEMONFIBER_LOCALE"), Some("en-US"));
+    assert!(plan.written().all(|(key, _)| key != "LEMONFIBER_LOCALE"));
+    assert_eq!(
+        plan.stored().cloned().collect::<Vec<_>>(),
+        [("LEMONFIBER_LOCALE".to_owned(), "en-US".to_owned())]
+    );
+    assert!(Step::Preflight.is_question());
 }

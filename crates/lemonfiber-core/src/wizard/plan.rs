@@ -6,6 +6,7 @@
 use super::{Change, EnvFile, Kind};
 use crate::instant::Instant;
 use crate::settings::legacy::held_as;
+use crate::settings::own::is_core;
 
 /// The environment settings a reviewed wizard will write.
 ///
@@ -23,12 +24,18 @@ impl Plan {
         &self.settings
     }
 
-    /// The settings that are not credentials, as ordered key/value pairs the environment
-    /// file is written with.
+    /// The settings that are neither credentials nor the core's own, as ordered key/value
+    /// pairs the environment file is written with.
     pub(crate) fn written(&self) -> impl Iterator<Item = &(String, String)> {
         self.settings
             .iter()
-            .filter(|(key, _)| held_as(key).is_none())
+            .filter(|(key, _)| held_as(key).is_none() && !is_core(key))
+    }
+
+    /// The core's own settings, as ordered key/value pairs the settings store is written
+    /// with.
+    pub(crate) fn stored(&self) -> impl Iterator<Item = &(String, String)> {
+        self.settings.iter().filter(|(key, _)| is_core(key))
     }
 
     /// The credentials, each by the name the secret store holds it as, with its value.

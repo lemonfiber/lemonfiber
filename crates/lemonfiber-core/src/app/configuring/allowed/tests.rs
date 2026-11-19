@@ -33,13 +33,26 @@ async fn a_name_nothing_reads_is_refused() {
             "{refused} is refused"
         );
     }
-    for known in ["LEMONFIBER_EXPLANATIONS", "TZ", "SONARR_API_KEY"] {
+    for (known, value) in [
+        ("LEMONFIBER_EXPLANATIONS", "x"),
+        ("TZ", "Asia/Tokyo"),
+        ("SONARR_API_KEY", "x"),
+    ] {
         assert_eq!(
-            refusal(&ctx, &held, known, "x").await,
+            refusal(&ctx, &held, known, value).await,
             None,
             "{known} is known"
         );
     }
+}
+
+/// The zone the stack runs in is one the time zone database names, or it is refused.
+#[tokio::test]
+async fn a_zone_the_database_does_not_name_is_refused() {
+    let ctx = ctx_in(Path::new("/home/op/.config/lemonfiber"), Path::new("/data"));
+    assert!(refusal(&ctx, &EnvFile::default(), "TZ", "Mars/Olympus")
+        .await
+        .is_some_and(|why| why.starts_with("TZ is the zone the stack runs in")));
 }
 
 /// The embedded stack declares the names something it runs reads, and none of the keys

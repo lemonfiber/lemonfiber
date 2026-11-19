@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where the house is: the zone the stack runs in and the house's language and region.",
+  "type": "object",
+  "properties": {
+    "locale": {
+      "description": "The house's language and region.",
+      "$ref": "Locale.json"
+    },
+    "zone": {
+      "description": "The zone the stack runs in, which it writes as `TZ`.",
+      "$ref": "Zone.json"
+    }
+  },
+  "required": [
+    "zone",
+    "locale"
+  ]
+}

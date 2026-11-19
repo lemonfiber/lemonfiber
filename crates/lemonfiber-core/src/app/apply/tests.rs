@@ -44,6 +44,21 @@ fn made_dir(path: &Path) -> Change {
     }
 }
 
+/// A journal line for a setting apply recorded in the settings store where none was.
+fn a_fresh_setting(name: &str, value: &str) -> Change {
+    Change {
+        at: STAMPED,
+        operation: "apply".to_owned(),
+        target: name.to_owned(),
+        kind: Kind::Setting {
+            name: name.to_owned(),
+            previous: None,
+            current: Some(value.to_owned()),
+            filed: None,
+        },
+    }
+}
+
 /// The journal text those changes serialise to, one object per line.
 fn journal_text(changes: &[Change]) -> String {
     changes
@@ -243,6 +258,7 @@ fn every_write_is_journalled_so_it_can_be_unwound() {
         written,
         journal_text(&[
             made_dir(&root),
+            a_fresh_write("TZ", "Europe/Amsterdam"),
             a_fresh_write("LEMONFIBER_USENET", "on"),
             a_fresh_write("LEMONFIBER_TORRENT", "on"),
             a_fresh_write("LEMONFIBER_VPN", "on"),
@@ -250,6 +266,7 @@ fn every_write_is_journalled_so_it_can_be_unwound() {
             a_fresh_write("PUID", "1000"),
             a_fresh_write("PGID", "1000"),
             a_fresh_write("MEDIA_SERVER_MODE", "docker"),
+            a_fresh_setting("LEMONFIBER_LOCALE", "en-US"),
         ]),
     );
 }
@@ -274,6 +291,7 @@ fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
         journal_text(&[
             made_dir(&parent),
             made_dir(&root),
+            a_fresh_write("TZ", "Europe/Amsterdam"),
             a_fresh_write("LEMONFIBER_USENET", "on"),
             a_fresh_write("LEMONFIBER_TORRENT", "on"),
             a_fresh_write("LEMONFIBER_VPN", "on"),
@@ -281,6 +299,7 @@ fn a_data_directory_several_levels_deep_records_every_directory_it_makes() {
             a_fresh_write("PUID", "1000"),
             a_fresh_write("PGID", "1000"),
             a_fresh_write("MEDIA_SERVER_MODE", "docker"),
+            a_fresh_setting("LEMONFIBER_LOCALE", "en-US"),
         ]),
     );
 }

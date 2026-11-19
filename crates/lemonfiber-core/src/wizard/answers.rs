@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 
 use super::{PathBuf, Protocols};
 use crate::alert::Appetite;
+use crate::locale::Locale;
+use crate::zone::Zone;
 use serde::{Deserialize, Serialize};
 
 /// How the operator wants their existing and downloaded media served, where they
@@ -278,6 +280,20 @@ pub struct Answers {
     pub vpn: Option<Vpn>,
     /// Whether the stack starts on boot.
     pub autostart: Option<bool>,
+    /// The house's zone and locale, where the operator confirmed or gave them. Absent
+    /// from a progress file written before the question existed, so defaulted.
+    #[serde(default)]
+    pub house: Option<House>,
+}
+
+/// Where the house is: the zone the stack runs in and the house's language and region.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[schemars(rename = "SetupHouse")]
+pub struct House {
+    /// The zone the stack runs in, which it writes as `TZ`.
+    pub zone: Zone,
+    /// The house's language and region.
+    pub locale: Locale,
 }
 
 /// One answer, tagged by the step it belongs to.
@@ -288,6 +304,8 @@ pub struct Answers {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Answer {
+    /// The house's zone and locale, as the operator confirmed or gave them.
+    House(House),
     /// The protocol choice.
     Protocols(Protocols),
     /// Whether a VPN carries the torrents, and where none does, that the operator

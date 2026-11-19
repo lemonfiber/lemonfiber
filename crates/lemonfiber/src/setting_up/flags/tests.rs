@@ -384,3 +384,33 @@ fn a_vpn_flag_that_is_not_name_equals_value_is_refused_without_saying_a_secret()
     assert!(setting.is_err_and(|why| why.contains("guard:vpn-type")));
     assert!(secret.is_err_and(|why| why.contains("--vpn-secret") && !why.contains("a-key")));
 }
+
+#[test]
+fn the_house_s_locale_is_the_flag_s_or_the_proposal_and_its_zone_the_proposal() {
+    let proposed = lemonfiber_core::wizard::House {
+        zone: lemonfiber_core::zone::Zone::proposed(Some("Asia/Tokyo")),
+        locale: lemonfiber_core::locale::Locale::proposed(Some("ja_JP.UTF-8")),
+    };
+    let unflagged = Flags::new(
+        SetupFlags::parse(workable()).unwrap_or(SetupFlags::none()),
+        PathBuf::from("/elsewhere"),
+    );
+    assert_eq!(unflagged.house(&proposed), proposed);
+    let flagged = Flags::new(
+        SetupFlags::parse(RawSetup {
+            locale: Some("nl-NL".to_owned()),
+            ..workable()
+        })
+        .unwrap_or(SetupFlags::none()),
+        PathBuf::from("/elsewhere"),
+    );
+    let house = flagged.house(&proposed);
+    assert_eq!(house.locale.as_str(), "nl-NL");
+    assert_eq!(house.zone, proposed.zone);
+    assert!(SetupFlags::parse(RawSetup {
+        locale: Some("nl_NL".to_owned()),
+        ..workable()
+    })
+    .err()
+    .is_some_and(|why| why.starts_with("--locale: LEMONFIBER_LOCALE is the house's language")));
+}

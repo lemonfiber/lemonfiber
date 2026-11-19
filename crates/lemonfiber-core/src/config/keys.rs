@@ -435,6 +435,8 @@ pub const SETTINGS: &[&str] = &[
     FRONT_DOOR_KEY,
     FILLS_KEY,
     FILLS_WHY_KEY,
+    ZONE_KEY,
+    crate::locale::SETTING,
 ];
 
 /// What a minted replacement's name ends in, after the name of the credential it

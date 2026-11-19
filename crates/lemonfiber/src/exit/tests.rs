@@ -42,6 +42,7 @@ fn a_wizard() -> WizardReport {
         phase: Phase::InProgress,
         at: Step::DataLocation,
         asks: true,
+        house: lemonfiber_core::wizard::House::default(),
         unanswered: Vec::new(),
         ready_for_review: false,
         plan: Vec::new(),

@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "locale": {
+      "type": [
+        "ref:Locale"
+      ],
+      "required": true
+    },
+    "zone": {
+      "type": [
+        "ref:Zone"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

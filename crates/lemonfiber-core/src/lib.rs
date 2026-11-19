@@ -85,6 +85,7 @@ pub mod household;
 pub mod invitation;
 pub mod journal;
 pub mod keys;
+pub mod locale;
 pub mod logs;
 pub mod machine;
 pub mod materialised;
@@ -167,6 +168,7 @@ pub mod walkthrough;
 pub mod wiring;
 pub mod within;
 pub mod wizard;
+pub mod zone;
 
 /// The name of the product, as it appears to users.
 pub const PRODUCT: &str = "lemonfiber";

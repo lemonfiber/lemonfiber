@@ -522,6 +522,7 @@ pub(super) fn a_setup_part_way() -> WizardReport {
         phase: lemonfiber_core::wizard::Phase::InProgress,
         at: lemonfiber_core::wizard::Step::Credentials,
         asks: true,
+        house: lemonfiber_core::wizard::House::default(),
         unanswered: vec![
             lemonfiber_core::wizard::Step::Credentials,
             lemonfiber_core::wizard::Step::Library,

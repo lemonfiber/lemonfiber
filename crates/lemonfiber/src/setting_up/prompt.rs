@@ -9,7 +9,7 @@ use lemonfiber_core::config::Protocols;
 use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::Library;
+use lemonfiber_core::wizard::{House, Library};
 
 /// How the operator is asked the questions setup's walk puts to them.
 ///
@@ -56,6 +56,8 @@ pub trait Prompt {
     fn notifications(&self) -> Appetite;
     /// Whether the stack starts on boot.
     fn autostart(&self) -> bool;
+    /// The house's zone and locale, offered `proposed` to confirm or change.
+    fn house(&self, proposed: &House) -> House;
     /// Whether the operator, shown what applying will write, confirms it.
     fn confirm(&self, plan: &[SettingReport]) -> bool;
 }

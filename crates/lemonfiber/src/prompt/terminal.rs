@@ -12,12 +12,14 @@ use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::Asking;
 use lemonfiber_core::autostart::DECLINE_CONSEQUENCE;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::locale::Locale;
 use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::storage::COPY_CONSEQUENCE;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::Library;
+use lemonfiber_core::wizard::{House, Library};
+use lemonfiber_core::zone::Zone;
 
 use super::{Answers, CredentialChoice, Prompt, ProviderEntry};
 use crate::say::say;
@@ -109,6 +111,26 @@ impl Terminal {
         }
         met.push(word);
         true
+    }
+
+    /// Ask for a value, taking `proposed` where nothing is given and asking again, saying
+    /// why, where what is given does not read.
+    fn read<T: Clone + std::fmt::Display>(
+        &self,
+        question: &str,
+        proposed: &T,
+        reading: impl Fn(&str) -> Result<T, String>,
+    ) -> T {
+        loop {
+            let answer = self.answers.ask(&format!("{question} [{proposed}]:"));
+            if answer.is_empty() {
+                return proposed.clone();
+            }
+            match reading(&answer) {
+                Ok(read) => return read,
+                Err(why) => say!("  {why}."),
+            }
+        }
     }
 
     /// Ask a yes-or-no question, taking the default where the answer is neither.
@@ -399,6 +421,20 @@ impl Prompt for Terminal {
         // answer — a laptop that is not always on has no business starting a media
         // stack at login. Nothing here decides for them.
         self.yes_no("Start the stack when this machine boots?", false)
+    }
+    fn house(&self, proposed: &House) -> House {
+        House {
+            zone: self.read(
+                "\nThe zone the stack keeps its clock in, such as Europe/Amsterdam.",
+                &proposed.zone,
+                Zone::read,
+            ),
+            locale: self.read(
+                "The house's language and region, as a tag such as nl-NL or en-US.",
+                &proposed.locale,
+                Locale::read,
+            ),
+        }
     }
 
     fn confirm(&self, plan: &[SettingReport]) -> bool {

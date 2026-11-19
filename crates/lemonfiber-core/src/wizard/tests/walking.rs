@@ -32,6 +32,7 @@ fn setup_is_offered_only_when_nothing_is_configured() {
 #[test]
 fn only_the_question_steps_report_as_questions() {
     for step in [
+        Step::Preflight,
         Step::Protocols,
         Step::DataLocation,
         Step::ServiceUser,
@@ -41,12 +42,7 @@ fn only_the_question_steps_report_as_questions() {
     ] {
         assert!(step.is_question(), "{step:?} asks something");
     }
-    for step in [
-        Step::Welcome,
-        Step::Preflight,
-        Step::Prerequisites,
-        Step::Review,
-    ] {
+    for step in [Step::Welcome, Step::Prerequisites, Step::Review] {
         assert!(!step.is_question(), "{step:?} only informs");
     }
 }

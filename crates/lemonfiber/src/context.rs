@@ -194,6 +194,8 @@ pub(crate) fn settings_at(run: Option<&Ctx>, paths: Option<&Paths>) -> Settings 
         indexer: indexer_from_env(&recorded),
         admission: paths.map(Paths::admission),
         companion: paths.map(Paths::companion),
+        host_locale: std::env::var(lemonfiber_core::locale::HOST).ok(),
+        host_zone: lemonfiber_core::zone::Zone::host(),
         household_host: household_host_from_env(&recorded),
         events_address: lemonfiber_core::config::events_address_from_env(&recorded),
         household_domain: lemonfiber_core::config::household_domain_from_env(&recorded),

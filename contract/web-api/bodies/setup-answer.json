@@ -4,6 +4,19 @@
   "description": "One answer, tagged by the step it belongs to.\n\nRead back as well as built, because a surface that is not in this process\nsubmits one: the tag is the step, so an answer names the question it belongs\nto rather than arriving as a field a reader has to guess the meaning of.",
   "oneOf": [
     {
+      "description": "The house's zone and locale, as the operator confirmed or gave them.",
+      "type": "object",
+      "properties": {
+        "house": {
+          "$ref": "../defs/SetupHouse.json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "house"
+      ]
+    },
+    {
       "description": "The protocol choice.",
       "type": "object",
       "properties": {
