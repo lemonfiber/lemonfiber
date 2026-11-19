@@ -29,9 +29,25 @@ pub fn call(
     key: &str,
     body: Option<&str>,
 ) -> Result<Answered, String> {
+    call_within(method, port, path, key, body, PATIENCE)
+}
+
+/// [`call`], waiting up to `patience` for the answer.
+///
+/// # Errors
+///
+/// Where the service cannot be reached or answers nothing HTTP within `patience`.
+pub fn call_within(
+    method: &str,
+    port: u16,
+    path: &str,
+    key: &str,
+    body: Option<&str>,
+    patience: Duration,
+) -> Result<Answered, String> {
     let mut stream = TcpStream::connect(("127.0.0.1", port))
         .map_err(|why| format!("127.0.0.1:{port}: {why}"))?;
-    let _ = stream.set_read_timeout(Some(PATIENCE));
+    let _ = stream.set_read_timeout(Some(patience));
     let sent = body.unwrap_or_default();
     write!(
         stream,
