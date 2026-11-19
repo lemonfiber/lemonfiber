@@ -141,3 +141,21 @@ async fn an_action_whose_command_cannot_be_rehearsed_is_refused_with_its_reason(
     assert!(rendered.contains(r#""kind":"error""#), "{rendered}");
     assert!(rendered.contains("REHEARSE-"), "{rendered}");
 }
+
+#[test]
+fn the_reads_every_request_makes_rehearse_as_the_reads_they_are() {
+    use lemonfiber_core::app::admitting::{Asked, Carried};
+    use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
+    use lemonfiber_core::app::Command;
+
+    let caller = Command::Admission(Asked::Caller(Carried {
+        offered: None,
+        arrived: None,
+    }));
+    for command in [Command::Standing, caller] {
+        assert!(
+            matches!(asked(&command).rehearsal, Rehearsal::Reads),
+            "{command:?}"
+        );
+    }
+}
