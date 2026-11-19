@@ -53,6 +53,9 @@ pub struct Placed {
     pub digest: String,
     /// The readable name that digest went by when it was installed.
     pub tag: String,
+    /// The upstream image and release its image is built on, where its manifest says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_on: Option<lemonfiber_plugin::BuiltOn>,
     /// Where inside the container its one configuration directory is mounted.
     ///
     /// Resolved rather than optional. The record answers where the directory is, and
@@ -178,6 +181,7 @@ impl Placed {
             image: service.image.clone(),
             digest: service.digest.clone(),
             tag: service.tag.clone(),
+            built_on: service.built_on.clone(),
             config_path: service.configuration().to_owned(),
             takes_data: service.takes_data,
             reached: Reached::of(service, entry),

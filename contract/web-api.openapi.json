@@ -1714,6 +1714,83 @@
           }
         ]
       },
+      "Based": {
+        "description": "What a service says its image is built on, and what this build makes of it.",
+        "oneOf": [
+          {
+            "description": "The build of every platform's image is recorded as starting from it.",
+            "properties": {
+              "basis": {
+                "const": "recorded",
+                "type": "string"
+              },
+              "digests": {
+                "description": "The digest of the upstream image each build is recorded as starting from.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "basis",
+              "digests"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The build provenance could not be asked for.",
+            "properties": {
+              "basis": {
+                "const": "unproven",
+                "type": "string"
+              },
+              "why": {
+                "description": "What stopped it being asked for.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "basis",
+              "why"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The build of some platform's image is not recorded as starting from it.",
+            "properties": {
+              "basis": {
+                "const": "refused",
+                "type": "string"
+              },
+              "why": {
+                "description": "What each such build is recorded as starting from.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "basis",
+              "why"
+            ],
+            "type": "object"
+          }
+        ],
+        "properties": {
+          "image": {
+            "description": "The upstream image, as the manifest names it.",
+            "type": "string"
+          },
+          "release": {
+            "description": "The upstream's release, as the manifest names it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image",
+          "release"
+        ],
+        "type": "object"
+      },
       "Became": {
         "description": "What asking for a title came to.",
         "oneOf": [
@@ -11446,6 +11523,25 @@
         ],
         "type": "object"
       },
+      "PluginBuiltOn": {
+        "additionalProperties": false,
+        "description": "The upstream image a service's image is built on, and the release of it the build\nstarted from.",
+        "properties": {
+          "image": {
+            "description": "The upstream image's registry path as the build names it, without tag or digest.",
+            "type": "string"
+          },
+          "release": {
+            "description": "The upstream's release the build started from, as that image tags it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image",
+          "release"
+        ],
+        "type": "object"
+      },
       "PluginChange": {
         "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. None is an\nedit to a file the stack already has: a plugin's route is the proxy's routing table\nand its dashboard entry the panel list's, each applied over its contract.",
         "properties": {
@@ -12331,6 +12427,17 @@
               "string",
               "null"
             ]
+          },
+          "built_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginBuiltOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream image and release its image is built on, where its manifest says."
           },
           "config_path": {
             "description": "Where inside the container its one configuration directory is mounted.\n\nResolved rather than optional. The record answers where the directory is, and\na run that re-derived the fallback would answer for a container it did not\nwrite the day that fallback moved.",
@@ -22228,6 +22335,17 @@
           }
         ],
         "properties": {
+          "built_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Based"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the service says its image is built on, and what its build provenance makes\nof that, where it says."
+          },
           "digest": {
             "description": "The digest that fixes what runs.",
             "type": "string"
@@ -22263,7 +22381,7 @@
             "type": "array"
           },
           "installable": {
-            "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none.",
+            "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none, and so does an\nupstream image a service says it is built on that its build provenance does not\nrecord.",
             "type": "boolean"
           }
         },

@@ -3,8 +3,9 @@
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::filling::{Filling, Shown};
 use lemonfiber_core::plugin::{
-    Asserted, Assertion, CaseVerdict, Claimed, Claiming, Conformed, Contributed, Evidence, Failed,
-    Judged, Provenance, Ran, Recorded, Taken, Took, Verdict, Violation, Vouch, Vouched,
+    Asserted, Assertion, Based, Basis, CaseVerdict, Claimed, Claiming, Conformed, Contributed,
+    Evidence, Failed, Judged, Provenance, Ran, Recorded, Taken, Took, Verdict, Violation, Vouch,
+    Vouched,
 };
 
 /// What the four reads of a plugin's source answer with.
@@ -99,6 +100,16 @@ fn vouched() -> Vouched {
             held: Provenance::Signed {
                 by: "keys/subber.pem".to_owned(),
             },
+            built_on: Some(Based {
+                image: "python".to_owned(),
+                release: "3.13.1".to_owned(),
+                held: Basis::Recorded {
+                    digests: vec![
+                        "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+                            .to_owned(),
+                    ],
+                },
+            }),
         }],
         installable: true,
     }

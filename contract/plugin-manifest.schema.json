@@ -401,6 +401,16 @@
         {"description": "Published on the host's loopback alone, and reached by the household by name through\nthe stack's proxy.", "type": "string", "const": "proxied"}
       ]
     },
+    "PluginBuiltOn": {
+      "description": "The upstream image a service's image is built on, and the release of it the build\nstarted from.",
+      "type": "object",
+      "properties": {
+        "image": {"description": "The upstream image's registry path as the build names it, without tag or digest.", "type": "string"},
+        "release": {"description": "The upstream's release the build started from, as that image tags it.", "type": "string"}
+      },
+      "additionalProperties": false,
+      "required": ["image", "release"]
+    },
     "PluginConstraint": {
       "description": "A kind of constraint an expectation can put on a body.\n\nThe same vocabulary a proof's expectation and a contributed check's use, so that\n\"a status alone is not evidence\" is one rule rather than three. Read as well as\nwritten: a declaration that an assertion fails on a recording names the one of these\nthat fails there.",
       "oneOf": [
@@ -600,6 +610,13 @@
           "description": "Which tier every port it publishes is published on.",
           "anyOf": [
             {"$ref": "#/$defs/PluginBind"},
+            {"type": "null"}
+          ]
+        },
+        "built_on": {
+          "description": "The upstream image this service's image is built on and the release it was built\nfrom, where its image is built on an upstream's.",
+          "anyOf": [
+            {"$ref": "#/$defs/PluginBuiltOn"},
             {"type": "null"}
           ]
         },

@@ -104,7 +104,9 @@ pub use lemonfiber_manifest::container::Fields;
 pub use owning::{owned_by, owner, owns};
 pub use placing::{configuration, key_file, mount_sources, mount_tree, writes, Lands, Write};
 pub use profiled::{joining, profile_of, profiled, Profiled};
-pub use provenance::{held, vouched, Key, Provenance, Unusable, Vouch, Vouched};
+pub use provenance::{
+    based, held, vouched, Based, Basis, Key, Provenance, Unusable, Vouch, Vouched,
+};
 pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};

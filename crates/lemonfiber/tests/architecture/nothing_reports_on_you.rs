@@ -120,6 +120,11 @@ const NAMED: &[(&str, Reach, &str)] = &[
          Scheduler reads; it is an identifier inside the file and nothing fetches it",
     ),
     (
+        "slsa.dev",
+        Reach::Printed,
+        "the prefix of the predicate type a build provenance statement in an image index names          itself by, read to pick those statements out from the rest; it is an identifier in the          registry's answer and nothing fetches it",
+    ),
+    (
         "trash-guides.info",
         Reach::Printed,
         "named in a comment as where the community profiles come from; the quality sync tool \

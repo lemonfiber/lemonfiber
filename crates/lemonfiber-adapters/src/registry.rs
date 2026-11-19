@@ -26,8 +26,12 @@ use async_trait::async_trait;
 use base64::Engine as _;
 use lemonfiber_ports::http::{Http, Method, Request, Response};
 use lemonfiber_ports::registry::{
-    is_digest, Image, Offered, Registry, Tagged, Unanswerable, REVISION,
+    is_digest, Built, Image, Offered, Registry, Tagged, Unanswerable, DEFAULT_REGISTRY,
+    DEFAULT_REGISTRY_HOST, DEFAULT_REGISTRY_LIBRARY, REVISION,
 };
+
+mod building;
+mod served;
 
 /// Where the signature's own bytes sit on a layer.
 const SIGNATURE: &str = "dev.cosignproject.cosign/signature";
@@ -83,14 +87,14 @@ fn addressed(repository: &str) -> (String, String) {
     let (host, path) = repository
         .split_once('/')
         .filter(|(host, _)| host.contains('.') || host.contains(':') || *host == "localhost")
-        .unwrap_or(("docker.io", repository));
-    let host = if host == "docker.io" {
-        "registry-1.docker.io"
+        .unwrap_or((DEFAULT_REGISTRY, repository));
+    let host = if host == DEFAULT_REGISTRY {
+        DEFAULT_REGISTRY_HOST
     } else {
         host
     };
-    let path = if host == "registry-1.docker.io" && !path.contains('/') {
-        format!("library/{path}")
+    let path = if host == DEFAULT_REGISTRY_HOST && !path.contains('/') {
+        format!("{DEFAULT_REGISTRY_LIBRARY}{path}")
     } else {
         path.to_owned()
     };
@@ -115,6 +119,10 @@ impl Registry for Oci {
     async fn revision(&self, image: &Image) -> Result<Option<String>, Unanswerable> {
         revising(self.reaching.as_ref(), image).await
     }
+
+    async fn built(&self, image: &Image) -> Result<Built, Unanswerable> {
+        building::built(self.reaching.as_ref(), image).await
+    }
 }
 
 /// The commit one image says it was built from, asked over one transport: the one every
@@ -124,11 +132,10 @@ async fn revising(reaching: &dyn Http, image: &Image) -> Result<Option<String>, 
     let unanswerable = |why: String| Unanswerable::about(image, &why);
     let mut held = None;
     let manifests = format!("https://{host}/v2/{path}/manifests");
-    let named = json(
+    let named = served::json_by_digest(
         reaching,
-        &host,
-        &format!("{manifests}/{}", image.digest),
-        INDEXES,
+        (&host, &format!("{manifests}/{}", image.digest), INDEXES),
+        &image.digest,
         &mut held,
     )
     .await
@@ -144,11 +151,10 @@ async fn revising(reaching: &dyn Http, image: &Image) -> Result<Option<String>, 
             .get("digest")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| unanswerable("an image its index lists names no digest".to_owned()))?;
-        let manifest = json(
+        let manifest = served::json_by_digest(
             reaching,
-            &host,
-            &format!("{manifests}/{digest}"),
-            MANIFESTS,
+            (&host, &format!("{manifests}/{digest}"), MANIFESTS),
+            digest,
             &mut held,
         )
         .await
@@ -195,11 +201,14 @@ async fn labelled(
         .and_then(|config| config.get("digest"))
         .and_then(serde_json::Value::as_str)
         .ok_or("its manifest names no configuration")?;
-    let configuration = json(
+    let configuration = served::json_by_digest(
         reaching,
-        host,
-        &format!("https://{host}/v2/{path}/blobs/{digest}"),
-        ANYTHING,
+        (
+            host,
+            &format!("https://{host}/v2/{path}/blobs/{digest}"),
+            ANYTHING,
+        ),
+        digest,
         held,
     )
     .await?;
@@ -209,22 +218,6 @@ async fn labelled(
         .and_then(|labels| labels.get(REVISION))
         .and_then(serde_json::Value::as_str)
         .map(str::to_owned))
-}
-
-/// What `url` on the registry at `host` answers as JSON, or why it answered nothing that
-/// reads.
-async fn json(
-    reaching: &dyn Http,
-    host: &str,
-    url: &str,
-    accept: &str,
-    held: &mut Option<String>,
-) -> Result<serde_json::Value, String> {
-    let answer = authorised(reaching, host, url, accept, held).await?;
-    if !answer.is_success() {
-        return Err(format!("{url} answered {}", answer.status));
-    }
-    serde_json::from_str(&answer.body).map_err(|why| format!("{url} answered no JSON: {why}"))
 }
 
 /// The digest a registry publishes one tag at, asked over one transport.
@@ -304,7 +297,7 @@ fn challenged(host: &str, challenge: &str) -> Option<String> {
     let realm = field("realm")?;
     let realm_host = realm.strip_prefix("https://")?.split('/').next()?;
     let trusted =
-        realm_host == host || (host == "registry-1.docker.io" && realm_host == DOCKER_HUB_TOKENS);
+        realm_host == host || (host == DEFAULT_REGISTRY_HOST && realm_host == DOCKER_HUB_TOKENS);
     if !trusted {
         return None;
     }
@@ -412,19 +405,10 @@ async fn asking(reaching: &dyn Http, image: &Image) -> Result<Vec<Offered>, Unan
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| Unanswerable::about(image, "a signature layer names no blob"))?;
         let blob = format!("https://{host}/v2/{path}/blobs/{digest}");
-        let payload = authorised(reaching, &host, &blob, ANYTHING, &mut held)
+        let payload = served::by_digest(reaching, (&host, &blob, ANYTHING), digest, &mut held)
             .await
             .map_err(|why| Unanswerable::about(image, &why))?;
-        if !payload.is_success() {
-            return Err(Unanswerable::about(
-                image,
-                &format!("{blob} answered {}", payload.status),
-            ));
-        }
-        offered.push(Offered {
-            payload: payload.body,
-            signature,
-        });
+        offered.push(Offered { payload, signature });
     }
     Ok(offered)
 }

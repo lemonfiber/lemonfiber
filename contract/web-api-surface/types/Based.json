@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "basis": {
+      "type": [
+        "const:\"recorded\"",
+        "const:\"refused\"",
+        "const:\"unproven\""
+      ],
+      "required": true
+    },
+    "digests": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "image": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"recorded\"",
+    "\"refused\"",
+    "\"unproven\""
+  ]
+}

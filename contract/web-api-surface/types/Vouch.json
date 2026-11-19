@@ -1,5 +1,11 @@
 {
   "fields": {
+    "built_on": {
+      "type": [
+        "anyOf(null,ref:Based)"
+      ],
+      "required": false
+    },
     "by": {
       "type": [
         "string"

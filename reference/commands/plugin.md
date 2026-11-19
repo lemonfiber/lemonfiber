@@ -232,6 +232,8 @@ Ask each image's registry whether anybody has said it is theirs.
 
 The one read here that reaches the network, and the only one: it asks the registry the manifest pins an image in whether it offers a signature for that exact digest, and says what this build makes of the answer.
 
+A service saying its image is built on an upstream's, in `built_on`, is held to the build provenance beside that image: the build of every platform's image has to be recorded as starting from that upstream image at that release, or it is **refused**, naming the service and what the provenance records. Provenance nobody could ask for leaves it **unproven**.
+
 Three answers and never two. An image whose signature verifies against a key you hold is **signed**. One nobody signed is **unproven** — a publisher who signed nothing has made no claim, which is a different fact from a claim that did not check out, and it does not stop an install. One carrying a signature that does not hold is **refused**, and it does.
 
 Without `--key` nothing can be verified, so an image a registry does offer a signature for is reported unproven rather than signed. Nothing is ever reported as signed on the strength of an answer that did not arrive.

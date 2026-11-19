@@ -11,6 +11,7 @@
 //! reach rather than a missing feature.
 
 mod asking;
+mod built;
 mod evidence;
 mod health;
 mod reach;
@@ -23,6 +24,7 @@ use crate::conforming::nonconforming;
 use crate::{is_compatible, Failure, SUPPORTED_SCHEMA_VERSIONS};
 
 pub use asking::Ask;
+pub use built::BuiltOn;
 pub use evidence::{
     Claim, ClaimProbe, Contribution, Declaration, Declared, Expect, Expected, ExpectedKind, Proof,
     Request, Run, LONGEST_ARG, MOST_ARGS, NAMED_HEADERS, RUN_TIMEOUT,
@@ -191,6 +193,10 @@ pub struct Service {
     /// The human-readable version the digest corresponds to. Recorded and shown;
     /// never resolved.
     pub tag: String,
+    /// The upstream image this service's image is built on and the release it was built
+    /// from, where its image is built on an upstream's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_on: Option<BuiltOn>,
     /// Where it is published on the host, absent for a service that publishes nothing.
     #[serde(default)]
     pub port: Option<u16>,

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The upstream image a service's image is built on, and the release of it the build\nstarted from.",
+  "type": "object",
+  "properties": {
+    "image": {
+      "description": "The upstream image's registry path as the build names it, without tag or digest.",
+      "type": "string"
+    },
+    "release": {
+      "description": "The upstream's release the build started from, as that image tags it.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "image",
+    "release"
+  ]
+}
