@@ -62,19 +62,10 @@ fn a_refusal_raised_as_a_problem_answers_at_its_status() {
 }
 
 #[test]
-fn only_the_door_answers_unauthorized() {
-    let unauthorized: Vec<Refusal> = Refusal::EVERY
+fn nothing_the_surface_refuses_itself_answers_unauthorized() {
+    assert!(Refusal::EVERY
         .into_iter()
-        .filter(|refusal| refusal.status() == StatusCode::UNAUTHORIZED)
-        .collect();
-    assert_eq!(
-        unauthorized,
-        vec![
-            Refusal::NotThePassword,
-            Refusal::NotOpen,
-            Refusal::NotWaiting
-        ]
-    );
+        .all(|refusal| refusal.status() != StatusCode::UNAUTHORIZED));
 }
 
 #[test]
@@ -88,8 +79,6 @@ fn the_refusals_of_who_is_asking_share_a_status_and_not_a_code() {
         vec![
             Refusal::NotAdmitted,
             Refusal::Elsewhere,
-            Refusal::NotYours,
-            Refusal::Unconfirmed,
             Refusal::KeyInTheClear,
             Refusal::NotForAKey,
         ]
@@ -99,14 +88,7 @@ fn the_refusals_of_who_is_asking_share_a_status_and_not_a_code() {
 #[test]
 fn only_the_refusals_that_are_not_faults_are_warnings() {
     for refusal in Refusal::EVERY {
-        let warns = matches!(
-            refusal,
-            Refusal::NotYours
-                | Refusal::Unconfirmed
-                | Refusal::TooManyAttempts
-                | Refusal::TooManyCodes
-                | Refusal::NotForAKey
-        );
+        let warns = matches!(refusal, Refusal::NotForAKey);
         let severity = refusal.problem("").severity;
         assert_eq!(
             severity == lemonfiber_core::error::Severity::Warning,

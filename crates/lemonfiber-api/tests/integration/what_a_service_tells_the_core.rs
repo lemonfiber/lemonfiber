@@ -29,10 +29,7 @@ fn a_machine(named: &str) -> axum::Router {
         let _ = fs::write(dir.join("notify-events.json"), kept.to_string());
     }
     ctx.settings.env_file = Some(env.to_path_buf());
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission.to_path_buf()),
-        ..Admitting::default()
-    });
+    let admitting = unhoused();
     surface(ctx.holding(env).holding(admission), &admitting).0
 }
 

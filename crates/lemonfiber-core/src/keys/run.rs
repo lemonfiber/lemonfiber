@@ -9,6 +9,7 @@
 //! themselves, whatever surface asked.
 
 use std::collections::BTreeSet;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use crate::app::{Ctx, Outcome};
@@ -41,16 +42,16 @@ pub enum Asked {
         /// Whether to mint it as a claim, collected once by the program it is for,
         /// rather than handing over its secret now.
         claim: bool,
-        /// The device key whose signature proved the operator for this mint, where one
-        /// did rather than the password.
-        proved_by: Option<String>,
+        /// What proves who asked, where it was asked over the web API rather than at this
+        /// machine's terminal.
+        proving: Option<Box<Proving>>,
     },
     /// Collect a key minted as a claim, with that claim.
     Collect {
         /// The claim, as the key link carried it.
         claim: String,
         /// The address the collecting request came from, where it is known.
-        from: Option<String>,
+        from: Option<IpAddr>,
     },
     /// List the keys, without their secrets: every one to the operator, and to a
     /// member only those scoped to them.
@@ -100,147 +101,51 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             scope,
             purpose,
             by,
-            claim: false,
-            proved_by,
-        } => mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
-            .await
-            .map(Outcome::Minted),
-        Asked::Mint {
-            name,
-            scope,
-            purpose,
-            by,
-            claim: true,
-            proved_by,
-        } => claimed::mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
-            .await
-            .map(Outcome::KeyClaim),
-        Asked::Collect { claim, from } => claimed::collect(ctx, &claim, from)
-            .await
-            .map(Outcome::Minted),
+            claim,
+            proving,
+        } => {
+            let proved_by = match proving {
+                Some(proving) => {
+                    let signed = crate::device_keys::proof::Mint {
+                        name: &name,
+                        scope: &scope,
+                        purpose: &purpose,
+                        claim,
+                    };
+                    proving::proved(ctx, &by, &signed, *proving).await?
+                }
+                None => None,
+            };
+            if claim {
+                claimed::mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
+                    .await
+                    .map(Outcome::KeyClaim)
+            } else {
+                mint(ctx, &name, &scope, &purpose, &by, proved_by.as_deref())
+                    .await
+                    .map(Outcome::Minted)
+            }
+        }
+        Asked::Collect { claim, from } => collected(ctx, &claim, from).await,
         Asked::List { by } => list(ctx, &by).await.map(Outcome::Keys),
         Asked::Revoke { name, by } => revoke(ctx, &name, &by).await.map(Outcome::Keys),
     }
 }
 
-/// Mint a key, and answer with its secret and what a client elsewhere needs beside it.
-///
-/// # Errors
-///
-/// A [`Problem`] where the name, the scope or the purpose names nothing, the name is
-/// taken, a member's account cannot be found, a member asked for anything but a key of
-/// their own, the keys or the journal cannot be read or written, or this machine will
-/// not supply the randomness a secret is made of.
-pub async fn mint(
-    ctx: &Ctx,
-    name: &str,
-    scope: &str,
-    purpose: &str,
-    by: &Minter,
-    proved_by: Option<&str>,
-) -> Result<Minted, Box<Problem>> {
-    let Prepared {
-        path,
-        scope,
-        purpose,
-    } = prepared(ctx, name, scope, purpose, by).await?;
-    let secret = Secret::mint(ctx.seams.random.as_ref()).ok_or_else(|| Box::new(no_secret()))?;
-    let record =
-        Record::minted(name, scope, purpose, &secret, ctx.stamp(), by.clone()).proved_by(proved_by);
-    let mut opened = Opened::at(ctx, &path).await?;
-    let made = added(ctx, &path, &mut opened.kept, &record, by);
-    opened.let_go(ctx).await;
-    made?;
-    heard(ctx, &record, Heard::Minted).await;
-    let reached = crate::companion::reaching(ctx).await;
-    Ok(Minted {
-        name: record.name,
-        scope: record.scope.written(),
-        purpose,
-        secret,
-        address: reached.address,
-        pin: reached.pin,
-        caution: reached.caution,
-    })
-}
-
-/// What a mint has settled before the keys are held: where they are, and the scope and
-/// purpose asked for, each read and allowed.
-struct Prepared {
-    /// Where the keys are kept.
-    path: PathBuf,
-    /// What the key will admit.
-    scope: Scope,
-    /// What it is for.
-    purpose: Purpose,
-}
-
-/// Everything a mint, of a secret or of a claim, checks before it holds the keys.
-///
-/// # Errors
-///
-/// A [`Problem`] where the name, the scope or the purpose names nothing, a member's
-/// account cannot be found, a member asked for anything but a key of their own or is not
-/// allowed keys, or there is nowhere keys are kept.
-async fn prepared(
-    ctx: &Ctx,
-    name: &str,
-    scope: &str,
-    purpose: &str,
-    by: &Minter,
-) -> Result<Prepared, Box<Problem>> {
-    if matches!(by, Minter::Member { .. }) && !members_may_mint(ctx) {
-        return Err(Box::new(members_may_not_mint()));
-    }
-    if !names_a_key(name) {
-        return Err(Box::new(bad_name(name)));
-    }
-    let wanted = Wanted::read(scope).ok_or_else(|| Box::new(not_a_scope(scope)))?;
-    let purpose = Purpose::read(purpose).ok_or_else(|| Box::new(not_a_purpose(purpose)))?;
-    let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let scope = resolved(ctx, wanted).await?;
-    if let Minter::Member { id } = by {
-        if scope.member() != Some(id.as_str()) {
-            return Err(Box::new(not_for_yourself()));
-        }
-    }
-    Ok(Prepared {
-        path,
-        scope,
-        purpose,
-    })
-}
-
-/// Add `record` to the keys, journaled first, where its name is nobody's yet.
-///
-/// # Errors
-///
-/// A [`Problem`] where the name is taken, or the journal or the keys cannot be written.
-fn added(
-    ctx: &Ctx,
-    path: &Path,
-    kept: &mut Kept,
-    record: &Record,
-    by: &Minter,
-) -> Result<(), Box<Problem>> {
-    if let Some(held) = kept.named(&record.name) {
-        return Err(Box::new(match by {
-            Minter::Member { id } if held.scope.member() != Some(id.as_str()) => {
-                name_held(&record.name)
-            }
-            _ => name_taken(held),
-        }));
-    }
-    journalled(
-        ctx,
-        record,
-        Kind::KeyMinted {
-            name: record.name.clone(),
-            scope: record.scope.written(),
-        },
-    )?;
-    kept.keys.push(record.clone());
-    kept.keep(path).map_err(|why| Box::new(unkept(why)))
+/// The key a claim collects, counted as an answer from `from` like a key presented.
+async fn collected(ctx: &Ctx, claim: &str, from: Option<IpAddr>) -> Result<Outcome, Box<Problem>> {
+    let now = ctx.seams.clock.now();
+    let attempts = &ctx.admitting.attempts;
+    let ticket = attempts
+        .taken_at_a_key(from, now)
+        .await
+        .map_err(crate::app::admitting::held)?;
+    let from = from.map(|from| from.to_canonical().to_string());
+    let minted = claimed::collect(ctx, claim, from).await?;
+    attempts
+        .right(&ticket, crate::app::admitting::Door::Key, now)
+        .await;
+    Ok(Outcome::Minted(minted))
 }
 
 /// The keys as one change finds them: held, read under the hold, and with every claim
@@ -285,11 +190,6 @@ impl Opened {
     }
 }
 
-/// The hold on the keys at `path`, or why it could not be taken.
-async fn held(path: &Path) -> Result<Held, Box<Problem>> {
-    Held::taken(path).await.map_err(|why| Box::new(unkept(why)))
-}
-
 /// The keys `by` may see, without their secrets: every one to the operator, and to a
 /// member only those scoped to them.
 ///
@@ -326,7 +226,7 @@ fn seen_by(kept: Kept, by: &Minter) -> Kept {
 /// Off unless the setting reads as on, and off where there is no configuration to read
 /// it from.
 #[must_use]
-pub fn members_may_mint(ctx: &Ctx) -> bool {
+pub(crate) fn members_may_mint(ctx: &Ctx) -> bool {
     ctx.settings
         .env_file
         .as_deref()
@@ -538,7 +438,13 @@ fn journalled(ctx: &Ctx, record: &Record, kind: Kind) -> Result<(), Box<Problem>
 
 mod claimed;
 mod heard;
+mod minting;
+mod proving;
 mod refused;
+
+pub use minting::mint;
+use minting::{added, held, prepared, Prepared};
+pub use proving::{Proof, Proving};
 
 use heard::{heard, Heard};
 

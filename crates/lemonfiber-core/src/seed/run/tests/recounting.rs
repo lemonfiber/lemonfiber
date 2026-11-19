@@ -164,7 +164,8 @@ async fn a_media_server_is_handed_the_address_and_a_key_minted_for_it_alone() {
         cleared: false,
     };
     assert_eq!(
-        crate::notify::events::intake(&ctx, &key, &told)
+        crate::notify::events::intake(&ctx, &key, &told, None)
+            .await
             .ok()
             .as_deref(),
         Some(SERVICE)

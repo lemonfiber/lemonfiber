@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the web API composes its routes and its answers from.",
+  "type": "object",
+  "properties": {
+    "members_mint": {
+      "description": "Whether household members may mint keys for themselves.",
+      "type": "boolean"
+    },
+    "stack": {
+      "description": "The stack's own identifier, the one pairing material carries; absent where this\nmachine has nowhere to keep one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "switched_off": {
+      "description": "Each setting a command is refused without that is off on this machine.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "told": {
+      "description": "Whether a way to be told is configured.",
+      "type": "boolean"
+    },
+    "waiting": {
+      "description": "Whether a phone's push endpoint is waiting to be woken.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "switched_off",
+    "told",
+    "waiting",
+    "members_mint"
+  ]
+}

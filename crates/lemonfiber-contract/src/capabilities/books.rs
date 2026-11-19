@@ -11,6 +11,10 @@ use lemonfiber_ports::service::{
 
 use super::{FOLDER, NAMED, PROFILE};
 
+/// How long a curator asked for a book, an author or a series may take to answer: it
+/// fetches the record from the metadata sources it reads before it answers.
+pub const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
 crate::contract! {
     /// `books.curate`: what a member asks a curator of books for.
     pub mod curate = "books.curate" @ 1 holds [
@@ -29,7 +33,7 @@ crate::contract! {
                 reference: NAMED.to_owned(),
             };
             /// Ask for one candidate, by its unit and the curator's reference for it.
-            fn request(refer ask: &BookAsk as BookAsk) -> Candidate where asks = Asked {
+            fn request(refer ask: &BookAsk as BookAsk) -> Candidate where deadline = REQUEST_DEADLINE, asks = Asked {
                 ask: BookAsk {
                     unit: BookUnit::Book,
                     reference: NAMED.to_owned(),

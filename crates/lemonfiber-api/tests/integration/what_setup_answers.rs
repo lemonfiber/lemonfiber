@@ -62,7 +62,6 @@ fn serving(paths: &Paths) -> Option<Serving> {
         ctx: Arc::new(world(paths)),
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
         kept: Arc::default(),
@@ -84,7 +83,6 @@ fn homeless() -> Option<axum::Router> {
         ),
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         jobs: Jobs::default(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
         kept: Arc::default(),
@@ -484,7 +482,6 @@ async fn no_setup_endpoint_is_reachable_without_this_run_s_token() {
         unreachable!("cycling letters always supply bytes")
     };
     let streaming = Arc::new(Streaming {
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
@@ -530,7 +527,6 @@ async fn a_token_from_this_run_is_admitted() {
     };
     let carried = serving.token.as_str().to_owned();
     let streaming = Arc::new(Streaming {
-        admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
         token: Arc::clone(&serving.token),
         bound: bound(),
         live: Arc::new(Live::opening(Stopped::at(0).as_ref())),

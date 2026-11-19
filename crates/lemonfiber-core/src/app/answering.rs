@@ -71,6 +71,15 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Authoring(authoring::Asked::Record { .. }) => &[kind::PLUGIN_RECORDING],
         Command::Password => &[kind::PASSWORD],
         Command::WalkthroughOffer => &[kind::WALKTHROUGH_OFFER],
+        Command::Standing => &[kind::STANDING],
+        Command::Admission(super::admitting::Asked::Password(_)) => &[kind::ADMISSION],
+        Command::Admission(super::admitting::Asked::Code(_)) => {
+            &[kind::SIGN_IN_CODE, kind::ADMISSION]
+        }
+        Command::Admission(super::admitting::Asked::Caller(_)) => &[kind::CALLER],
+        Command::DeviceKeys(crate::device_keys::run::Asked::Challenge { .. }) => {
+            &[kind::DEVICE_CHALLENGE]
+        }
         Command::Logs(_) => &[kind::LOGS],
         Command::InFlight { .. } => &[kind::IN_FLIGHT],
         Command::Served(_) => &[kind::SERVED],

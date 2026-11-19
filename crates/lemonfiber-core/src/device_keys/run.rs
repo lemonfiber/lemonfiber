@@ -12,6 +12,7 @@
 //! is no longer the one kept is revoked the moment the record is next opened, so a
 //! password changed by any means cuts off every phone before anything is asked of one.
 
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use crate::app::{Ctx, Outcome};
@@ -19,21 +20,19 @@ use crate::config::store::Failure;
 use crate::error::{Diagnose, Problem};
 use crate::instant::Instant;
 use crate::journal::{Change, Kind};
-use crate::keys::names_a_key;
 
 use super::identity::{self, AppIdentity};
-use super::{Attestation, Kept, Listed, Listing, PublicKey, Record, Registered, FILE};
+use super::{Attestation, Kept, Listed, Listing, Record, FILE};
 use heard::{heard, Heard, Revoked};
-use refused::{
-    bad_name, key_taken, name_taken, no_attestation, not_p256, not_registered, nowhere, unproved,
-};
 pub use refused::{challenge_not_standing, no_challenge, signature_wrong};
+use refused::{not_registered, nowhere};
+pub use registering::{challenged, register};
 
 /// What was asked of the device keys.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Asked {
-    /// Register a device key under a name, with the platform's attestation. The
-    /// operator's password has proved them by the time this is asked.
+    /// Register a device key under a name, with the platform's attestation, once the
+    /// password the asker gives proves the operator.
     Register {
         /// What to call it.
         name: String,
@@ -41,6 +40,8 @@ pub enum Asked {
         public_key: String,
         /// The platform's attestation of where it lives, where one was given.
         attestation: Option<Attestation>,
+        /// Where the request came from, where it came over a socket.
+        from: Option<IpAddr>,
     },
     /// List the device keys.
     List,
@@ -49,9 +50,40 @@ pub enum Asked {
         /// The device key's name.
         name: String,
     },
+    /// Issue a challenge for the device key holding a name to sign.
+    Challenge {
+        /// The device key's name.
+        name: String,
+        /// The session the challenge is issued to, and only it may spend it.
+        session: String,
+    },
 }
 
 /// The operation every journal entry about a device key is written under.
+impl std::fmt::Debug for Asked {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Register {
+                name,
+                attestation,
+                from,
+                ..
+            } => out
+                .debug_struct("Register")
+                .field("name", name)
+                .field("attestation", attestation)
+                .field("from", from)
+                .finish(),
+            Self::List => out.write_str("List"),
+            Self::Revoke { name } => out.debug_struct("Revoke").field("name", name).finish(),
+            Self::Challenge { name, .. } => out
+                .debug_struct("Challenge")
+                .field("name", name)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 pub(crate) const OPERATION: &str = "device-key";
 
 /// Where this machine keeps its device keys, or nothing where it keeps no configuration.
@@ -71,76 +103,27 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
             name,
             public_key,
             attestation,
-        } => register(ctx, &name, &public_key, attestation.as_ref())
-            .await
-            .map(Outcome::DeviceKey),
+            from,
+        } => {
+            let now = ctx.seams.clock.now();
+            let password = ctx.asking.secret(crate::app::admitting::PASSWORD);
+            match crate::app::admitting::proves_the_operator(ctx, &password, from, now).await {
+                Ok(true) => register(ctx, &name, &public_key, attestation.as_ref())
+                    .await
+                    .map(Outcome::DeviceKey),
+                Ok(false) => Err(crate::app::admitting::not_the_password()),
+                Err(left) => Err(crate::app::admitting::held(left)),
+            }
+        }
         Asked::List => list(ctx).await.map(Outcome::DeviceKeys),
-        Asked::Revoke { name } => revoke(ctx, &name).await.map(Outcome::DeviceKeys),
-    }
-}
-
-/// Register a device key, once its attestation vouches for it.
-///
-/// # Errors
-///
-/// A [`Problem`] where the name cannot name one or is taken, the public half is not a
-/// P-256 key or is registered already, the attestation is missing, does not verify,
-/// places the key in software or names an app this stack does not trust, or the record
-/// or the journal cannot be read or written.
-pub async fn register(
-    ctx: &Ctx,
-    name: &str,
-    public_key: &str,
-    attestation: Option<&Attestation>,
-) -> Result<Registered, Box<Problem>> {
-    if !names_a_key(name) {
-        return Err(Box::new(bad_name(name)));
-    }
-    let key = PublicKey::read(public_key).ok_or_else(|| Box::new(not_p256()))?;
-    let path = at(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let under = password(ctx).ok_or_else(|| Box::new(nowhere()))?;
-    let Some(attestation) = attestation else {
-        return Err(refused(ctx, name, no_attestation()).await);
-    };
-    let trusted = trusted(ctx).map_err(|failure| Box::new(failure.problem()))?;
-    let now = ctx.seams.clock.now();
-    let attested = match attestation.verified(&key, &trusted, now) {
-        Ok(attested) => attested,
-        Err(why) => return Err(refused(ctx, name, unproved(&why)).await),
-    };
-    let record = Record {
-        name: name.to_owned(),
-        public_key: key.written(),
-        fingerprint: key.fingerprint(),
-        backing: attested.backing,
-        app: attested.app.written(),
-        registered: Instant::of(now),
-        under,
-        used: None,
-        revoked: None,
-    };
-    let added = record.clone();
-    changed(ctx, &path, move |ctx, kept| {
-        if let Some(held) = kept.named(&added.name) {
-            return Err(Box::new(name_taken(held)));
+        Asked::Revoke { name } => {
+            ctx.admitting.challenges.forgotten(&name).await;
+            revoke(ctx, &name).await.map(Outcome::DeviceKeys)
         }
-        if let Some(held) = kept.holding(&added.fingerprint) {
-            return Err(Box::new(key_taken(held)));
-        }
-        journalled(
-            ctx,
-            &added.name,
-            Kind::DeviceKeyRegistered {
-                name: added.name.clone(),
-                backing: added.backing.written().to_owned(),
-            },
-        )?;
-        kept.keys.push(added.clone());
-        Ok(())
-    })
-    .await?;
-    heard(ctx, &record, &Heard::Registered).await;
-    Ok(Registered::from(&record))
+        Asked::Challenge { name, session } => challenged(ctx, &name, &session)
+            .await
+            .map(|issued| Outcome::Admitting(crate::app::admitting::Answer::Challenge(issued))),
+    }
 }
 
 /// Every device key this machine has registered.
@@ -497,6 +480,7 @@ fn journalled(ctx: &Ctx, name: &str, kind: Kind) -> Result<(), Box<Problem>> {
 
 mod heard;
 mod refused;
+mod registering;
 
 #[cfg(test)]
 mod tests;

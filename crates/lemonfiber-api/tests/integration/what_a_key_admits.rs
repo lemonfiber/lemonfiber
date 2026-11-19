@@ -7,7 +7,6 @@
 
 use std::net::IpAddr;
 
-use lemonfiber_api::admission::Keyring;
 use lemonfiber_api::guard::Arrived;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope, Secret};
@@ -93,12 +92,11 @@ pub(crate) fn keeping_keys(named: &str) -> Keys {
 
 /// A surface admitting those keys, its household holding `household`.
 fn surface_with(keys: &Keys, household: Arc<Recognising>) -> (axum::Router, Arc<Admitting>) {
-    let admitting = Arc::new(Admitting {
-        keys: Keyring::at(Some(keys.kept.clone()), Some(keys.used.clone())),
-        household: Some(Arc::new(household as Arc<dyn Household>) as Arc<dyn HouseholdAtHand>),
-        ..Admitting::default()
-    });
-    let (router, _) = surface(world(None, Chance::cycling()), &admitting);
+    let admitting = housed(household);
+    let (router, _) = surface(
+        keeping_at(world(None, Chance::cycling()), &keys.kept),
+        &admitting,
+    );
     (router, admitting)
 }
 
@@ -562,6 +560,7 @@ async fn wrong_keys_earn_the_wait_wrong_passwords_do_and_a_right_key_meets_it_to
         unreachable!("twelve wrong keys in a moment earned no wait")
     };
     assert!(held.left.is_some());
+    assert_eq!(waited(&held), held.left, "{}", held.body);
     // While the wait holds, a right key is not even looked at.
     let right = presented(
         router,

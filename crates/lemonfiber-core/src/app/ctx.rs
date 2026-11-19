@@ -144,6 +144,8 @@ pub struct Ctx {
     /// What lives exactly as long as this context and its clones: the directories a
     /// test's context reads and writes, removed when the last clone drops.
     pub held: Arc<dyn std::any::Any + Send + Sync>,
+    /// Who this run lets in through the web API, shared by every clone.
+    pub admitting: Arc<super::admitting::Admitting>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -218,6 +220,7 @@ impl Ctx {
             catalogue_key: crate::plugin::catalogue::carried().map(Box::new),
             built_from: crate::stack::BUILT_FROM,
             held: Arc::new(()),
+            admitting: Arc::default(),
         }
     }
 
@@ -449,6 +452,14 @@ impl Ctx {
     #[must_use]
     pub fn with_hosting(mut self, hosting: Arc<dyn Host>) -> Self {
         self.seams.hosting = hosting;
+        self
+    }
+
+    /// The same context, finding the household through `household` when somebody is
+    /// checked against it, with a register of its own.
+    #[must_use]
+    pub fn with_household(mut self, household: Arc<dyn super::admitting::AtHand>) -> Self {
+        self.admitting = Arc::new(super::admitting::Admitting::over(household));
         self
     }
 

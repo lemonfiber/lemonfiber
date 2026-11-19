@@ -361,7 +361,7 @@ pub fn replacing(ctx: &Ctx, confirm: bool) -> Result<Replacement, Box<Problem>> 
 /// client holding a key for a member and one for the operator can tell both reach one
 /// stack.
 #[must_use]
-pub fn identified(ctx: &Ctx) -> Option<String> {
+pub(crate) fn identified(ctx: &Ctx) -> Option<String> {
     let directory = kept_in(ctx).ok()?;
     identifier::kept_or_minted(directory, ctx.seams.random.as_ref()).ok()
 }

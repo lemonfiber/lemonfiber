@@ -2,6 +2,7 @@
 //! core handed that one service, and told as the household chose to be told.
 
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -50,13 +51,35 @@ pub(crate) fn minted(ctx: &Ctx, service: &str) -> Result<String, String> {
     Ok(key)
 }
 
-/// Take `event` from whichever service `presented` is the key of, and owe every back-end
-/// that receives the stack's alerts the alert it comes to, where the operator wants it.
+/// Take `event` from whichever service `presented` is the key of, counted as an answer
+/// from `from` like a key presented, and owe every back-end that receives the stack's
+/// alerts the alert it comes to, where the operator wants it.
 ///
 /// # Errors
 ///
-/// [`EVENTS_REFUSED`] where no service was handed `presented`.
-pub fn intake(ctx: &Ctx, presented: &str, event: &Event) -> Result<String, Box<Problem>> {
+/// [`EVENTS_REFUSED`] where no service was handed `presented`, and the wait wrong answers
+/// have earned where they have.
+pub async fn intake(
+    ctx: &Ctx,
+    presented: &str,
+    event: &Event,
+    from: Option<IpAddr>,
+) -> Result<String, Box<Problem>> {
+    let now = ctx.seams.clock.now();
+    let attempts = &ctx.admitting.attempts;
+    let ticket = attempts
+        .taken_at_a_key(from, now)
+        .await
+        .map_err(crate::app::admitting::held)?;
+    let service = heard(ctx, presented, event)?;
+    attempts
+        .right(&ticket, crate::app::admitting::Door::Key, now)
+        .await;
+    Ok(service)
+}
+
+/// Take `event` from whichever service `presented` is the key of.
+fn heard(ctx: &Ctx, presented: &str, event: &Event) -> Result<String, Box<Problem>> {
     let presented = sha256(presented);
     let service = at(ctx)
         .and_then(|path| crate::settings::kept::read::<Keyed>(&path).ok())

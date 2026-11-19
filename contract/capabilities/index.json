@@ -250,7 +250,7 @@
       ],
       "openapi": "books.curate/v1/openapi.json",
       "operations": 5,
-      "sha256": "745a070e3779fb2eb01d00a401cbe281cd59ff46ee189c7391f094577d8a9437"
+      "sha256": "832471f91e5f19c7de34b9a8acefe2523860074080c5ddc7fe03c973e302368f"
     },
     {
       "capability": "owner.claim",

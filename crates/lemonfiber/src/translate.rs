@@ -397,13 +397,13 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
 
 /// Which of the two is asked of every download client.
 pub(crate) fn pausing(asked: &RawDownloads) -> Command {
-    Command::Downloads {
+    Command::Downloads(lemonfiber_core::app::Downloading {
         asked: match asked.action {
             DownloadsCommand::Pause => Pausing::Pause,
             DownloadsCommand::Resume => Pausing::Resume,
         },
         offer: asked.offer.clone(),
-    }
+    })
 }
 
 /// Which of the two is asked of pairing.
@@ -436,7 +436,7 @@ pub(crate) fn keyed(asked: RawKey) -> Command {
             purpose,
             by: Minter::Operator,
             claim,
-            proved_by: None,
+            proving: None,
         },
         KeyCommand::List => Keyed::List {
             by: Minter::Operator,

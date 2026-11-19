@@ -115,10 +115,9 @@ fn moved(answered: &str, standing: &str) -> Problem {
 /// As [`pausing`].
 pub(crate) async fn paused(
     ctx: &Ctx,
-    asked: Pausing,
-    offer: Option<String>,
+    downloading: crate::app::Downloading,
 ) -> Result<Outcome, Box<Problem>> {
-    pausing(ctx, asked, offer.as_deref())
+    pausing(ctx, downloading.asked, downloading.offer.as_deref())
         .await
         .map(Outcome::Pausing)
 }

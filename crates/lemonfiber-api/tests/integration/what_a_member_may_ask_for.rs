@@ -514,7 +514,13 @@ async fn the_stream_tells_a_member_only_what_is_theirs() {
     assert_eq!(kinds, a_members_kinds(), "{kinds:?}");
     // A stack that answers is said the same three ways as one that cannot be read.
     let answering = lemonfiber_testing::a_context().build();
-    let (_, kinds) = listened(stream_reading(&admitting, answering), &carried, None, 3).await;
+    let (_, kinds) = listened(
+        stream_reading(admitting.held(), answering),
+        &carried,
+        None,
+        3,
+    )
+    .await;
     assert_eq!(kinds, a_members_kinds(), "{kinds:?}");
 
     let mut machine = from_here();

@@ -68,7 +68,6 @@ use lemonfiber_core::wiring;
 
 use crate::actions::published::Action;
 use crate::actions::{self, named, Arguments, KEY_CALLABLE};
-use crate::admission::admitted::Admitted;
 use crate::capabilities::Capabilities;
 use crate::events::wire::{Audience, EventKind, Nature, BEAT};
 use crate::jobs::ended::Ended;
@@ -259,20 +258,14 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 
 /// The shapes that belong to no command's answer.
 ///
-/// A session, a failure, a name for work that outlives its request, and the lines a
-/// long run says while it is still running — none of which any [`Outcome`] carries,
+/// A failure, a name for work that outlives its request, and the lines a long run says
+/// while it is still running — none of which any [`Outcome`] carries,
 /// and each of which a caller still has to parse.
 ///
 /// The walkthrough and the supervision report sat here and are carried by an outcome,
 /// which is what a count could not tell anybody: the doc said one thing, the code did
 /// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
-    describing(kinds, kind::ADMISSION, schema_for!(Envelope<Admitted>));
-    describing(
-        kinds,
-        kind::SIGN_IN_CODE,
-        schema_for!(Envelope<crate::admission::coded::SignInCode>),
-    );
     describing(kinds, kind::ALERT, schema_for!(Envelope<Alert>));
     describing(
         kinds,
@@ -280,11 +273,6 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
         schema_for!(Envelope<Capabilities>),
     );
     describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
-    describing(
-        kinds,
-        kind::DEVICE_CHALLENGE,
-        schema_for!(Envelope<lemonfiber_core::device_keys::Challenged>),
-    );
     describing(kinds, kind::ENDED, schema_for!(Envelope<Ended>));
     describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
@@ -303,8 +291,9 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// work rather than a request, and they are the one refusal a client answers by reading
 /// again rather than by reporting a failure. The rest are each family's refusals of what
 /// a request named or how it asked, which a client branches on by code.
-pub(crate) const CORE_REFUSALS: [&[Code]; 24] = [
+pub(crate) const CORE_REFUSALS: [&[Code]; 25] = [
     &agreement::MOVED,
+    &lemonfiber_core::app::admitting::REFUSALS,
     &wiring::REFUSED,
     &lemonfiber_core::app::REFUSALS,
     &lemonfiber_core::app::SCHEDULED_REFUSALS,

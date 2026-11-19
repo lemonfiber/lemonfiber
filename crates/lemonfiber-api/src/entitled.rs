@@ -69,7 +69,7 @@ impl Permitted {
     pub fn granted(self) -> Result<Command, Box<axum::response::Response>> {
         match self {
             Self::This(command) => Ok(command),
-            Self::Nothing => Err(Box::new(crate::refusal::Refusal::NotYours.answered())),
+            Self::Nothing => Err(Box::new(crate::refusal::not_yours(None))),
             Self::NotForAKey(scope) => Err(Box::new(crate::refusal::Refusal::NotForAKey.saying(
                 format!(
                     "A key with the scope {scope} may not call this. A key calls only the \
@@ -144,7 +144,7 @@ pub const fn callable_by_a_key(command: &Command) -> bool {
         Command::Restart(_)
             | Command::Doctor(Diagnosing { accept: None, .. })
             | Command::Update(_)
-            | Command::Downloads { .. }
+            | Command::Downloads(_)
     )
 }
 

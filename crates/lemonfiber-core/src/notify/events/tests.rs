@@ -64,8 +64,8 @@ async fn an_event_is_taken_only_with_the_key_its_service_was_handed_and_owed_to_
     let key = minted(&ctx, "sonarr").unwrap_or_default();
     let failed = event(Happened::Failed, "Severance", Some("no release found"));
 
-    let refused = intake(&ctx, "not-the-key", &failed);
-    let taken = intake(&ctx, &key, &failed);
+    let refused = intake(&ctx, "not-the-key", &failed, None).await;
+    let taken = intake(&ctx, &key, &failed, None).await;
 
     assert_eq!(
         refused.err().map(|problem| problem.code),
@@ -88,16 +88,16 @@ async fn an_event_is_taken_only_with_the_key_its_service_was_handed_and_owed_to_
     );
 }
 
-#[test]
-fn a_fresh_key_replaces_the_last_one_handed_out() {
+#[tokio::test]
+async fn a_fresh_key_replaces_the_last_one_handed_out() {
     let ctx = machine("notify-events-rekeyed").with_random(Arc::new(Chance::turning(1)));
     let first = minted(&ctx, "jellyfin").unwrap_or_default();
     let second = minted(&ctx, "jellyfin").unwrap_or_default();
     let added = event(Happened::Added, "Dune", None);
 
     assert_ne!(first, second);
-    assert!(intake(&ctx, &first, &added).is_err());
-    assert!(intake(&ctx, &second, &added).is_ok());
+    assert!(intake(&ctx, &first, &added, None).await.is_err());
+    assert!(intake(&ctx, &second, &added, None).await.is_ok());
 }
 
 #[test]

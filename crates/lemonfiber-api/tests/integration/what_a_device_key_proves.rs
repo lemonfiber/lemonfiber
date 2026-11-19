@@ -8,7 +8,6 @@ use lemonfiber_fixtures::attestations::ANDROID_RSA_ROOT;
 use ring::rand::SystemRandom;
 use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
 
-use lemonfiber_api::admission::Keyring;
 use lemonfiber_core::keys::{Kept, Minter, Purpose, Record, Scope};
 
 use crate::door::*;
@@ -61,15 +60,15 @@ fn a_machine_keeping(
     named: &str,
     phone: Option<&EcdsaKeyPair>,
 ) -> (axum::Router, String, PathBuf, PathBuf) {
-    built(named, phone, not_the_token(), Keyring::default())
+    built(named, phone, not_the_token(), None)
 }
 
-/// The same machine, its randomness drawn from `random` and its keys from `keys`.
+/// The same machine, its randomness drawn from `random`, keeping `keys` where given.
 fn built(
     named: &str,
     phone: Option<&EcdsaKeyPair>,
     random: Chance,
-    keys: Keyring,
+    keys: Option<&Kept>,
 ) -> (axum::Router, String, PathBuf, PathBuf) {
     let admission = keeping(&format!("device-{named}"));
     let mut ctx = world(Some(admission.to_path_buf()), random);
@@ -109,11 +108,12 @@ fn built(
             record.to_string(),
         );
     }
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission.to_path_buf()),
-        keys,
-        ..Admitting::default()
-    });
+    if let Some(keys) = keys {
+        assert!(keys
+            .keep(&env.with_file_name(lemonfiber_core::keys::FILE))
+            .is_ok());
+    }
+    let admitting = unhoused();
     let (env_at, admission_at) = (env.to_path_buf(), admission.to_path_buf());
     let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
     (router, token.as_str().to_owned(), env_at, admission_at)
@@ -439,8 +439,6 @@ async fn a_registration_from_another_machine_in_the_clear_is_refused_before_the_
 #[tokio::test]
 async fn a_key_is_refused_at_every_device_key_route_whatever_its_scope() {
     let secret = a_secret(7);
-    let dir = a_directory("device-keyed");
-    let _ = fs::create_dir_all(&dir);
     let kept = Kept {
         keys: vec![Record::minted(
             "actor",
@@ -451,12 +449,7 @@ async fn a_key_is_refused_at_every_device_key_route_whatever_its_scope() {
             Minter::Operator,
         )],
     };
-    assert!(kept.keep(&dir.join("keys.json")).is_ok());
-    let keys = Keyring::at(
-        Some(dir.join("keys.json")),
-        Some(dir.join("keys-used.json")),
-    );
-    let (router, _, _, _) = built("keyed", Some(&a_phone()), not_the_token(), keys);
+    let (router, _, _, _) = built("keyed", Some(&a_phone()), not_the_token(), Some(&kept));
     for (method, path) in [
         ("GET", "/api/device-keys"),
         ("POST", "/api/device-keys"),
@@ -515,12 +508,7 @@ async fn a_registration_that_is_not_one_is_refused_and_guessing_its_password_ear
 #[tokio::test]
 async fn a_machine_that_will_not_supply_randomness_issues_no_challenge() {
     let phone = a_phone();
-    let (router, token, _, _) = built(
-        "unrandom",
-        Some(&phone),
-        Chance::exactly(None),
-        Keyring::default(),
-    );
+    let (router, token, _, _) = built("unrandom", Some(&phone), Chance::exactly(None), None);
     let answer = presented(
         router,
         "POST",

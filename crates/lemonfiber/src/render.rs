@@ -11,6 +11,7 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
 
+mod admitting;
 mod alerts;
 mod archive;
 mod bandwidth;
@@ -281,6 +282,8 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Logs(read) => logs::read(read.lines),
         Outcome::InFlight(report) => downloads::in_flight(report),
         Outcome::Served(report) => companion::served(report),
+        Outcome::Standing(report) => companion::standing(report),
+        Outcome::Admitting(answer) => admitting::answered(answer),
         Outcome::PluginClaims(read) => plugin::claims(read),
         Outcome::PluginConformance(read) => plugin::conformance::judged(read),
         Outcome::PluginProvenance(read) => plugin::provenance(read),

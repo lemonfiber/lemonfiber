@@ -3,6 +3,7 @@
 //! The code comes first, because the operator is holding the phone: everything under it
 //! is what to check and what to know, and none of it has to be read to pair.
 
+use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::companion::{Pairing, Replacement, LASTS};
 use lemonfiber_core::PRODUCT;
@@ -93,6 +94,35 @@ pub(super) fn served(report: &ServedReport) -> Lines {
         lines.put(format!("Certificate fingerprint: {fingerprint}"));
     }
     lines
+}
+
+/// The stack's identifier, the settings that are off, and whether a way to be told,
+/// a waiting push and members' own keys stand.
+pub(super) fn standing(report: &StackStanding) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(report.stack.as_ref().map_or_else(
+        || "No stack identifier is kept here.".to_owned(),
+        |stack| format!("Stack {stack}."),
+    ));
+    for setting in &report.switched_off {
+        lines.put(format!("{setting} is off."));
+    }
+    lines.put(format!("A way to be told: {}.", said(report.told)));
+    lines.put(format!("A push waiting: {}.", said(report.waiting)));
+    lines.put(format!(
+        "Members mint their own keys: {}.",
+        said(report.members_mint)
+    ));
+    lines
+}
+
+/// Yes or no, as a line says it.
+const fn said(holds: bool) -> &'static str {
+    if holds {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 #[cfg(test)]

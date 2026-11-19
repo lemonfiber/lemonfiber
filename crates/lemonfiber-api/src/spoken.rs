@@ -68,10 +68,10 @@ impl Audience {
 pub(crate) struct Refused(pub(crate) Problem);
 
 /// A refusal at `status`, in the envelope every refusal arrives in, carrying its problem
-/// and, where its code says how long to wait before trying again, `Retry-After`.
+/// and, where it says how long to wait before trying again, `Retry-After`.
 pub(crate) fn refused(status: StatusCode, problem: Problem) -> Response {
     let mut response = enveloped(status, Envelope::new(kind::ERROR, &problem).to_json());
-    if let Some(seconds) = crate::read::retry_after(&problem) {
+    if let Some(seconds) = problem.retry_after {
         response
             .headers_mut()
             .insert(RETRY_AFTER, axum::http::HeaderValue::from(seconds));

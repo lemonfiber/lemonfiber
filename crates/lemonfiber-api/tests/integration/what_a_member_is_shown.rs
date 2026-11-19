@@ -87,14 +87,11 @@ fn over_a_picture(named: &str) -> (axum::Router, Arc<Token>, Arc<Fake>) {
         (media::serve("title"), media::answered(&Some(the_film()))),
         (media::identity("household"), media::answered(&household())),
     ]);
-    let ctx = a_stack(named, Arc::clone(&transport));
+    let mut ctx = a_stack(named, Arc::clone(&transport));
     let kept = keeping(&format!("{named}-kept"));
+    ctx.settings.admission = Some(kept.to_path_buf());
     seeded(&ctx);
-    let admitting = Arc::new(Admitting {
-        kept: Some(kept.to_path_buf()),
-        household: Some(Arc::new(ctx.clone()) as Arc<dyn HouseholdAtHand>),
-        ..Admitting::default()
-    });
+    let admitting = Arc::new(Admitting::over(Arc::new(Stacked)));
     let (router, token) = surface(ctx.holding(kept), &admitting);
     (router, token, transport)
 }

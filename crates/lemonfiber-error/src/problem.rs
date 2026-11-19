@@ -169,6 +169,10 @@ pub struct Problem {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[schemars(default)]
     pub steps: Vec<Stepped>,
+    /// How many whole seconds to wait before asking again, where the refusal says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(default)]
+    pub retry_after: Option<u64>,
 }
 
 /// What one step of a run that stopped part-way came to.
@@ -244,6 +248,7 @@ impl Problem {
             detail: None,
             cause: None,
             steps: Vec::new(),
+            retry_after: code.declaration().and_then(Declared::retry_after),
         }
     }
 
@@ -291,6 +296,13 @@ impl Problem {
     /// rule that holds until somebody is in a hurry.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(crate::withheld::withheld_text(&detail.into()));
+        self
+    }
+
+    /// Say that asking again is refused for `left`, in whole seconds and never less than one.
+    #[must_use]
+    pub fn waiting(mut self, left: std::time::Duration) -> Self {
+        self.retry_after = Some(left.as_secs().max(1));
         self
     }
 

@@ -615,19 +615,50 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
     let (ctx, _) = a_machine("asked");
     trusting(&ctx, &[recorded_app(&ctx)]);
     let (attestation, key) = recorded();
+    let wrong = super::Asked::Register {
+        name: "pixel".to_owned(),
+        public_key: key.clone(),
+        attestation: Some(attestation.clone()),
+        from: None,
+    };
+    let mistyped = ctx
+        .clone()
+        .with_asking(lemonfiber_fixtures::typing::Typing::answering("not it"));
+    assert_eq!(
+        super::asked(&mistyped, wrong)
+            .await
+            .err()
+            .map(|problem| problem.code),
+        Some(crate::error::codes::admit::NOT_THE_PASSWORD)
+    );
     let registering = super::Asked::Register {
         name: "pixel".to_owned(),
         public_key: key,
         attestation: Some(attestation),
+        from: None,
     };
+    let typed = ctx
+        .clone()
+        .with_asking(lemonfiber_fixtures::typing::Typing::answering_each(vec![
+            lemonfiber_fixtures::passwords::a_password(),
+        ]));
     assert!(matches!(
-        super::asked(&ctx, registering).await,
+        super::asked(&typed, registering).await,
         Ok(crate::app::Outcome::DeviceKey(_))
     ));
     assert!(matches!(
         super::asked(&ctx, super::Asked::List).await,
         Ok(crate::app::Outcome::DeviceKeys(_))
     ));
+    let challenging = super::Asked::Challenge {
+        name: "pixel".to_owned(),
+        session: "a-session".to_owned(),
+    };
+    let Ok(crate::app::Outcome::Admitting(crate::app::admitting::Answer::Challenge(issued))) =
+        super::asked(&ctx, challenging).await
+    else {
+        unreachable!("a standing device key is challenged")
+    };
     let revoking = super::Asked::Revoke {
         name: "pixel".to_owned(),
     };
@@ -635,6 +666,29 @@ async fn each_thing_asked_of_the_device_keys_is_carried_out() {
         super::asked(&ctx, revoking).await,
         Ok(crate::app::Outcome::DeviceKeys(_))
     ));
+    let now = ctx.seams.clock.now();
+    assert!(
+        !ctx.admitting
+            .challenges
+            .spent(&issued.challenge, "a-session", "pixel", now)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn a_device_key_nobody_registered_is_not_challenged() {
+    let (ctx, _) = a_machine("unchallenged");
+    let challenging = super::Asked::Challenge {
+        name: "pixel".to_owned(),
+        session: "a-session".to_owned(),
+    };
+    assert_eq!(
+        super::asked(&ctx, challenging)
+            .await
+            .err()
+            .map(|problem| problem.code),
+        Some(super::refused::not_registered("pixel").code)
+    );
 }
 
 #[tokio::test]
@@ -649,4 +703,32 @@ async fn a_signature_a_device_key_did_not_make_is_heard() {
         .said()
         .iter()
         .any(|said| said.contains("did not make")));
+}
+
+#[test]
+fn what_is_asked_of_the_device_keys_is_debugged_without_a_session() {
+    let asked = [
+        super::Asked::List,
+        super::Asked::Revoke {
+            name: "pixel".to_owned(),
+        },
+        super::Asked::Challenge {
+            name: "pixel".to_owned(),
+            session: "s3ss10n".to_owned(),
+        },
+        super::Asked::Register {
+            name: "pixel".to_owned(),
+            public_key: "k3y".to_owned(),
+            attestation: None,
+            from: None,
+        },
+    ];
+    let said: Vec<String> = asked.iter().map(|one| format!("{one:?}")).collect();
+    assert_eq!(said.first().map(String::as_str), Some("List"));
+    assert!(said
+        .iter()
+        .all(|one| one.contains("pixel") || one == "List"));
+    assert!(said
+        .iter()
+        .all(|one| !one.contains("s3ss10n") && !one.contains("k3y")));
 }

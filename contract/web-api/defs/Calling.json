@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the session or key a request carried came to.",
+  "oneOf": [
+    {
+      "description": "Somebody this run admits.",
+      "type": "object",
+      "properties": {
+        "caller": {
+          "description": "Who they are.",
+          "$ref": "Caller.json"
+        },
+        "standing": {
+          "type": "string",
+          "const": "known"
+        }
+      },
+      "required": [
+        "standing",
+        "caller"
+      ]
+    },
+    {
+      "description": "Nobody this run admits.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "nobody"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    },
+    {
+      "description": "A member the media server could not be asked about.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "unconfirmed"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    },
+    {
+      "description": "A key held back by too many wrong answers.",
+      "type": "object",
+      "properties": {
+        "retry_after": {
+          "description": "How many whole seconds are left to wait.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "standing": {
+          "type": "string",
+          "const": "held"
+        }
+      },
+      "required": [
+        "standing",
+        "retry_after"
+      ]
+    },
+    {
+      "description": "A key that crossed a network in the clear.",
+      "type": "object",
+      "properties": {
+        "standing": {
+          "type": "string",
+          "const": "exposed"
+        }
+      },
+      "required": [
+        "standing"
+      ]
+    }
+  ]
+}

@@ -11,14 +11,14 @@ use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Response};
 use axum::Extension;
 use futures_util::StreamExt;
-use lemonfiber_api::admission::{Admitting, Caller, Keyed, Keyring};
+use lemonfiber_api::admission::{Caller, Keyed};
 use lemonfiber_api::events::extending::Together;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::events::settings::Settings;
 use lemonfiber_api::events::wire::{Audience, EventKind, Rendered};
 use lemonfiber_api::events::{stream, Streaming};
 use lemonfiber_api::guard::{Arrived, Binding, Token, TOKEN_HEADER};
-use lemonfiber_core::app::{Command, Settling};
+use lemonfiber_core::app::{Command, Ctx, Settling};
 use lemonfiber_core::keys::Scope;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 
@@ -144,19 +144,14 @@ fn only_the_per_run_token_and_an_operator_session_hear_as_the_operator() {
 }
 
 /// A stream opened over the route with `secret`, and the gather it listens to.
-async fn opened(
-    secret: &str,
-    admitting: Arc<Admitting>,
-    token: Token,
-) -> (Response<Body>, Arc<Live>) {
+async fn opened(secret: &str, reading: Ctx, token: Token) -> (Response<Body>, Arc<Live>) {
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
     let streaming = Arc::new(Streaming {
-        admitting,
         token: Arc::new(token),
         bound: Binding::here(8471),
         live: Arc::clone(&live),
         clock: Stopped::at(0),
-        reading: Arc::new(crate::idle::ctx()),
+        reading: Arc::new(reading),
     });
     let mut headers = HeaderMap::new();
     for (name, value) in [(TOKEN_HEADER, secret), ("host", "127.0.0.1:8471")] {
@@ -197,15 +192,12 @@ async fn first(answer: Response<Body>) -> String {
 #[tokio::test]
 async fn a_key_on_the_stream_passes_over_what_is_said_to_the_operator() {
     let keys = keeping_keys("settings-stream");
-    let admitting = Arc::new(Admitting {
-        keys: Keyring::at(Some(keys.kept.clone()), Some(keys.used.clone())),
-        ..Admitting::default()
-    });
+    let reading = crate::door::keeping_at(crate::idle::ctx(), &keys.kept);
     for secret in [&keys.read, &keys.act] {
         let Some(token) = Token::mint(&Chance::cycling()) else {
             unreachable!("cycling letters always supply bytes");
         };
-        let (answer, live) = opened(secret.as_str(), Arc::clone(&admitting), token).await;
+        let (answer, live) = opened(secret.as_str(), reading.clone(), token).await;
         both_said(&live).await;
         let said = first(answer).await;
         assert_eq!(named(&said), Some("news"), "{said}");
@@ -218,7 +210,7 @@ async fn the_per_run_token_on_the_stream_hears_what_is_said_to_the_operator() {
         unreachable!("cycling letters always supply bytes");
     };
     let secret = token.as_str().to_owned();
-    let (answer, live) = opened(&secret, Arc::new(Admitting::default()), token).await;
+    let (answer, live) = opened(&secret, crate::idle::ctx(), token).await;
     both_said(&live).await;
     let said = first(answer).await;
     assert_eq!(named(&said), Some("settings"), "{said}");

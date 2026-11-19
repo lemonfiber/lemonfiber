@@ -26,7 +26,6 @@ fn routed(caller: Caller) -> axum::Router {
             ctx: Arc::new(lemonfiber_testing::a_context().build()),
             token: Arc::new(token),
             bound: lemonfiber_api::guard::Binding::here(8471),
-            admitting: Arc::new(lemonfiber_api::admission::Admitting::default()),
             jobs: Jobs::default(),
             live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
             kept: Arc::default(),

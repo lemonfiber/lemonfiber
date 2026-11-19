@@ -122,15 +122,15 @@ struct Counted {
 }
 
 #[async_trait::async_trait]
-impl HouseholdAtHand for Counted {
-    async fn now(&self) -> Option<Arc<dyn Household>> {
+impl AtHand for Counted {
+    async fn now(&self, _: &Ctx) -> Option<Arc<dyn Household>> {
         self.opened.fetch_add(1, Ordering::SeqCst);
         self.there
             .load(Ordering::SeqCst)
             .then(|| Arc::clone(&self.household))
     }
 
-    fn vouches_for(&self, id: &str) -> bool {
+    fn vouches_for(&self, _: &Ctx, id: &str) -> bool {
         id == "a7f3"
     }
 }
@@ -142,13 +142,13 @@ async fn an_opened_household_is_used_for_a_while_and_none_is_never_kept() {
         there: AtomicBool::new(false),
         household: Recognising::knowing("a7f3") as Arc<dyn Household>,
     });
-    let remembered = lemonfiber_api::admission::remembered::Remembered::over(
-        Arc::clone(&counted) as Arc<dyn HouseholdAtHand>
-    );
+    let remembered =
+        lemonfiber_core::app::admitting::Remembered::over(Arc::clone(&counted) as Arc<dyn AtHand>);
+    let ctx = crate::idle::ctx();
     let opened = || counted.opened.load(Ordering::SeqCst);
 
-    assert!(remembered.now().await.is_none());
-    assert!(remembered.now().await.is_none());
+    assert!(remembered.now(&ctx).await.is_none());
+    assert!(remembered.now(&ctx).await.is_none());
     assert_eq!(
         opened(),
         2,
@@ -156,14 +156,14 @@ async fn an_opened_household_is_used_for_a_while_and_none_is_never_kept() {
     );
 
     counted.there.store(true, Ordering::SeqCst);
-    assert!(remembered.now().await.is_some());
-    assert!(remembered.now().await.is_some());
+    assert!(remembered.now(&ctx).await.is_some());
+    assert!(remembered.now(&ctx).await.is_some());
     assert_eq!(opened(), 3, "an opened household was opened again at once");
 
-    tokio::time::advance(lemonfiber_api::admission::remembered::KEPT_FOR).await;
-    assert!(remembered.now().await.is_some());
+    tokio::time::advance(lemonfiber_core::app::admitting::KEPT_FOR).await;
+    assert!(remembered.now(&ctx).await.is_some());
     assert_eq!(opened(), 4, "a household kept past its time was used");
 
-    assert!(remembered.vouches_for("a7f3"));
-    assert!(!remembered.vouches_for("b9c1"));
+    assert!(remembered.vouches_for(&ctx, "a7f3"));
+    assert!(!remembered.vouches_for(&ctx, "b9c1"));
 }

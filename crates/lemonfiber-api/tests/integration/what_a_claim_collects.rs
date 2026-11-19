@@ -6,7 +6,6 @@
 
 use std::path::PathBuf;
 
-use lemonfiber_api::admission::Keyring;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::{Claim, Kept, Minter, Purpose, Record, Scope};
 
@@ -39,11 +38,7 @@ fn waiting_machine(named: &str, claim: &Claim) -> (axum::Router, String, PathBuf
     }
     .keep(&kept_at)
     .is_ok());
-    let admitting = Arc::new(Admitting {
-        kept: Some(admission.to_path_buf()),
-        keys: Keyring::at(Some(kept_at), lemonfiber_core::keys::run::used_at(&ctx)),
-        ..Admitting::default()
-    });
+    let admitting = unhoused();
     let env_at = env.to_path_buf();
     let (router, token) = surface(ctx.holding(env).holding(admission), &admitting);
     (router, token.as_str().to_owned(), env_at)

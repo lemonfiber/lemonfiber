@@ -2042,6 +2042,147 @@
         ],
         "type": "object"
       },
+      "Caller": {
+        "description": "Who is calling.",
+        "oneOf": [
+          {
+            "description": "The operator, on a session opened with the machine's password.",
+            "properties": {
+              "as": {
+                "const": "operator",
+                "type": "string"
+              }
+            },
+            "required": [
+              "as"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A household member, on a session of their own.",
+            "properties": {
+              "as": {
+                "const": "member",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id the media server files them under.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "as",
+              "id"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A program, on a key the operator or a member minted for it.",
+            "properties": {
+              "as": {
+                "const": "key",
+                "type": "string"
+              },
+              "name": {
+                "description": "The key's name.",
+                "type": "string"
+              },
+              "scope": {
+                "description": "What it admits: `read`, `act` or `member:<name>`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "as",
+              "name",
+              "scope"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Calling": {
+        "description": "What the session or key a request carried came to.",
+        "oneOf": [
+          {
+            "description": "Somebody this run admits.",
+            "properties": {
+              "caller": {
+                "$ref": "#/components/schemas/Caller",
+                "description": "Who they are."
+              },
+              "standing": {
+                "const": "known",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing",
+              "caller"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nobody this run admits.",
+            "properties": {
+              "standing": {
+                "const": "nobody",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A member the media server could not be asked about.",
+            "properties": {
+              "standing": {
+                "const": "unconfirmed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A key held back by too many wrong answers.",
+            "properties": {
+              "retry_after": {
+                "description": "How many whole seconds are left to wait.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "standing": {
+                "const": "held",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing",
+              "retry_after"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A key that crossed a network in the clear.",
+            "properties": {
+              "standing": {
+                "const": "exposed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Candidate": {
         "description": "One completed download, and what reclaiming it would come to.",
         "properties": {
@@ -4050,6 +4191,15 @@
                 },
                 "type": "array"
               },
+              "retry_after": {
+                "description": "How many whole seconds to wait before asking again, where the refusal says.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "severity": {
                 "$ref": "#/components/schemas/ProblemSeverity",
                 "description": "How much it matters."
@@ -4120,6 +4270,15 @@
                   "$ref": "#/components/schemas/Remedy"
                 },
                 "type": "array"
+              },
+              "retry_after": {
+                "description": "How many whole seconds to wait before asking again, where the refusal says.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
               },
               "severity": {
                 "$ref": "#/components/schemas/ProblemSeverity",
@@ -13733,6 +13892,15 @@
             },
             "type": "array"
           },
+          "retry_after": {
+            "description": "How many whole seconds to wait before asking again, where the refusal says.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "severity": {
             "$ref": "#/components/schemas/ProblemSeverity",
             "description": "How much it matters."
@@ -18506,6 +18674,44 @@
             "type": "object"
           }
         ]
+      },
+      "StackStanding": {
+        "description": "What the web API composes its routes and its answers from.",
+        "properties": {
+          "members_mint": {
+            "description": "Whether household members may mint keys for themselves.",
+            "type": "boolean"
+          },
+          "stack": {
+            "description": "The stack's own identifier, the one pairing material carries; absent where this\nmachine has nowhere to keep one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "switched_off": {
+            "description": "Each setting a command is refused without that is off on this machine.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "told": {
+            "description": "Whether a way to be told is configured.",
+            "type": "boolean"
+          },
+          "waiting": {
+            "description": "Whether a phone's push endpoint is waiting to be woken.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "switched_off",
+          "told",
+          "waiting",
+          "members_mint"
+        ],
+        "type": "object"
       },
       "StackUpdateReport": {
         "description": "What updating the stack would change, or what a run of it came to.",
@@ -23574,6 +23780,9 @@
             "$ref": "#/components/schemas/kind-bundle"
           },
           {
+            "$ref": "#/components/schemas/kind-caller"
+          },
+          {
             "$ref": "#/components/schemas/kind-capabilities"
           },
           {
@@ -23794,6 +24003,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-stack"
+          },
+          {
+            "$ref": "#/components/schemas/kind-standing"
           },
           {
             "$ref": "#/components/schemas/kind-start"
@@ -24357,6 +24569,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/Bundle",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-caller": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Calling",
             "description": "The payload."
           },
           "host": {
@@ -27317,6 +27569,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/StackReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-standing": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StackStanding",
             "description": "The payload."
           },
           "host": {

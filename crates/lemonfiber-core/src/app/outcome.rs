@@ -28,6 +28,24 @@ use crate::model::{
 /// The enum, the kind each variant is written under, how it serialises and the
 /// contract's shape for each are all generated from that list, so a new answer is one
 /// line here rather than an arm in four tables that have to agree.
+macro_rules! kind_of {
+    ($payload:ident, carried) => {
+        $payload.kind()
+    };
+    ($payload:ident, $kind:ident) => {
+        kind::$kind
+    };
+}
+
+macro_rules! schemas_of {
+    ($each:ident, $payload:ty, carried) => {
+        <$payload>::schemas(&mut $each)
+    };
+    ($each:ident, $payload:ty, $kind:ident) => {
+        $each(kind::$kind, schemars::schema_for!(Envelope<$payload>))
+    };
+}
+
 macro_rules! outcomes {
     ($($(#[doc = $doc:literal])* $variant:ident($payload:ty) => $kind:ident $([$said:ident])?,)*) => {
         /// What dispatching produced.
@@ -41,7 +59,7 @@ macro_rules! outcomes {
             #[must_use]
             pub const fn kind(&self) -> Kind {
                 match self {
-                    $(Self::$variant(_) => kind::$kind,)*
+                    $(Self::$variant(_payload) => kind_of!(_payload, $kind),)*
                 }
             }
 
@@ -67,7 +85,7 @@ macro_rules! outcomes {
             /// The schema of the envelope carrying each kind of outcome, handed to
             /// `each` one kind at a time.
             pub fn schemas(mut each: impl FnMut(Kind, schemars::Schema)) {
-                $(each(kind::$kind, schemars::schema_for!(Envelope<$payload>));)*
+                $(schemas_of!(each, $payload, $kind);)*
             }
         }
 
@@ -280,6 +298,10 @@ outcomes! {
     Walkthrough(WalkthroughReport) => WALKTHROUGH,
     /// Whether a walkthrough is worth offering this stack, and which one.
     WalkthroughOffer(crate::walkthrough::Why) => WALKTHROUGH_OFFER,
+    /// What the web API composes its routes and its answers from.
+    Standing(super::standing::StackStanding) => STANDING,
+    /// Who comes in through the web API, each answer under its own kind.
+    Admitting(super::admitting::Answer) => carried,
     /// What reading the services' logs came to.
     Logs(super::engine::LogsReport) => LOGS,
     /// What is still coming down inside the forms a teardown would stop.

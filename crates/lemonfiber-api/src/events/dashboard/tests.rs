@@ -138,13 +138,13 @@ async fn what_is_playing_unchanged_is_not_said_again() {
 
 /// A dashboard with no phone waiting to be woken is not gathered for nobody, alone or
 /// beside the other sources.
-#[test]
-fn with_no_phone_waiting_nothing_is_gathered_for_nobody() {
+#[tokio::test]
+async fn with_no_phone_waiting_nothing_is_gathered_for_nobody() {
     use crate::events::extending::Together;
     use crate::events::live::Gathers as _;
-    assert!(!a_dashboard().wanted_unheard());
+    assert!(!a_dashboard().wanted_unheard().await);
     let ctx = Arc::new(lemonfiber_testing::a_context().build());
-    assert!(!Together::in_a_run(&ctx).wanted_unheard());
+    assert!(!Together::in_a_run(&ctx).wanted_unheard().await);
 }
 
 /// A dashboard whose engine is slower than the first wave hands what the rest answered

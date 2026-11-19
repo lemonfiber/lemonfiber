@@ -18,11 +18,11 @@
         "plugin": "decline"
       },
       {
-        "offer": "c89add96d07efdbca36e7d79615f34d7-ca58b0a3-90bd3b5a-a50794fa-d202ef8d",
+        "offer": "342aa1b93165d7b6eaa2b06e5ca95e06-ca58b0a3-90bd3b5a-a50794fa-d202ef8d",
         "plugin": "navidrome"
       },
       {
-        "offer": "edc4ebec05eb1a91ab04248c58ceb18b-8ad139bd-90bd3b5a-17490ba8-d202ef8d",
+        "offer": "e48795c1214e3aaff2dcaf2aee2f5ed3-8ad139bd-90bd3b5a-17490ba8-d202ef8d",
         "plugin": "door"
       },
       {
@@ -34,7 +34,7 @@
         "plugin": "seerr"
       }
     ],
-    "offer": "101da24d",
+    "offer": "d2eb9676",
     "plan": {
       "dropped": [],
       "filtered": [],

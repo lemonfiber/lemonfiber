@@ -5,6 +5,12 @@ use lemonfiber_core::keys::Minter;
 
 use super::{keeper, proof, Collecting, Minting, Proof};
 use crate::admission::{Caller, Keyed};
+use crate::guard::Presented;
+
+/// The session a mint arrives with.
+fn session() -> Presented {
+    Presented("a-session".to_owned())
+}
 
 /// A key of `scope`, as the door hands it over.
 fn a_key(scope: Scope) -> Caller {
@@ -51,7 +57,7 @@ fn a_mint_names_exactly_what_it_needs_and_nothing_else() {
     assert!(serde_json::from_str::<Minting>(padded).is_err());
     let unproven = r#"{"name":"ha","scope":"act","purpose":"other"}"#;
     let unproven = serde_json::from_str::<Minting>(unproven);
-    assert!(unproven.is_ok_and(|minting| proof(&minting).is_none()));
+    assert!(unproven.is_ok_and(|minting| proof(&minting, &session()).is_none()));
 }
 
 #[test]
@@ -63,13 +69,16 @@ fn a_mint_carries_the_password_or_the_whole_of_a_device_keys_proof_and_never_bot
         }
         serde_json::from_value::<Minting>(body)
             .ok()
-            .and_then(|minting| proof(&minting))
+            .and_then(|minting| proof(&minting, &session()))
     };
     let device = serde_json::json!({"device": "pixel", "challenge": "c", "signature": "s"});
-    assert!(matches!(mint(device.clone()), Some(Proof::Device(_))));
+    assert!(matches!(
+        mint(device.clone()),
+        Some(Proof::Device { session, .. }) if session == "a-session"
+    ));
     assert!(matches!(
         mint(serde_json::json!({"password": "p"})),
-        Some(Proof::Password(_))
+        Some(Proof::Password)
     ));
     let mut both = device;
     if let Some(both) = both.as_object_mut() {

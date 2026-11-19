@@ -116,7 +116,14 @@ fn a_stack_service_s_declared_hostname_is_its_container_s_and_no_other_is_writte
                 .and_then(Yaml::as_str)
                 .map(str::to_owned)
         });
-        let expected = (Some(&service.id) == named.as_ref()).then(|| "named".to_owned());
-        assert_eq!(hostname, expected, "{}", service.id);
+        assert_eq!(hostname, service.container_hostname, "{}", service.id);
     }
+    assert!(
+        manifest
+            .services
+            .iter()
+            .any(|service| service.container_hostname.is_none()
+                && written(&project, &service.id).is_some()),
+        "a service that declares no hostname is written"
+    );
 }

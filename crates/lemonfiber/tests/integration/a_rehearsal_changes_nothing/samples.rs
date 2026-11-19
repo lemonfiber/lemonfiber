@@ -334,10 +334,10 @@ fn over_what_this_machine_keeps() -> Vec<(&'static str, Command)> {
         // its evening if it leaked through.
         (
             "downloads",
-            Command::Downloads {
+            Command::Downloads(lemonfiber_core::app::Downloading {
                 asked: lemonfiber_core::bandwidth::Pausing::Pause,
                 offer: None,
-            },
+            }),
         ),
         ("seed", Command::Seed),
         ("adopt", Command::Adopt),

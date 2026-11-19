@@ -63,6 +63,15 @@
             "$ref": "Remedy.json"
           }
         },
+        "retry_after": {
+          "description": "How many whole seconds to wait before asking again, where the refusal says.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
         "severity": {
           "description": "How much it matters.",
           "$ref": "ProblemSeverity.json"
@@ -133,6 +142,15 @@
           "items": {
             "$ref": "Remedy.json"
           }
+        },
+        "retry_after": {
+          "description": "How many whole seconds to wait before asking again, where the refusal says.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
         },
         "severity": {
           "description": "How much it matters.",

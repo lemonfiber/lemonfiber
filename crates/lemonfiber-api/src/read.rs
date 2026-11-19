@@ -220,21 +220,12 @@ impl Reply {
 /// The failure a command reported, as the status and envelope it is answered with.
 fn failed(problem: &Problem) -> Reply {
     Reply {
-        retry_after: retry_after(problem),
+        retry_after: problem.retry_after,
         ..Reply::of(
             refusing(problem),
             Envelope::new(kind::ERROR, problem).to_json(),
         )
     }
-}
-
-/// How many seconds `problem`'s code tells a caller to wait before trying again, where it
-/// says.
-pub(crate) fn retry_after(problem: &Problem) -> Option<u64> {
-    problem
-        .code
-        .declaration()
-        .and_then(lemonfiber_core::error::codes::Declared::retry_after)
 }
 
 /// The failure a command reported, in the envelope machine-readable output gives
