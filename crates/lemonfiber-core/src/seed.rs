@@ -63,7 +63,7 @@ pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,
     wire_request_identity, wire_request_source, Keep, IDENTITY,
 };
-pub use taking_back::{kept, take_back_clients, TakenBack};
+pub use taking_back::{folded, kept, take_back_clients, TakenBack};
 
 use std::collections::BTreeMap;
 use std::future::Future;

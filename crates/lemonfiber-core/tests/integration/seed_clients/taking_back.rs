@@ -7,7 +7,7 @@ use lemonfiber_core::instant::Instant;
 use lemonfiber_core::journal::Journal;
 use lemonfiber_core::ports::service::{Client as _, DownloadClient, RegisteredClient};
 use lemonfiber_core::seed::{
-    take_back_clients, wire_download_clients, Baselines, Severity, State, Wiring,
+    folded, take_back_clients, wire_download_clients, Baselines, Severity, State, Wiring,
 };
 
 /// qBittorrent, as the stack declares it.
@@ -53,10 +53,7 @@ async fn seeded(
     .await;
     let taken = take_back_clients(curator, "radarr", baseline, &at(wanted), false).await;
     wirings.extend(taken.wirings);
-    baseline.merge(&records);
-    for field in &taken.let_go {
-        baseline.forget("radarr", field);
-    }
+    folded(baseline, "radarr", &records, &taken.let_go);
     wirings
 }
 

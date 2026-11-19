@@ -33,6 +33,15 @@ pub struct TakenBack {
     pub let_go: Vec<String>,
 }
 
+/// Fold what seeding `curator` recorded into `baseline`, letting go of each field in
+/// `let_go`.
+pub fn folded(baseline: &mut Baseline, curator: &str, records: &Baseline, let_go: &[String]) {
+    baseline.merge(records);
+    for field in let_go {
+        baseline.forget(curator, field);
+    }
+}
+
 /// The baseline field keeping the client the curator gave `id`.
 fn field(id: &str) -> String {
     format!("{}{id}", prefix())
