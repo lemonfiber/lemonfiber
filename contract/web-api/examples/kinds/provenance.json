@@ -21,12 +21,12 @@
         "upstream": "https://github.com/morpheus65535/bazarr"
       },
       {
-        "digest": "sha256:27109c963f91a27f08d8825b406b2b5a5c59aed080bd9f3a7e585e235673d489",
+        "digest": "sha256:c22516f3ebe69239c09021cc232765944737dfd1c5c77fa18a2213a87d65ddb9",
         "id": "bindery",
         "image": "ghcr.io/vavallee/bindery",
         "license": "MIT",
         "name": "Bindery",
-        "pinned": "v1.43.1",
+        "pinned": "v1.51.1",
         "upstream": "https://github.com/vavallee/bindery"
       },
       {
@@ -57,12 +57,12 @@
         "upstream": "https://github.com/lemonfiber/lemonfiber-decline"
       },
       {
-        "digest": "sha256:e8fa70c407ba25320f0a8606681837b6bdc1cecad7c4b649639de32afebb2def",
+        "digest": "sha256:9c6fd9254c40925d0f91104e745002fb4c2e1c58b8c72983f9ae59f7a7113b05",
         "id": "door",
         "image": "ghcr.io/lemonfiber/door",
         "license": "Hippocratic-3.0",
         "name": "Door",
-        "pinned": "main-5b65b742fdf9",
+        "pinned": "main-5662bbfae875",
         "upstream": "https://github.com/lemonfiber/lemonfiber-door"
       },
       {
@@ -102,12 +102,12 @@
         "upstream": "https://github.com/jellyfin/jellyfin"
       },
       {
-        "digest": "sha256:5e1235d00b5d1c1f60ca0d472e554a6611aef41aa7b5b6d88260214bf4809af0",
+        "digest": "sha256:8fb40ada166dd1880cb1b166df5bcbb081107523f20ab60df05c313e2052a467",
         "id": "lidarr",
         "image": "lscr.io/linuxserver/lidarr",
         "license": "GPL-3.0-only",
         "name": "Lidarr",
-        "pinned": "2.14.5.4836-ls9",
+        "pinned": "3.1.6.5079-ls49",
         "upstream": "https://github.com/Lidarr/Lidarr"
       },
       {
@@ -147,12 +147,12 @@
         "upstream": "https://github.com/qbittorrent/qBittorrent"
       },
       {
-        "digest": "sha256:c984533510abe0219a70e80d15bd0d212b7df21baa0913759c4ce6cc9092240b",
+        "digest": "sha256:044788f5508b7f67a3e0368cdd142c77c4d4cd5aec2efaba53e1a68b6b6231e7",
         "id": "radarr",
         "image": "lscr.io/linuxserver/radarr",
         "license": "GPL-3.0-only",
         "name": "Radarr",
-        "pinned": "5.28.0.10274-ls286",
+        "pinned": "7.0.3.10918-ls328",
         "upstream": "https://github.com/Radarr/Radarr"
       },
       {
