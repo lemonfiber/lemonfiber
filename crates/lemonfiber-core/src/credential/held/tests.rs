@@ -93,6 +93,21 @@ fn a_stack_that_only_torrents_is_not_asked_for_a_usenet_password() {
 }
 
 #[test]
+fn a_stack_torrenting_without_a_vpn_is_not_told_it_is_missing_a_tunnel_key() {
+    let unguarded = catalogue(crate::config::Supported {
+        protocols: Protocols::both(),
+        vpn_declined: true,
+    });
+    let named: Vec<&str> = unguarded.iter().map(|entry| entry.name).collect();
+
+    assert!(!named.iter().any(|name| name.contains("VPN")), "{named:?}");
+    assert!(
+        named.iter().any(|name| name.contains("Usenet")),
+        "{named:?}"
+    );
+}
+
+#[test]
 fn a_stack_running_neither_still_holds_the_credentials_it_always_needs() {
     let neither = catalogue(Protocols::none());
 

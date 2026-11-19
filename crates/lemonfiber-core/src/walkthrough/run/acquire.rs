@@ -53,13 +53,14 @@ pub(super) async fn acquire(walk: &mut Walk<'_>, chosen: &Chosen<'_>) -> Result<
     }
 }
 
-/// Prove the tunnel before anything is asked for, where torrents are in play.
+/// Prove the tunnel before anything is asked for, where torrents are in play through a
+/// VPN.
 ///
 /// The gate is on torrents being *configured*, not on the release that will be picked
 /// being a torrent: which protocol wins is the service's decision, made after this, and a
 /// gate that waited to find out would be a gate that opened first.
 async fn tunnel_is_up(walk: &mut Walk<'_>) -> Result<(), Reason> {
-    if !walk.ctx.settings.protocols.torrent {
+    if !walk.ctx.settings.supported().tunnelled() {
         return Ok(());
     }
     let proved = diagnose(walk.ctx, &Narrowing::Category(Category::Vpn), false)

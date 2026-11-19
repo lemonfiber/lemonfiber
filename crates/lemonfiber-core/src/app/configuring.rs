@@ -390,7 +390,7 @@ pub(crate) fn consequence(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -> 
     if let Some(entry) = crate::reconfigure::decision(key) {
         return Some(format!("changing this affects {}", entry.affects));
     }
-    if !ctx.settings.protocols.torrent {
+    if !ctx.settings.supported().tunnelled() {
         return None;
     }
     let mut proposed = held.clone();

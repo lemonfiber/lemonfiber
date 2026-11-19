@@ -184,6 +184,7 @@ pub(crate) fn settings_at(run: Option<&Ctx>, paths: Option<&Paths>) -> Settings 
         quiet: lemonfiber_core::config::quiet_from_env(&recorded),
         overlays: lemonfiber_core::overlay::layered(env_file.as_deref()),
         protocols: Protocols::from_env(&recorded),
+        vpn_declined: lemonfiber_core::config::vpn_declined_from_env(&recorded),
         ip_echo: ip_echo_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
         nfs: lemonfiber_core::config::nfs_from_env(&recorded),

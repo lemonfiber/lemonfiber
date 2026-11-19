@@ -8,7 +8,7 @@
 //! A reason is the operator's own words, so it is carried percent-encoded: nothing an
 //! operator types can end a pair early or start a second one.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The most characters a reason may hold.
 ///
@@ -28,6 +28,8 @@ pub struct Chosen {
     fillers: BTreeMap<String, String>,
     /// What the operator said about a choice, where they said anything.
     reasons: BTreeMap<String, String>,
+    /// The capabilities the operator chose that nothing fills.
+    declined: BTreeSet<String>,
 }
 
 impl Chosen {
@@ -50,6 +52,29 @@ impl Chosen {
                 .filter(|(capability, service)| !capability.is_empty() && !service.is_empty())
                 .collect(),
             reasons: BTreeMap::new(),
+            declined: BTreeSet::new(),
+        }
+    }
+
+    /// The same choices, with `capability` filled by nothing.
+    #[must_use]
+    pub fn declining(mut self, capability: &str) -> Self {
+        self.declined.insert(capability.to_owned());
+        self
+    }
+
+    /// Whether the operator chose that nothing fills this capability.
+    #[must_use]
+    pub fn declines(&self, capability: &str) -> bool {
+        self.declined.contains(capability)
+    }
+
+    /// The choices `setting` records, with every capability these decline still declined.
+    #[must_use]
+    pub fn recorded(&self, setting: &str) -> Self {
+        Self {
+            declined: self.declined.clone(),
+            ..Self::read(Some(setting))
         }
     }
 

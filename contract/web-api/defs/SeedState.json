@@ -182,6 +182,32 @@
       ]
     },
     {
+      "description": "A download client lemonfiber created in a curator, taken back out of it because\nnothing here answers where it points any more.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "taken-back"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
+      "description": "A download client a real run would take back, and this one did not.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "would-take-back"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    {
       "description": "An area the operator declared unmanaged. Nothing was read from the service and\nnothing was written to it, and the reason they gave is carried so a report says\nwhose decision it was.\n\nApart from [`Self::Unmanaged`], which lemonfiber *infers* from a value it has\nno record of having written, and which it adopts as the baseline so that later\nruns recognise it. This one is a decision somebody wrote down, and it holds\nwhether or not lemonfiber would have had anything to say — nothing is adopted,\nbecause adopting would be the first half of managing it again.",
       "type": "object",
       "properties": {

@@ -20,6 +20,7 @@ use crate::config::{
     Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, INDEXER_VALIDATED_KEY,
     MEDIA_SERVER_MODE_KEY, PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY,
     PROVIDER_TLS_KEY, PROVIDER_USER_KEY, PROVIDER_VALIDATED_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
+    VPN_KEY,
 };
 use crate::journal::{Change, Journal, Kind, Undo};
 use crate::platform::Environment;
@@ -315,6 +316,9 @@ impl Wizard {
         if let Some(protocols) = answers.protocols {
             settings.push((USENET_KEY.to_owned(), on_off(protocols.usenet)));
             settings.push((TORRENT_KEY.to_owned(), on_off(protocols.torrent)));
+        }
+        if let Some(vpn) = answers.vpn.as_ref().filter(|_| self.applies(Step::Vpn)) {
+            settings.push((VPN_KEY.to_owned(), on_off(matches!(vpn, Vpn::Carrying(_)))));
         }
         if let Some(path) = &answers.data_location {
             settings.push((DATA_ROOT_KEY.to_owned(), path.display().to_string()));

@@ -96,6 +96,11 @@ pub enum State {
     /// what it expects. Its value is not shown, exactly as [`Self::Unmanaged`] does not
     /// show one, so a secret among the adopted is never put on display by a question.
     WouldAdopt,
+    /// A download client lemonfiber created in a curator, taken back out of it because
+    /// nothing here answers where it points any more.
+    TakenBack,
+    /// A download client a real run would take back, and this one did not.
+    WouldTakeBack,
     /// An area the operator declared unmanaged. Nothing was read from the service and
     /// nothing was written to it, and the reason they gave is carried so a report says
     /// whose decision it was.
@@ -164,6 +169,7 @@ impl State {
                 | Self::Stale
                 | Self::Adopted
                 | Self::Unmanaged
+                | Self::TakenBack
                 | Self::Observed { .. }
                 | Self::Unmatched { .. }
         )

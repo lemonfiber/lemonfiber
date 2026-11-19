@@ -8,8 +8,8 @@ use super::{filled, settle, Chosen, Reaches, Settled, Whose};
 use crate::plugin::Installed;
 
 /// Every service the operator's choices in `chosen` take out of its form: each one a
-/// choice passed over that fills nothing anything asks for, with the upstream each such
-/// adapter fronts, in the order the stack and its plugins declare them.
+/// choice or a decline passed over that fills nothing anything asks for, with the
+/// upstream each such adapter fronts, in the order the stack and its plugins declare them.
 #[must_use]
 pub fn replaced(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -> Vec<String> {
     let wired = settle(manifest, installed, chosen);
@@ -23,7 +23,8 @@ pub fn replaced(manifest: &Manifest, installed: &[Installed], chosen: &Chosen) -
                         whose: Whose::Operator,
                         over,
                         ..
-                    },
+                    }
+                    | Settled::Declined { over },
                 ..
             } => Some(over),
             _ => None,

@@ -453,3 +453,50 @@ async fn a_boot_leaves_nothing_out_where_nothing_waits() {
 
     assert!(waiting.is_ok_and(|waiting| waiting.is_none()));
 }
+
+/// The plugins a start over every form offers to install on `ctx`.
+async fn offered_over_everything(ctx: &Ctx) -> Vec<String> {
+    crate::app::engine::offline(ctx, &[])
+        .await
+        .ok()
+        .flatten()
+        .map(|offline| offline.installs.into_iter().map(|one| one.plugin).collect())
+        .unwrap_or_default()
+}
+
+/// Torrents chosen without a VPN are offered the torrent client's install and never the
+/// egress guard's.
+#[tokio::test]
+async fn torrents_chosen_without_a_vpn_are_offered_no_egress_guard() {
+    let serving = watching();
+    let mut ctx = super::embedding::unmoved("offline-unguarded", &serving);
+    ctx.settings.protocols = crate::config::Protocols::both();
+    let manifest = ctx.stack.checked_manifest(ctx.today()).ok();
+    let id = |pick: fn(&lemonfiber_manifest::Service) -> bool| {
+        manifest
+            .iter()
+            .flat_map(|one| &one.services)
+            .find(|service| pick(service))
+            .map(|service| service.id.clone())
+            .unwrap_or_default()
+    };
+    let guard = id(lemonfiber_manifest::Service::guards_egress);
+    let client = id(|service| {
+        service.network.as_ref().and_then(|network| network.via())
+            == Some(lemonfiber_contract::capabilities::network::egress::CAPABILITY)
+    });
+    for service in [&guard, &client] {
+        let _ = std::fs::remove_dir_all(crate::plugin::configuration(&stack_of(&ctx), service));
+    }
+
+    let guarded = offered_over_everything(&ctx).await;
+    assert!(
+        guarded.contains(&guard) && guarded.contains(&client),
+        "{guarded:?}"
+    );
+
+    ctx.settings.vpn_declined = true;
+    let unguarded = offered_over_everything(&ctx).await;
+    assert!(unguarded.contains(&client), "{unguarded:?}");
+    assert!(!unguarded.contains(&guard), "{unguarded:?}");
+}

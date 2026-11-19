@@ -47,10 +47,10 @@ pub(crate) async fn permitted(
         &declared,
         &containers,
         &super::halted::load(ctx),
-        ctx.settings.protocols,
+        ctx.settings.supported(),
     );
 
-    let needed = needed_by(manifest, ctx.settings.protocols, &running, forms);
+    let needed = needed_by(manifest, ctx.settings.supported(), &running, forms);
     if needed.is_empty() {
         return Ok(());
     }

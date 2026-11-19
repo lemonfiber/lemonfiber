@@ -19,7 +19,7 @@ use lemonfiber_manifest::Manifest;
 pub use lemonfiber_manifest::Protocol;
 use thiserror::Error;
 
-use crate::config::Protocols;
+use crate::config::Supported;
 use crate::error::codes::form::{FORMS_CONFLICT, NOTHING_TO_RUN, NO_FORM_NAMED, NO_SUCH_FORM};
 use crate::error::{Code, Diagnose, Problem, Remedy, State};
 
@@ -244,7 +244,7 @@ impl Plan {
 pub fn resolve(
     manifest: &Manifest,
     forms: &[String],
-    protocols: Protocols,
+    supported: impl Into<Supported>,
 ) -> Result<Plan, Failure> {
     if forms.is_empty() {
         return Err(Failure::NothingNamed);
@@ -280,7 +280,7 @@ pub fn resolve(
         .flat_map(|form| form.profiles.iter().cloned())
         .collect();
 
-    planned(manifest, forms, closure, protocols)
+    planned(manifest, forms, closure, supported.into())
 }
 
 /// A plan over everything the stack declares.
@@ -298,9 +298,9 @@ pub fn resolve(
 ///
 /// Returns [`Failure::NothingLeft`] where the configuration supports none of the
 /// profiles the stack declares — a stack with no way of downloading at all.
-pub fn everything(manifest: &Manifest, protocols: Protocols) -> Result<Plan, Failure> {
+pub fn everything(manifest: &Manifest, supported: impl Into<Supported>) -> Result<Plan, Failure> {
     let closure: BTreeSet<String> = manifest.profile_ids();
-    planned(manifest, &[], closure, protocols)
+    planned(manifest, &[], closure, supported.into())
 }
 
 /// What a set of profiles comes to, once the ones this configuration cannot support
@@ -312,14 +312,18 @@ pub fn everything(manifest: &Manifest, protocols: Protocols) -> Result<Plan, Fai
 /// nothing to run, whatever runs beside it, and a beside profile needing one is left
 /// out without the forms reading as narrowed.
 ///
+/// An egress guard is no service of the plan where the operator chose torrents without a
+/// VPN.
+///
 /// The half of resolving that does not care how the profiles were arrived at, so
 /// naming forms and asking for everything cannot come to differently-shaped answers.
 fn planned(
     manifest: &Manifest,
     forms: &[String],
     closure: BTreeSet<String>,
-    protocols: Protocols,
+    supported: Supported,
 ) -> Result<Plan, Failure> {
+    let protocols = supported.protocols;
     let beside: BTreeSet<String> = manifest
         .profiles
         .iter()
@@ -369,6 +373,7 @@ fn planned(
         .services
         .iter()
         .filter(|service| profiles.contains(&service.profile))
+        .filter(|service| !(supported.vpn_declined && service.guards_egress()))
         .map(|service| service.id.clone())
         .collect();
 

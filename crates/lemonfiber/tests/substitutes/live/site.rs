@@ -1,6 +1,6 @@
-//! The one edge an arm fakes: a Newznab indexer site, answering every search with the one
-//! release the arm's request is for and serving that release's NZB, and writing down
-//! each NZB it served, which is the first proof of the grab.
+//! The one edge an arm fakes: a Newznab or Torznab indexer site, answering every search
+//! with the one release the arm's request is for and serving that release's NZB or torrent,
+//! and writing down each one it served, which is the first proof of the grab.
 
 use std::fmt::Write as _;
 use std::io::{BufRead as _, BufReader, Write as _};
@@ -42,6 +42,44 @@ const CATEGORIES: [Category; 4] = [
 /// The key the site answers to, which the operator gives the indexer that searches it.
 pub const KEY: &str = "fixture-site-key";
 
+/// What the site's release is fetched as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Carried {
+    /// An NZB, over Usenet, as a Newznab site serves it.
+    Nzb,
+    /// A torrent, from peers, as a Torznab site serves it.
+    Torrent,
+}
+
+impl Carried {
+    /// The path the site serves the release's file under, before its id.
+    const fn path(self) -> &'static str {
+        match self {
+            Self::Nzb => "/nzb/",
+            Self::Torrent => "/torrent/",
+        }
+    }
+
+    /// The media type the release's file is served as.
+    const fn media_type(self) -> &'static str {
+        match self {
+            Self::Nzb => "application/x-nzb",
+            Self::Torrent => "application/x-bittorrent",
+        }
+    }
+
+    /// The namespace the feed's attributes are written in, and the prefix they carry.
+    const fn attributes(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Nzb => (
+                "newznab",
+                "http://www.newznab.com/DTD/2010/feeds/attributes/",
+            ),
+            Self::Torrent => ("torznab", "http://torznab.com/schemas/2015/feed"),
+        }
+    }
+}
+
 /// The one release the site holds.
 #[derive(Debug, Clone)]
 pub struct Release {
@@ -51,13 +89,15 @@ pub struct Release {
     pub category: &'static str,
     /// Its size in bytes, within what its curator takes for a release of its kind.
     pub size: u64,
+    /// What it is fetched as.
+    pub carried: Carried,
 }
 
 /// The site, listening.
 pub struct Site {
     /// The port it answers on, on every address of this machine.
     pub port: u16,
-    /// Every NZB it served, by the release's id.
+    /// Every NZB or torrent it served, by the release's id.
     served: Arc<Mutex<Vec<String>>>,
 }
 
@@ -67,6 +107,19 @@ const ARTICLE: u64 = 768_000;
 
 /// The id the site names its release by.
 const ID: &str = "lemonfiber-arm-release";
+
+/// The length of one piece of the release's torrent.
+const PIECE: u64 = 16_777_216;
+
+/// The length of one piece's hash in a torrent.
+const HASHED: usize = 20;
+
+/// The peers a search of the site finds sharing the release's torrent, above the one a
+/// curator asks for at least.
+const SEEDERS: u32 = 10;
+
+/// The tracker the release's torrent names, which nothing in the run announces to.
+const TRACKER: &str = "http://tracker.lemonfiber.invalid/announce";
 
 impl Site {
     /// The site holding `release`, answering on a port of its own on every address.
@@ -95,7 +148,7 @@ impl Site {
         Self { port, served }
     }
 
-    /// Whether the site has served its release's NZB.
+    /// Whether the site has served its release's NZB or torrent.
     #[must_use]
     pub fn grabbed(&self) -> bool {
         self.served
@@ -106,7 +159,7 @@ impl Site {
     }
 }
 
-/// Answer one request on `stream`: the capabilities, a search, or the NZB.
+/// Answer one request on `stream`: the capabilities, a search, or the release's file.
 fn answer(mut stream: TcpStream, release: &Release, served: &Mutex<Vec<String>>) {
     let mut line = String::new();
     let mut reading = BufReader::new(&stream);
@@ -128,24 +181,30 @@ fn answer(mut stream: TcpStream, release: &Release, served: &Mutex<Vec<String>>)
         .nth(1)
         .unwrap_or_default()
         .to_owned();
-    let (status, kind, body) = if target.starts_with(&format!("/nzb/{ID}")) {
+    let carried = release.carried;
+    let (kind, body) = if target.starts_with(&format!("{}{ID}", carried.path())) {
         served
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(ID.to_owned());
-        ("200 OK", "application/x-nzb", nzb(release))
+        let file = match carried {
+            Carried::Nzb => nzb(release).into_bytes(),
+            Carried::Torrent => torrent(release),
+        };
+        (carried.media_type(), file)
     } else if !target.contains(&format!("apikey={KEY}")) {
-        ("200 OK", "application/xml", refused())
+        ("application/xml", refused().into_bytes())
     } else if target.contains("t=caps") {
-        ("200 OK", "application/xml", caps())
+        ("application/xml", caps().into_bytes())
     } else {
-        ("200 OK", "application/rss+xml", found(release, &host))
+        ("application/rss+xml", found(release, &host).into_bytes())
     };
     let _ = write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
+    let _ = stream.write_all(&body);
 }
 
 /// What the site answers a key it does not hold.
@@ -181,18 +240,50 @@ fn caps() -> String {
 
 /// The one release, as every search made of the site at `host` finds it.
 fn found(release: &Release, host: &str) -> String {
+    let carried = release.carried;
+    let (prefix, namespace) = carried.attributes();
+    let shared = match carried {
+        Carried::Nzb => String::new(),
+        Carried::Torrent => format!(
+            "<{prefix}:attr name=\"seeders\" value=\"{SEEDERS}\"/>\
+             <{prefix}:attr name=\"peers\" value=\"{SEEDERS}\"/>"
+        ),
+    };
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\" \
-         xmlns:newznab=\"http://www.newznab.com/DTD/2010/feeds/attributes/\"><channel>\
+         xmlns:{prefix}=\"{namespace}\"><channel>\
          <title>lemonfiber arm</title><item><title>{title}</title><guid>{ID}</guid>\
-         <link>http://{host}/nzb/{ID}?apikey={KEY}</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0000</pubDate>\
-         <enclosure url=\"http://{host}/nzb/{ID}?apikey={KEY}\" length=\"{size}\" type=\"application/x-nzb\"/>\
-         <newznab:attr name=\"category\" value=\"{category}\"/>\
-         <newznab:attr name=\"size\" value=\"{size}\"/></item></channel></rss>",
+         <link>http://{host}{path}{ID}?apikey={KEY}</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0000</pubDate>\
+         <enclosure url=\"http://{host}{path}{ID}?apikey={KEY}\" length=\"{size}\" type=\"{kind}\"/>\
+         <{prefix}:attr name=\"category\" value=\"{category}\"/>\
+         <{prefix}:attr name=\"size\" value=\"{size}\"/>{shared}</item></channel></rss>",
         title = release.title,
         category = release.category,
         size = release.size,
+        path = carried.path(),
+        kind = carried.media_type(),
     )
+}
+
+/// The release's torrent: one file of its size, in pieces of [`PIECE`] bytes, announced to
+/// [`TRACKER`]. No peer holds it, so a client given it waits for one.
+fn torrent(release: &Release) -> Vec<u8> {
+    let pieces = usize::try_from(release.size.div_ceil(PIECE)).unwrap_or_default();
+    let hashes: Vec<u8> = (0..pieces * HASHED)
+        .map(|at| u8::try_from(at % 251).unwrap_or_default())
+        .collect();
+    let name = format!("{}.mkv", release.title);
+    let mut file = format!(
+        "d8:announce{}:{TRACKER}4:infod6:lengthi{}e4:name{}:{name}12:piece lengthi{PIECE}e6:pieces{}:",
+        TRACKER.len(),
+        release.size,
+        name.len(),
+        hashes.len(),
+    )
+    .into_bytes();
+    file.extend(hashes);
+    file.extend(b"ee");
+    file
 }
 
 /// The release's NZB: one file, in articles of [`ARTICLE`] bytes that add up to its size.

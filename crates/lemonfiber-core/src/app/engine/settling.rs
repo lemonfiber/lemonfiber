@@ -64,7 +64,7 @@ async fn settle(
             profiles,
             &containers,
             &super::halted::load(ctx),
-            ctx.settings.protocols,
+            ctx.settings.supported(),
         );
 
         let waiting: Vec<String> = unsettled(&services)
@@ -318,7 +318,7 @@ pub(crate) async fn fell_short_into(
         &profiles,
         &containers,
         &super::halted::load(ctx),
-        ctx.settings.protocols,
+        ctx.settings.supported(),
     );
     report.condition = Some(condition(&read));
     report.services = read;

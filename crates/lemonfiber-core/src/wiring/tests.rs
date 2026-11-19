@@ -136,6 +136,32 @@ fn an_ask_with_one_claimant_reaches_it_outright() {
     );
 }
 
+#[test]
+fn a_declined_ask_reaches_nothing_and_names_every_claimant_it_passed_over() {
+    let manifest = written(&format!(
+        "{}{}{}\n[[wiring]]\nby = \"asker\"\nasks = \"media.serve\"\nfilled_by = \"server\"\n",
+        service("asker", ""),
+        service("server", "\"media.serve\""),
+        service("other", "\"media.serve\"")
+    ));
+    let declined = Chosen::read(Some("media.serve=other")).declining("media.serve");
+    assert_eq!(
+        came(manifest.clone(), &declined, "asker"),
+        Some(Reaches::Asked {
+            native: None,
+            files: None,
+            capability: "media.serve".to_owned(),
+            services: Vec::new(),
+            settled: Settled::Declined {
+                over: vec!["server".to_owned(), "other".to_owned()],
+            },
+            origins: bundled(&["server", "other"]),
+            media_types: Vec::new(),
+        })
+    );
+    assert_eq!(nothing_fills(manifest, &declined), Some(Vec::new()));
+}
+
 /// Several claimants and a link asking for one, with nobody having chosen:
 /// refused, with every candidate named so the choice is made from a list.
 #[test]
@@ -683,4 +709,11 @@ fn what_nothing_asks_for_is_filled_by_its_one_provider_or_the_one_chosen() {
         filled_by(&theirs, &Chosen::read(Some("dashboard.show=index"))),
         None
     );
+    let placed = |chosen: &Chosen| {
+        manifest
+            .as_ref()
+            .and_then(|manifest| crate::project::placed_at(manifest, &[], chosen, "dashboard.show"))
+    };
+    assert_eq!(placed(&Chosen::default()), Some("dashboard".to_owned()));
+    assert_eq!(placed(&Chosen::default().declining("dashboard.show")), None);
 }

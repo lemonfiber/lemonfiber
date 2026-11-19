@@ -32,6 +32,11 @@ pub enum Mode {
     /// Lists fine, but refuses an in-place update — the failure a reset's revert meets
     /// when the service will not take lemonfiber's category back.
     RefusesUpdate,
+    /// Lists fine, but cannot take a download client back at all.
+    KeepsClients,
+    /// Lists fine, but will not let a download client go while an indexer is pinned to
+    /// it, naming the indexers.
+    PinsClients,
 }
 
 /// A service that answers the seed driver from a script.
@@ -233,8 +238,21 @@ fn set_client_field(
 
 /// How `Receiving` answers `forget_download_client`.
 fn forget_download_client(fake: &Receiving, id: &str) -> Result<(), Failure> {
-    if matches!(fake.mode, Mode::Down) {
-        return Err(down("sonarr"));
+    match fake.mode {
+        Mode::Down => return Err(down("sonarr")),
+        Mode::KeepsClients => {
+            return Err(Failure::Unsupported {
+                service: "sonarr".to_owned(),
+                detail: "it takes no download client back".to_owned(),
+            })
+        }
+        Mode::PinsClients => {
+            return Err(Failure::Refused {
+                service: "sonarr".to_owned(),
+                detail: "HTTP 409: indexers Nyaa, Tracker pinned to it".to_owned(),
+            })
+        }
+        _ => {}
     }
     fake.clients
         .lock()

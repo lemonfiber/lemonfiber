@@ -33,6 +33,12 @@
 # site under the solver's tag and must find the release it holds, which the site answers
 # only to a request carrying the cookie it hands a browser that ran its challenge.
 #
+# A download client standing in is run live as a curator arm is, put in the place of the
+# client the bundle fills the capability with once the stack is first seeded: the indexer
+# site serves the release as an NZB or a torrent, the curator grabs it through the client,
+# and the core then pauses and resumes every client, the one standing in read back stopped
+# and then fetching, every other being a service of the part it replaced.
+#
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
 # asked for one title by a household member, proved to grab it where the indexer site the
@@ -93,7 +99,7 @@ arm           = "media-serve-emby"
 capability    = "media.serve"
 plugin        = "emby"
 origin        = "https://github.com/lemonfiber/plugin-emby"
-revision      = "1323c777ba908dc66285875bec600f2085ddef3b"
+revision      = "4e92ecf5cbcf28c6d571414b146ad6eb54cdc282"
 stands_in_for = "jellyfin"
 media_type    = "movies"
 claimed       = true
@@ -117,6 +123,26 @@ revision      = "4eee641119f2fc7145ecbdf7939564cc31969751"
 stands_in_for = "flaresolverr"
 claimed       = true
 
+[[substitute]]
+arm           = "download-usenet"
+capability    = "download.usenet"
+plugin        = "nzbget"
+origin        = "https://github.com/lemonfiber/plugin-nzbget"
+revision      = "c1844f8ec99f2f416be2b794918b87c21f060b90"
+stands_in_for = "sabnzbd"
+media_type    = "movies"
+claimed       = true
+
+[[substitute]]
+arm           = "download-torrent"
+capability    = "download.torrent"
+plugin        = "transmission"
+origin        = "https://github.com/lemonfiber/plugin-transmission"
+revision      = "010ff61d1a4eaee13328cf105d335fb8d85873cb"
+stands_in_for = "qbittorrent"
+media_type    = "movies"
+claimed       = true
+
 [[curator]]
 arm        = "curator-radarr"
 plugin     = "radarr"
@@ -135,5 +161,5 @@ media_type = "music"
 arm        = "curator-bindery"
 plugin     = "bindery"
 origin     = "https://github.com/lemonfiber/plugin-bindery"
-revision   = "0331a8ccd6871afc8c4a20a873c99309380f3f30"
+revision   = "09954f75527f3d4dd41ee5bb67b0248578c6895a"
 media_type = "books"

@@ -50,7 +50,7 @@ pub async fn logs(
     // and both narrow: a form is the services its profiles declare.
     let mut wanted: Vec<String> = services.to_vec();
     if !forms.is_empty() {
-        let plan = resolve(&manifest, forms, ctx.settings.protocols)
+        let plan = resolve(&manifest, forms, ctx.settings.supported())
             .map_err(|err| Box::new(err.problem()))?;
         let profiles: Vec<String> = plan.profiles.into_iter().collect();
         wanted.extend(

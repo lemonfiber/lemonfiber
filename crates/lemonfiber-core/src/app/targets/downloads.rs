@@ -115,15 +115,15 @@ pub(crate) struct DeclaredDownload {
     pub target: Option<DownloadTarget>,
 }
 
-/// Every download client among `fillers`, in the order they are declared, whether or
-/// not anything here can reach it.
+/// Every download client among `fillers` the wiring uses, in the order they are declared,
+/// whether or not anything here can reach it. One the wiring passed over is left out.
 ///
 /// For the requests that owe an answer about every client the stack runs: one that
 /// could not be reached is named as not reached rather than left out, where a read
 /// leaves it out because it has nothing to read.
 pub(crate) async fn declared_downloads(ctx: &Ctx, fillers: &Fillers) -> Vec<DeclaredDownload> {
     let mut declared = Vec::new();
-    for filler in fillers.services() {
+    for filler in fillers.services().filter(|one| !fillers.passed_over(one)) {
         let Some(moving) = moving(filler) else {
             continue;
         };

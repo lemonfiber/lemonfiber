@@ -58,6 +58,7 @@ fn setting<'a>(plan: &'a super::Plan, key: &str) -> Option<&'a str> {
 }
 
 mod planning;
+mod recovering;
 mod walking;
 
 mod answering;

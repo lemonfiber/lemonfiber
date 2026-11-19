@@ -119,9 +119,9 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Unfinished> {
         // was silent: `lemonfiber down --wait` with no form named waited for the
         // downloads inside no services at all and stopped immediately.
         let resolved = if forms.is_empty() {
-            everything(&manifest, ctx.settings.protocols)
+            everything(&manifest, ctx.settings.supported())
         } else {
-            resolve(&manifest, forms, ctx.settings.protocols)
+            resolve(&manifest, forms, ctx.settings.supported())
         };
         let Ok(plan) = resolved else {
             return Vec::new();

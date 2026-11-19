@@ -108,6 +108,20 @@ fn every_seed_state_says_what_became_of_the_connection() {
 }
 
 #[test]
+fn a_client_taken_back_says_so_in_both_tenses() {
+    let report = seed_report(vec![
+        wiring("q", SeedState::TakenBack),
+        wiring("r", SeedState::WouldTakeBack),
+    ]);
+    let text = seeding(&report).text();
+    assert!(
+        text.contains("q   taken back — nothing here answers where it pointed"),
+        "{text}"
+    );
+    assert!(text.contains("r   would be taken back"), "{text}");
+}
+
+#[test]
 fn a_kept_edit_names_its_file_and_the_command_that_puts_the_preset_back() {
     let report = seed_report(vec![wiring(
         "Sonarr's quality profiles",

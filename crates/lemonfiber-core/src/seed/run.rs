@@ -210,9 +210,14 @@ async fn pass(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem
             .map(|curator| seed_curator(ctx, *curator, &seeding)),
     )
     .await;
-    for (curator_wirings, records) in seeded {
-        wirings.extend(curator_wirings);
-        baseline.merge(&records);
+    for (curator, seeded) in curating.iter().zip(seeded) {
+        wirings.extend(seeded.wirings);
+        super::folded(
+            &mut baseline,
+            curator.name(),
+            &seeded.records,
+            &seeded.let_go,
+        );
     }
 
     let (filed, completed) = filing::seed_completed_folders(ctx, &fillers, &mut baseline).await;

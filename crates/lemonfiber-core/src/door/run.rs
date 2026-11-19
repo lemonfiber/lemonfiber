@@ -61,7 +61,7 @@ pub(crate) async fn front_door(
         &profiles,
         &containers,
         &halted,
-        ctx.settings.protocols,
+        ctx.settings.supported(),
     );
     let undeclared = crate::docker::undeclared(&manifest, &containers, &halted);
     // A record of what is installed that will not read leaves the stack's own services

@@ -3,8 +3,9 @@
 //! gate and the curator to a grab, and the run undone.
 //!
 //! The one thing faked is the indexer site the operator gives the stack's indexer, which
-//! [`site`] serves: the grab is proved where it serves the release's NZB, and again where
-//! the core's own trace of the title reaches a grab.
+//! [`site`] serves: the grab is proved where it serves the release's NZB or torrent, and
+//! again where the core's own trace of the title reaches a grab. A download client standing
+//! in is then paused and resumed with every other one.
 
 mod core;
 mod http;
@@ -18,7 +19,7 @@ pub use self::substitute::Substitution;
 use std::time::{Duration, Instant};
 
 use self::core::{strings_under, Core};
-use self::site::{Release, Site};
+use self::site::{Carried, Release, Site};
 
 /// The service whose key adds the site as an indexer, and where its port is declared.
 const INDEXER: &str = "prowlarr";
@@ -28,7 +29,7 @@ const INDEXER_KEY: &str = "prowlarr:upstream-key";
 
 /// The Usenet login setup is given: a provider over TLS, which nothing in the run
 /// downloads from, since the grab is proved where the download is queued.
-pub const USENET: [&str; 10] = [
+const USENET_LOGIN: [&str; 10] = [
     "--usenet-host",
     "news.lemonfiber.invalid",
     "--usenet-port",
@@ -45,9 +46,40 @@ pub const USENET: [&str; 10] = [
 /// stack's first start offers, which `up` then agrees to.
 const APPLIED: &str = "applied";
 
-/// The indexer's generic Newznab definition: its implementation, and the name or the
-/// definition name it is listed under, which Prowlarr releases differ on.
-const NEWZNAB: (&str, &str, &str) = ("Newznab", "Generic Newznab", "generic-newznab");
+/// How a stack downloads what its curators grab, as setup is told and the indexer site
+/// serves it.
+#[derive(Debug, Clone, Copy)]
+pub struct Downloads {
+    /// The protocol setup is given.
+    protocol: &'static str,
+    /// The login setup is given for it.
+    login: &'static [&'static str],
+    /// The indexer's generic definition for a site of it: its implementation, and the
+    /// name or the definition name it is listed under, which Prowlarr releases differ on.
+    definition: (&'static str, &'static str, &'static str),
+    /// What the site serves its release as.
+    carried: Carried,
+}
+
+/// Downloading over Usenet, from a Newznab site.
+pub const USENET: Downloads = Downloads {
+    protocol: "usenet",
+    login: &USENET_LOGIN,
+    definition: ("Newznab", "Generic Newznab", "generic-newznab"),
+    carried: Carried::Nzb,
+};
+
+/// Downloading torrents, from a Torznab site. Setup is told there is no VPN, which it warns
+/// about and goes on with, since nothing in the run reaches a peer.
+pub const TORRENT: Downloads = Downloads {
+    protocol: "torrent",
+    login: &[],
+    definition: ("Torznab", "Generic Torznab", "generic-torznab"),
+    carried: Carried::Torrent,
+};
+
+/// What a download client is read back as once paused, and once resumed.
+const PAUSED: (&str, &str) = ("stopped", "fetching");
 
 /// The policy the member asks under, so their ask reaches the curator without the
 /// operator's yes.
@@ -292,10 +324,16 @@ fn bridged() -> Option<String> {
     ])
 }
 
-/// The site added to the indexer as the operator adds one: its own Newznab definition
-/// from the indexer's schema, pointed at the site and under `tags`, asked under the key
-/// the core minted for it. The id the indexer gave it.
-fn site_added(key: &str, port: u16, site: &str, tags: &[i64]) -> Result<i64, String> {
+/// The site added to the indexer as the operator adds one: the indexer's own generic
+/// definition for `downloads` from its schema, pointed at the site and under `tags`, asked
+/// under the key the core minted for it. The id the indexer gave it.
+fn site_added(
+    key: &str,
+    port: u16,
+    site: &str,
+    (downloads, tags): (&Downloads, &[i64]),
+) -> Result<i64, String> {
+    let (implementation, name, definition_name) = downloads.definition;
     let schema = http::call("GET", port, "/api/v1/indexer/schema", key, None)?;
     let schemas: serde_json::Value =
         serde_json::from_str(&schema.body).map_err(|why| format!("{why}: {}", schema.body))?;
@@ -305,8 +343,8 @@ fn site_added(key: &str, port: u16, site: &str, tags: &[i64]) -> Result<i64, Str
         .flatten()
         .find(|one| {
             let said = |field: &str| one.get(field).and_then(serde_json::Value::as_str);
-            said("implementation") == Some(NEWZNAB.0)
-                && (said("name") == Some(NEWZNAB.1) || said("definitionName") == Some(NEWZNAB.2))
+            said("implementation") == Some(implementation)
+                && (said("name") == Some(name) || said("definitionName") == Some(definition_name))
         })
         .cloned()
         .ok_or_else(|| {
@@ -317,11 +355,11 @@ fn site_added(key: &str, port: u16, site: &str, tags: &[i64]) -> Result<i64, Str
                 .filter(|one| {
                     one.get("implementation")
                         .and_then(serde_json::Value::as_str)
-                        == Some(NEWZNAB.0)
+                        == Some(implementation)
                 })
                 .filter_map(|one| one.get("name").and_then(serde_json::Value::as_str))
                 .collect();
-            format!("no generic Newznab definition among {listed:?}")
+            format!("no generic {implementation} definition among {listed:?}")
         })?;
     if let Some(fields) = definition
         .get_mut("fields")
@@ -385,8 +423,51 @@ fn member_asked(core: &Core, asked: &Asked) {
     assert!(ask.is_ok(), "the member's ask: {ask:?}");
 }
 
-/// A stack this build sets up beneath `root` and starts with `forms`, with the usenet login
-/// `usenet` gives setup, seeded, and `substitution` put in place once it is first seeded.
+/// Every download client `core` pauses, then resumes, each as it read back, held to the
+/// one `client` standing in reading back each as it should, and every other client named
+/// being one of `passed_over`, the services of the part it stands in for.
+fn paused_and_resumed(core: &Core, client: &str, passed_over: &[String]) {
+    for (asked, now) in [("pause", PAUSED.0), ("resume", PAUSED.1)] {
+        let ran = core.run(&["downloads", asked], "");
+        step(&ran, asked);
+        let clients: Vec<&serde_json::Value> = ran
+            .said
+            .pointer("/data/clients")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .collect();
+        let named = |one: &serde_json::Value, key: &str| {
+            one.get(key)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        };
+        let standing_in: Vec<(Option<String>, Option<String>)> = clients
+            .iter()
+            .filter(|one| named(one, "client").as_deref() == Some(client))
+            .map(|one| (named(one, "now"), named(one, "unreached")))
+            .collect();
+        assert_eq!(
+            standing_in,
+            vec![(Some(now.to_owned()), None)],
+            "{asked}: {client} in\n{}",
+            ran.printed
+        );
+        let others: Vec<String> = clients
+            .iter()
+            .filter_map(|one| named(one, "client"))
+            .filter(|named| named != client && !passed_over.contains(named))
+            .collect();
+        assert!(
+            others.is_empty(),
+            "{asked} named {others:?}:\n{}",
+            ran.printed
+        );
+    }
+}
+
+/// A stack this build sets up beneath `root` and starts with `forms`, downloading as
+/// `downloads` says, seeded, and `substitution` put in place once it is first seeded.
 /// Nothing where the household has no address to reach it at.
 ///
 /// # Panics
@@ -395,7 +476,7 @@ fn member_asked(core: &Core, asked: &Asked) {
 fn started(
     root: &std::path::Path,
     forms: &[&str],
-    usenet: &[&str],
+    downloads: &Downloads,
     substitution: Option<&Substitution>,
 ) -> Option<Core> {
     let core = Core::beneath(root);
@@ -405,7 +486,7 @@ fn started(
         "setup",
         "--yes",
         "--protocols",
-        "usenet",
+        downloads.protocol,
         "--data-location",
         &media,
         "--library",
@@ -417,7 +498,7 @@ fn started(
         "--autostart",
         "false",
     ];
-    setup.extend(usenet);
+    setup.extend(downloads.login);
     let set_up = core.run(&setup, "");
     assert!(
         strings_under(&set_up.said, "outcome")
@@ -480,8 +561,9 @@ fn undone(core: &Core) {
     }
 }
 
-/// Run `asked` live through a stack this build sets up beneath `root`, with the usenet
-/// login `usenet` gives setup, and `substitution` put in place once it is first seeded.
+/// Run `asked` live through a stack this build sets up beneath `root`, downloading as
+/// `downloads` says, and `substitution` put in place once it is first seeded; a download
+/// client standing in is paused and resumed once the grab is made.
 ///
 /// # Panics
 ///
@@ -489,15 +571,16 @@ fn undone(core: &Core) {
 pub fn run(
     root: &std::path::Path,
     asked: &Asked,
-    usenet: &[&str],
+    downloads: &Downloads,
     substitution: Option<&Substitution>,
 ) {
     let site = Site::serving(Release {
         title: asked.release.to_owned(),
         category: asked.category,
         size: asked.size,
+        carried: downloads.carried,
     });
-    let Some(core) = started(root, asked.forms, usenet, substitution) else {
+    let Some(core) = started(root, asked.forms, downloads, substitution) else {
         return;
     };
     let Some((key, port)) = indexer(&core) else {
@@ -511,7 +594,12 @@ pub fn run(
     let Some(gateway) = gateway else {
         return;
     };
-    let added = site_added(&key, port, &format!("http://{gateway}:{}", site.port), &[]);
+    let added = site_added(
+        &key,
+        port,
+        &format!("http://{gateway}:{}", site.port),
+        (downloads, &[]),
+    );
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 
@@ -519,7 +607,8 @@ pub fn run(
 
     assert!(
         waited(GRAB_WITHIN, || site.grabbed()),
-        "the site never served the release's NZB"
+        "the site never served the release's {:?}",
+        downloads.carried
     );
     assert!(
         waited(GRAB_WITHIN, || {
@@ -530,6 +619,13 @@ pub fn run(
         "no trace of {} reached a grab",
         asked.traced
     );
+    if let Some(substitution) = substitution.filter(|one| one.downloads()) {
+        let client = providing(&substitution.plugin, &substitution.capability);
+        assert!(client.is_some(), "{substitution:?}");
+        if let Some(client) = client {
+            paused_and_resumed(&core, &client, &substitution.passed_over());
+        }
+    }
 
     undone(&core);
 }

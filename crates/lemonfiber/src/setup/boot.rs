@@ -173,7 +173,8 @@ enum Wired {
 /// next room, and the last thing on the screen is the thing that gets read.
 async fn afterwards(ctx: &Ctx) -> Vec<String> {
     let mut lines = Vec::new();
-    if let Some(cost) = unforwarded::at_setup(ctx.settings.protocols, &ctx.settings.port_forward) {
+    if let Some(cost) = unforwarded::at_setup(ctx.settings.supported(), &ctx.settings.port_forward)
+    {
         lines.push(format!("\n{cost}"));
     }
     lines.extend(door::handed(ctx).await);

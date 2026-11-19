@@ -8,7 +8,7 @@
 
 use lemonfiber_manifest::Manifest;
 
-use crate::config::Protocols;
+use crate::config::Supported;
 use crate::ports::docker::Engine;
 
 use super::leak::Reach;
@@ -19,7 +19,8 @@ use super::probe::{addresses, exit_country, find};
 /// panel maps directly, kept apart from the leak check's `Verdict`s so the panel
 /// need not read one.
 pub(crate) enum VpnReading {
-    /// This stack has no VPN-contained torrent client, so the panel does not apply.
+    /// This stack has no VPN-contained torrent client, or the operator chose torrents
+    /// without a VPN, so the panel does not apply.
     NotApplicable,
     /// The tunnel could not be read; the reason the panel shows.
     Unavailable(String),
@@ -49,11 +50,11 @@ pub(crate) async fn read_vpn(
     engine: &dyn Engine,
     project: &str,
     manifest: &Manifest,
-    protocols: Protocols,
+    supported: Supported,
     echoes: Vec<String>,
     forwarded: Option<u16>,
 ) -> VpnReading {
-    if !protocols.torrent {
+    if !supported.tunnelled() {
         return VpnReading::NotApplicable;
     }
     let Some(pair) = resolve_pair(manifest) else {

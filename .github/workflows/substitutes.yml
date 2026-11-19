@@ -104,6 +104,8 @@ jobs:
           - media-serve-emby
           - library-curate-medusa
           - indexer-proxy
+          - download-usenet
+          - download-torrent
           - curator-radarr
           - curator-lidarr
           - curator-bindery

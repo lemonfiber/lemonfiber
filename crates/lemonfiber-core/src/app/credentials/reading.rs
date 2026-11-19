@@ -32,7 +32,7 @@ pub(crate) async fn taken(
     fillers: &crate::wiring::Fillers,
     installed: &[Installed],
 ) -> Vec<Held> {
-    let mut taken: Vec<Held> = catalogue(ctx.settings.protocols)
+    let mut taken: Vec<Held> = catalogue(ctx.settings.supported())
         .into_iter()
         .map(|entry| recorded(ctx, entry))
         .collect();

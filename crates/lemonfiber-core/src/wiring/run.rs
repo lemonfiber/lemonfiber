@@ -15,7 +15,7 @@ use crate::app::plugins::guarding::{rehearsed, taken};
 use crate::app::Ctx;
 use crate::error::codes::wire::{
     ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
-    WIRING_MOVED,
+    VPN_DECLINED, WIRING_MOVED,
 };
 use crate::error::Diagnose;
 use crate::model::{SubstitutionReport, WiringReport};
@@ -146,7 +146,7 @@ async fn substituting(
         ctx,
         &manifest,
         &installed,
-        &crate::wiring::Chosen::read(Some(&substitution.setting)),
+        &held.recorded(&substitution.setting),
         &crate::settings::Resolved::of(ctx, Some(&manifest), installed.installed()),
     )?;
     if ctx.dry_run {
@@ -360,6 +360,19 @@ fn problem(refused: &Refused) -> Problem {
             listing,
         )
         .in_state(crate::error::State::Guided),
+        Refused::VpnDeclined(capability) => Problem::new(
+            VPN_DECLINED,
+            "torrents run without a VPN; turn the VPN on first",
+            format!(
+                "Nothing was changed. {} records that torrents run without a VPN, so \
+                 nothing fills {capability} whatever is chosen.",
+                crate::config::VPN_KEY
+            ),
+            Remedy::new("Turn the VPN on, then choose what fills it").with_detail(format!(
+                "lemonfiber config set {} on",
+                crate::config::VPN_KEY
+            )),
+        ),
     }
 }
 

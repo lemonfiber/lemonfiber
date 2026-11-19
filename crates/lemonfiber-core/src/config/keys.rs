@@ -34,6 +34,10 @@ pub const USENET_KEY: &str = "LEMONFIBER_USENET";
 /// The setting recording that a VPN and torrent client are configured.
 pub const TORRENT_KEY: &str = "LEMONFIBER_TORRENT";
 
+/// The setting recording whether a VPN carries the torrent traffic: off where the
+/// operator chose torrents without one.
+pub const VPN_KEY: &str = "LEMONFIBER_VPN";
+
 /// The IP-echo service the leak check asks each container for its public
 /// address.
 ///
@@ -377,6 +381,7 @@ pub(crate) fn for_plugin(plugin: &str, id: &str, holds: &str) -> String {
 pub const SETTINGS: &[&str] = &[
     USENET_KEY,
     TORRENT_KEY,
+    VPN_KEY,
     IP_ECHO_KEY,
     OFFLINE_KEY,
     REACH_REGISTRY_KEY,

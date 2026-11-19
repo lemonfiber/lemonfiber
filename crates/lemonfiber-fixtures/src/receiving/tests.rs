@@ -206,6 +206,8 @@ async fn a_service_forgets_the_client_it_is_named_and_no_other() {
         held.iter().map(|one| one.host.as_str()).collect::<Vec<_>>(),
         ["kept"]
     );
-    let down = Receiving::with(Mode::Down, Vec::new());
-    assert!(down.forget_download_client("100").await.is_err());
+    for mode in [Mode::Down, Mode::KeepsClients, Mode::PinsClients] {
+        let refusing = Receiving::with(mode, Vec::new());
+        assert!(refusing.forget_download_client("100").await.is_err());
+    }
 }

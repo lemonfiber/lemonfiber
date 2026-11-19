@@ -3,8 +3,9 @@
 
 use lemonfiber_manifest::{Manifest, Profile, Protocol};
 
-use super::super::{everything, resolve, Failure, Protocols};
+use super::super::{everything, resolve, Failure};
 use super::{named, STACK};
+use crate::config::Protocols;
 
 /// The profile these cases run beside the forms.
 const BESIDE: &str = "notify";

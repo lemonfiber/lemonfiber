@@ -26,6 +26,7 @@ use serde::Serialize;
 use crate::error::codes::plugin::UNRECORDED;
 use crate::error::codes::wire::{
     ALREADY_FILLS, CANNOT_FILL, CHOICE_UNWRITABLE, NOTHING_ASKS, NO_SUCH_FILLER, UNREASONABLE,
+    VPN_DECLINED,
 };
 use crate::error::Code;
 use crate::instant::Instant;
@@ -60,13 +61,14 @@ pub const UNREAD: [&[Code]; 2] = [&crate::stack::FAILURES, &[UNRECORDED]];
 /// an answer to a moved reading is.
 ///
 /// Listed so a client can name each one and read its status before it meets it.
-pub const REFUSED: [Code; 6] = [
+pub const REFUSED: [Code; 7] = [
     NO_SUCH_FILLER,
     CANNOT_FILL,
     ALREADY_FILLS,
     NOTHING_ASKS,
     CHOICE_UNWRITABLE,
     UNREASONABLE,
+    VPN_DECLINED,
 ];
 
 /// The setting holding which service the operator chose to fill a capability.
@@ -119,6 +121,11 @@ pub enum Settled {
     },
     /// Nothing claims it. What asked is named beside this, which is the point.
     Unfilled,
+    /// The operator chose that nothing fills it.
+    Declined {
+        /// Every claimant passed over.
+        over: Vec<String>,
+    },
 }
 
 /// What one link reaches, and how that was settled.
@@ -269,6 +276,10 @@ pub enum Refused {
         /// What it already fills.
         capability: String,
     },
+    /// Torrents run without a VPN, so nothing fills the capability, the egress guard,
+    /// whatever is chosen.
+    #[error("torrents run without a VPN, so nothing fills {0}")]
+    VpnDeclined(String),
 }
 
 /// One service standing in for another, worked out before anything is written.
@@ -314,9 +325,10 @@ pub struct Substitution {
 ///
 /// # Errors
 ///
-/// [`Refused`] where the named service is not one of this stack's — a bundled service
-/// or an installed plugin's — does not provide the capability, already fills it, or
-/// where nothing asks for it at all.
+/// [`Refused`] where the capability is the egress guard and torrents run without a VPN,
+/// where the named service is not one of this stack's — a bundled service or an
+/// installed plugin's — does not provide the capability, already fills it, or where
+/// nothing asks for it at all.
 pub fn substitute(
     manifest: &Manifest,
     installed: &[crate::plugin::Installed],
@@ -324,6 +336,9 @@ pub fn substitute(
     capability: &str,
     service: &str,
 ) -> Result<Substitution, Refused> {
+    if chosen.declines(capability) {
+        return Err(Refused::VpnDeclined(capability.to_owned()));
+    }
     // A plugin's service is one of this stack's once it is installed, and choosing one
     // is how a contest a plugin made is settled in the plugin's favour.
     let brought = installed
@@ -372,7 +387,7 @@ pub fn substitute(
     }
 
     let setting = chosen.with(capability, service);
-    let choosing = Chosen::read(Some(&setting));
+    let choosing = chosen.recorded(&setting);
     let after = settle(manifest, installed, &choosing);
     let out = replaced(manifest, installed, chosen);
     let left_out = replaced(manifest, installed, &choosing);

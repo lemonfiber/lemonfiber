@@ -81,6 +81,7 @@ pub fn as_written(ctx: &Ctx, paths: &Paths) -> Settings {
         .unwrap_or_default();
     Settings {
         protocols: Protocols::from_env(&recorded),
+        vpn_declined: lemonfiber_core::config::vpn_declined_from_env(&recorded),
         data_root: data_root_from_env(&recorded),
         service_user: service_user_from_env(&recorded),
         ..ctx.settings.clone()

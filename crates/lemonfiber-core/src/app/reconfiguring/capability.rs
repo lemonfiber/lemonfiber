@@ -26,11 +26,15 @@ pub(crate) async fn opening(ctx: &Ctx, found: &mut Findings, key: &str, value: &
     found.opens = opened(before, after);
     found.keeps = kept(before, after, ctx.settings.data_root.as_deref());
     if let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) {
+        let supporting = |protocols| crate::config::Supported {
+            protocols,
+            vpn_declined: ctx.settings.vpn_declined,
+        };
         found.stops = stopped(
             &manifest,
             &crate::app::plugins::profiled(ctx),
-            before,
-            after,
+            supporting(before),
+            supporting(after),
         );
     }
     if reduces(before, after) {

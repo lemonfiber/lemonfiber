@@ -219,3 +219,59 @@ async fn the_plex_link_check_names_the_claiming_account_where_plex_answers() {
         "{unnamed:?}"
     );
 }
+
+/// How many times the VPN check, built over a running guard and torrent client with
+/// torrents configured and the VPN declined as `declined` says, asked the client its port
+/// or the guard what it forwarded.
+async fn ports_asked(name: &str, declined: bool) -> usize {
+    use crate::test_support::{guard, torrent};
+    let http = lemonfiber_fixtures::http::Fake::by_path(vec![
+        (
+            torrent::operation("peer_port"),
+            torrent::answered(&Some(51413_u16)),
+        ),
+        guard::forwarding(Some(51413)),
+    ]);
+    let env = crate::test_support::env_without_password(name);
+    let ctx = a_context()
+        .engine(std::sync::Arc::new(
+            guard::running().alongside(torrent::running()),
+        ))
+        .settings(crate::config::Settings {
+            env_file: Some(env.to_path_buf()),
+            stack_dir: env.parent().map(|config| config.join("data").join("stack")),
+            protocols: crate::config::Protocols::both(),
+            vpn_declined: declined,
+            ..crate::config::Settings::default()
+        })
+        .holding(env)
+        .build()
+        .with_http(http.clone());
+    let ctx = guard::keyed(torrent::keyed(ctx));
+    let manifests: Vec<_> = ctx
+        .stack
+        .checked_manifest(ctx.today())
+        .into_iter()
+        .collect();
+    let project =
+        crate::app::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref());
+    for manifest in &manifests {
+        let _findings = tunnel(&ctx, manifest, project.as_deref(), false)
+            .run()
+            .await;
+    }
+    let (port, forwarded) = (
+        torrent::operation("peer_port"),
+        guard::operation("forwarded"),
+    );
+    http.requests()
+        .iter()
+        .filter(|request| request.url.contains(port) || request.url.contains(forwarded))
+        .count()
+}
+
+#[tokio::test]
+async fn the_vpn_check_asks_no_port_where_torrents_were_chosen_without_a_vpn() {
+    assert!(ports_asked("deferring-guarded", false).await > 0);
+    assert_eq!(ports_asked("deferring-unguarded", true).await, 0);
+}

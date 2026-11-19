@@ -45,6 +45,7 @@ mod report;
 mod roots;
 pub(crate) mod run;
 mod services;
+mod taking_back;
 
 pub use clients::{client_field, wire_download_clients, Baselines, CLIENT};
 pub(crate) use drift::observe_client;
@@ -62,6 +63,7 @@ pub use services::{
     wire_applications, wire_fulfilment_targets, wire_household_telling, wire_media_server_admin,
     wire_request_identity, wire_request_source, Keep, IDENTITY,
 };
+pub use taking_back::{folded, kept, take_back_clients, TakenBack};
 
 use std::collections::BTreeMap;
 use std::future::Future;
