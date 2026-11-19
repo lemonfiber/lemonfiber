@@ -4,6 +4,7 @@
 //! refusing one inside the stack before the solver is handed it.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use lemonfiber_contract::capabilities::indexer::{proxy, SOLVER_TAG};
 use lemonfiber_contract::Contracted;
@@ -27,6 +28,14 @@ const TESTED: &str = "/api/v1/indexerproxy/test";
 
 /// The field of a solver the indexer holds that names where it reaches the solver.
 const HOST: &str = "host";
+
+/// The field of a solver the indexer holds that names, in seconds, how long it gives the
+/// solver to answer: the timeout the solver is handed with each page.
+const TIMEOUT: &str = "requestTimeout";
+
+/// How long a solver's browser takes to launch before its own timeout starts counting, two
+/// at once on a machine busy with the whole stack.
+const LAUNCH: Duration = Duration::from_secs(60);
 
 /// A page out on the internet kept for examples, and words it carries.
 const OUTSIDE: (&str, &str) = ("https://example.com/", "Example Domain");
@@ -78,17 +87,30 @@ fn held_at(key: &str, port: u16, at: &str) -> Result<serde_json::Value, String> 
                 .get("tags")
                 .and_then(serde_json::Value::as_array)
                 .is_some_and(|tags| tags.iter().any(|one| one.as_i64() == Some(tag)));
-            let host = proxy
-                .get("fields")
-                .and_then(serde_json::Value::as_array)
-                .into_iter()
-                .flatten()
-                .find(|field| field.get("name").and_then(serde_json::Value::as_str) == Some(HOST))
-                .and_then(|field| field.get("value").and_then(serde_json::Value::as_str));
+            let host = field(proxy, HOST).and_then(serde_json::Value::as_str);
             tagged && host.map(|host| host.trim_end_matches('/')) == Some(at)
         })
         .cloned()
         .ok_or_else(|| format!("the indexer holds no solver at {at} under {SOLVER_TAG}: {proxies}"))
+}
+
+/// The value of the field `name` of the solver `proxy` the indexer holds.
+fn field<'a>(proxy: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
+    proxy
+        .get("fields")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|field| field.get("name").and_then(serde_json::Value::as_str) == Some(name))
+        .and_then(|field| field.get("value"))
+}
+
+/// How long the indexer's test of the solver `held` may take: the timeout the indexer hands
+/// the solver, after a [`LAUNCH`], or nothing where the indexer names no timeout.
+fn tested_within(held: &serde_json::Value) -> Option<Duration> {
+    field(held, TIMEOUT)
+        .and_then(serde_json::Value::as_u64)
+        .map(|seconds| Duration::from_secs(seconds) + LAUNCH)
 }
 
 /// The challenged site at `site` added to the indexer under [`SOLVER_TAG`], and searched
@@ -188,7 +210,15 @@ pub fn run(root: &std::path::Path, substitution: &Substitution) {
     let Ok(held) = held else {
         return;
     };
-    let tested = http::call("POST", port, TESTED, &key, Some(&held.to_string()));
+    let within = tested_within(&held);
+    assert!(
+        within.is_some(),
+        "the indexer names no {TIMEOUT} for the solver at {at}: {held}"
+    );
+    let Some(within) = within else {
+        return;
+    };
+    let tested = http::call_within("POST", port, TESTED, &key, Some(&held.to_string()), within);
     assert!(
         tested.as_ref().is_ok_and(|tested| tested.status / 100 == 2),
         "the indexer's test of the solver at {at}: {tested:?}"
