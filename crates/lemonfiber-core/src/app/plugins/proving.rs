@@ -327,7 +327,9 @@ pub(super) async fn spoken(
 /// were taken from, and each live case of each contract answered as the contract says.
 ///
 /// A service that speaks for itself is its own upstream, and an image cannot name its own
-/// digest, so it may list no release; one it does list is held to its own pin.
+/// digest, so it may list no release; one it does list is held to its own pin. Where the
+/// upstream is built on another's image, the release listed at its pin is the release it
+/// was built from.
 async fn held_to(
     ctx: &Ctx,
     (stack, deadline): (&Path, std::time::SystemTime),
@@ -362,6 +364,25 @@ async fn held_to(
             "it lists release {} at {}, and its recordings were taken from {} alone",
             release.version, release.digest, pinned.digest
         ))
+    }));
+    faults.extend(upstream.and_then(|upstream| {
+        let built_on = upstream.built_on.as_ref()?;
+        about
+            .releases
+            .iter()
+            .find(|release| {
+                release.digest == upstream.digest && release.version != built_on.release
+            })
+            .map(|release| {
+                format!(
+                    "it lists release {} at {}, and {} is built on {} {}",
+                    release.version,
+                    release.digest,
+                    upstream.service,
+                    built_on.image,
+                    built_on.release
+                )
+            })
     }));
     let spoken: Vec<_> = lemonfiber_contract::capabilities::all()
         .into_iter()

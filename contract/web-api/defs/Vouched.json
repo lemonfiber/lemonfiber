@@ -15,7 +15,7 @@
       }
     },
     "installable": {
-      "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none.",
+      "description": "Whether what was found stops an install.\n\nAn unproven image does not: a publisher who signed nothing has made no claim,\nand refusing every unsigned image would refuse most of the registry. A refused\none does, because a claim that did not hold is worse than none, and so does an\nupstream image a service says it is built on that its build provenance does not\nrecord.",
       "type": "boolean"
     }
   },

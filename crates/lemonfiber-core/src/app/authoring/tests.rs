@@ -81,12 +81,15 @@ fn registry_answering(status: u16, body: &'static str) -> Arc<dyn Registry> {
 }
 
 fn registry_offering(payload: &'static str) -> Arc<dyn Registry> {
-    const MANIFEST: &str = r#"{"schemaVersion":2,"layers":[
-            {"digest":"sha256:aaa","annotations":{"dev.cosignproject.cosign/signature":"AQID"}}
-        ]}"#;
+    let manifest = format!(
+        r#"{{"schemaVersion":2,"layers":[
+            {{"digest":"sha256:{}","annotations":{{"dev.cosignproject.cosign/signature":"AQID"}}}}
+        ]}}"#,
+        crate::ports::digest::sha256(payload)
+    );
     Arc::new(lemonfiber_adapters::registry::Oci::new(Fake::by_path(
         vec![
-            ("/manifests/", Answer::reply(200, MANIFEST)),
+            ("/manifests/", Answer::reply(200, &manifest)),
             ("/blobs/", Answer::reply(200, payload)),
         ],
     )))

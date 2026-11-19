@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "image": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "release": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

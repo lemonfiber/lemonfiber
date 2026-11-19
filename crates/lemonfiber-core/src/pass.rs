@@ -202,7 +202,7 @@ fn once(pairs: &[(&str, Option<&str>)], parameter: &str) -> Option<String> {
 
 /// `value` percent-decoded once, where every `%` begins an escape and what it decodes to
 /// is UTF-8 holding no control character; a `+` is refused rather than read either way.
-fn decoded(value: &str) -> Option<String> {
+pub(crate) fn decoded(value: &str) -> Option<String> {
     let bytes = value.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut at = 0;

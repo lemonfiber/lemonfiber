@@ -67,6 +67,31 @@ pub struct Offered {
     pub signature: Vec<u8>,
 }
 
+/// The build provenance a registry holds beside one pinned image, as served.
+///
+/// What each statement records is read above; the registry is only asked what it holds.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Built {
+    /// The digest of each image a platform runs that the pinned image reaches: the image
+    /// itself where it is no index.
+    pub images: Vec<String>,
+    /// Each build provenance statement listed beside them.
+    pub statements: Vec<Statement>,
+    /// What the registry lists beyond what a read holds, where it lists more: no statement
+    /// is read then, and nothing about the image follows from what was.
+    pub beyond: Option<String>,
+}
+
+/// One build provenance statement, and the image it is listed beside.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Statement {
+    /// The digest of the image the pinned index lists it as attesting.
+    pub attests: String,
+    /// The in-toto statement, exactly as served, its digest checked against the one it
+    /// was asked by.
+    pub body: String,
+}
+
 /// The registry could not be asked, so nothing was established either way.
 ///
 /// Distinct from an answer of *nothing is signed*: this is a refused connection, a
@@ -103,6 +128,40 @@ impl Unanswerable {
             reason: reason.to_owned(),
         }
     }
+}
+
+/// The default registry, as a repository name writes its host.
+pub const DEFAULT_REGISTRY: &str = "docker.io";
+
+/// The host the default registry serves from.
+pub const DEFAULT_REGISTRY_HOST: &str = "registry-1.docker.io";
+
+/// The other name the default registry's host is written by.
+const DEFAULT_REGISTRY_INDEX: &str = "index.docker.io";
+
+/// The path the default registry keeps its own images under.
+pub const DEFAULT_REGISTRY_LIBRARY: &str = "library/";
+
+/// `repository` named the way an image builder names it: the default registry's host left
+/// off, and its library path too.
+#[must_use]
+pub fn familiar(repository: &str) -> &str {
+    let named = [
+        DEFAULT_REGISTRY,
+        DEFAULT_REGISTRY_INDEX,
+        DEFAULT_REGISTRY_HOST,
+    ]
+    .iter()
+    .find_map(|host| {
+        repository
+            .strip_prefix(host)
+            .and_then(|rest| rest.strip_prefix('/'))
+    })
+    .unwrap_or(repository);
+    named
+        .strip_prefix(DEFAULT_REGISTRY_LIBRARY)
+        .filter(|name| !name.contains('/'))
+        .unwrap_or(named)
 }
 
 /// Whether `digest` is one sha256 digest, written as a registry writes it.
@@ -153,6 +212,18 @@ pub trait Registry: Send + Sync {
     /// Returns [`Unanswerable`] where the question could not be put or the answer
     /// could not be read.
     async fn revision(&self, image: &Image) -> Result<Option<String>, Unanswerable>;
+
+    /// The build provenance the registry lists beside `image`'s platforms' images.
+    ///
+    /// No statement where it lists none, which is an answer. Anything that stopped the
+    /// asking, or a manifest or statement not the one its digest names, is
+    /// [`Unanswerable`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Unanswerable`] where the question could not be put or the answer
+    /// could not be read.
+    async fn built(&self, image: &Image) -> Result<Built, Unanswerable>;
 }
 
 /// The label an image configuration names the commit it was built from in.

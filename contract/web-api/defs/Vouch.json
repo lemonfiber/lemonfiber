@@ -3,6 +3,17 @@
   "description": "What one of a plugin's images is vouched for.",
   "type": "object",
   "properties": {
+    "built_on": {
+      "description": "What the service says its image is built on, and what its build provenance makes\nof that, where it says.",
+      "anyOf": [
+        {
+          "$ref": "Based.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "digest": {
       "description": "The digest that fixes what runs.",
       "type": "string"

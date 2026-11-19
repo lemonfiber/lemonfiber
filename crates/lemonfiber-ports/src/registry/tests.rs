@@ -50,3 +50,20 @@ fn a_digest_is_sha256_in_lowercase_hex() {
     assert!(!is_digest(DIGEST.get(..70).unwrap_or_default()));
     assert!(!is_digest("sha512:00"));
 }
+
+#[test]
+fn an_image_on_the_default_registry_is_named_as_a_builder_names_it() {
+    for (written, named) in [
+        ("caddy", "caddy"),
+        ("library/caddy", "caddy"),
+        ("docker.io/library/caddy", "caddy"),
+        ("index.docker.io/caddy", "caddy"),
+        ("registry-1.docker.io/gotson/komga", "gotson/komga"),
+        ("docker.io/gotson/komga", "gotson/komga"),
+        ("library/nested/image", "library/nested/image"),
+        ("docker.iox/caddy", "docker.iox/caddy"),
+        ("ghcr.io/lemonfiber/caddy", "ghcr.io/lemonfiber/caddy"),
+    ] {
+        assert_eq!(super::familiar(written), named, "{written}");
+    }
+}

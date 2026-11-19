@@ -1,9 +1,9 @@
 use lemonfiber_fixtures::registered::Registered;
-use lemonfiber_ports::registry::{Image, Offered, Unanswerable};
+use lemonfiber_ports::registry::{Built, Image, Offered, Statement, Unanswerable};
 use ring::rand::SystemRandom;
 use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING};
 
-use super::{held, Key, Provenance, Vouched, P256_SPKI_PREFIX};
+use super::{held, Basis, Key, Provenance, Vouched, P256_SPKI_PREFIX};
 
 /// The image every case here is about.
 fn komga() -> Image {
@@ -303,6 +303,82 @@ async fn an_image_whose_signature_does_not_hold_stops_one() {
         Some(false),
         "a refused image did not stop an install: {asked:?}"
     );
+}
+
+/// The fixture plugin, its service saying it is built on komga 1.11.0, read against a
+/// registry answering its build provenance with `building`.
+async fn built_on(building: Result<Built, &str>) -> Option<Vouched> {
+    let asking = Registered::attesting(building);
+    read(
+        |one| {
+            if let Some(service) = one.services.first_mut() {
+                service.built_on = Some(lemonfiber_plugin::BuiltOn {
+                    image: "gotson/komga".to_owned(),
+                    release: "1.11.0".to_owned(),
+                });
+            }
+        },
+        &[],
+        &asking,
+    )
+    .await
+}
+
+/// What the read of `vouched`'s one image makes of what it is built on, and whether it
+/// may be installed.
+fn based(vouched: Option<&Vouched>) -> Option<(Option<&str>, bool)> {
+    let vouched = vouched?;
+    let basis = vouched
+        .images
+        .first()?
+        .built_on
+        .as_ref()
+        .map(|built_on| match built_on.held {
+            Basis::Recorded { .. } => "recorded",
+            Basis::Unproven { .. } => "unproven",
+            Basis::Refused { .. } => "refused",
+        });
+    Some((basis, vouched.installable))
+}
+
+#[tokio::test]
+async fn an_upstream_the_build_is_recorded_starting_from_does_not_stop_an_install() {
+    let digest = komga().digest;
+    let base = "504a44d7d74bd2bc28a66afc4774912fc21223ca8a67734af1c54ab2f999b489";
+    let statement = Statement {
+        attests: digest.clone(),
+        body: format!(
+            r#"{{"subject":[{{"digest":{{"sha256":"{}"}}}}],"predicate":{{"materials":[{{"uri":"pkg:docker/gotson/komga@1.11.0","digest":{{"sha256":"{base}"}}}}]}}}}"#,
+            digest.trim_start_matches("sha256:")
+        ),
+    };
+    let recorded = built_on(Ok(Built {
+        images: vec![digest],
+        statements: vec![statement],
+        beyond: None,
+    }))
+    .await;
+    assert_eq!(based(recorded.as_ref()), Some((Some("recorded"), true)));
+}
+
+#[tokio::test]
+async fn an_upstream_the_build_is_not_recorded_starting_from_stops_an_install() {
+    let unrecorded = built_on(Ok(Built {
+        images: vec![komga().digest],
+        statements: Vec::new(),
+        beyond: None,
+    }))
+    .await;
+    assert_eq!(based(unrecorded.as_ref()), Some((Some("refused"), false)));
+    let unasked = built_on(Err("connection refused")).await;
+    assert_eq!(based(unasked.as_ref()), Some((Some("unproven"), true)));
+}
+
+#[tokio::test]
+async fn a_service_saying_nothing_of_what_it_is_built_on_is_asked_nothing_of_it() {
+    let asking = Registered::attesting(Err("never asked"));
+    let read = read(|_| (), &[], &asking).await;
+    assert_eq!(based(read.as_ref()), Some((None, true)));
 }
 
 /// A plugin pinning nothing has had nothing established about it.

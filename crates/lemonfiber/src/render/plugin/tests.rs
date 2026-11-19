@@ -592,6 +592,7 @@ fn each_of_the_three_answers_says_which_one_it_is() {
             image: "docker.io/gotson/komga".to_owned(),
             digest: "sha256:abc".to_owned(),
             held,
+            built_on: None,
         }],
     };
 
@@ -619,6 +620,54 @@ fn each_of_the_three_answers_says_which_one_it_is() {
     }))
     .text();
     assert!(refused.contains("refused"), "{refused}");
+    assert!(refused.contains("would not be installed"), "{refused}");
+}
+
+#[test]
+fn what_an_image_is_built_on_is_said_with_what_its_build_provenance_makes_of_it() {
+    use lemonfiber_core::plugin::{Based, Basis, Provenance, Vouch};
+
+    let built = |held: Basis| {
+        super::provenance(&Vouched {
+            id: "caddy".to_owned(),
+            installable: !held.refuses(),
+            images: vec![Vouch {
+                service: "caddy".to_owned(),
+                image: "ghcr.io/lemonfiber/caddy".to_owned(),
+                digest: "sha256:abc".to_owned(),
+                held: Provenance::Unproven {
+                    why: "its publisher has made no claim".to_owned(),
+                },
+                built_on: Some(Based {
+                    image: "caddy".to_owned(),
+                    release: "2.11.7".to_owned(),
+                    held,
+                }),
+            }],
+        })
+        .text()
+    };
+    let recorded = built(Basis::Recorded {
+        digests: vec!["sha256:504a".to_owned()],
+    });
+    assert!(
+        recorded.contains("built on caddy 2.11.7: recorded, its build started from sha256:504a"),
+        "{recorded}"
+    );
+    let unproven = built(Basis::Unproven {
+        why: "nobody could ask".to_owned(),
+    });
+    assert!(
+        unproven.contains("built on caddy 2.11.7: unproven, nobody could ask"),
+        "{unproven}"
+    );
+    let refused = built(Basis::Refused {
+        why: "it records caddy 2.11.6".to_owned(),
+    });
+    assert!(
+        refused.contains("built on caddy 2.11.7: refused, it records caddy 2.11.6"),
+        "{refused}"
+    );
     assert!(refused.contains("would not be installed"), "{refused}");
 }
 

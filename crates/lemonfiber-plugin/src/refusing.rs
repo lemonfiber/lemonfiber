@@ -27,6 +27,7 @@
 //! contribution was judged.
 
 mod asking;
+mod building;
 mod bundled;
 pub mod carried;
 mod choosing;
@@ -202,6 +203,7 @@ fn running(manifest: &Manifest, found: &mut Vec<Violation>) {
             });
         }
         pinned(service, found);
+        building::built(service, found);
         filing(service, found);
         contained(manifest, service, found);
         speaking::spoken(service, &manifest.services, found);

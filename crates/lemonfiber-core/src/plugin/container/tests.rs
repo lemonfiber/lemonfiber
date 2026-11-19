@@ -50,6 +50,7 @@ fn placed() -> Placed {
         image: "ghcr.io/gotson/komga".to_owned(),
         digest: DIGEST.to_owned(),
         tag: "1.11.0".to_owned(),
+        built_on: None,
         config_path: "/config".to_owned(),
         takes_data: true,
         reached: Some(Reached::Household {

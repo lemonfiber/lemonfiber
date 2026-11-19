@@ -16,8 +16,8 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Asserted, Capabilities, Claimed, Claiming, Credential, Evidence, FailingAsDeclared, Points,
-    Probe, ProbeKind, Provenance, Ran, Verdict, Vouched,
+    Asserted, Basis, Capabilities, Claimed, Claiming, Credential, Evidence, FailingAsDeclared,
+    Points, Probe, ProbeKind, Provenance, Ran, Verdict, Vouched,
 };
 
 // The operator's half: what one machine has installed, and what installing one came
@@ -176,6 +176,14 @@ pub(crate) fn provenance(read: &Vouched) -> Lines {
             Provenance::Unproven { why } | Provenance::Refused { why } => why.clone(),
         };
         lines.put(format!("    {why}"));
+        if let Some(built_on) = &one.built_on {
+            lines.put(format!(
+                "    built on {} {}: {}",
+                built_on.image,
+                built_on.release,
+                basis(&built_on.held)
+            ));
+        }
         lines.put(String::new());
     }
     if read.images.is_empty() {
@@ -188,6 +196,17 @@ pub(crate) fn provenance(read: &Vouched) -> Lines {
         "this would not be installed as it stands.".to_owned()
     });
     lines
+}
+
+/// What the build provenance makes of the upstream an image says it is built on.
+fn basis(held: &Basis) -> String {
+    match held {
+        Basis::Recorded { digests } => {
+            format!("recorded, its build started from {}", digests.join(", "))
+        }
+        Basis::Unproven { why } => format!("unproven, {why}"),
+        Basis::Refused { why } => format!("refused, {why}"),
+    }
 }
 
 /// What one plugin's source claims, and what this build makes of it.

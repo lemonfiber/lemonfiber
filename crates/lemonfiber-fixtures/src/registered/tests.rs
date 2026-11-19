@@ -1,4 +1,4 @@
-use lemonfiber_ports::registry::{Image, Registry as _, Tagged};
+use lemonfiber_ports::registry::{Built, Image, Registry as _, Tagged};
 
 use super::{Registered, REVISION};
 
@@ -70,4 +70,28 @@ async fn a_registry_answers_the_revision_it_was_given_or_keeps_its_reason_about_
         .revision(&image)
         .await;
     assert!(refused.is_err_and(|why| why.asked == DIGEST && why.reason == "connection refused"));
+}
+
+#[tokio::test]
+async fn a_registry_answers_the_build_provenance_it_was_given_or_keeps_its_reason_about_the_image()
+{
+    let image = Image::new(REPOSITORY, DIGEST);
+    let built = Built {
+        images: vec![DIGEST.to_owned()],
+        statements: Vec::new(),
+        beyond: None,
+    };
+
+    assert_eq!(
+        Registered::attesting(Ok(built.clone())).built(&image).await,
+        Ok(built)
+    );
+    let refused = Registered::attesting(Err("connection refused"))
+        .built(&image)
+        .await;
+    assert!(refused.is_err_and(|why| why.asked == DIGEST && why.reason == "connection refused"));
+    assert_eq!(
+        Registered::publishing(DIGEST).built(&image).await,
+        Ok(Built::default())
+    );
 }

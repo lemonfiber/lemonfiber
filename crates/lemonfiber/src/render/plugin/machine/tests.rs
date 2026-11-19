@@ -27,6 +27,7 @@ pub(super) fn recorded(plugin: &str, reached: Option<Reached>) -> Installed {
             digest: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
                 .to_owned(),
             tag: "1.11.0".to_owned(),
+            built_on: None,
             config_path: "/app/data".to_owned(),
             takes_data: reached.is_some(),
             reached,

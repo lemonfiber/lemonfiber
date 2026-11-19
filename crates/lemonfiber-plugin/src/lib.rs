@@ -33,12 +33,12 @@ pub use refusing::{
     names_a_header_by_substitution, names_a_path_not_plain, outside, refusals, uninstallable,
 };
 pub use schema::{
-    Ask, Bind, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality, Declaration,
-    Declared, Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input, Manifest, On,
-    Origin, Override, Pair, Plugin, Proof, Reach, Recipe, Request, Requires, Retry, Run, Schedule,
-    Secret, Service, Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE, CONFIGURATION,
-    HEADER, LARGEST_ANSWER, LONGEST_ARG, LONGEST_WAIT, MOST_ARGS, MOST_RETRIES, NAMED_HEADERS, RUN,
-    RUN_TIMEOUT,
+    Ask, Bind, BuiltOn, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality,
+    Declaration, Declared, Entry, Expect, Expected, ExpectedKind, Health, HealthKind, Input,
+    Manifest, On, Origin, Override, Pair, Plugin, Proof, Reach, Recipe, Request, Requires, Retry,
+    Run, Schedule, Secret, Service, Shape, Step, StepCall, Wiring, ALL_WAITING, CALL_DEADLINE,
+    CONFIGURATION, HEADER, LARGEST_ANSWER, LONGEST_ARG, LONGEST_WAIT, MOST_ARGS, MOST_RETRIES,
+    NAMED_HEADERS, RUN, RUN_TIMEOUT,
 };
 
 /// The manifest schema version this crate prefers.

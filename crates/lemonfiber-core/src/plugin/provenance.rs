@@ -30,6 +30,10 @@ use lemonfiber_ports::registry::{Image, Offered, Unanswerable};
 use ring::signature::{UnparsedPublicKey, ECDSA_P256_SHA256_ASN1};
 use serde::Serialize;
 
+mod based;
+
+pub use based::{based, Based, Basis};
+
 /// What an SPKI-wrapped P-256 public key carries before the point itself.
 ///
 /// Fixed for this curve, so the parse is a length and a prefix rather than a DER
@@ -289,6 +293,10 @@ pub struct Vouch {
     /// What this build makes of it.
     #[serde(flatten)]
     pub held: Provenance,
+    /// What the service says its image is built on, and what its build provenance makes
+    /// of that, where it says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub built_on: Option<Based>,
 }
 
 /// Every image a plugin pins, and what anybody has said about each.
@@ -302,7 +310,9 @@ pub struct Vouched {
     ///
     /// An unproven image does not: a publisher who signed nothing has made no claim,
     /// and refusing every unsigned image would refuse most of the registry. A refused
-    /// one does, because a claim that did not hold is worse than none.
+    /// one does, because a claim that did not hold is worse than none, and so does an
+    /// upstream image a service says it is built on that its build provenance does not
+    /// record.
     pub installable: bool,
 }
 
@@ -322,18 +332,30 @@ pub async fn vouched(
     for service in &manifest.services {
         let image = Image::new(&service.image, &service.digest);
         let answer = asking.signatures(&image).await;
+        let built_on = match &service.built_on {
+            Some(built_on) => Some(based(&service.id, built_on, &asking.built(&image).await)),
+            None => None,
+        };
         images.push(Vouch {
             service: service.id.clone(),
             image: service.image.clone(),
             digest: service.digest.clone(),
             held: held(&image, &answer, keys),
+            built_on,
         });
     }
     // A plugin pinning no image is one this read has established nothing about, and
     // saying it may be installed would be answering a question nobody asked. The
     // format refuses a manifest with no service; a read that quietly passed one
     // would be the second opinion that disagrees.
-    let installable = !images.is_empty() && !images.iter().any(|one| one.held.refuses());
+    let installable = !images.is_empty()
+        && !images.iter().any(|one| {
+            one.held.refuses()
+                || one
+                    .built_on
+                    .as_ref()
+                    .is_some_and(|built_on| built_on.held.refuses())
+        });
     Vouched {
         id: manifest.plugin.id.clone(),
         images,

@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::registered::{ELSEWHERE, REVISION};
-use lemonfiber_ports::http::Http;
+use lemonfiber_ports::http::{Http, Response};
 use lemonfiber_ports::registry::{Image, Registry, Tagged};
 
+use super::served::tests::{answered, named, serving};
 use super::{addressed, beside, challenged, escaped, Oci};
 
 /// The fake, as the port takes a transport.
@@ -18,10 +19,18 @@ fn komga() -> Image {
     Image::new("docker.io/gotson/komga", DIGEST)
 }
 
-/// A signature manifest as the tooling that writes one produces it.
-const MANIFEST: &str = r#"{"schemaVersion":2,"layers":[
-    {"digest":"sha256:aaa","annotations":{"dev.cosignproject.cosign/signature":"AQID"}}
-]}"#;
+/// What was signed.
+const PAYLOAD: &str = "the payload";
+
+/// A signature manifest over [`PAYLOAD`] as the tooling that writes one produces it.
+fn manifest() -> String {
+    format!(
+        r#"{{"schemaVersion":2,"layers":[
+    {{"digest":"{}","annotations":{{"dev.cosignproject.cosign/signature":"AQID"}}}}
+]}}"#,
+        named(PAYLOAD)
+    )
+}
 
 #[tokio::test]
 async fn a_repository_with_nothing_signed_in_it_has_answered() {
@@ -53,12 +62,12 @@ async fn a_repository_this_build_may_not_look_in_is_unanswerable() {
 #[tokio::test]
 async fn a_signature_is_read_out_of_its_layer_and_its_blob() {
     let asked = reaching(Fake::by_path(vec![
-        ("/manifests/", Answer::reply(200, MANIFEST)),
-        ("/blobs/", Answer::reply(200, "the payload")),
+        ("/manifests/", Answer::reply(200, manifest())),
+        ("/blobs/", Answer::reply(200, PAYLOAD)),
     ]));
     let found = Oci::new(asked).signatures(&komga()).await;
     let one = found.as_ref().ok().and_then(|found| found.first());
-    assert_eq!(one.map(|one| one.payload.as_str()), Some("the payload"));
+    assert_eq!(one.map(|one| one.payload.as_str()), Some(PAYLOAD));
     assert_eq!(one.map(|one| one.signature.clone()), Some(vec![1, 2, 3]));
 }
 
@@ -119,7 +128,7 @@ async fn a_layer_this_build_cannot_read_is_a_question_nobody_put() {
 #[tokio::test]
 async fn a_payload_the_registry_would_not_serve_is_a_question_nobody_put() {
     let refused = reaching(Fake::by_path(vec![
-        ("/manifests/", Answer::reply(200, MANIFEST)),
+        ("/manifests/", Answer::reply(200, manifest())),
         ("/blobs/", Answer::reply(500, "")),
     ]));
     let why = Oci::new(refused)
@@ -131,7 +140,7 @@ async fn a_payload_the_registry_would_not_serve_is_a_question_nobody_put() {
     assert!(why.contains("answered 500"), "{why}");
 
     let silent = reaching(Fake::by_path(vec![
-        ("/manifests/", Answer::reply(200, MANIFEST)),
+        ("/manifests/", Answer::reply(200, manifest())),
         ("/blobs/", Answer::Silent),
     ]));
     assert!(
@@ -298,10 +307,10 @@ async fn a_signature_read_carries_the_token_to_its_blob() {
             "/manifests/",
             vec![
                 headed(401, &[("WWW-Authenticate", GHCR_CHALLENGE)], ""),
-                Answer::reply(200, MANIFEST),
+                Answer::reply(200, manifest()),
             ],
         ),
-        ("/blobs/", vec![Answer::reply(200, "payload")]),
+        ("/blobs/", vec![Answer::reply(200, PAYLOAD)]),
     ]);
     let found = Oci::new(reaching(Arc::clone(&asked)))
         .signatures(&ghcr)
@@ -380,59 +389,67 @@ fn a_query_value_carries_only_what_it_may_as_written() {
     assert_eq!(escaped("a b&c=d"), "a%20b%26c%3Dd");
 }
 
-/// The image the pass service runs, by the digest its tag was pinned at.
-fn pinned_lemonfiber() -> Image {
-    Image::new("ghcr.io/lemonfiber/lemonfiber", DIGEST)
+/// The image the pass service runs, by `digest`.
+fn pinned_lemonfiber(digest: &str) -> Image {
+    Image::new("ghcr.io/lemonfiber/lemonfiber", digest)
 }
 
-/// An image index listing an image for each of `platforms` and, beside them, what a
-/// builder lists for no platform.
-fn index(platforms: &[&str]) -> String {
-    let listed: Vec<String> = platforms
-        .iter()
-        .map(|arch| {
-            format!(
-                r#"{{"digest":"sha256:{arch}","platform":{{"os":"linux","architecture":"{arch}"}}}}"#
-            )
-        })
-        .chain(std::iter::once(
-            r#"{"digest":"sha256:attestation","platform":{"os":"unknown","architecture":"unknown"}}"#
-                .to_owned(),
-        ))
-        .collect();
-    format!(
-        r#"{{"schemaVersion":2,"manifests":[{}]}}"#,
-        listed.join(",")
-    )
-}
-
-/// An image manifest naming the configuration `config`.
-fn image(config: &str) -> Answer {
-    Answer::reply(
-        200,
-        format!(r#"{{"schemaVersion":2,"config":{{"digest":"sha256:{config}"}},"layers":[]}}"#),
-    )
-}
-
-/// An image configuration labelled with `revision`, or with no revision.
-fn configured(revision: Option<&str>) -> Answer {
+/// What a registry serves for one image built for `arch` whose configuration is labelled
+/// with `revision`, or with none: its manifest's digest, and the routes serving it.
+fn labelled(arch: &str, revision: Option<&str>) -> (String, Vec<(String, Response)>) {
     let labels = revision.map_or_else(String::new, |revision| {
         format!(r#""org.opencontainers.image.revision":"{revision}""#)
     });
-    Answer::reply(200, format!(r#"{{"config":{{"Labels":{{{labels}}}}}}}"#))
+    let config = format!(r#"{{"architecture":"{arch}","config":{{"Labels":{{{labels}}}}}}}"#);
+    let manifest = format!(
+        r#"{{"schemaVersion":2,"config":{{"digest":"{}"}},"layers":[]}}"#,
+        named(&config)
+    );
+    (
+        named(&manifest),
+        vec![
+            (named(&manifest), answered(200, &[], &manifest)),
+            (named(&config), answered(200, &[], &config)),
+        ],
+    )
+}
+
+/// What a registry serves for an index listing each of `images` for a platform and,
+/// beside them, what a builder lists for no platform: its digest, and the routes serving
+/// it and them.
+fn indexed(images: Vec<(String, Vec<(String, Response)>)>) -> (String, Vec<(String, Response)>) {
+    let mut routes = Vec::new();
+    let mut listed = Vec::new();
+    for (digest, served) in images {
+        listed.push(format!(
+            r#"{{"digest":"{digest}","platform":{{"os":"linux","architecture":"amd64"}}}}"#
+        ));
+        routes.extend(served);
+    }
+    listed.push(
+        r#"{"digest":"sha256:attestation","platform":{"os":"unknown","architecture":"unknown"}}"#
+            .to_owned(),
+    );
+    let index = format!(
+        r#"{{"schemaVersion":2,"manifests":[{}]}}"#,
+        listed.join(",")
+    );
+    routes.insert(0, (named(&index), answered(200, &[], &index)));
+    (named(&index), routes)
 }
 
 #[tokio::test]
 async fn an_index_whose_platforms_are_built_from_one_commit_names_it() {
-    let asked = Fake::by_path(vec![
-        (DIGEST, Answer::reply(200, index(&["amd64", "arm64"]))),
-        ("/manifests/sha256:amd64", image("amd64-config")),
-        ("/manifests/sha256:arm64", image("arm64-config")),
-        ("/blobs/sha256:amd64-config", configured(Some(REVISION))),
-        ("/blobs/sha256:arm64-config", configured(Some(REVISION))),
-    ]);
+    let amd64 = labelled("amd64", Some(REVISION));
+    let arm64 = labelled("arm64", Some(REVISION));
+    let read: Vec<String> = [&amd64, &arm64]
+        .iter()
+        .flat_map(|(_, routes)| routes.iter().map(|(digest, _)| digest.clone()))
+        .collect();
+    let (digest, routes) = indexed(vec![amd64, arm64]);
+    let asked = serving(routes);
     let revision = Oci::new(reaching(Arc::clone(&asked)))
-        .revision(&pinned_lemonfiber())
+        .revision(&pinned_lemonfiber(&digest))
         .await;
     assert_eq!(revision, Ok(Some(REVISION.to_owned())));
     let urls: Vec<String> = asked
@@ -440,15 +457,17 @@ async fn an_index_whose_platforms_are_built_from_one_commit_names_it() {
         .into_iter()
         .map(|request| request.url)
         .collect();
+    let mut expected = vec![format!(
+        "https://ghcr.io/v2/lemonfiber/lemonfiber/manifests/{digest}"
+    )];
+    for (at, one) in read.iter().enumerate() {
+        let kind = if at % 2 == 0 { "manifests" } else { "blobs" };
+        expected.push(format!(
+            "https://ghcr.io/v2/lemonfiber/lemonfiber/{kind}/{one}"
+        ));
+    }
     assert_eq!(
-        urls,
-        vec![
-            format!("https://ghcr.io/v2/lemonfiber/lemonfiber/manifests/{DIGEST}"),
-            "https://ghcr.io/v2/lemonfiber/lemonfiber/manifests/sha256:amd64".to_owned(),
-            "https://ghcr.io/v2/lemonfiber/lemonfiber/blobs/sha256:amd64-config".to_owned(),
-            "https://ghcr.io/v2/lemonfiber/lemonfiber/manifests/sha256:arm64".to_owned(),
-            "https://ghcr.io/v2/lemonfiber/lemonfiber/blobs/sha256:arm64-config".to_owned(),
-        ],
+        urls, expected,
         "what an index lists for no platform was read"
     );
 }
@@ -460,22 +479,20 @@ async fn an_index_whose_platforms_do_not_name_one_commit_names_none() {
         (Some(REVISION), None),
         (None, Some(REVISION)),
     ] {
-        let asked = reaching(Fake::by_path(vec![
-            (DIGEST, Answer::reply(200, index(&["amd64", "arm64"]))),
-            ("/manifests/sha256:amd64", image("amd64-config")),
-            ("/manifests/sha256:arm64", image("arm64-config")),
-            ("/blobs/sha256:amd64-config", configured(amd64)),
-            ("/blobs/sha256:arm64-config", configured(arm64)),
-        ]));
+        let (digest, routes) = indexed(vec![labelled("amd64", amd64), labelled("arm64", arm64)]);
         assert_eq!(
-            Oci::new(asked).revision(&pinned_lemonfiber()).await,
+            Oci::new(serving(routes))
+                .revision(&pinned_lemonfiber(&digest))
+                .await,
             Ok(None),
             "{amd64:?} {arm64:?}"
         );
     }
-    let empty = reaching(Fake::always(Answer::reply(200, index(&[]))));
+    let (empty, routes) = indexed(Vec::new());
     assert_eq!(
-        Oci::new(empty).revision(&pinned_lemonfiber()).await,
+        Oci::new(serving(routes))
+            .revision(&pinned_lemonfiber(&empty))
+            .await,
         Ok(None)
     );
 }
@@ -483,50 +500,56 @@ async fn an_index_whose_platforms_do_not_name_one_commit_names_none() {
 #[tokio::test]
 async fn an_image_names_the_commit_its_configuration_is_labelled_with_or_none() {
     for revision in [Some(REVISION), None] {
-        let asked = reaching(Fake::by_path(vec![
-            (DIGEST, image("config")),
-            ("/blobs/sha256:config", configured(revision)),
-        ]));
+        let (digest, routes) = labelled("amd64", revision);
         assert_eq!(
-            Oci::new(asked).revision(&pinned_lemonfiber()).await,
+            Oci::new(serving(routes))
+                .revision(&pinned_lemonfiber(&digest))
+                .await,
             Ok(revision.map(str::to_owned))
         );
     }
 }
 
+/// `body`, served by its own digest: that digest, and the one route serving it.
+fn alone(body: &str) -> (String, Vec<(String, Response)>) {
+    (named(body), vec![(named(body), answered(200, &[], body))])
+}
+
 #[tokio::test]
 async fn an_image_whose_commit_cannot_be_read_is_unanswerable() {
+    let (one, mut unserved) = indexed(vec![labelled("amd64", Some(REVISION))]);
+    unserved.truncate(1);
+    let (blank, blanked) = indexed(vec![alone("{}")]);
+    let (configless, mut unconfigured) = labelled("amd64", Some(REVISION));
+    unconfigured.truncate(1);
+    let (tampered, mut altered) = labelled("amd64", Some(REVISION));
+    if let Some((_, config)) = altered.get_mut(1) {
+        config.body = r#"{"config":{"Labels":{}}}"#.to_owned();
+    }
     let unreadable = [
-        vec![(DIGEST, Answer::reply(500, "{}"))],
-        vec![(DIGEST, Answer::reply(200, "not json"))],
-        vec![(DIGEST, Answer::reply(200, r#"{"schemaVersion":2}"#))],
-        vec![(
-            DIGEST,
-            Answer::reply(200, r#"{"manifests":[{"platform":{"os":"linux"}}]}"#),
-        )],
-        vec![
-            (DIGEST, Answer::reply(200, index(&["amd64"]))),
-            ("/manifests/sha256:amd64", Answer::reply(404, "{}")),
-        ],
-        vec![
-            (DIGEST, Answer::reply(200, index(&["amd64"]))),
-            ("/manifests/sha256:amd64", Answer::reply(200, "{}")),
-        ],
-        vec![
-            (DIGEST, image("config")),
-            ("/blobs/sha256:config", Answer::reply(404, "{}")),
-        ],
+        (
+            named("refused"),
+            vec![(named("refused"), answered(500, &[], "{}"))],
+        ),
+        alone("not json"),
+        alone(r#"{"schemaVersion":2}"#),
+        alone(r#"{"manifests":[{"platform":{"os":"linux"}}]}"#),
+        (one, unserved),
+        (blank, blanked),
+        (configless, unconfigured),
+        (tampered, altered),
     ];
-    for routes in unreadable {
-        let asked = reaching(Fake::by_path(routes));
-        let revision = Oci::new(asked).revision(&pinned_lemonfiber()).await;
+    for (digest, routes) in unreadable {
+        let revision = Oci::new(serving(routes))
+            .revision(&pinned_lemonfiber(&digest))
+            .await;
         assert!(
-            revision.as_ref().is_err_and(|why| why.asked == DIGEST),
+            revision.as_ref().is_err_and(|why| why.asked == digest),
             "{revision:?}"
         );
     }
     let silent = Oci::new(reaching(Fake::silent()))
-        .revision(&pinned_lemonfiber())
+        .revision(&pinned_lemonfiber(DIGEST))
         .await;
     assert!(silent.is_err());
 }

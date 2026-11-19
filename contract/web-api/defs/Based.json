@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a service says its image is built on, and what this build makes of it.",
+  "type": "object",
+  "properties": {
+    "image": {
+      "description": "The upstream image, as the manifest names it.",
+      "type": "string"
+    },
+    "release": {
+      "description": "The upstream's release, as the manifest names it.",
+      "type": "string"
+    }
+  },
+  "oneOf": [
+    {
+      "description": "The build of every platform's image is recorded as starting from it.",
+      "type": "object",
+      "properties": {
+        "basis": {
+          "type": "string",
+          "const": "recorded"
+        },
+        "digests": {
+          "description": "The digest of the upstream image each build is recorded as starting from.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "basis",
+        "digests"
+      ]
+    },
+    {
+      "description": "The build provenance could not be asked for.",
+      "type": "object",
+      "properties": {
+        "basis": {
+          "type": "string",
+          "const": "unproven"
+        },
+        "why": {
+          "description": "What stopped it being asked for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "why"
+      ]
+    },
+    {
+      "description": "The build of some platform's image is not recorded as starting from it.",
+      "type": "object",
+      "properties": {
+        "basis": {
+          "type": "string",
+          "const": "refused"
+        },
+        "why": {
+          "description": "What each such build is recorded as starting from.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "why"
+      ]
+    }
+  ],
+  "required": [
+    "image",
+    "release"
+  ]
+}

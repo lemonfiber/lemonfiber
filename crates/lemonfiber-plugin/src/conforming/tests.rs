@@ -444,6 +444,7 @@ fn a_plugins_service_declares_exactly_the_fields_the_contract_permits() {
         "args",
         "asks_for",
         "bind",
+        "built_on",
         "certificate",
         "config_path",
         "config_ro",

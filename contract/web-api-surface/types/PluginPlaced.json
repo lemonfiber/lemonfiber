@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "built_on": {
+      "type": [
+        "anyOf(null,ref:PluginBuiltOn)"
+      ],
+      "required": false
+    },
     "config_path": {
       "type": [
         "string"
