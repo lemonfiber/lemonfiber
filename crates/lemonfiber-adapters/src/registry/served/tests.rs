@@ -47,7 +47,7 @@ async fn read(reaching: &dyn Http, digest: &str) -> Result<String, String> {
     by_digest(
         reaching,
         ("ghcr.io", &format!("{BLOB}{digest}"), "*/*"),
-        digest,
+        (digest, None),
         &mut Some("anonymous".to_owned()),
     )
     .await
@@ -136,9 +136,32 @@ async fn what_is_served_by_digest_and_is_no_json_is_refused_as_json() {
     let read = json_by_digest(
         asked.as_ref(),
         ("ghcr.io", &format!("{BLOB}{digest}"), "*/*"),
-        &digest,
+        (&digest, None),
         &mut None,
     )
     .await;
     assert!(read.is_err_and(|why| why.contains("no JSON")));
+}
+
+#[tokio::test]
+async fn a_read_held_to_a_size_refuses_a_longer_answer_or_one_that_is_not_text() {
+    let body = "longer than four";
+    let digest = named(body);
+    let asked = serving(vec![(digest.clone(), answered(200, &[], body))]);
+    let held = by_digest(
+        asked.as_ref(),
+        ("ghcr.io", &format!("{BLOB}{digest}"), "*/*"),
+        (&digest, Some(4)),
+        &mut None,
+    )
+    .await;
+    assert!(held.is_err_and(|why| why.contains("more than 4 bytes")));
+    let held = by_digest(
+        asked.as_ref(),
+        ("ghcr.io", &format!("{BLOB}{digest}"), "*/*"),
+        (&digest, Some(body.len())),
+        &mut None,
+    )
+    .await;
+    assert_eq!(held, Ok(body.to_owned()));
 }

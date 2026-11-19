@@ -355,6 +355,7 @@ async fn an_upstream_the_build_is_recorded_starting_from_does_not_stop_an_instal
     let recorded = built_on(Ok(Built {
         images: vec![digest],
         statements: vec![statement],
+        beyond: None,
     }))
     .await;
     assert_eq!(based(recorded.as_ref()), Some((Some("recorded"), true)));
@@ -365,6 +366,7 @@ async fn an_upstream_the_build_is_not_recorded_starting_from_stops_an_install() 
     let unrecorded = built_on(Ok(Built {
         images: vec![komga().digest],
         statements: Vec::new(),
+        beyond: None,
     }))
     .await;
     assert_eq!(based(unrecorded.as_ref()), Some((Some("refused"), false)));

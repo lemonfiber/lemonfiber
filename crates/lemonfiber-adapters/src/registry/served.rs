@@ -6,15 +6,16 @@ use lemonfiber_ports::http::{Http, Method, Request};
 const LOCATION: &str = "Location";
 
 /// What the registry at `host` serves at `url`, named by `digest`: followed once where the
-/// registry hands it on to an https address, which is asked with no token, and refused
-/// unless its body is what `digest` names.
+/// registry hands it on to an https address, which is asked with no token, no more than
+/// `most` bytes of it held where it is given, and refused unless its body is what `digest`
+/// names.
 pub(super) async fn by_digest(
     reaching: &dyn Http,
     (host, url, accept): (&str, &str, &str),
-    digest: &str,
+    (digest, most): (&str, Option<usize>),
     held: &mut Option<String>,
 ) -> Result<String, String> {
-    let mut answer = super::authorised(reaching, host, url, accept, held).await?;
+    let mut answer = super::authorised_within(reaching, (host, url, accept), most, held).await?;
     if (300..400).contains(&answer.status) {
         let to = answer
             .header(LOCATION)
@@ -26,17 +27,15 @@ pub(super) async fn by_digest(
                 )
             })?
             .to_owned();
-        answer = reaching
-            .send(&Request {
-                method: Method::Get,
-                url: to,
-                headers: vec![("Accept".to_owned(), accept.to_owned())],
-                body: None,
-                pinned: None,
-                deadline: None,
-            })
-            .await
-            .map_err(|why| why.reason)?;
+        let handed = Request {
+            method: Method::Get,
+            url: to,
+            headers: vec![("Accept".to_owned(), accept.to_owned())],
+            body: None,
+            pinned: None,
+            deadline: None,
+        };
+        answer = super::put(reaching, &handed, most).await?;
     }
     if !answer.is_success() {
         return Err(format!("{url} answered {}", answer.status));
@@ -52,10 +51,10 @@ pub(super) async fn by_digest(
 pub(super) async fn json_by_digest(
     reaching: &dyn Http,
     (host, url, accept): (&str, &str, &str),
-    digest: &str,
+    (digest, most): (&str, Option<usize>),
     held: &mut Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let body = by_digest(reaching, (host, url, accept), digest, held).await?;
+    let body = by_digest(reaching, (host, url, accept), (digest, most), held).await?;
     serde_json::from_str(&body).map_err(|why| format!("{url} answered no JSON: {why}"))
 }
 

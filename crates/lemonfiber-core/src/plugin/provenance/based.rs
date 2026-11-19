@@ -90,10 +90,12 @@ fn held(service: &str, built_on: &BuiltOn, built: &Built) -> Basis {
     let claimed = familiar(&built_on.image);
     let mut digests = Vec::new();
     let mut faults = Vec::new();
-    if built.images.is_empty() {
+    if let Some(beyond) = &built.beyond {
+        faults.push(format!("{beyond}, so nothing it records was read"));
+    } else if built.images.is_empty() {
         faults.push("its index lists no image a platform runs".to_owned());
     }
-    for image in &built.images {
+    for image in built.images.iter().filter(|_| built.beyond.is_none()) {
         let mut started = Vec::new();
         let mut unreadable = Vec::new();
         for statement in built.statements.iter().filter(|one| &one.attests == image) {

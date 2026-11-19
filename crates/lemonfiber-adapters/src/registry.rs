@@ -135,7 +135,7 @@ async fn revising(reaching: &dyn Http, image: &Image) -> Result<Option<String>, 
     let named = served::json_by_digest(
         reaching,
         (&host, &format!("{manifests}/{}", image.digest), INDEXES),
-        &image.digest,
+        (&image.digest, None),
         &mut held,
     )
     .await
@@ -154,7 +154,7 @@ async fn revising(reaching: &dyn Http, image: &Image) -> Result<Option<String>, 
         let manifest = served::json_by_digest(
             reaching,
             (&host, &format!("{manifests}/{digest}"), MANIFESTS),
-            digest,
+            (digest, None),
             &mut held,
         )
         .await
@@ -208,7 +208,7 @@ async fn labelled(
             &format!("https://{host}/v2/{path}/blobs/{digest}"),
             ANYTHING,
         ),
-        digest,
+        (digest, None),
         held,
     )
     .await?;
@@ -253,6 +253,16 @@ async fn authorised(
     accept: &str,
     held: &mut Option<String>,
 ) -> Result<Response, String> {
+    authorised_within(reaching, (host, url, accept), None, held).await
+}
+
+/// As [`authorised`], holding no more than `most` bytes of an answer where it is given.
+async fn authorised_within(
+    reaching: &dyn Http,
+    (host, url, accept): (&str, &str, &str),
+    most: Option<usize>,
+    held: &mut Option<String>,
+) -> Result<Response, String> {
     let asked = |token: Option<&str>| Request {
         method: Method::Get,
         url: url.to_owned(),
@@ -263,10 +273,7 @@ async fn authorised(
         pinned: None,
         deadline: None,
     };
-    let answer = reaching
-        .send(&asked(held.as_deref()))
-        .await
-        .map_err(|why| why.reason)?;
+    let answer = put(reaching, &asked(held.as_deref()), most).await?;
     if answer.status != 401 {
         return Ok(answer);
     }
@@ -277,10 +284,33 @@ async fn authorised(
         return Ok(answer);
     };
     let token = held.insert(token(reaching, &handed).await?);
-    reaching
-        .send(&asked(Some(token)))
+    put(reaching, &asked(Some(token)), most).await
+}
+
+/// What `request` is answered, holding no more than `most` bytes of the answer where it
+/// is given and refusing one that is longer or is not text.
+async fn put(
+    reaching: &dyn Http,
+    request: &Request,
+    most: Option<usize>,
+) -> Result<Response, String> {
+    let Some(most) = most else {
+        return reaching.send(request).await.map_err(|why| why.reason);
+    };
+    let fetched = reaching
+        .fetch(request, most)
         .await
-        .map_err(|why| why.reason)
+        .map_err(|why| why.reason)?;
+    let bytes = fetched
+        .bytes
+        .ok_or_else(|| format!("{} answered more than {most} bytes", request.url))?;
+    let body = String::from_utf8(bytes)
+        .map_err(|_| format!("{} answered something that is not text", request.url))?;
+    Ok(Response {
+        status: fetched.status,
+        headers: fetched.headers,
+        body,
+    })
 }
 
 /// Where a bearer challenge from the registry at `host` says its token is handed out:
@@ -405,9 +435,14 @@ async fn asking(reaching: &dyn Http, image: &Image) -> Result<Vec<Offered>, Unan
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| Unanswerable::about(image, "a signature layer names no blob"))?;
         let blob = format!("https://{host}/v2/{path}/blobs/{digest}");
-        let payload = served::by_digest(reaching, (&host, &blob, ANYTHING), digest, &mut held)
-            .await
-            .map_err(|why| Unanswerable::about(image, &why))?;
+        let payload = served::by_digest(
+            reaching,
+            (&host, &blob, ANYTHING),
+            (digest, None),
+            &mut held,
+        )
+        .await
+        .map_err(|why| Unanswerable::about(image, &why))?;
         offered.push(Offered { payload, signature });
     }
     Ok(offered)

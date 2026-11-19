@@ -60,6 +60,7 @@ fn a_base_every_platforms_build_is_recorded_as_starting_from_is_recorded() {
     let built = Built {
         images: vec![AMD64.to_owned(), ARM64.to_owned()],
         statements: vec![caddy_built(AMD64, "2.11.7"), caddy_built(ARM64, "2.11.7")],
+        beyond: None,
     };
     let read = based("caddy", &caddy("2.11.7"), &Ok(built));
     assert_eq!(
@@ -80,6 +81,7 @@ fn a_release_the_build_did_not_start_from_is_refused_naming_the_service_and_what
     let built = Built {
         images: vec![AMD64.to_owned()],
         statements: vec![caddy_built(AMD64, "2.11.7")],
+        beyond: None,
     };
     let refused = held(&caddy("2.11.8"), built);
     assert!(refused.refuses());
@@ -101,10 +103,12 @@ fn a_platform_whose_build_is_not_recorded_starting_from_it_refuses_the_whole() {
     let elsewhere = Built {
         images: vec![AMD64.to_owned(), ARM64.to_owned()],
         statements: vec![caddy_built(AMD64, "2.11.7"), caddy_built(ARM64, "2.11.6")],
+        beyond: None,
     };
     let unattested = Built {
         images: vec![AMD64.to_owned(), ARM64.to_owned()],
         statements: vec![caddy_built(AMD64, "2.11.7")],
+        beyond: None,
     };
     for (built, said) in [
         (elsewhere, "caddy 2.11.6 at"),
@@ -137,6 +141,7 @@ fn a_statement_about_another_image_or_unreadable_records_nothing_and_says_so() {
         let built = Built {
             images: vec![AMD64.to_owned()],
             statements: vec![statement],
+            beyond: None,
         };
         let Basis::Refused { why } = held(&caddy("2.11.7"), built) else {
             unreachable!("{said}")
@@ -184,6 +189,7 @@ fn an_image_on_the_default_registry_is_the_same_image_however_it_is_named() {
         let built = Built {
             images: vec![AMD64.to_owned()],
             statements: vec![materials.clone()],
+            beyond: None,
         };
         assert!(
             matches!(held(&built_on, built), Basis::Recorded { .. }),
@@ -209,6 +215,7 @@ fn a_dependency_with_no_digest_or_two_that_disagree_is_no_image_the_build_starte
         let built = Built {
             images: vec![AMD64.to_owned()],
             statements: vec![statement(AMD64, std::slice::from_ref(&listed))],
+            beyond: None,
         };
         assert!(
             held(&caddy("2.11.7"), built).refuses(),
@@ -225,9 +232,28 @@ fn a_release_written_in_escapes_is_the_release_it_spells() {
             AMD64,
             &[dependency("pkg:docker/caddy@2.11.7%2Bbuild", BASE)],
         )],
+        beyond: None,
     };
     assert!(matches!(
         held(&caddy("2.11.7+build"), built),
         Basis::Recorded { .. }
     ));
+}
+
+#[test]
+fn provenance_listed_beyond_what_a_read_holds_is_refused_whatever_else_was_read() {
+    let built = Built {
+        images: vec![AMD64.to_owned()],
+        statements: vec![caddy_built(AMD64, "2.11.7")],
+        beyond: Some("its index lists 65 entries, and a read holds 64".to_owned()),
+    };
+    let Basis::Refused { why } = held(&caddy("2.11.7"), built) else {
+        unreachable!("provenance beyond the read was recorded")
+    };
+    assert!(
+        why.contains("caddy says it is built on caddy 2.11.7")
+            && why.contains("65 entries")
+            && why.contains("nothing it records was read"),
+        "{why}"
+    );
 }

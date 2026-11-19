@@ -77,6 +77,9 @@ pub struct Built {
     pub images: Vec<String>,
     /// Each build provenance statement listed beside them.
     pub statements: Vec<Statement>,
+    /// What the registry lists beyond what a read holds, where it lists more: no statement
+    /// is read then, and nothing about the image follows from what was.
+    pub beyond: Option<String>,
 }
 
 /// One build provenance statement, and the image it is listed beside.

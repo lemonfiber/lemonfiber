@@ -79,6 +79,7 @@ async fn a_registry_answers_the_build_provenance_it_was_given_or_keeps_its_reaso
     let built = Built {
         images: vec![DIGEST.to_owned()],
         statements: Vec::new(),
+        beyond: None,
     };
 
     assert_eq!(
