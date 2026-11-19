@@ -279,9 +279,6 @@ fn write(wizard: &mut Wizard, applying: &Applying, taken: &Guarded) -> Result<()
 /// written where every setting and secret is kept: each journalled before it is written,
 /// a secret by the fingerprints of what it replaces and of itself.
 fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<(), store::Failure> {
-    if taken == &Guarded::default() {
-        return Ok(());
-    }
     let (settings, secrets) = (&taken.settings, &taken.secrets);
     let (env, journal) = (applying.paths.env_file(), applying.paths.journal());
     let (settings_at, secrets_at) = (

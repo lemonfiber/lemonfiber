@@ -42,3 +42,14 @@ fn it_is_read_and_written_as_its_name() {
     );
     assert!(serde_json::from_str::<Zone>("\"Mars/Olympus\"").is_err());
 }
+
+#[test]
+fn the_host_s_zone_is_the_name_its_clock_keeps_and_none_where_it_keeps_none() {
+    let amsterdam = jiff::tz::TimeZone::get(DEFAULT_ZONE).ok();
+    assert_eq!(super::named(amsterdam), Some(DEFAULT_ZONE.to_owned()));
+    assert_eq!(
+        super::named(Some(jiff::tz::TimeZone::fixed(jiff::tz::offset(2)))),
+        None
+    );
+    assert_eq!(super::named(None), None);
+}

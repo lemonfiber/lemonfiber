@@ -38,9 +38,7 @@ impl Zone {
     /// The zone the host's own clock keeps, where it names one.
     #[must_use]
     pub fn host() -> Option<String> {
-        jiff::tz::TimeZone::try_system()
-            .ok()
-            .and_then(|zone| zone.iana_name().map(str::to_owned))
+        named(jiff::tz::TimeZone::try_system().ok())
     }
 
     /// The zone's name.
@@ -87,6 +85,10 @@ impl schemars::JsonSchema for Zone {
             "examples": [crate::config::DEFAULT_ZONE],
         })
     }
+}
+
+fn named(zone: Option<jiff::tz::TimeZone>) -> Option<String> {
+    zone?.iana_name().map(str::to_owned)
 }
 
 #[cfg(test)]
