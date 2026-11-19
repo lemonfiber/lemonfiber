@@ -15,7 +15,7 @@
     },
     {
       "path": "books.curate/v1/operations/request.json",
-      "sha256": "39f704f875f8317e0bc24512665799f3a9cb6e5abae95a07942c0d498d9ad5ab"
+      "sha256": "72dc65d2c52960167572d6553f6bec89fcbed61018c1190d19b25eea22027d2d"
     },
     {
       "path": "books.curate/v1/operations/profiles.json",

@@ -103,3 +103,15 @@ async fn a_curator_of_books_answers_and_is_told_through_its_contract_as_it_is_in
         ]
     );
 }
+
+#[test]
+fn a_request_for_a_book_waits_for_the_curator_to_fetch_its_record() {
+    let declared = books::curate::capability()
+        .operations
+        .iter()
+        .map(|operation| (operation.name, operation.bounds.deadline))
+        .filter(|(_, deadline)| *deadline != crate::client::DEADLINE)
+        .collect::<Vec<_>>();
+    assert_eq!(declared, [("request", books::REQUEST_DEADLINE)]);
+    assert_eq!(books::REQUEST_DEADLINE, std::time::Duration::from_secs(60));
+}
