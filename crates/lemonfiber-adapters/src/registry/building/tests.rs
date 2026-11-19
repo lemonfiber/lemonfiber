@@ -318,3 +318,16 @@ async fn a_statement_listed_twice_is_read_once() {
         1
     );
 }
+
+#[tokio::test]
+async fn an_attestation_the_index_lists_twice_is_read_once() {
+    let platform = || Platform {
+        image: named("amd64"),
+        layers: vec![(SLSA, "the provenance".to_owned())],
+    };
+    let (digest, routes) = published(&[platform(), platform()]);
+    let asked = serving(routes);
+    let built = Oci::new(asked.clone()).built(&caddy(&digest)).await;
+    assert_eq!(built.map(|built| built.statements.len()), Ok(1));
+    assert_eq!(asked.requests().len(), 3);
+}
