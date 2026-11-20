@@ -64,7 +64,7 @@ pub(super) async fn remove(
     waiting: Waiting,
 ) -> Result<Removal, Box<Problem>> {
     if waiting == Waiting::ForTheDownloads {
-        crate::app::engine::drained(ctx, &[]).await;
+        crate::app::engine::drained(ctx, &[], &[]).await;
     }
 
     let mut went = Went::default();

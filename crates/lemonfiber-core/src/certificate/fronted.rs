@@ -133,22 +133,7 @@ fn signed_for_hosts(authority: &str, certificate: &str) -> bool {
     ) else {
         return false;
     };
-    let mut named: Vec<String> = certificate
-        .subject_alternative_name()
-        .ok()
-        .flatten()
-        .map(|names| {
-            names
-                .value
-                .general_names
-                .iter()
-                .filter_map(|name| match name {
-                    x509_parser::extensions::GeneralName::DNSName(dns) => Some((*dns).to_owned()),
-                    _ => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut named = super::described::dns_names(&certificate);
     named.sort();
     let mut hosts = HOSTS.map(str::to_owned).to_vec();
     hosts.sort();

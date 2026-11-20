@@ -82,7 +82,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         }
         Command::Logs(_) => &[kind::LOGS],
         Command::InFlight { .. } => &[kind::IN_FLIGHT],
-        Command::Served(_) => &[kind::SERVED],
+        Command::Served(_) | Command::Serving => &[kind::SERVED],
         Command::Wiring(Linking::Read) => &[kind::WIRING],
         Command::Settings(Settling::Read) => &[kind::SETTINGS],
         Command::Playing { .. } => &[kind::PLAYING],

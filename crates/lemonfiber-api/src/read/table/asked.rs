@@ -26,9 +26,10 @@ use crate::refusal::Refusal;
 use super::{
     Wanted, ALERTS, ASKABLE, ASKABLE_KINDS, ASKABLE_POSTER, BACKDROP, BACKUPS, BANDWIDTH, BOOT,
     BUNDLE, CATALOGUE, CHANNELS, CHECKS, CLIENTS, CONFIG, CREDENTIALS, EXPLAIN, FORMS, FRONT_DOOR,
-    GUIDE, HELD, HOSTING, LOGS, NEWS, NOTIFY, NOTIFY_MINE, OUTBOUND, PLAYING, PLUGINS, POSTER,
-    QUALITY, QUEUE, REQUESTS, REQUEST_POSTER, SERVICES, SETTINGS, SETTLED, SPACE, STACK, STATUS,
-    STORAGE, STORED, STUCK, TITLE, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER, WATCHING, WIRING,
+    GUIDE, HELD, HOSTING, IN_FLIGHT, LOGS, NEWS, NOTIFY, NOTIFY_MINE, OUTBOUND, PLAYING, PLUGINS,
+    POSTER, QUALITY, QUEUE, REQUESTS, REQUEST_POSTER, SERVED, SERVICES, SETTINGS, SETTLED, SPACE,
+    STACK, STATUS, STORAGE, STORED, STUCK, TITLE, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
+    WATCHING, WIRING,
 };
 
 /// The parameter naming a form to narrow to.
@@ -36,6 +37,12 @@ pub(crate) const FORM: &str = "form";
 
 /// The parameter naming a service to read.
 pub(crate) const SERVICE: &str = "service";
+
+/// The parameter naming the forms a stop would stop, as the stop itself names them.
+const STOPPED_FORMS: &str = "forms";
+
+/// The parameter naming the services a stop would stop, as the stop itself names them.
+const STOPPED_SERVICES: &str = "services";
 
 /// The parameter saying how many existing log lines to begin with.
 pub(crate) const TAIL: &str = "tail";
@@ -126,6 +133,8 @@ const TAKEN: &[(&str, &[&str])] = &[
     (FRONT_DOOR, &[]),
     (STACK, &[]),
     (SETTLED, &[]),
+    (IN_FLIGHT, &[STOPPED_FORMS, STOPPED_SERVICES]),
+    (SERVED, &[]),
     (NOTIFY, &[]),
     (NOTIFY_MINE, &[MEMBER]),
     (NEWS, &[]),
@@ -156,10 +165,11 @@ const TAKEN: &[(&str, &[&str])] = &[
 
 /// The parameters that name one of several rather than one thing.
 ///
-/// Two, and they are the two the commands behind them take as lists: a log read is
-/// narrowed to as many forms and as many services as were named. Every other
-/// parameter names one thing, and naming a second is a request with two answers.
-pub(crate) const REPEATABLE: &[&str] = &[FORM, SERVICE];
+/// The ones the commands behind them take as lists: a log read is narrowed to as many
+/// forms and as many services as were named, and what a stop would interrupt is asked of
+/// as many as the stop names. Every other parameter names one thing, and naming a second
+/// is a request with two answers.
+pub(crate) const REPEATABLE: &[&str] = &[FORM, SERVICE, STOPPED_FORMS, STOPPED_SERVICES];
 
 /// What a read with no row takes.
 const NOTHING: &[&str] = &[];
@@ -225,7 +235,11 @@ impl Asked {
     /// and a request that named it was refused before this ran.
     pub(crate) fn wanted(&self) -> Wanted {
         Wanted {
-            forms: self.every(FORM),
+            forms: [FORM, STOPPED_FORMS]
+                .into_iter()
+                .flat_map(|name| self.every(name))
+                .collect(),
+            services: self.every(STOPPED_SERVICES),
             member: self.one(MEMBER).map(str::to_owned),
             defaults: self.one(DEFAULTS).map(str::to_owned),
             term: self.one(TERM).map(str::to_owned),

@@ -3868,6 +3868,69 @@
           }
         ]
       },
+      "Described": {
+        "description": "What a certificate says about itself.",
+        "properties": {
+          "fingerprint": {
+            "description": "What a phone pins: SHA-256 over the certificate's DER encoding, lower-case hex.",
+            "type": "string"
+          },
+          "issuer": {
+            "description": "Who signed it, as an RFC 4514 string, cut where it is too long to show.",
+            "type": "string"
+          },
+          "issuer_cut": {
+            "description": "Whether the issuer was cut, being too long to show whole.",
+            "type": "boolean"
+          },
+          "names": {
+            "description": "The names it is made out to, its subject alternative names, each whole; those too\nmany or too long to show, or not written as text, are left out.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "names_more": {
+            "description": "How many of the names it is made out to are left out, being too many or too long to\nshow, or not written as text.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "self_signed": {
+            "description": "Whether it was signed by its own key under its own name.",
+            "type": "boolean"
+          },
+          "subject": {
+            "description": "Who it is made out to, as an RFC 4514 string, cut where it is too long to show.",
+            "type": "string"
+          },
+          "subject_cut": {
+            "description": "Whether the subject was cut, being too long to show whole.",
+            "type": "boolean"
+          },
+          "valid_from": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it begins to hold."
+          },
+          "valid_until": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it stops holding."
+          }
+        },
+        "required": [
+          "fingerprint",
+          "subject",
+          "subject_cut",
+          "issuer",
+          "issuer_cut",
+          "self_signed",
+          "names",
+          "names_more",
+          "valid_from",
+          "valid_until"
+        ],
+        "type": "object"
+      },
       "Device": {
         "description": "A kind of device somebody in the house might watch on.",
         "properties": {
@@ -6882,7 +6945,7 @@
         "type": "object"
       },
       "InFlightReport": {
-        "description": "What is still coming down inside the forms a teardown would stop.",
+        "description": "What is still coming down inside what a stop would stop.",
         "properties": {
           "downloads": {
             "description": "Each download still coming down, with how far it has got.",
@@ -16950,12 +17013,20 @@
       "ServedReport": {
         "description": "What a run serving the surface presents, answers to and wrote down.",
         "properties": {
-          "fingerprint": {
-            "description": "What a phone pins for the certificate presented, where the run is encrypted.",
-            "type": [
-              "string",
-              "null"
-            ]
+          "certificate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Described"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The certificate it presents, as it describes itself, where the run is encrypted."
+          },
+          "encrypted": {
+            "description": "Whether it presents a certificate, rather than plain text.",
+            "type": "boolean"
           },
           "named": {
             "description": "The name a request has to carry beyond this machine, where the run is encrypted on\na network.",
@@ -16963,6 +17034,17 @@
               "string",
               "null"
             ]
+          },
+          "network": {
+            "description": "Whether it is offered to the network, rather than to this machine alone.",
+            "type": "boolean"
+          },
+          "port": {
+            "description": "The port it listens on.",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
           },
           "unrecorded": {
             "description": "Why where it is served could not be written down, where it could not.",
@@ -16972,6 +17054,11 @@
             ]
           }
         },
+        "required": [
+          "port",
+          "encrypted",
+          "network"
+        ],
         "type": "object"
       },
       "Service": {
@@ -33832,6 +33919,54 @@
         }
       }
     },
+    "/api/in-flight": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "forms",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "services",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-in-flight"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/jobs/{job}": {
       "delete": {
         "responses": {
@@ -34483,6 +34618,33 @@
               }
             },
             "description": "The file."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/served": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-served"
+                }
+              }
+            },
+            "description": "Answered."
           },
           "default": {
             "content": {

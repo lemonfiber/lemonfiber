@@ -71,12 +71,12 @@ pub(super) async fn apply(
     let taking = steps(ctx, taking).await?;
 
     // Asked before anything stops, because stopping is what would interrupt them.
-    let active = named(&engine::in_flight(ctx, &[]).await);
+    let active = named(&engine::in_flight(ctx, &[], &[]).await);
     if !active.is_empty() {
         if wait != Waiting::ForTheDownloads {
             return Err(Box::new(still_transferring(&active)));
         }
-        engine::drained(ctx, &[]).await;
+        engine::drained(ctx, &[], &[]).await;
     }
 
     // Before anything is pulled rather than after: a fetch that runs out of disk

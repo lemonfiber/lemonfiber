@@ -7,11 +7,21 @@
 //! surface itself — rather than either of them guessing.
 
 use std::path::Path;
+use std::sync::PoisonError;
 
 use serde::Deserialize;
 
+use crate::config::store::Failure;
+
+/// Every refusal reading how the surface is served answers with, which a client names by
+/// its code: a surface asked before its run settled how it serves.
+pub const REFUSALS: [crate::error::Code; 1] = [crate::error::codes::serve::NOT_SERVING];
+
 /// Where it is written, beside the certificate.
 const FILE: &str = "served.json";
+
+/// Why it was not written, where the store says nothing more that names no path.
+const UNWRITTEN: &str = "the store would not write it";
 
 /// How the web surface was last served.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -29,7 +39,8 @@ pub struct Served {
 ///
 /// # Errors
 ///
-/// What stopped it being written, in words.
+/// What stopped it being written, in the operating system's words and naming no path, so
+/// it can be said to whoever asks how the surface is served.
 pub fn record(directory: &Path, served: Served) -> Result<(), String> {
     // Written out rather than serialised: three scalars cannot fail to be written, and a
     // serialiser's failure branch here would be one nothing could reach.
@@ -37,7 +48,20 @@ pub fn record(directory: &Path, served: Served) -> Result<(), String> {
         "{{\n  \"port\": {},\n  \"encrypted\": {},\n  \"network\": {}\n}}\n",
         served.port, served.encrypted, served.network
     );
-    crate::config::store::write(&directory.join(FILE), &text).map_err(|why| why.to_string())
+    crate::config::store::write(&directory.join(FILE), &text).map_err(unwritten)
+}
+
+/// Why the record was not written, in the operating system's words where those name no
+/// path, and in this module's own where they might.
+fn unwritten(why: Failure) -> String {
+    match why {
+        Failure::NotWritten { reason, .. } | Failure::Unreadable { reason, .. }
+            if !reason.contains(['/', '\\']) =>
+        {
+            reason
+        }
+        _ => UNWRITTEN.to_owned(),
+    }
 }
 
 /// How the surface was last served, or nothing where no run wrote it down or what was
@@ -51,22 +75,52 @@ pub fn last(directory: &Path) -> Option<Served> {
 /// What a run serving the surface presents, answers to and wrote down.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct ServedReport {
-    /// What a phone pins for the certificate presented, where the run is encrypted.
-    pub fingerprint: Option<String>,
+    /// The port it listens on.
+    pub port: u16,
+    /// Whether it presents a certificate, rather than plain text.
+    pub encrypted: bool,
+    /// Whether it is offered to the network, rather than to this machine alone.
+    pub network: bool,
     /// The name a request has to carry beyond this machine, where the run is encrypted on
     /// a network.
     pub named: Option<String>,
     /// Why where it is served could not be written down, where it could not.
     pub unrecorded: Option<String>,
+    /// The certificate it presents, as it describes itself, where the run is encrypted.
+    pub certificate: Option<crate::certificate::described::Described>,
     /// The certificate and key presented, held in this process and never written out.
     #[serde(skip)]
     #[schemars(skip)]
     pub presented: Option<crate::certificate::Kept>,
 }
 
+/// How this run serves the surface, as settling it answered, shared by every clone of the
+/// run's context and holding no key.
+#[derive(Debug, Default)]
+pub struct Settled(std::sync::RwLock<Option<ServedReport>>);
+
+impl Settled {
+    /// Keep `report` as what this run settled, without the key it presents.
+    fn keep(&self, report: &ServedReport) {
+        *self.0.write().unwrap_or_else(PoisonError::into_inner) = Some(ServedReport {
+            presented: None,
+            ..report.clone()
+        });
+    }
+
+    /// What this run settled, or nothing where it settled nothing.
+    fn read(&self) -> Option<ServedReport> {
+        self.0
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
 /// Settle how the surface is served: the certificate it presents where `served` is
 /// encrypted, kept or made beside the configuration; the name it answers to on a network;
-/// and the record pairing reads back, which a rehearsal leaves unwritten.
+/// and the record pairing reads back, which a rehearsal leaves unwritten. What it settled
+/// is kept for the run to be asked.
 ///
 /// # Errors
 ///
@@ -89,6 +143,13 @@ pub(crate) async fn serving(
     } else {
         None
     };
+    let certificate = presented
+        .as_ref()
+        .map(|kept| {
+            kept.described()
+                .ok_or_else(|| Box::new(uncertified("what is kept does not read as a certificate")))
+        })
+        .transpose()?;
     let named = if served.network && served.encrypted {
         super::answers_to(ctx, served.port).await
     } else {
@@ -98,12 +159,42 @@ pub(crate) async fn serving(
         Some(directory) if !ctx.dry_run => record(directory, served).err(),
         _ => None,
     };
-    Ok(ServedReport {
-        fingerprint: presented.as_ref().map(|kept| kept.fingerprint.clone()),
+    let report = ServedReport {
+        port: served.port,
+        encrypted: served.encrypted,
+        network: served.network,
         named,
         unrecorded,
+        certificate,
         presented,
-    })
+    };
+    ctx.served.keep(&report);
+    Ok(report)
+}
+
+/// How this run serves the surface, as it settled when it began: read, and never settled
+/// again.
+///
+/// # Errors
+///
+/// The [`Problem`] where this run settled nothing, because it is not serving the surface.
+pub(crate) fn settled(ctx: &crate::app::Ctx) -> Result<ServedReport, Box<crate::error::Problem>> {
+    ctx.served.read().ok_or_else(|| Box::new(not_serving()))
+}
+
+/// How the surface is served was asked of a run that is not serving it.
+fn not_serving() -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::codes::serve::NOT_SERVING,
+        format!(
+            "This run of {} is not serving the web interface",
+            crate::PRODUCT
+        ),
+        "How the web interface is served is what the run serving it settled when it began, and \
+         this run settled nothing.",
+        crate::error::Remedy::new("Ask the run serving the web interface")
+            .with_detail(format!("the address {} ui printed", crate::PRODUCT)),
+    )
 }
 
 /// The certificate to present could not be had, for the reason `why` gives.

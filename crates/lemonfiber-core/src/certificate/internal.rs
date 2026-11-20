@@ -124,22 +124,10 @@ pub fn read(bytes: &[u8]) -> Result<Internal, Unkept> {
 
 /// Every DNS name the certificate `der` is made out to.
 fn named(der: &[u8]) -> Vec<String> {
-    use x509_parser::prelude::{FromDer as _, GeneralName, X509Certificate};
-    let Ok((_, certificate)) = X509Certificate::from_der(der) else {
-        return Vec::new();
-    };
-    let Ok(Some(extension)) = certificate.subject_alternative_name() else {
-        return Vec::new();
-    };
-    extension
-        .value
-        .general_names
-        .iter()
-        .filter_map(|name| match name {
-            GeneralName::DNSName(dns) => Some((*dns).to_owned()),
-            _ => None,
-        })
-        .collect()
+    use x509_parser::prelude::{FromDer as _, X509Certificate};
+    X509Certificate::from_der(der)
+        .map(|(_, certificate)| super::described::dns_names(&certificate))
+        .unwrap_or_default()
 }
 
 /// The certificate kept beneath `config`, read through no link, or nothing where none has

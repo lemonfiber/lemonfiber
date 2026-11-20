@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a certificate says about itself.",
+  "type": "object",
+  "properties": {
+    "fingerprint": {
+      "description": "What a phone pins: SHA-256 over the certificate's DER encoding, lower-case hex.",
+      "type": "string"
+    },
+    "issuer": {
+      "description": "Who signed it, as an RFC 4514 string, cut where it is too long to show.",
+      "type": "string"
+    },
+    "issuer_cut": {
+      "description": "Whether the issuer was cut, being too long to show whole.",
+      "type": "boolean"
+    },
+    "names": {
+      "description": "The names it is made out to, its subject alternative names, each whole; those too\nmany or too long to show, or not written as text, are left out.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "names_more": {
+      "description": "How many of the names it is made out to are left out, being too many or too long to\nshow, or not written as text.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "self_signed": {
+      "description": "Whether it was signed by its own key under its own name.",
+      "type": "boolean"
+    },
+    "subject": {
+      "description": "Who it is made out to, as an RFC 4514 string, cut where it is too long to show.",
+      "type": "string"
+    },
+    "subject_cut": {
+      "description": "Whether the subject was cut, being too long to show whole.",
+      "type": "boolean"
+    },
+    "valid_from": {
+      "description": "When it begins to hold.",
+      "$ref": "Instant.json"
+    },
+    "valid_until": {
+      "description": "When it stops holding.",
+      "$ref": "Instant.json"
+    }
+  },
+  "required": [
+    "fingerprint",
+    "subject",
+    "subject_cut",
+    "issuer",
+    "issuer_cut",
+    "self_signed",
+    "names",
+    "names_more",
+    "valid_from",
+    "valid_until"
+  ]
+}

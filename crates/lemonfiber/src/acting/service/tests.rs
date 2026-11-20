@@ -222,10 +222,11 @@ fn naming_a_service_reaches_whatever_command_that_action_forks_to() {
     );
     assert_eq!(
         carried(&taking("down", "Sonarr")),
-        Some(Command::Halt {
+        Some(Command::Halt(lemonfiber_core::app::Halting {
             forms: vec!["full".to_owned()],
             services: vec!["sonarr".to_owned()],
-        })
+            wait: lemonfiber_core::app::Waiting::Never,
+        }))
     );
     assert_eq!(
         carried(&taking("restart", "Sonarr")),

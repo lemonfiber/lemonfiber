@@ -657,3 +657,44 @@ fn a_member_reads_the_front_door_as_the_household_from_where_they_asked() {
         Permitted::This(asked)
     );
 }
+
+/// What a stop would interrupt and how the surface is served are answered to the operator
+/// and to a key whose scope reaches reads, and refused to a member and to a key scoped to
+/// one; neither is an action a key may call.
+#[test]
+fn what_a_stop_would_interrupt_and_how_the_surface_is_served_are_read_by_the_operator_and_read_keys(
+) {
+    use lemonfiber_core::keys::Scope;
+    for command in [
+        Command::InFlight {
+            forms: vec!["tv".to_owned()],
+            services: vec!["qbittorrent".to_owned()],
+        },
+        Command::Serving,
+    ] {
+        for caller in [
+            Caller::Machine,
+            Caller::Operator,
+            key(Scope::Read),
+            key(Scope::Act),
+        ] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::This(command.clone()),
+                "{caller:?}"
+            );
+        }
+        let member_key = key(Scope::Member {
+            id: ASKING.to_owned(),
+            name: "ana".to_owned(),
+        });
+        for caller in [member(), member_key] {
+            assert_eq!(
+                may(&caller, Door::Reading, command.clone()),
+                Permitted::Nothing,
+                "{caller:?}"
+            );
+        }
+        assert!(!callable_by_a_key(&command));
+    }
+}

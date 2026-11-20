@@ -26,10 +26,13 @@ fn every_command() -> [Command; 5] {
             tail: TAIL,
             follow: false,
         }),
-        Command::InFlight { forms: Vec::new() },
+        Command::InFlight {
+            forms: Vec::new(),
+            services: Vec::new(),
+        },
         Command::Served(Served {
             port: PORT,
-            encrypted: false,
+            encrypted: true,
             network: false,
         }),
         Command::Password,
@@ -39,6 +42,7 @@ fn every_command() -> [Command; 5] {
 /// Every command the command line dispatches for itself answered, and what each said kept.
 pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
     let world = World::named("terminal");
+    crate::companion::certified(&world.root().join("state").join("companion"));
     let ctx = world
         .ctx
         .clone()

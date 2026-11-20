@@ -346,10 +346,11 @@ async fn stopping_does_not_wait_for_anything() {
 async fn stopping_named_services_stops_only_those() {
     let engine = Reporting::holding(&LIBRARY, Lifecycle::Running, Health::Healthy);
     let ctx = watching(engine).with_patience(Duration::ZERO);
-    let command = Command::Halt {
+    let command = Command::Halt(crate::app::Halting {
         forms: vec!["library".to_owned()],
         services: vec!["sonarr".to_owned()],
-    };
+        wait: crate::app::Waiting::Never,
+    });
 
     let produced = report(dispatch(command, &ctx).await);
     assert_eq!(

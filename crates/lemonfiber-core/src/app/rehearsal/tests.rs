@@ -261,12 +261,16 @@ fn reads() -> Vec<Command> {
             tail: 10,
             follow: false,
         }),
-        Command::InFlight { forms: Vec::new() },
+        Command::InFlight {
+            forms: Vec::new(),
+            services: Vec::new(),
+        },
         Command::Served(crate::companion::served::Served {
             port: 8443,
             encrypted: true,
             network: true,
         }),
+        Command::Serving,
         Command::Version,
         Command::Forms,
         Command::Preview {
@@ -388,10 +392,11 @@ fn always_reported() -> Vec<Command> {
             forms: Vec::new(),
             wait: Waiting::Never,
         }),
-        Command::Halt {
+        Command::Halt(crate::app::Halting {
             forms: Vec::new(),
             services: Vec::new(),
-        },
+            wait: crate::app::Waiting::Never,
+        }),
         Command::Switch {
             forms: vec!["library".to_owned()],
             offer: None,

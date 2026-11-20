@@ -1,0 +1,65 @@
+{
+  "fields": {
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "issuer": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "issuer_cut": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "names": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "names_more": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "self_signed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "subject": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "subject_cut": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "valid_from": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "valid_until": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

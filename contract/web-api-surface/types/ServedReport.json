@@ -1,16 +1,34 @@
 {
   "fields": {
-    "fingerprint": {
+    "certificate": {
       "type": [
-        "null|string"
+        "anyOf(null,ref:Described)"
       ],
       "required": false
+    },
+    "encrypted": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
     },
     "named": {
       "type": [
         "null|string"
       ],
       "required": false
+    },
+    "network": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "port": {
+      "type": [
+        "integer/uint16"
+      ],
+      "required": true
     },
     "unrecorded": {
       "type": [

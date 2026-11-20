@@ -146,6 +146,9 @@ pub struct Ctx {
     pub held: Arc<dyn std::any::Any + Send + Sync>,
     /// Who this run lets in through the web API, shared by every clone.
     pub admitting: Arc<super::admitting::Admitting>,
+    /// How this run serves the web surface, as it settled when it began, shared by every
+    /// clone.
+    pub served: Arc<crate::companion::served::Settled>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -221,6 +224,7 @@ impl Ctx {
             built_from: crate::stack::BUILT_FROM,
             held: Arc::new(()),
             admitting: Arc::default(),
+            served: Arc::default(),
         }
     }
 

@@ -82,7 +82,7 @@ pub(super) fn certificate(report: &Replacement) -> Lines {
     lines
 }
 
-/// The name the web surface is served under, and its certificate's fingerprint where it
+/// The name the web surface is served under, and the certificate it presents where it
 /// has one.
 pub(super) fn served(report: &ServedReport) -> Lines {
     let mut lines = Lines::default();
@@ -90,10 +90,52 @@ pub(super) fn served(report: &ServedReport) -> Lines {
         || "Served under no name.".to_owned(),
         |name| format!("Served as {name}."),
     ));
-    if let Some(fingerprint) = &report.fingerprint {
-        lines.put(format!("Certificate fingerprint: {fingerprint}"));
+    if let Some(certificate) = &report.certificate {
+        lines.put(format!(
+            "Certificate fingerprint: {}",
+            certificate.fingerprint
+        ));
+        lines.put(format!(
+            "Made out to {}{}, for {}{}.",
+            certificate.subject,
+            cut(certificate.subject_cut),
+            certificate.names.join(", "),
+            left_out(certificate.names_more)
+        ));
+        lines.put(if certificate.self_signed {
+            "Signed by itself.".to_owned()
+        } else {
+            format!(
+                "Signed by {}{}.",
+                certificate.issuer,
+                cut(certificate.issuer_cut)
+            )
+        });
+        lines.put(format!(
+            "Valid from {} until {}.",
+            certificate.valid_from.said(),
+            certificate.valid_until.said()
+        ));
     }
     lines
+}
+
+/// What follows a text that was cut, being too long to show: an ellipsis, or nothing.
+const fn cut(was: bool) -> &'static str {
+    if was {
+        "…"
+    } else {
+        ""
+    }
+}
+
+/// What follows a list of names some of which were left out: how many, or nothing.
+fn left_out(more: usize) -> String {
+    if more == 0 {
+        String::new()
+    } else {
+        format!(" and {more} more")
+    }
 }
 
 /// The stack's identifier, the settings that are off, and whether a way to be told,

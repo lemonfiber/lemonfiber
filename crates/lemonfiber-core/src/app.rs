@@ -106,10 +106,10 @@ pub(crate) mod watcher;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Diagnosing, Doorway, Downloading, Filling, Gathering, Hostable, Inviting, Keeping, LettingGo,
-    Linking, Live, MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs, Reclaiming,
-    Removing, Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing, Viewing, Whom,
-    Wishing, HOSTABLE,
+    Diagnosing, Doorway, Downloading, Filling, Gathering, Halting, Hostable, Inviting, Keeping,
+    LettingGo, Linking, Live, MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs,
+    Reclaiming, Removing, Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing,
+    Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -169,6 +169,19 @@ async fn upgraded(ctx: &Ctx, confirm: bool) -> Result<Outcome, Box<Problem>> {
 /// Beside the table because its row, spelled out, is longer than one line.
 async fn down(ctx: &Ctx, forms: &[String], wait: Waiting) -> Result<Outcome, Box<Problem>> {
     engine::teardown(ctx, forms, wait).await.map(Outcome::from)
+}
+
+/// Stop the named services, having waited for their downloads first where that was asked.
+async fn halted(ctx: &Ctx, halting: &Halting) -> Result<Outcome, Box<Problem>> {
+    engine::halt(ctx, &halting.forms, &halting.services, halting.wait)
+        .await
+        .map(Outcome::from)
+}
+
+/// What is still coming down inside what stopping `forms`, or the named `services` of them,
+/// would stop.
+async fn interrupted(ctx: &Ctx, forms: &[String], services: &[String]) -> Outcome {
+    Outcome::InFlight(in_flight_report(ctx, forms, services).await)
 }
 
 /// Which app to use on which device, with what the quality in force does to playback.
@@ -397,7 +410,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Run { service, now } => scheduled::run(ctx, &service, now).await.map(Outcome::Ran),
         Command::Start { forms, services } => lifecycle(ctx, &forms, Action::Start(services)).await,
         Command::Down(Teardown { forms, wait }) => down(ctx, &forms, wait).await,
-        Command::Halt { forms, services } => lifecycle(ctx, &forms, Action::Stop(services)).await,
+        Command::Halt(halting) => halted(ctx, &halting).await,
         Command::Switch { forms, offer } => engine::switched(ctx, &forms, offer).await,
         Command::Restart(restart) => engine::restarted(ctx, restart).await,
         Command::Pull { forms } => lifecycle(ctx, &forms, Action::Pull(Vec::new())).await,
@@ -496,7 +509,8 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Admission(asked) => admitting::admitted(ctx, asked).await,
         Command::Logs(asked) => engine::read_logs(ctx, &asked).await.map(Outcome::Logs),
         Command::Served(asked) => served::serving(ctx, asked).await.map(Outcome::Served),
-        Command::InFlight { forms } => Ok(Outcome::InFlight(in_flight_report(ctx, &forms).await)),
+        Command::InFlight { forms, services } => Ok(interrupted(ctx, &forms, &services).await),
+        Command::Serving => served::settled(ctx).map(Outcome::Served),
         Command::Seed => seed::seed(ctx, false).await.map(Outcome::Seed),
         Command::Adopt => seed::seed(ctx, true).await.map(Outcome::Seed),
         Command::Uninstall(how) => uninstall::uninstall(ctx, how).await.map(Outcome::Uninstall),

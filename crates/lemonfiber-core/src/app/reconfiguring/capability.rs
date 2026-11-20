@@ -68,7 +68,7 @@ async fn interrupted(
         Protocol::Usenet => before.usenet && !after.usenet,
         Protocol::Torrent => before.torrent && !after.torrent,
     };
-    super::super::engine::in_flight(ctx, &[])
+    super::super::engine::in_flight(ctx, &[], &[])
         .await
         .into_iter()
         .filter(|download| dropped(download.protocol))

@@ -71,11 +71,6 @@ pub(crate) fn exactly_what(action: &str) -> Arguments {
         } else {
             Vec::new()
         },
-        // Everything that takes services, apart from the one that takes a wait as
-        // well: those two name different requests, so an action given both would
-        // be given a pair no run can carry. The teardown is handed its wait and
-        // the stop of named services beside it is left to the tests that are
-        // about that request.
         services: if takes(TAKES_SERVICES) && !takes(TAKES_WAITING) {
             vec!["sonarr".to_owned()]
         } else {

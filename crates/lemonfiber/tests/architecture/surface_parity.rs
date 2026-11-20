@@ -134,10 +134,12 @@ const DASHBOARD: &str = "dashboard";
 /// a service tells the core what happened at is a curator's or the media server's, holding
 /// nothing but the key the core minted for it, and nobody at a command line has anything
 /// to tell it. The door a member signs in by a code at is a household device's, holding no
-/// session yet, and a command line signs no member in.
+/// session yet, and a command line signs no member in. How the surface is served is read
+/// of the run answering, by a client that reached it, and the command line that started
+/// that run printed how it serves when it began.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 11] = [
+const UNREQUESTED: [&str; 12] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
@@ -149,6 +151,7 @@ const UNREQUESTED: [&str; 11] = [
     "/api/device-keys/{name}",
     "/api/device-keys/{name}/challenge",
     "/api/notify/events",
+    "/api/served",
 ];
 
 /// One row of the parity table.

@@ -23,7 +23,7 @@ use lemonfiber_core::app::restore::Kept;
 use lemonfiber_core::app::support::Destination;
 use lemonfiber_core::app::{
     Command, Diagnosing, Gathering, Hostable, Keeping, LettingGo, Removing, Restarting, Restoring,
-    Teardown, Waiting, HOSTABLE,
+    Waiting, HOSTABLE,
 };
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
@@ -314,8 +314,7 @@ pub(crate) fn carried(action: &str, given: Arguments) -> Result<Command, Refused
         // tearing a form down are, and Compose spells both pairs differently.
         "up" if services.is_empty() => Ok(Command::Up { forms, offer }),
         "up" => Ok(Command::Start { forms, services }),
-        "down" if services.is_empty() => Ok(Command::Down(Teardown { forms, wait })),
-        "down" => Ok(Command::Halt { forms, services }),
+        "down" => Ok(Command::stopping(forms, services, wait)),
         "switch" => Ok(Command::Switch { forms, offer }),
         "restart" => Ok(Command::Restart(Restarting {
             forms,
@@ -524,21 +523,13 @@ fn beforehand(action: &str, given: &Arguments) -> Option<Refused> {
     if let Some(refused) = viewing::alongside(action, given) {
         return Some(refused);
     }
-    // Two arguments, two requests. A teardown that waits and a stop of named services are
-    // different things to ask for, as are a start answering an install and a start of named
-    // services, which installs nothing, and a run given both would have to drop one of them.
-    let asked_alongside = match action {
-        "down" if given.wait == Waiting::ForTheDownloads => Some("wait"),
-        "up" if given.offer.is_some() => Some("offer"),
-        _ => None,
-    };
-    asked_alongside
-        .filter(|_| !given.services.is_empty())
-        .map(|argument| Refused::Together {
+    (action == "up" && given.offer.is_some() && !given.services.is_empty()).then(|| {
+        Refused::Together {
             action: action.to_owned(),
-            argument: argument.to_owned(),
+            argument: "offer".to_owned(),
             alongside: "services".to_owned(),
-        })
+        }
+    })
 }
 
 #[cfg(test)]

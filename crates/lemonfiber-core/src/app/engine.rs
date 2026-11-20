@@ -45,8 +45,8 @@ pub use diagnosis::diagnose;
 pub(crate) use diagnosis::{assembled, assembling, examined, Stack};
 pub(crate) use fenced::held_back;
 pub(crate) use inflight::drained;
-pub(crate) use inflight::teardown;
 pub use inflight::InFlightReport;
+pub(crate) use inflight::{halt, teardown};
 pub use inflight::{in_flight, in_flight_report, Unfinished, Waiting};
 #[cfg(test)]
 pub(crate) use installing::left_out;

@@ -30,6 +30,7 @@
 
 mod asked;
 mod naming;
+mod wanted;
 
 pub(crate) use naming::{askable, THE_STACK, THIS_BINARY};
 use naming::{
@@ -58,6 +59,7 @@ use crate::refusal::Refusal;
 
 pub(crate) use asked::{taken, Asked, FOLLOW, FORM, REPEATABLE, SERVICE, TAIL};
 pub(crate) use naming::told;
+pub use wanted::Wanted;
 
 /// The versions in play: this binary, the stack it operates, and the engine's.
 pub const VERSION: &str = "/api/version";
@@ -152,6 +154,21 @@ pub const STACK: &str = "/api/stack";
 
 /// What setup settled, and whether this stack is set up.
 pub const SETTLED: &str = "/api/settled";
+
+/// What is still coming down inside what a stop of the named forms and services would
+/// stop, which that stop would interrupt.
+///
+/// Named for what it answers rather than for a command: the command line asks it inside
+/// `down`, before it stops anything, and has no word of its own for it.
+pub const IN_FLIGHT: &str = "/api/in-flight";
+
+/// How the run answering serves this surface: its port, whether it is encrypted and on
+/// the network, the name it answers to, and the certificate it presents as that
+/// certificate describes itself.
+///
+/// Read from what the run settled when it began, so asking makes, replaces and writes
+/// nothing.
+pub const SERVED: &str = "/api/served";
 
 /// The back-ends the stack delivers its alerts to, the operator's alone.
 pub const NOTIFY: &str = "/api/notify";
@@ -333,6 +350,8 @@ pub const OFFERED: &[&str] = &[
     FRONT_DOOR,
     STACK,
     SETTLED,
+    IN_FLIGHT,
+    SERVED,
     NOTIFY,
     NOTIFY_MINE,
     NEWS,
@@ -363,71 +382,6 @@ pub const OFFERED: &[&str] = &[
     SETTINGS,
 ];
 
-/// An item's identifier, standing for whichever title a request names.
-const AN_ITEM: &str = "0123456789abcdef0123456789abcdef";
-
-/// What a read was given, mirroring the flags its command takes.
-///
-/// One carrier rather than one shape per read, so a caller fills the field the read
-/// names and leaves the rest. Each field is the query parameter of the same
-/// meaning, taken as it was written — the parsing a season needs is done here, so
-/// a request that named one badly is refused in the same words wherever it arrived.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Wanted {
-    /// The forms to narrow to, or to say what starting would come to.
-    pub forms: Vec<String>,
-    /// The household member to narrow to.
-    pub member: Option<String>,
-    /// Whether a household read is answered as the household's defaults, as it was
-    /// written.
-    pub defaults: Option<String>,
-    /// What to follow, named as a person would say it.
-    pub term: Option<String>,
-    /// The season to narrow a trace to, as it was written.
-    pub season: Option<String>,
-    /// The setting to read, instead of every one of them.
-    pub key: Option<String>,
-    /// The group of checks, or the one check, to narrow a diagnosis to.
-    pub only: Option<String>,
-    /// The word to explain, instead of every word there is to ask about.
-    pub word: Option<String>,
-    /// Which of the four removals to read.
-    pub tier: Option<String>,
-    /// The version to move to, instead of whatever is newest.
-    pub to: Option<String>,
-    /// Which of the two things that can be moved forward is being read.
-    pub what: Option<String>,
-    /// How many holdings a shelf answers with.
-    pub most: Option<String>,
-    /// Where a page of a search said the next one begins.
-    pub after: Option<String>,
-    /// Whether the title a read is about is a series or a film, as it was written.
-    pub kind: Option<String>,
-    /// What a search for music or books looks for, as it was written.
-    pub unit: Option<String>,
-    /// The title a read is about, as its path names it.
-    pub title: Option<String>,
-}
-
-impl Wanted {
-    /// Enough for every read to reach the command it names: the subjects a read cannot
-    /// be named without, and nothing that narrows one.
-    ///
-    /// For asking which command a request reaches without a request: what this carries
-    /// is never read, and nothing about a stack is in it. Held to every read in a test,
-    /// so a read that gains a required parameter is given one here too.
-    #[must_use]
-    pub fn naming_everything() -> Self {
-        Self {
-            member: Some("someone".to_owned()),
-            term: Some("Sintel".to_owned()),
-            title: Some(AN_ITEM.to_owned()),
-            what: Some(THE_STACK.to_owned()),
-            ..Self::default()
-        }
-    }
-}
-
 /// What a read was given, or why the request cannot be read as it stands.
 ///
 /// # Errors
@@ -446,6 +400,7 @@ pub fn wanted(read: &str, query: Option<&str>) -> Result<Wanted, Box<Problem>> {
 pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
     let Wanted {
         forms,
+        services,
         member,
         defaults,
         term,
@@ -486,6 +441,8 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         FRONT_DOOR => Ok(Command::FrontDoor(lemonfiber_core::app::Doorway::default())),
         STACK => Ok(Command::Stack),
         SETTLED => Ok(Command::Settled),
+        IN_FLIGHT => Ok(Command::InFlight { forms, services }),
+        SERVED => Ok(Command::Serving),
         NOTIFY => Ok(Command::Notify(Notifying::List)),
         NOTIFY_MINE => Ok(Command::Notify(Notifying::Mine {
             member: member.unwrap_or_default(),

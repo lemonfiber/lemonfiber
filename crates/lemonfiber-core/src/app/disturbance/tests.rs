@@ -83,10 +83,11 @@ fn a_teardown_that_does_not_wait_is_bounded_by_the_engines_grace() {
 
 #[test]
 fn stopping_named_services_is_the_same_stop() {
-    let command = Command::Halt {
+    let command = Command::Halt(crate::app::Halting {
         forms: Vec::new(),
         services: vec!["sonarr".to_owned()],
-    };
+        wait: crate::app::Waiting::Never,
+    });
 
     assert_eq!(of(&command, WAITED), Some(Disturbance::Bounded(GRACE)));
 }
@@ -269,10 +270,11 @@ fn the_payload_and_the_command_agree_on_every_length() {
             payload.stopping,
         ),
         (
-            Command::Halt {
+            Command::Halt(crate::app::Halting {
                 forms: forms(),
                 services: services(),
-            },
+                wait: crate::app::Waiting::Never,
+            }),
             payload.stopping,
         ),
         (
@@ -341,10 +343,11 @@ fn a_form_and_the_services_inside_it_are_held_to_the_same_clock() {
                 forms: forms.clone(),
                 wait: Waiting::Never,
             }),
-            Command::Halt {
+            Command::Halt(crate::app::Halting {
                 forms: forms.clone(),
                 services,
-            },
+                wait: crate::app::Waiting::Never,
+            }),
         ),
     ];
 

@@ -417,10 +417,11 @@ pub(super) fn beyond_the_command_line() -> Vec<(&'static str, Command)> {
         ),
         (
             "halt",
-            Command::Halt {
+            Command::Halt(lemonfiber_core::app::Halting {
                 forms: Vec::new(),
                 services: Vec::new(),
-            },
+                wait: lemonfiber_core::app::Waiting::Never,
+            }),
         ),
         (
             "config-get",
