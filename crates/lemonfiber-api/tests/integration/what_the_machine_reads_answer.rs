@@ -104,6 +104,14 @@ async fn how_the_surface_is_served_is_refused_where_nothing_was_settled() {
             && body.contains(&format!("\"code\":\"{}\"", NOT_SERVING.as_str()))),
         "a run that settled nothing answered as if it had"
     );
+    let listed = lemonfiber_api::contract::Contract::describe().refusals;
+    assert_eq!(
+        listed
+            .get(NOT_SERVING.as_str())
+            .map(|refusal| refusal.status),
+        Some(500),
+        "a code this read answers with is one the contract lists"
+    );
 }
 
 /// How the surface is served is answered from what the run settled, carrying no key, no

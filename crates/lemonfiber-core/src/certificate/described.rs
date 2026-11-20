@@ -34,6 +34,40 @@ const SHORT_NAMES: [(Oid<'static>, &str); 9] = [
     (OID_USERID, "UID"),
 ];
 
+/// The most names a description lists; how many more there are is said after them.
+const MOST_NAMES: usize = 64;
+
+/// The most characters, as written, any one text in a description holds; how many more
+/// there are is said after them.
+const LONGEST: usize = 512;
+
+/// The characters that lay text out rather than being shown, first and last of each run:
+/// Unicode's format characters, the line and paragraph separators and the direction
+/// overrides and isolates among them.
+const LAYING_OUT: [(char, char); 21] = [
+    ('\u{ad}', '\u{ad}'),
+    ('\u{600}', '\u{605}'),
+    ('\u{61c}', '\u{61c}'),
+    ('\u{6dd}', '\u{6dd}'),
+    ('\u{70f}', '\u{70f}'),
+    ('\u{890}', '\u{891}'),
+    ('\u{8e2}', '\u{8e2}'),
+    ('\u{180e}', '\u{180e}'),
+    ('\u{200b}', '\u{200f}'),
+    ('\u{2028}', '\u{202e}'),
+    ('\u{2060}', '\u{2064}'),
+    ('\u{2066}', '\u{206f}'),
+    ('\u{feff}', '\u{feff}'),
+    ('\u{fff9}', '\u{fffb}'),
+    ('\u{110bd}', '\u{110bd}'),
+    ('\u{110cd}', '\u{110cd}'),
+    ('\u{13430}', '\u{1343f}'),
+    ('\u{1bca0}', '\u{1bca3}'),
+    ('\u{1d173}', '\u{1d17a}'),
+    ('\u{e0001}', '\u{e0001}'),
+    ('\u{e0020}', '\u{e007f}'),
+];
+
 /// The characters RFC 4514 escapes wherever they stand in a value.
 const ESCAPED: [char; 7] = ['"', '+', ',', ';', '<', '>', '\\'];
 
@@ -87,18 +121,25 @@ pub(crate) fn dns_names(certificate: &X509Certificate<'_>) -> Vec<String> {
         .collect()
 }
 
-/// Every name `certificate` is made out to that can be written as text.
+/// Every name `certificate` is made out to that can be written as text, as each is shown,
+/// the first [`MOST_NAMES`] of them and how many more there are.
 fn names(certificate: &X509Certificate<'_>) -> Vec<String> {
-    alternative(certificate)
+    let mut names: Vec<String> = alternative(certificate)
         .into_iter()
         .filter_map(|name| match name {
             GeneralName::DNSName(text) | GeneralName::RFC822Name(text) | GeneralName::URI(text) => {
-                Some((*text).to_owned())
+                Some(bounded(&shown(text)))
             }
             GeneralName::IPAddress(octets) => address(octets),
             _ => None,
         })
-        .collect()
+        .collect();
+    if names.len() > MOST_NAMES {
+        let more = names.len() - MOST_NAMES;
+        names.truncate(MOST_NAMES);
+        names.push(format!("and {more} more"));
+    }
+    names
 }
 
 /// `certificate`'s subject alternative names, or none where it carries none it can read.
@@ -139,52 +180,109 @@ fn moment(moment: &ASN1Time) -> Instant {
     Instant::from_seconds(u64::try_from(moment.timestamp()).unwrap_or_default())
 }
 
-/// `name` as RFC 4514 writes a distinguished name: its last part first.
+/// `name` as RFC 4514 writes a distinguished name, its last part first, bounded as every
+/// text here is.
 fn written(name: &X509Name<'_>) -> String {
-    let mut parts: Vec<String> = name
+    let mut parts: Vec<Vec<String>> = name
         .iter()
-        .map(|part| part.iter().map(attribute).collect::<Vec<_>>().join("+"))
+        .map(|part| joined(part.iter().map(attribute).collect(), "+"))
         .collect();
     parts.reverse();
-    parts.join(",")
+    bounded(&joined(parts, ","))
 }
 
-/// One attribute as RFC 4514 writes it: its short name and its text where it has both, and
-/// otherwise its identifier and its encoding in hex.
-fn attribute(attribute: &AttributeTypeAndValue<'_>) -> String {
+/// `groups` one after another, with `between` between each two.
+fn joined(groups: Vec<Vec<String>>, between: &str) -> Vec<String> {
+    let mut units = Vec::new();
+    for (at, group) in groups.into_iter().enumerate() {
+        if at > 0 {
+            units.push(between.to_owned());
+        }
+        units.extend(group);
+    }
+    units
+}
+
+/// One attribute as RFC 4514 writes it, a written character at a time: its short name and
+/// its text where it has both, and otherwise its identifier and its encoding in hex.
+fn attribute(attribute: &AttributeTypeAndValue<'_>) -> Vec<String> {
     let short = SHORT_NAMES
         .iter()
         .find(|(named, _)| named == attribute.attr_type())
         .map(|(_, short)| *short);
     match (short, attribute.as_str()) {
-        (Some(short), Ok(text)) => format!("{short}={}", escaped(text)),
-        (short, _) => format!(
-            "{}=#{}",
-            short.map_or_else(|| attribute.attr_type().to_id_string(), str::to_owned),
-            attribute
+        (Some(short), Ok(text)) => std::iter::once(format!("{short}="))
+            .chain(escaped(text))
+            .collect(),
+        (short, _) => {
+            let named = short.map_or_else(|| attribute.attr_type().to_id_string(), str::to_owned);
+            let encoded = attribute
                 .attr_value()
                 .to_der_vec()
                 .map(|encoded| crate::secret::render(&encoded))
-                .unwrap_or_default()
-        ),
+                .unwrap_or_default();
+            std::iter::once(format!("{named}=#"))
+                .chain(encoded.chars().map(String::from))
+                .collect()
+        }
     }
 }
 
-/// `value` with what RFC 4514 escapes escaped.
-fn escaped(value: &str) -> String {
+/// `value` as RFC 4514 writes it, a character at a time: what it escapes escaped, and what
+/// is not shown written as its UTF-8 in hex.
+fn escaped(value: &str) -> Vec<String> {
     let last = value.chars().count().saturating_sub(1);
-    let mut written = String::with_capacity(value.len());
-    for (at, letter) in value.chars().enumerate() {
-        if letter == '\0' {
-            written.push_str("\\00");
-            continue;
+    value
+        .chars()
+        .enumerate()
+        .map(|(at, letter)| {
+            hidden(letter).unwrap_or_else(|| {
+                let leading = at == 0 && matches!(letter, ' ' | '#');
+                let trailing = at == last && letter == ' ';
+                if ESCAPED.contains(&letter) || leading || trailing {
+                    format!("\\{letter}")
+                } else {
+                    letter.to_string()
+                }
+            })
+        })
+        .collect()
+}
+
+/// `text` a character at a time, each as it is shown.
+fn shown(text: &str) -> Vec<String> {
+    text.chars()
+        .map(|letter| hidden(letter).unwrap_or_else(|| letter.to_string()))
+        .collect()
+}
+
+/// `letter` as its UTF-8 in hex, each byte `\xx` as RFC 4514 writes one, where it is a
+/// control character or one that lays text out rather than being shown; nothing otherwise.
+fn hidden(letter: char) -> Option<String> {
+    let lays_out = LAYING_OUT
+        .iter()
+        .any(|(first, last)| (*first..=*last).contains(&letter));
+    (letter.is_control() || lays_out).then(|| {
+        let mut bytes = [0; 4];
+        letter
+            .encode_utf8(&mut bytes)
+            .bytes()
+            .map(|byte| format!("\\{byte:02x}"))
+            .collect::<Vec<_>>()
+            .concat()
+    })
+}
+
+/// `units` written out, up to [`LONGEST`] characters, and how many more there are.
+fn bounded(units: &[String]) -> String {
+    let mut written = String::new();
+    let mut width = 0;
+    for (at, unit) in units.iter().enumerate() {
+        width += unit.chars().count();
+        if width > LONGEST {
+            return format!("{written}… and {} more", units.len() - at);
         }
-        let leading = at == 0 && matches!(letter, ' ' | '#');
-        let trailing = at == last && letter == ' ';
-        if ESCAPED.contains(&letter) || leading || trailing {
-            written.push('\\');
-        }
-        written.push(letter);
+        written.push_str(unit);
     }
     written
 }

@@ -1,6 +1,6 @@
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{last, record, Served, FILE};
+use super::{last, record, unwritten, Served, FILE, UNWRITTEN};
 
 /// What a run wrote is what pairing reads back.
 #[test]
@@ -181,10 +181,14 @@ async fn how_the_surface_is_served_carries_no_key_no_encoding_and_no_path() {
         &ctx,
     )
     .await;
+    let Ok(settled) = settled else {
+        unreachable!("a scratch directory keeps a certificate")
+    };
+    let debugged = format!("{settled:?}");
     let Some((certificate, key)) = settled
-        .ok()
-        .and_then(|report| report.presented)
-        .map(|kept| kept.presented())
+        .presented
+        .as_ref()
+        .map(crate::certificate::Kept::presented)
     else {
         unreachable!("an encrypted run presents a certificate")
     };
@@ -214,6 +218,70 @@ async fn how_the_surface_is_served_carries_no_key_no_encoding_and_no_path() {
     ] {
         let start: String = secret.chars().take(24).collect();
         assert!(!said.contains(&start), "the answer carries {what}: {said}");
+        assert!(
+            !debugged.contains(&start),
+            "the report prints {what}: {debugged}"
+        );
     }
     assert!(said.contains("\"certificate\":{"), "{said}");
+}
+
+/// Whatever the store refused with, why the record was not written names no path: the
+/// operating system's words where they name none, and this module's own otherwise.
+#[test]
+fn why_the_record_was_not_written_never_names_a_path() {
+    use crate::config::store::Failure;
+    let path = std::path::PathBuf::from("/home/someone/.config/lemonfiber/served.json");
+    let said = |reason: &str| reason.to_owned();
+    let refusals = [
+        (
+            Failure::NotWritten {
+                path: path.clone(),
+                reason: said("Permission denied (os error 13)"),
+            },
+            "Permission denied (os error 13)",
+        ),
+        (
+            Failure::Unreadable {
+                path: path.clone(),
+                reason: said("Is a directory (os error 21)"),
+            },
+            "Is a directory (os error 21)",
+        ),
+        (
+            Failure::NotWritten {
+                path: path.clone(),
+                reason: said("could not write /home/someone/.config/lemonfiber/served.json"),
+            },
+            UNWRITTEN,
+        ),
+        (
+            Failure::Unreadable {
+                path: path.clone(),
+                reason: said("C:\\Users\\someone\\served.json is locked"),
+            },
+            UNWRITTEN,
+        ),
+        (Failure::Nowhere, UNWRITTEN),
+        (
+            Failure::SpansLines {
+                path: path.clone(),
+                key: "PORT".to_owned(),
+            },
+            UNWRITTEN,
+        ),
+        (
+            Failure::TooNew {
+                path,
+                wrote: "9.0.0".to_owned(),
+                running: "0.18.0".to_owned(),
+            },
+            UNWRITTEN,
+        ),
+    ];
+    for (failure, expected) in refusals {
+        let told = unwritten(failure);
+        assert_eq!(told, expected);
+        assert!(!told.contains('/') && !told.contains('\\'), "{told}");
+    }
 }

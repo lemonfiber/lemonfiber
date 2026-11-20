@@ -159,14 +159,76 @@ fn what_is_not_one_certificate_is_described_as_nothing() {
 /// leading, a space trailing, and a nul.
 #[test]
 fn a_value_is_escaped_as_rfc_4514_writes_it() {
-    assert_eq!(escaped("plain"), "plain");
+    assert_eq!(escaped("plain").concat(), "plain");
     assert_eq!(
-        escaped("a,b+c;d<e>f\"g\\h"),
+        escaped("a,b+c;d<e>f\"g\\h").concat(),
         "a\\,b\\+c\\;d\\<e\\>f\\\"g\\\\h"
     );
-    assert_eq!(escaped("#lead"), "\\#lead");
-    assert_eq!(escaped(" both "), "\\ both\\ ");
-    assert_eq!(escaped("mid#dle"), "mid#dle");
-    assert_eq!(escaped("a\0b"), "a\\00b");
-    assert_eq!(escaped(""), "");
+    assert_eq!(escaped("#lead").concat(), "\\#lead");
+    assert_eq!(escaped(" both ").concat(), "\\ both\\ ");
+    assert_eq!(escaped("mid#dle").concat(), "mid#dle");
+    assert_eq!(escaped("a\0b").concat(), "a\\00b");
+    assert_eq!(escaped("").concat(), "");
+}
+
+/// A certificate made out to `common` and to `names`, signed by its own key.
+fn made_out_to(common: &str, names: Vec<String>) -> Option<Described> {
+    let mut params = CertificateParams::new(names).ok()?;
+    params.distinguished_name = rcgen::DistinguishedName::new();
+    params.distinguished_name.push(
+        DnType::CommonName,
+        rcgen::DnValue::Utf8String(common.to_owned()),
+    );
+    let key = KeyPair::generate().ok()?;
+    let certificate = params.self_signed(&key).ok()?;
+    described(certificate.der())
+}
+
+/// What a terminal or a phone would act on rather than show is written as its UTF-8 in hex,
+/// in a name and in what the certificate is made out to: an escape, a carriage return and a
+/// line feed, a nul, and a direction override.
+#[test]
+fn what_would_be_acted_on_rather_than_shown_is_written_in_hex() {
+    let read = made_out_to(
+        "evil\u{1b}[31m\r\nname\0\u{202e}gpj.exe",
+        vec!["host\u{1b}\r\n.example".to_owned()],
+    );
+    let Some(read) = read else {
+        unreachable!("rcgen makes a certificate out to any text")
+    };
+    assert_eq!(
+        read.subject,
+        "CN=evil\\1b[31m\\0d\\0aname\\00\\e2\\80\\aegpj.exe"
+    );
+    assert_eq!(read.names, vec!["host\\1b\\0d\\0a.example".to_owned()]);
+    for text in [&read.subject, &read.issuer].into_iter().chain(&read.names) {
+        assert!(
+            !text
+                .chars()
+                .any(|letter| letter.is_control() || letter == '\u{202e}'),
+            "{text:?}"
+        );
+    }
+}
+
+/// However many names a certificate is made out to, the description lists the first
+/// sixty-four and says how many more there are.
+#[test]
+fn a_certificate_made_out_to_many_names_lists_the_first_and_counts_the_rest() {
+    let names: Vec<String> = (0..70).map(|at| format!("host{at}.example")).collect();
+    let read = made_out_to(HOUSE, names).map(|read| read.names);
+    let Some(read) = read else {
+        unreachable!("rcgen makes a certificate out to seventy names")
+    };
+    assert_eq!(read.len(), 65);
+    assert_eq!(read.first().map(String::as_str), Some("host0.example"));
+    assert_eq!(read.last().map(String::as_str), Some("and 6 more"));
+}
+
+/// However long a name is, the description holds the first of it and says how much more
+/// there is.
+#[test]
+fn a_long_name_is_cut_and_says_how_much_more_there_is() {
+    let read = made_out_to(&"a".repeat(600), vec![HOUSE.to_owned()]).map(|read| read.subject);
+    assert_eq!(read, Some(format!("CN={}… and 91 more", "a".repeat(509))));
 }

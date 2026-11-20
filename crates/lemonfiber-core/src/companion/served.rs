@@ -12,6 +12,10 @@ use serde::Deserialize;
 
 use crate::config::store::Failure;
 
+/// Every refusal reading how the surface is served answers with, which a client names by
+/// its code: a surface asked before its run settled how it serves.
+pub const REFUSALS: [crate::error::Code; 1] = [crate::error::codes::serve::NOT_SERVING];
+
 /// Where it is written, beside the certificate.
 const FILE: &str = "served.json";
 
@@ -43,10 +47,20 @@ pub fn record(directory: &Path, served: Served) -> Result<(), String> {
         "{{\n  \"port\": {},\n  \"encrypted\": {},\n  \"network\": {}\n}}\n",
         served.port, served.encrypted, served.network
     );
-    crate::config::store::write(&directory.join(FILE), &text).map_err(|why| match why {
-        Failure::NotWritten { reason, .. } | Failure::Unreadable { reason, .. } => reason,
+    crate::config::store::write(&directory.join(FILE), &text).map_err(unwritten)
+}
+
+/// Why the record was not written, in the operating system's words where those name no
+/// path, and in this module's own where they might.
+fn unwritten(why: Failure) -> String {
+    match why {
+        Failure::NotWritten { reason, .. } | Failure::Unreadable { reason, .. }
+            if !reason.contains(['/', '\\']) =>
+        {
+            reason
+        }
         _ => UNWRITTEN.to_owned(),
-    })
+    }
 }
 
 /// How the surface was last served, or nothing where no run wrote it down or what was
