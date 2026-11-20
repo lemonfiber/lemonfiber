@@ -60,7 +60,16 @@ pub(crate) fn is_stored(name: &str) -> bool {
     is_named(name)
         || crate::outbound::behalf::switched(name).is_some()
         || own::is_core(name)
-        || lemonfiber_manifest::container::PUBLISHED.contains(&name)
+        || (lemonfiber_manifest::container::PUBLISHED.contains(&name)
+            && published_from(name).is_none())
+}
+
+/// The name a core-published setting is held under, where it is held under another.
+pub(crate) fn published_from(name: &str) -> Option<&'static str> {
+    own::PUBLISHED_FROM
+        .iter()
+        .find(|(published, _)| *published == name)
+        .map(|(_, held)| *held)
 }
 
 pub(crate) fn in_namespace(name: &str, namespace: &str) -> bool {

@@ -79,10 +79,12 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
         return Err(Box::new(already_set_up()));
     }
 
-    let mut wizard = saved.map_or_else(
-        || Wizard::new(ctx.environment),
-        |progress| Wizard::resume(ctx.environment, progress),
-    );
+    let mut wizard = saved
+        .map_or_else(
+            || Wizard::new(ctx.environment),
+            |progress| Wizard::resume(ctx.environment, progress),
+        )
+        .proposing(proposed(ctx));
     let guard = super::guard(ctx);
 
     let mut proof = super::proving::Proof::default();
@@ -152,13 +154,22 @@ pub async fn setup(ctx: &Ctx, action: SetupAction) -> Result<WizardReport, Box<P
                 // beginning — and a report still reading them off the wizard in hand
                 // would describe a run that no longer exists anywhere.
                 if choice == Choice::StartOver {
-                    wizard = Wizard::new(ctx.environment);
+                    wizard = Wizard::new(ctx.environment).proposing(proposed(ctx));
                 }
             }
         }
     }
 
     Ok(reported(&wizard, &paths, proof, guard.as_ref()))
+}
+
+/// The house's zone and locale setup proposes: the host's own, from the zone its clock
+/// keeps and what its `LANG` names.
+fn proposed(ctx: &Ctx) -> crate::wizard::House {
+    crate::wizard::House {
+        zone: crate::zone::Zone::proposed(ctx.settings.host_zone.as_deref()),
+        locale: crate::locale::Locale::proposed(ctx.settings.host_locale.as_deref()),
+    }
 }
 
 /// Keep what has been answered so far, unless this run is only saying what it would do.
@@ -234,6 +245,7 @@ fn reported(
         phase: wizard.phase(),
         at: wizard.at(),
         asks: wizard.at().is_question(),
+        house: wizard.house().clone(),
         unanswered: wizard.unanswered(),
         ready_for_review: wizard.ready_for_review(),
         // Withheld the way `config show` withholds, through the same rule: this is

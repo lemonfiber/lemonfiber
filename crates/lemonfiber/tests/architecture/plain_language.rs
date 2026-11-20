@@ -263,9 +263,11 @@ fn unexplained_acronyms(said: &str) -> Vec<String> {
     }
     outside_shouting(&prose)
         .split_whitespace()
-        // An error code is looked up rather than read, and a path, a variable name or
-        // a setting given a value is not addressed to anybody.
-        .filter(|word| !is_a_code(word) && !word.contains('_') && !word.contains('/'))
+        // An error code is looked up rather than read, a language tag is typed as it
+        // is written, and a path, a variable name or a setting given a value is not
+        // addressed to anybody.
+        .filter(|word| !is_a_code(word) && !is_a_language_tag(word))
+        .filter(|word| !word.contains('_') && !word.contains('/'))
         .filter(|word| !word.contains('='))
         .flat_map(capitals)
         .filter(|short| !ORDINARY.contains(&short.as_str()))
@@ -355,6 +357,19 @@ fn is_a_code(word: &str) -> bool {
         && letters.chars().all(|letter| letter.is_ascii_uppercase())
         && !number.is_empty()
         && number.chars().all(|letter| letter.is_ascii_digit())
+}
+
+/// Whether this is a language tag — a language in lower case, a dash, and a region in
+/// capitals, as `en-US` is.
+fn is_a_language_tag(word: &str) -> bool {
+    let trimmed = word.trim_matches(|letter: char| !letter.is_ascii_alphanumeric());
+    let Some((language, region)) = trimmed.split_once('-') else {
+        return false;
+    };
+    (2..=3).contains(&language.len())
+        && language.chars().all(|letter| letter.is_ascii_lowercase())
+        && region.len() == 2
+        && region.chars().all(|letter| letter.is_ascii_uppercase())
 }
 
 /// Every run of two or more capitals in a word, with names left out.

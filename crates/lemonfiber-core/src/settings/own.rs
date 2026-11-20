@@ -50,7 +50,19 @@ pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
 /// The domain the household's names are under.
 pub(crate) const DOMAIN: &str = lemonfiber_manifest::container::DOMAIN;
 
-pub(crate) const CORE: [&str; 9] = [
+/// The house's language and region.
+pub(crate) const LOCALE: &str = crate::locale::SETTING;
+
+/// Each core-published setting held under another name, with that name.
+pub(crate) const PUBLISHED_FROM: [(&str, &str); 2] = [
+    (
+        lemonfiber_manifest::container::TIMEZONE,
+        crate::config::ZONE_KEY,
+    ),
+    (lemonfiber_manifest::container::LOCALE, LOCALE),
+];
+
+pub(crate) const CORE: [&str; 10] = [
     DEVICE_KEY_APPS,
     DASHBOARD_SEARCH,
     GUIDE_HOURS,
@@ -59,6 +71,7 @@ pub(crate) const CORE: [&str; 9] = [
     CODES_PERIOD,
     CODES_BY_ADDRESS,
     DOMAIN,
+    LOCALE,
     crate::plex_link::SETTING,
 ];
 
@@ -91,6 +104,9 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
                  or http address the terms are appended to, and {value} is not one"
             )
         });
+    }
+    if name == LOCALE {
+        return crate::locale::Locale::read(value).err();
     }
     if name == GUIDE_HOURS {
         return guide_hours(value).err();

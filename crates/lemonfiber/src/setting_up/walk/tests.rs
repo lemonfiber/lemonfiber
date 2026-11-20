@@ -204,6 +204,9 @@ impl Prompt for Scripted {
     fn autostart(&self) -> bool {
         false
     }
+    fn house(&self, proposed: &lemonfiber_core::wizard::House) -> lemonfiber_core::wizard::House {
+        proposed.clone()
+    }
     fn confirm(&self, plan: &[SettingReport]) -> bool {
         *self.reviewed.borrow_mut() = plan.to_vec();
         self.confirms

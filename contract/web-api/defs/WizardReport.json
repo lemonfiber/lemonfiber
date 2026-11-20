@@ -18,6 +18,10 @@
         "$ref": "GuardQuestion.json"
       }
     },
+    "house": {
+      "description": "The house's zone and locale: the ones the operator confirmed or gave, or the ones\nproposed from the host's where none are yet.",
+      "$ref": "SetupHouse.json"
+    },
     "offered": {
       "description": "Whether this machine has setup left to do. False once configuration\nexists and nothing is part-way through, which is when a surface directs\nthe operator to reconfiguration instead of asking the first question again.",
       "type": "boolean"
@@ -87,6 +91,7 @@
     "phase",
     "at",
     "asks",
+    "house",
     "unanswered",
     "ready_for_review",
     "plan",

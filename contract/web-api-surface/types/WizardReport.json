@@ -18,6 +18,12 @@
       ],
       "required": true
     },
+    "house": {
+      "type": [
+        "ref:SetupHouse"
+      ],
+      "required": true
+    },
     "offered": {
       "type": [
         "boolean"

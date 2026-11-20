@@ -38,6 +38,16 @@
       {
         "choices": null,
         "environment": null,
+        "name": "LEMONFIBER_LOCALE",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
         "name": "LEMONFIBER_SIGN_IN_CODES_BY_ADDRESS",
         "readers": [],
         "value": null,

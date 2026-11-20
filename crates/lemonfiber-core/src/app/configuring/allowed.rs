@@ -9,7 +9,7 @@
 //! their own.
 
 use crate::config::{
-    env::EnvFile, BESIDE_KEY, DATA_ROOT_KEY, OVERLAY_KEY, PGID_KEY, PUID_KEY, SETTINGS,
+    env::EnvFile, BESIDE_KEY, DATA_ROOT_KEY, OVERLAY_KEY, PGID_KEY, PUID_KEY, SETTINGS, ZONE_KEY,
 };
 use crate::stack::Source;
 
@@ -34,6 +34,7 @@ pub(super) async fn refusal(ctx: &Ctx, held: &EnvFile, key: &str, value: &str) -
     match key {
         DATA_ROOT_KEY => super::data_root::refusal(ctx, value).await,
         PUID_KEY | PGID_KEY => identity(key, value),
+        ZONE_KEY => crate::zone::Zone::read(value).err(),
         BESIDE_KEY => beside(value),
         _ => crate::config::resending::refusal(key, value)
             .or_else(|| crate::config::healing::refusal(key, value))

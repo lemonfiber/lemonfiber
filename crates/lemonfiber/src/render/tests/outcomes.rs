@@ -10,6 +10,7 @@ fn part_way() -> WizardReport {
         phase: Phase::InProgress,
         at: Step::DataLocation,
         asks: true,
+        house: lemonfiber_core::wizard::House::default(),
         unanswered: vec![Step::DataLocation, Step::Library],
         ready_for_review: false,
         plan: Vec::new(),
@@ -206,6 +207,7 @@ fn a_complete_set_of_answers_shows_what_applying_would_write() {
     let said = standing(&WizardReport {
         at: Step::Review,
         asks: false,
+        house: lemonfiber_core::wizard::House::default(),
         unanswered: Vec::new(),
         ready_for_review: true,
         plan: vec![SettingReport {

@@ -228,6 +228,10 @@ pub struct Settings {
     /// which leaves nothing to pair with rather than a certificate made somewhere else
     /// every run.
     pub companion: Option<PathBuf>,
+    /// What the host's `LANG` names, which setup proposes the house's locale from.
+    pub host_locale: Option<String>,
+    /// The zone the host's clock keeps, which setup proposes the stack's from.
+    pub host_zone: Option<String>,
     /// The address the operator recorded for the household's own links.
     ///
     /// Where the front door is reached from another device in the house, on a
@@ -358,6 +362,8 @@ impl Default for Settings {
             indexer: None,
             admission: None,
             companion: None,
+            host_locale: None,
+            host_zone: None,
             household_host: None,
             events_address: None,
             household_domain: None,

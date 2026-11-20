@@ -32,6 +32,9 @@ pub(crate) fn settings_takes(name: &str, read: bool) -> Result<(), Box<Problem>>
     if own::is_configs(name) {
         return Err(Box::new(taken(name, "lemonfiber config set")));
     }
+    if let Some(held) = super::published_from(name) {
+        return Err(Box::new(published(name, held)));
+    }
     if read || own::is_core(name) {
         return Ok(());
     }
@@ -102,6 +105,23 @@ pub(crate) fn timed(
         ),
         Remedy::new("Give the value in that form"),
     )))
+}
+
+fn published(name: &str, held: &str) -> Problem {
+    let command = if own::is_core(held) {
+        format!("lemonfiber settings set {held}=<value>")
+    } else {
+        format!("lemonfiber config set {held} <value>")
+    };
+    Problem::new(
+        TAKEN_ELSEWHERE,
+        format!("{name} is published from {held}"),
+        format!(
+            "Nothing was changed. The core publishes {name} to every service as {held} holds \
+             it, so {held} is the one to change."
+        ),
+        Remedy::new(format!("Change {held}")).with_detail(command),
+    )
 }
 
 fn taken(name: &str, command: &str) -> Problem {

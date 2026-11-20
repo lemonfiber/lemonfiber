@@ -340,3 +340,47 @@ fn the_sign_in_code_limits_are_those_recorded_or_their_defaults_where_none_or_no
     ]));
     assert_eq!(crate::settings::sign_in_codes(&ctx), defaults);
 }
+
+#[test]
+fn the_house_s_locale_is_a_core_setting_taking_a_language_region_tag() {
+    use crate::settings::own::LOCALE;
+    assert!(is_core(LOCALE));
+    assert_eq!(refusal(LOCALE, "nl-NL"), None);
+    assert!(refusal(LOCALE, "nl_NL.UTF-8").is_some_and(
+        |said| said.starts_with(LOCALE) && said.contains("language and region as one tag")
+    ));
+}
+
+#[test]
+fn the_zone_and_the_locale_are_published_from_what_holds_them_and_not_written_as_themselves() {
+    use lemonfiber_manifest::container::{DOMAIN as PUBLISHED_DOMAIN, LOCALE, TIMEZONE};
+    assert_eq!(
+        crate::settings::published_from(TIMEZONE),
+        Some(crate::config::ZONE_KEY)
+    );
+    assert_eq!(
+        crate::settings::published_from(LOCALE),
+        Some(crate::settings::own::LOCALE)
+    );
+    assert_eq!(crate::settings::published_from(PUBLISHED_DOMAIN), None);
+    assert!(crate::settings::is_stored(PUBLISHED_DOMAIN));
+    assert!(!crate::settings::is_stored(TIMEZONE));
+    assert!(!crate::settings::is_stored(LOCALE));
+    for (name, command) in [
+        (TIMEZONE, "lemonfiber config set TZ <value>"),
+        (LOCALE, "lemonfiber settings set LEMONFIBER_LOCALE=<value>"),
+    ] {
+        for read in [true, false] {
+            let refused = crate::settings::fences::settings_takes(name, read).err();
+            assert_eq!(
+                refused.as_ref().map(|problem| problem.code),
+                Some(crate::error::codes::setting::TAKEN_ELSEWHERE),
+                "{name}"
+            );
+            assert!(
+                refused.is_some_and(|problem| format!("{problem:?}").contains(command)),
+                "{name}"
+            );
+        }
+    }
+}

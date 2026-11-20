@@ -2,12 +2,14 @@ use std::path::{Path, PathBuf};
 
 use lemonfiber_core::app::setup::Asking;
 use lemonfiber_core::config::{store, Protocols};
+use lemonfiber_core::locale::Locale;
 use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::origin::Origin;
 use lemonfiber_core::platform::Environment;
 use lemonfiber_core::prerequisites::prerequisites;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Answer, Indexer, Library, Plan, Provider};
+use lemonfiber_core::wizard::{Answer, House, Indexer, Library, Plan, Provider};
+use lemonfiber_core::zone::Zone;
 
 use super::{reviewed, Terminal};
 use crate::prompt::fixtures::{answered, answered_watching, wizard, Script};
@@ -187,6 +189,18 @@ fn a_run_with_prerequisites_waits_on_the_operator_and_one_with_none_does_not() {
         unasked.borrow().is_empty(),
         "the operator was shown a list and not waited on"
     );
+}
+
+#[test]
+fn the_house_takes_what_is_proposed_unless_told_and_asks_again_until_what_is_told_reads() {
+    let proposed = House {
+        zone: Zone::proposed(Some("Asia/Tokyo")),
+        locale: Locale::proposed(Some("ja_JP.UTF-8")),
+    };
+    assert_eq!(answered(&["", ""]).house(&proposed), proposed);
+    let told = answered(&["Mars/Olympus", "America/Chicago", "english", "en-US"]).house(&proposed);
+    assert_eq!(told.zone.as_str(), "America/Chicago");
+    assert_eq!(told.locale.as_str(), "en-US");
 }
 
 #[test]

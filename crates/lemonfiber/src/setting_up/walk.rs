@@ -113,6 +113,9 @@ async fn walking(
                 step(ctx, SetupAction::Apply).await?;
                 return Ok(Walked::Applied);
             }
+            Step::Preflight if report.asks => {
+                answer(ctx, Answer::House(prompt.house(&report.house))).await?
+            }
             Step::Protocols if asked => {
                 let protocols = prompt.protocols();
                 prompt.prerequisites(&prerequisites(protocols));
@@ -186,7 +189,7 @@ async fn credentials(ctx: &Ctx, prompt: &dyn Prompt) -> Result<WizardReport, End
         }));
         let report = answer(ctx, given).await?;
         match settled(ctx, prompt, report).await? {
-            Settled::Kept(report) => return Ok(report),
+            Settled::Kept(report) => return Ok(*report),
             Settled::Again => {}
             Settled::Unset => return answer(ctx, Answer::Credentials(None)).await,
         }
@@ -210,7 +213,7 @@ async fn provider(ctx: &Ctx, prompt: &dyn Prompt) -> Result<WizardReport, Ended>
         }));
         let report = answer(ctx, given).await?;
         match settled(ctx, prompt, report).await? {
-            Settled::Kept(report) => return Ok(report),
+            Settled::Kept(report) => return Ok(*report),
             Settled::Again => {}
             Settled::Unset => return answer(ctx, Answer::Provider(None)).await,
         }
@@ -220,7 +223,7 @@ async fn provider(ctx: &Ctx, prompt: &dyn Prompt) -> Result<WizardReport, Ended>
 /// What the operator made of a credential's live test.
 enum Settled {
     /// Kept, proven or not, with where the walk now stands.
-    Kept(WizardReport),
+    Kept(Box<WizardReport>),
     /// Taken back, to be entered again.
     Again,
     /// Taken back, to be left unset.
@@ -238,10 +241,10 @@ async fn settled(ctx: &Ctx, prompt: &dyn Prompt, report: WizardReport) -> Result
         other => other.as_ref(),
     };
     let Some(outcome) = failed else {
-        return Ok(Settled::Kept(report));
+        return Ok(Settled::Kept(Box::new(report)));
     };
     match prompt.credential_failed(outcome) {
-        CredentialChoice::Proceed => Ok(Settled::Kept(report)),
+        CredentialChoice::Proceed => Ok(Settled::Kept(Box::new(report))),
         CredentialChoice::Retry => {
             step(ctx, SetupAction::Back).await?;
             Ok(Settled::Again)

@@ -11,10 +11,11 @@ use crate::cli::RawSetup;
 use lemonfiber_core::alert::Appetite;
 use lemonfiber_core::app::setup::Asking;
 use lemonfiber_core::config::Protocols;
+use lemonfiber_core::locale::Locale;
 use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Guarded, Library, Step};
+use lemonfiber_core::wizard::{Guarded, House, Library, Step};
 
 use super::{CredentialChoice, Prompt, ProviderEntry};
 
@@ -116,6 +117,7 @@ pub struct SetupFlags {
     household: Option<bool>,
     notifications: Option<Appetite>,
     autostart: Option<bool>,
+    locale: Option<Locale>,
 }
 
 impl SetupFlags {
@@ -139,6 +141,7 @@ impl SetupFlags {
             household: None,
             notifications: None,
             autostart: None,
+            locale: None,
         }
     }
 
@@ -203,6 +206,10 @@ impl SetupFlags {
                 .map(|value| parse_appetite(&value))
                 .transpose()?,
             autostart: raw.autostart,
+            locale: raw
+                .locale
+                .map(|value| Locale::read(&value).map_err(|why| format!("--locale: {why}")))
+                .transpose()?,
         })
     }
 
@@ -345,6 +352,16 @@ impl Prompt for Flags {
     }
     fn autostart(&self) -> bool {
         self.flags.autostart.unwrap_or(false)
+    }
+    fn house(&self, proposed: &House) -> House {
+        House {
+            zone: proposed.zone.clone(),
+            locale: self
+                .flags
+                .locale
+                .clone()
+                .unwrap_or_else(|| proposed.locale.clone()),
+        }
     }
     fn confirm(&self, _plan: &[SettingReport]) -> bool {
         self.flags.yes

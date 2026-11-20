@@ -81,10 +81,29 @@ impl Resolved {
     }
 
     pub(crate) fn setting(&self, name: &str) -> Option<String> {
+        if let Some(held) = super::published_from(name) {
+            return Some(self.published(name, held));
+        }
         match self.changing.get(name) {
             Some(value) => value.clone(),
             None => self.recorded.value(name).map(str::to_owned),
         }
+    }
+
+    fn published(&self, name: &str, held: &str) -> String {
+        if name == lemonfiber_manifest::container::LOCALE {
+            return self
+                .setting(held)
+                .and_then(|tag| crate::locale::Locale::read(&tag).ok())
+                .unwrap_or_default()
+                .to_string();
+        }
+        self.recorded
+            .line(held)
+            .map(str::trim)
+            .filter(|zone| !zone.is_empty())
+            .unwrap_or(crate::config::DEFAULT_ZONE)
+            .to_owned()
     }
 
     pub(crate) fn secrets_file(&self, service: &str) -> Option<PathBuf> {

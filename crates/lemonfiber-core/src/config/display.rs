@@ -278,6 +278,10 @@ pub const SHOWN: &[(&str, &str)] = &[
         "schedules and log timestamps are read in this zone",
     ),
     (
+        crate::locale::SETTING,
+        "the language and region a service presenting the house to the outside says it has",
+    ),
+    (
         super::LAN_BIND_KEY,
         "the address the household tier is published on, which an operator narrows by hand",
     ),

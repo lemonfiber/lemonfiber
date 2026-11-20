@@ -27,7 +27,9 @@ pub enum Step {
     /// States what is about to happen and roughly how long it takes. Informs.
     #[default]
     Welcome,
-    /// Detects the environment: OS, Docker, Compose, daemon reachability. Informs.
+    /// Detects the environment: OS, Docker, Compose, daemon reachability; and proposes
+    /// the house's zone and locale from the host's, for the operator to confirm or
+    /// change.
     Preflight,
     /// The account checklist derived from the protocol choice. Informs.
     Prerequisites,
@@ -186,7 +188,8 @@ impl Step {
     pub(crate) const fn is_question(self) -> bool {
         matches!(
             self,
-            Self::Protocols
+            Self::Preflight
+                | Self::Protocols
                 | Self::Vpn
                 | Self::DataLocation
                 | Self::Credentials

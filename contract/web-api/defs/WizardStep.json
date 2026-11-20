@@ -8,7 +8,7 @@
       "const": "welcome"
     },
     {
-      "description": "Detects the environment: OS, Docker, Compose, daemon reachability. Informs.",
+      "description": "Detects the environment: OS, Docker, Compose, daemon reachability; and proposes\nthe house's zone and locale from the host's, for the operator to confirm or\nchange.",
       "type": "string",
       "const": "preflight"
     },

@@ -20,7 +20,7 @@ use crate::config::{
     Protocols, DATA_ROOT_KEY, INDEXER_APIKEY_KEY, INDEXER_URL_KEY, INDEXER_VALIDATED_KEY,
     MEDIA_SERVER_MODE_KEY, PGID_KEY, PROVIDER_HOST_KEY, PROVIDER_PASS_KEY, PROVIDER_PORT_KEY,
     PROVIDER_TLS_KEY, PROVIDER_USER_KEY, PROVIDER_VALIDATED_KEY, PUID_KEY, TORRENT_KEY, USENET_KEY,
-    VPN_KEY,
+    VPN_KEY, ZONE_KEY,
 };
 use crate::journal::{Change, Journal, Kind, Undo};
 use crate::platform::Environment;
@@ -31,8 +31,8 @@ mod recovery;
 mod steps;
 
 pub use answers::{
-    Answer, Answers, ContainerUser, Credentials, Guarded, Indexer, Library, Provider, Rejected,
-    Usenet, Vpn,
+    Answer, Answers, ContainerUser, Credentials, Guarded, House, Indexer, Library, Provider,
+    Rejected, Usenet, Vpn,
 };
 pub use plan::{on_off, Plan, APPLY, ENV_FILE};
 pub use recovery::{described, Choice, Recovery, Resolution, Status};
@@ -44,6 +44,7 @@ pub use steps::{offer_setup, opened_by, Direction, Phase, Progress, Step};
 pub struct Wizard {
     environment: Environment,
     progress: Progress,
+    proposed: House,
 }
 
 impl Wizard {
@@ -53,7 +54,28 @@ impl Wizard {
         Self {
             environment,
             progress: Progress::default(),
+            proposed: House::default(),
         }
+    }
+
+    /// This wizard, proposing `house` as the house's zone and locale where none are
+    /// answered.
+    #[must_use]
+    pub fn proposing(self, house: House) -> Self {
+        Self {
+            proposed: house,
+            ..self
+        }
+    }
+
+    /// The house's zone and locale: the ones answered, or the ones proposed.
+    #[must_use]
+    pub fn house(&self) -> &House {
+        self.progress
+            .answers
+            .house
+            .as_ref()
+            .unwrap_or(&self.proposed)
     }
 
     /// A wizard restored to where a previous run left off.
@@ -68,6 +90,7 @@ impl Wizard {
         let mut wizard = Self {
             environment,
             progress,
+            proposed: House::default(),
         };
         wizard.reconcile();
         wizard
@@ -152,6 +175,7 @@ impl Wizard {
     /// is mapped away.
     pub fn answer(&mut self, answer: Answer) -> Result<(), Rejected> {
         match answer {
+            Answer::House(house) => self.progress.answers.house = Some(house),
             Answer::Protocols(protocols) => self.progress.answers.protocols = Some(protocols),
             Answer::Vpn(vpn) => self.progress.answers.vpn = Some(vpn),
             Answer::DataLocation(path) => self.progress.answers.data_location = Some(path),
@@ -256,7 +280,8 @@ impl Wizard {
             Step::Household => answers.household.is_some(),
             Step::Notifications => answers.notifications.is_some(),
             Step::Autostart => answers.autostart.is_some(),
-            // Informing steps have no answer to hold.
+            // Informing steps have no answer to hold, and the house's zone and locale
+            // stand as proposed until the operator gives others.
             Step::Welcome | Step::Preflight | Step::Prerequisites | Step::Review => true,
         }
     }
@@ -311,7 +336,11 @@ impl Wizard {
     /// household choice is applied by its own feature.
     #[must_use]
     pub fn plan(&self) -> Plan {
-        let mut settings = Vec::new();
+        let house = self.house();
+        let mut settings = vec![
+            (ZONE_KEY.to_owned(), house.zone.to_string()),
+            (crate::locale::SETTING.to_owned(), house.locale.to_string()),
+        ];
         let answers = &self.progress.answers;
         if let Some(protocols) = answers.protocols {
             settings.push((USENET_KEY.to_owned(), on_off(protocols.usenet)));

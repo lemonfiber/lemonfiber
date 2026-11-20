@@ -113,6 +113,7 @@
       "Library",
       "ListedDeviceKey",
       "ListedPushEndpoint",
+      "Locale",
       "Location",
       "LogsReport",
       "MonitorKind",
@@ -212,6 +213,7 @@
       "SettingsReport",
       "SettledReport",
       "SetupGuarded",
+      "SetupHouse",
       "SetupVpn",
       "SetupVpnCarrying",
       "SetupVpnSaid",
@@ -255,7 +257,8 @@
       "WatcherReport",
       "Wedge",
       "Wedged",
-      "Why"
+      "Why",
+      "Zone"
     ],
     "removed": [
       "Api",
