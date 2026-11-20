@@ -87,10 +87,10 @@ pub struct Described {
     /// Whether it was signed by its own key under its own name.
     pub self_signed: bool,
     /// The names it is made out to, its subject alternative names, each whole; those too
-    /// many or too long to show are left out.
+    /// many or too long to show, or not written as text, are left out.
     pub names: Vec<String>,
     /// How many of the names it is made out to are left out, being too many or too long to
-    /// show.
+    /// show, or not written as text.
     pub names_more: usize,
     /// When it begins to hold.
     pub valid_from: Instant,
@@ -137,13 +137,12 @@ pub(crate) fn dns_names(certificate: &X509Certificate<'_>) -> Vec<String> {
         .collect()
 }
 
-/// Every name `certificate` is made out to that can be written as text, as each is shown:
-/// the first [`MOST_NAMES`] of those no longer than [`LONGEST`] characters, and how many
-/// are left out.
+/// The names `certificate` is made out to, as each is shown: the first [`MOST_NAMES`] of
+/// those written as text no longer than [`LONGEST`] characters, and how many are left out.
 fn names(certificate: &X509Certificate<'_>) -> Named {
-    let all: Vec<Bounded> = alternative(certificate)
+    let all: Vec<Option<Bounded>> = alternative(certificate)
         .into_iter()
-        .filter_map(|name| match name {
+        .map(|name| match name {
             GeneralName::DNSName(text) | GeneralName::RFC822Name(text) | GeneralName::URI(text) => {
                 Some(bounded(&shown(text)))
             }
@@ -156,6 +155,7 @@ fn names(certificate: &X509Certificate<'_>) -> Named {
     let count = all.len();
     let kept: Vec<String> = all
         .into_iter()
+        .flatten()
         .filter(|name| !name.cut)
         .map(|name| name.text)
         .take(MOST_NAMES)

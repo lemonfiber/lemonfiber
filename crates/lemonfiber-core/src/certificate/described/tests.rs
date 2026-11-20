@@ -244,3 +244,41 @@ fn a_long_subject_is_cut_and_says_so() {
         .map(|read| (read.subject_cut, read.issuer_cut, read.names_more));
     assert_eq!(short, Some((false, false, 0)));
 }
+
+/// Each kind of name written as text is listed as it is written, and one that is not text
+/// is left out and counted.
+#[test]
+fn every_name_written_as_text_is_listed_and_one_that_is_not_is_counted() {
+    let mut params = CertificateParams::new(vec![HOUSE.to_owned()]).ok();
+    let added = params.as_mut().and_then(|params| {
+        let mail = "operator@house.example".try_into().ok()?;
+        let uri = "https://house.example/".try_into().ok()?;
+        params.subject_alt_names.extend([
+            SanType::Rfc822Name(mail),
+            SanType::URI(uri),
+            SanType::IpAddress(AT_HOME),
+            SanType::IpAddress(IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)),
+            SanType::OtherName((vec![1, 3, 6, 1, 4, 1, 311, 20, 2, 3], "upn".into())),
+        ]);
+        Some(())
+    });
+    assert_eq!(added, Some(()));
+    let read = params
+        .zip(KeyPair::generate().ok())
+        .and_then(|(params, key)| params.self_signed(&key).ok())
+        .and_then(|certificate| described(certificate.der()))
+        .map(|read| (read.names, read.names_more));
+    assert_eq!(
+        read,
+        Some((
+            vec![
+                HOUSE.to_owned(),
+                "operator@house.example".to_owned(),
+                "https://house.example/".to_owned(),
+                AT_HOME.to_string(),
+                "::1".to_owned(),
+            ],
+            1
+        ))
+    );
+}
