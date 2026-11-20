@@ -10,8 +10,10 @@ use toml::{Table, Value};
 
 const CATALOGUE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/plugins");
 
-/// The fields of an installed part's upstream service its stack service does not carry.
-const PLUGIN_ONLY: [&str; 5] = ["replaces", "native", "env", "speaks", "contract"];
+/// The fields of an installed part's upstream service this test reads apart from the rest:
+/// what it replaces, which names the stack service it becomes, and its environment, whose
+/// secrets are held to what the copy declares.
+const READ_APART: [&str; 2] = ["replaces", "env"];
 
 /// Each variable a part takes from a secret it declares, as its service, the variable
 /// and the secret: the media stack's own services declare none of them.
@@ -128,12 +130,17 @@ fn an_installed_part_is_embedded_as_its_copy_declares_the_service_it_takes_the_p
             .unwrap_or_default();
         assert!(!declared.is_empty(), "{}", one.pin.id);
         for (field, value) in &declared {
-            if PLUGIN_ONLY.contains(&field.as_str()) {
+            if lemonfiber_bundle::PLUGIN_ONLY.contains(&field.as_str())
+                || READ_APART.contains(&field.as_str())
+            {
                 continue;
             }
             assert_eq!(embedded.get(field), Some(value), "{} {field}", one.pin.id);
         }
-        for field in ["replaces", "native", "api", "claim", "speaks", "contract"] {
+        for field in lemonfiber_bundle::PLUGIN_ONLY
+            .into_iter()
+            .chain(["replaces", "api", "claim"])
+        {
             assert!(embedded.get(field).is_none(), "{} {field}", one.pin.id);
         }
         let copied = services(&one.copy);
