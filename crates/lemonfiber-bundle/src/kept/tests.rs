@@ -34,6 +34,7 @@ name = "Player"
 image = "example.invalid/player"
 native = "player"
 replaces = "player"
+built_on = { image = "example.invalid/player-upstream", release = "1.0" }
 
 [service.env]
 PLAYER_LOG = { setting = "player:log", default = "info" }
@@ -146,6 +147,7 @@ fn what_only_the_plugin_reads_stays_out_of_the_kept_service() {
     let player = player(&stack(&[held("player", Stage::Installed, PLAYER)]));
     assert_eq!(field(&player, "replaces"), None);
     assert_eq!(field(&player, "native"), None);
+    assert_eq!(field(&player, "built_on"), None);
     let env = player
         .get("env")
         .and_then(Value::as_table)

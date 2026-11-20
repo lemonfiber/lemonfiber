@@ -7,9 +7,10 @@ use crate::assembly::{services, stacked};
 use crate::{Held, Stage};
 
 /// The fields of an installed part's service its stack service does not carry: the API its
-/// adapter speaks to it in, which only the plugin's adapter reads, and the contracts it
-/// speaks itself and the port it speaks them on, which only the plugin's install reaches.
-const PLUGIN_ONLY: [&str; 3] = ["native", "speaks", "contract"];
+/// adapter speaks to it in, which only the plugin's adapter reads, the contracts it speaks
+/// itself and the port it speaks them on, which only the plugin's install reaches, and the
+/// upstream image it is built on, which only the plugin's install holds its provenance to.
+const PLUGIN_ONLY: [&str; 4] = ["native", "speaks", "contract", "built_on"];
 
 /// The stack `assembled` with each part `held` installs kept as its copy declares the
 /// service of its id: that one service, providing what any service of the part provides,
