@@ -96,14 +96,20 @@ pub(super) fn served(report: &ServedReport) -> Lines {
             certificate.fingerprint
         ));
         lines.put(format!(
-            "Made out to {}, for {}.",
+            "Made out to {}{}, for {}{}.",
             certificate.subject,
-            certificate.names.join(", ")
+            cut(certificate.subject_cut),
+            certificate.names.join(", "),
+            left_out(certificate.names_more)
         ));
         lines.put(if certificate.self_signed {
             "Signed by itself.".to_owned()
         } else {
-            format!("Signed by {}.", certificate.issuer)
+            format!(
+                "Signed by {}{}.",
+                certificate.issuer,
+                cut(certificate.issuer_cut)
+            )
         });
         lines.put(format!(
             "Valid from {} until {}.",
@@ -112,6 +118,24 @@ pub(super) fn served(report: &ServedReport) -> Lines {
         ));
     }
     lines
+}
+
+/// What follows a text that was cut, being too long to show: an ellipsis, or nothing.
+const fn cut(was: bool) -> &'static str {
+    if was {
+        "…"
+    } else {
+        ""
+    }
+}
+
+/// What follows a list of names some of which were left out: how many, or nothing.
+fn left_out(more: usize) -> String {
+    if more == 0 {
+        String::new()
+    } else {
+        format!(" and {more} more")
+    }
 }
 
 /// The stack's identifier, the settings that are off, and whether a way to be told,

@@ -55,9 +55,12 @@ fn this_machines_own_certificate_is_described_as_made_by_itself() {
         Some(Described {
             fingerprint: kept.fingerprint.clone(),
             subject: RCGEN_NAMED.to_owned(),
+            subject_cut: false,
             issuer: RCGEN_NAMED.to_owned(),
+            issuer_cut: false,
             self_signed: true,
             names: vec!["localhost".to_owned()],
+            names_more: 0,
             valid_from: Instant::from_seconds(157_766_400),
             valid_until: Instant::from_seconds(67_090_118_400),
         })
@@ -79,9 +82,12 @@ fn an_operators_own_certificate_is_described_as_it_is() {
         Some(Described {
             fingerprint: fingerprint(&der),
             subject: format!("CN={HOUSE},O=Example\\, House"),
+            subject_cut: false,
             issuer: "CN=Example Root".to_owned(),
+            issuer_cut: false,
             self_signed: false,
             names: vec![HOUSE.to_owned(), AT_HOME.to_string()],
+            names_more: 0,
             valid_from: Instant::from_seconds(1_767_225_600),
             valid_until: Instant::from_seconds(1_798_761_600),
         })
@@ -212,23 +218,29 @@ fn what_would_be_acted_on_rather_than_shown_is_written_in_hex() {
 }
 
 /// However many names a certificate is made out to, the description lists the first
-/// sixty-four and says how many more there are.
+/// sixty-four whole, leaves out any too long to show, and counts what it left out.
 #[test]
 fn a_certificate_made_out_to_many_names_lists_the_first_and_counts_the_rest() {
-    let names: Vec<String> = (0..70).map(|at| format!("host{at}.example")).collect();
-    let read = made_out_to(HOUSE, names).map(|read| read.names);
-    let Some(read) = read else {
-        unreachable!("rcgen makes a certificate out to seventy names")
+    let mut names: Vec<String> = (0..70).map(|at| format!("host{at}.example")).collect();
+    names.insert(0, format!("{}.example", "a".repeat(600)));
+    let read = made_out_to(HOUSE, names).map(|read| (read.names, read.names_more));
+    let Some((listed, more)) = read else {
+        unreachable!("rcgen makes a certificate out to seventy-one names")
     };
-    assert_eq!(read.len(), 65);
-    assert_eq!(read.first().map(String::as_str), Some("host0.example"));
-    assert_eq!(read.last().map(String::as_str), Some("and 6 more"));
+    assert_eq!(listed.len(), 64);
+    assert_eq!(listed.first().map(String::as_str), Some("host0.example"));
+    assert_eq!(listed.last().map(String::as_str), Some("host63.example"));
+    assert_eq!(more, 7);
 }
 
-/// However long a name is, the description holds the first of it and says how much more
-/// there is.
+/// A subject too long to show is cut and says it was, and the one beside it that is not
+/// says it was not.
 #[test]
-fn a_long_name_is_cut_and_says_how_much_more_there_is() {
-    let read = made_out_to(&"a".repeat(600), vec![HOUSE.to_owned()]).map(|read| read.subject);
-    assert_eq!(read, Some(format!("CN={}… and 91 more", "a".repeat(509))));
+fn a_long_subject_is_cut_and_says_so() {
+    let read = made_out_to(&"a".repeat(600), vec![HOUSE.to_owned()])
+        .map(|read| (read.subject, read.subject_cut, read.issuer_cut));
+    assert_eq!(read, Some((format!("CN={}", "a".repeat(509)), true, true)));
+    let short = made_out_to(HOUSE, vec![HOUSE.to_owned()])
+        .map(|read| (read.subject_cut, read.issuer_cut, read.names_more));
+    assert_eq!(short, Some((false, false, 0)));
 }

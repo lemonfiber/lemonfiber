@@ -12,9 +12,21 @@
       ],
       "required": true
     },
+    "issuer_cut": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
     "names": {
       "type": [
         "array[string]"
+      ],
+      "required": true
+    },
+    "names_more": {
+      "type": [
+        "integer/uint"
       ],
       "required": true
     },
@@ -27,6 +39,12 @@
     "subject": {
       "type": [
         "string"
+      ],
+      "required": true
+    },
+    "subject_cut": {
+      "type": [
+        "boolean"
       ],
       "required": true
     },

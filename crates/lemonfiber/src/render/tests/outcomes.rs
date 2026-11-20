@@ -228,14 +228,17 @@ fn presented(self_signed: bool) -> lemonfiber_core::certificate::described::Desc
     lemonfiber_core::certificate::described::Described {
         fingerprint: "abcd".to_owned(),
         subject: "CN=lemonfiber.home".to_owned(),
+        subject_cut: false,
         issuer: if self_signed {
             "CN=lemonfiber.home"
         } else {
             "CN=Example Root"
         }
         .to_owned(),
+        issuer_cut: false,
         self_signed,
         names: vec!["lemonfiber.home".to_owned()],
+        names_more: 0,
         valid_from: lemonfiber_core::instant::Instant::from_seconds(1_767_225_600),
         valid_until: lemonfiber_core::instant::Instant::from_seconds(1_798_761_600),
     }
@@ -308,6 +311,17 @@ fn each_dispatched_read_renders_what_it_says() {
                 ..ServedReport::default()
             }),
             "Signed by CN=Example Root.",
+        ),
+        (
+            Outcome::Served(ServedReport {
+                certificate: Some(lemonfiber_core::certificate::described::Described {
+                    subject_cut: true,
+                    names_more: 3,
+                    ..presented(true)
+                }),
+                ..ServedReport::default()
+            }),
+            "Made out to CN=lemonfiber.home…, for lemonfiber.home and 3 more.",
         ),
         (
             Outcome::Served(ServedReport {

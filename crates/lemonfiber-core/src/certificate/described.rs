@@ -34,11 +34,11 @@ const SHORT_NAMES: [(Oid<'static>, &str); 9] = [
     (OID_USERID, "UID"),
 ];
 
-/// The most names a description lists; how many more there are is said after them.
+/// The most names a description lists; how many it leaves out is counted beside them.
 const MOST_NAMES: usize = 64;
 
-/// The most characters, as written, any one text in a description holds; how many more
-/// there are is said after them.
+/// The most characters, as written, any one text in a description holds: a subject or an
+/// issuer past it is cut and says so, and a name past it is left out and counted.
 const LONGEST: usize = 512;
 
 /// The characters that lay text out rather than being shown, first and last of each run:
@@ -76,14 +76,22 @@ const ESCAPED: [char; 7] = ['"', '+', ',', ';', '<', '>', '\\'];
 pub struct Described {
     /// What a phone pins: SHA-256 over the certificate's DER encoding, lower-case hex.
     pub fingerprint: String,
-    /// Who it is made out to, as an RFC 4514 string.
+    /// Who it is made out to, as an RFC 4514 string, cut where it is too long to show.
     pub subject: String,
-    /// Who signed it, as an RFC 4514 string.
+    /// Whether the subject was cut, being too long to show whole.
+    pub subject_cut: bool,
+    /// Who signed it, as an RFC 4514 string, cut where it is too long to show.
     pub issuer: String,
+    /// Whether the issuer was cut, being too long to show whole.
+    pub issuer_cut: bool,
     /// Whether it was signed by its own key under its own name.
     pub self_signed: bool,
-    /// The names it is made out to: its subject alternative names.
+    /// The names it is made out to, its subject alternative names, each whole; those too
+    /// many or too long to show are left out.
     pub names: Vec<String>,
+    /// How many of the names it is made out to are left out, being too many or too long to
+    /// show.
+    pub names_more: usize,
     /// When it begins to hold.
     pub valid_from: Instant,
     /// When it stops holding.
@@ -99,12 +107,20 @@ pub fn described(der: &[u8]) -> Option<Described> {
         return None;
     }
     let validity = certificate.validity();
+    let (subject, issuer) = (
+        written(certificate.subject()),
+        written(certificate.issuer()),
+    );
+    let names = names(&certificate);
     Some(Described {
         fingerprint: super::fingerprint(der),
-        subject: written(certificate.subject()),
-        issuer: written(certificate.issuer()),
+        subject: subject.text,
+        subject_cut: subject.cut,
+        issuer: issuer.text,
+        issuer_cut: issuer.cut,
         self_signed: self_signed(&certificate),
-        names: names(&certificate),
+        names: names.kept,
+        names_more: names.more,
         valid_from: moment(&validity.not_before),
         valid_until: moment(&validity.not_after),
     })
@@ -121,25 +137,49 @@ pub(crate) fn dns_names(certificate: &X509Certificate<'_>) -> Vec<String> {
         .collect()
 }
 
-/// Every name `certificate` is made out to that can be written as text, as each is shown,
-/// the first [`MOST_NAMES`] of them and how many more there are.
-fn names(certificate: &X509Certificate<'_>) -> Vec<String> {
-    let mut names: Vec<String> = alternative(certificate)
+/// Every name `certificate` is made out to that can be written as text, as each is shown:
+/// the first [`MOST_NAMES`] of those no longer than [`LONGEST`] characters, and how many
+/// are left out.
+fn names(certificate: &X509Certificate<'_>) -> Named {
+    let all: Vec<Bounded> = alternative(certificate)
         .into_iter()
         .filter_map(|name| match name {
             GeneralName::DNSName(text) | GeneralName::RFC822Name(text) | GeneralName::URI(text) => {
                 Some(bounded(&shown(text)))
             }
-            GeneralName::IPAddress(octets) => address(octets),
+            GeneralName::IPAddress(octets) => {
+                address(octets).map(|text| Bounded { text, cut: false })
+            }
             _ => None,
         })
         .collect();
-    if names.len() > MOST_NAMES {
-        let more = names.len() - MOST_NAMES;
-        names.truncate(MOST_NAMES);
-        names.push(format!("and {more} more"));
+    let count = all.len();
+    let kept: Vec<String> = all
+        .into_iter()
+        .filter(|name| !name.cut)
+        .map(|name| name.text)
+        .take(MOST_NAMES)
+        .collect();
+    Named {
+        more: count - kept.len(),
+        kept,
     }
-    names
+}
+
+/// The names a description lists, and how many it leaves out.
+struct Named {
+    /// The names listed, each whole.
+    kept: Vec<String>,
+    /// How many are left out.
+    more: usize,
+}
+
+/// A text as it is shown, and whether it is the start of a longer one.
+struct Bounded {
+    /// The text, at most [`LONGEST`] characters.
+    text: String,
+    /// Whether the text went on past it.
+    cut: bool,
 }
 
 /// `certificate`'s subject alternative names, or none where it carries none it can read.
@@ -182,7 +222,7 @@ fn moment(moment: &ASN1Time) -> Instant {
 
 /// `name` as RFC 4514 writes a distinguished name, its last part first, bounded as every
 /// text here is.
-fn written(name: &X509Name<'_>) -> String {
+fn written(name: &X509Name<'_>) -> Bounded {
     let mut parts: Vec<Vec<String>> = name
         .iter()
         .map(|part| joined(part.iter().map(attribute).collect(), "+"))
@@ -273,18 +313,18 @@ fn hidden(letter: char) -> Option<String> {
     })
 }
 
-/// `units` written out, up to [`LONGEST`] characters, and how many more there are.
-fn bounded(units: &[String]) -> String {
-    let mut written = String::new();
+/// `units` written out, up to [`LONGEST`] characters, and whether there were more.
+fn bounded(units: &[String]) -> Bounded {
+    let mut text = String::new();
     let mut width = 0;
-    for (at, unit) in units.iter().enumerate() {
+    for unit in units {
         width += unit.chars().count();
         if width > LONGEST {
-            return format!("{written}… and {} more", units.len() - at);
+            return Bounded { text, cut: true };
         }
-        written.push_str(unit);
+        text.push_str(unit);
     }
-    written
+    Bounded { text, cut: false }
 }
 
 #[cfg(test)]

@@ -3876,23 +3876,37 @@
             "type": "string"
           },
           "issuer": {
-            "description": "Who signed it, as an RFC 4514 string.",
+            "description": "Who signed it, as an RFC 4514 string, cut where it is too long to show.",
             "type": "string"
           },
+          "issuer_cut": {
+            "description": "Whether the issuer was cut, being too long to show whole.",
+            "type": "boolean"
+          },
           "names": {
-            "description": "The names it is made out to: its subject alternative names.",
+            "description": "The names it is made out to, its subject alternative names, each whole; those too\nmany or too long to show are left out.",
             "items": {
               "type": "string"
             },
             "type": "array"
+          },
+          "names_more": {
+            "description": "How many of the names it is made out to are left out, being too many or too long to\nshow.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
           },
           "self_signed": {
             "description": "Whether it was signed by its own key under its own name.",
             "type": "boolean"
           },
           "subject": {
-            "description": "Who it is made out to, as an RFC 4514 string.",
+            "description": "Who it is made out to, as an RFC 4514 string, cut where it is too long to show.",
             "type": "string"
+          },
+          "subject_cut": {
+            "description": "Whether the subject was cut, being too long to show whole.",
+            "type": "boolean"
           },
           "valid_from": {
             "$ref": "#/components/schemas/Instant",
@@ -3906,9 +3920,12 @@
         "required": [
           "fingerprint",
           "subject",
+          "subject_cut",
           "issuer",
+          "issuer_cut",
           "self_signed",
           "names",
+          "names_more",
           "valid_from",
           "valid_until"
         ],

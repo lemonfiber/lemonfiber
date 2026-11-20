@@ -4,11 +4,14 @@
     "certificate": {
       "fingerprint": "c4c8d978178c10e291af6f97a4f9759fc1c2923f4416ec3f3aa28b1652235b9d",
       "issuer": "CN=rcgen self signed cert",
+      "issuer_cut": false,
       "names": [
         "localhost"
       ],
+      "names_more": 0,
       "self_signed": true,
       "subject": "CN=rcgen self signed cert",
+      "subject_cut": false,
       "valid_from": 157766400,
       "valid_until": 67090118400
     },

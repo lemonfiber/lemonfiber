@@ -36,9 +36,12 @@ pub(crate) fn samples() -> Vec<Outcome> {
             certificate: Some(Described {
                 fingerprint: "6642e3f45a1d89c0".repeat(4),
                 subject: "CN=lemonfiber.local".to_owned(),
+                subject_cut: false,
                 issuer: "CN=lemonfiber.local".to_owned(),
+                issuer_cut: false,
                 self_signed: true,
                 names: vec!["lemonfiber.local".to_owned()],
+                names_more: 0,
                 valid_from: Instant::from_seconds(157_766_400),
                 valid_until: Instant::from_seconds(67_090_118_400),
             }),
