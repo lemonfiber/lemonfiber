@@ -65,7 +65,7 @@ fn carries_forms(command: &Command) -> bool {
         | Command::Pull { forms }
         | Command::Watch { forms }
         | Command::Start { forms, .. }
-        | Command::Halt { forms, .. }
+        | Command::Halt(lemonfiber_core::app::Halting { forms, .. })
         | Command::Restart(Restarting { forms, .. })
         | Command::Hosting(Keeping::Install { forms, .. }) => !forms.is_empty(),
         _ => false,
@@ -79,6 +79,9 @@ fn carries_wait(command: &Command) -> bool {
         Command::Down(Teardown {
             wait: Waiting::ForTheDownloads,
             ..
+        }) | Command::Halt(lemonfiber_core::app::Halting {
+            wait: Waiting::ForTheDownloads,
+            ..
         }) | Command::ConfigSet(Setting {
             waiting: Waiting::ForTheDownloads,
             ..
@@ -90,7 +93,7 @@ fn carries_wait(command: &Command) -> bool {
 fn carries_services(command: &Command) -> bool {
     match command {
         Command::Start { services, .. }
-        | Command::Halt { services, .. }
+        | Command::Halt(lemonfiber_core::app::Halting { services, .. })
         | Command::Restart(Restarting { services, .. }) => !services.is_empty(),
         _ => false,
     }

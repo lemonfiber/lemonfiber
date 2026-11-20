@@ -223,6 +223,24 @@ fn a_complete_set_of_answers_shows_what_applying_would_write() {
     assert!(said.contains("INDEXER_APIKEY=(set, not shown)"), "{said}");
 }
 
+/// A certificate presented, signed by itself or by a root.
+fn presented(self_signed: bool) -> lemonfiber_core::certificate::described::Described {
+    lemonfiber_core::certificate::described::Described {
+        fingerprint: "abcd".to_owned(),
+        subject: "CN=lemonfiber.home".to_owned(),
+        issuer: if self_signed {
+            "CN=lemonfiber.home"
+        } else {
+            "CN=Example Root"
+        }
+        .to_owned(),
+        self_signed,
+        names: vec!["lemonfiber.home".to_owned()],
+        valid_from: lemonfiber_core::instant::Instant::from_seconds(1_767_225_600),
+        valid_until: lemonfiber_core::instant::Instant::from_seconds(1_798_761_600),
+    }
+}
+
 /// Each answer a dispatched read of the command line comes back as renders to what it
 /// says, rather than to nothing.
 #[test]
@@ -271,11 +289,32 @@ fn each_dispatched_read_renders_what_it_says() {
         ),
         (
             Outcome::Served(ServedReport {
-                fingerprint: Some("AB:CD".to_owned()),
                 named: Some("lemonfiber.home".to_owned()),
+                certificate: Some(presented(true)),
                 ..ServedReport::default()
             }),
-            "Certificate fingerprint: AB:CD",
+            "Certificate fingerprint: abcd",
+        ),
+        (
+            Outcome::Served(ServedReport {
+                certificate: Some(presented(true)),
+                ..ServedReport::default()
+            }),
+            "Signed by itself.",
+        ),
+        (
+            Outcome::Served(ServedReport {
+                certificate: Some(presented(false)),
+                ..ServedReport::default()
+            }),
+            "Signed by CN=Example Root.",
+        ),
+        (
+            Outcome::Served(ServedReport {
+                certificate: Some(presented(false)),
+                ..ServedReport::default()
+            }),
+            "Valid from 2026-01-01T00:00:00 UTC until 2027-01-01T00:00:00 UTC.",
         ),
     ];
     for (outcome, expected) in cases {

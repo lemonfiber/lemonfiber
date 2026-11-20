@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "issuer": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "names": {
+      "type": [
+        "array[string]"
+      ],
+      "required": true
+    },
+    "self_signed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "subject": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "valid_from": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "valid_until": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

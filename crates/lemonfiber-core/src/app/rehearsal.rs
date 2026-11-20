@@ -326,6 +326,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Logs(_) => reads("logs"),
         Command::InFlight { .. } => reads("in flight"),
         Command::Served(_) => reads("ui"),
+        Command::Serving => reads("served"),
 
         // Reports. Each of these builds the report it would have filled in and stops
         // before the step it cannot take back.
@@ -337,7 +338,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Run { .. } => reports("run", &[kind::RAN]),
         Command::Start { .. } => reports("start", LIFECYCLE).disturbing(Situation::Starting),
         Command::Down(teardown) => reports("down", LIFECYCLE).disturbing(stopping(teardown)),
-        Command::Halt { .. } => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
+        Command::Halt(_) => reports("stop", LIFECYCLE).disturbing(Situation::Stopping),
         Command::Switch { .. } => reports("switch", LIFECYCLE).disturbing(Situation::Switching),
         Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
         Command::Pull { .. } => reports("pull", LIFECYCLE).disturbing(Situation::Fetching),

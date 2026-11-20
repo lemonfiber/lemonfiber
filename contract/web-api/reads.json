@@ -249,6 +249,31 @@
     "file": false
   },
   {
+    "path": "/api/in-flight",
+    "parameters": [
+      {
+        "name": "forms",
+        "repeatable": true
+      },
+      {
+        "name": "services",
+        "repeatable": true
+      }
+    ],
+    "kinds": [
+      "in-flight"
+    ],
+    "file": false
+  },
+  {
+    "path": "/api/served",
+    "parameters": [],
+    "kinds": [
+      "served"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/notify",
     "parameters": [],
     "kinds": [

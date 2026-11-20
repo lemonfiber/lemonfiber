@@ -3,12 +3,20 @@
   "description": "What a run serving the surface presents, answers to and wrote down.",
   "type": "object",
   "properties": {
-    "fingerprint": {
-      "description": "What a phone pins for the certificate presented, where the run is encrypted.",
-      "type": [
-        "string",
-        "null"
+    "certificate": {
+      "description": "The certificate it presents, as it describes itself, where the run is encrypted.",
+      "anyOf": [
+        {
+          "$ref": "Described.json"
+        },
+        {
+          "type": "null"
+        }
       ]
+    },
+    "encrypted": {
+      "description": "Whether it presents a certificate, rather than plain text.",
+      "type": "boolean"
     },
     "named": {
       "description": "The name a request has to carry beyond this machine, where the run is encrypted on\na network.",
@@ -17,6 +25,17 @@
         "null"
       ]
     },
+    "network": {
+      "description": "Whether it is offered to the network, rather than to this machine alone.",
+      "type": "boolean"
+    },
+    "port": {
+      "description": "The port it listens on.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
     "unrecorded": {
       "description": "Why where it is served could not be written down, where it could not.",
       "type": [
@@ -24,5 +43,10 @@
         "null"
       ]
     }
-  }
+  },
+  "required": [
+    "port",
+    "encrypted",
+    "network"
+  ]
 }

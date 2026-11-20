@@ -286,19 +286,14 @@ pub const TAKES_CHECK: &[&str] = &["accept"];
 /// service in it.
 pub const TAKES_SERVICES: &[&str] = &["up", "down", "restart"];
 
-/// The action whose command carries whether to let the downloads finish.
+/// The actions whose command carries whether to let the downloads finish.
 ///
-/// A teardown and nothing else. It is the one action that takes something away
+/// A stop is the first, of a form or of named services. It takes something away
 /// while it may be in the middle of arriving, and the wait is inside the command
 /// rather than in front of it — so a caller that cannot sit in a loop asks for it
 /// by saying so, and what it gets back is a name for work that goes on after the
-/// reply.
-///
-/// Not for the stop of named services beside it. What is in flight is a question
-/// about the download clients a form holds, so a wait asked of two services that
-/// are not download clients would hold up a stop for downloads stopping them
-/// cannot interrupt — which is why the two are refused together rather than one of
-/// them being dropped, and why the command line declares them in conflict.
+/// reply. A stop of named services waits for the downloads inside those services
+/// alone, so naming services that download nothing waits for nothing.
 /// Dropping a way of downloading is the third. It takes the download client away
 /// while something may be in the middle of arriving, exactly as a teardown does, and
 /// the wait is the offer it makes rather than a way past it — so it is answered with

@@ -39,7 +39,7 @@ async fn a_form_holding_no_client_asks_nothing_at_all() {
     let fake = Fake::silent();
     let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, None);
 
-    let found = in_flight(&ctx, &named(&["search"])).await;
+    let found = in_flight(&ctx, &named(&["search"]), &[]).await;
 
     assert!(found.is_empty());
     assert!(
@@ -54,7 +54,7 @@ async fn both_clients_say_what_they_are_working_on() {
     let env = env_without_password("in-flight");
     let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
 
-    let found = in_flight(&ctx, &named(&["dl"])).await;
+    let found = in_flight(&ctx, &named(&["dl"]), &[]).await;
 
     let names: Vec<&str> = found
         .iter()
@@ -72,10 +72,11 @@ async fn what_is_in_flight_is_read_through_dispatch() {
     let env = env_without_password("in-flight-dispatched");
     let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
 
-    let direct = in_flight(&ctx, &named(&["dl"])).await;
+    let direct = in_flight(&ctx, &named(&["dl"]), &[]).await;
     let read = crate::app::dispatch(
         crate::app::Command::InFlight {
             forms: named(&["dl"]),
+            services: Vec::new(),
         },
         &ctx,
     )
@@ -90,13 +91,47 @@ async fn what_is_in_flight_is_read_through_dispatch() {
     );
 }
 
+/// Naming a download client asks that client alone, so a stop of one service is told only
+/// what stopping it would interrupt.
+#[tokio::test]
+async fn naming_a_service_asks_that_client_alone() {
+    let fake = usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
+    let env = env_without_password("in-flight-named");
+    let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
+
+    let found = in_flight(&ctx, &named(&["dl"]), &named(&[torrent::PLUGIN])).await;
+
+    let names: Vec<&str> = found
+        .iter()
+        .map(|download| download.name.as_str())
+        .collect();
+    assert_eq!(names, vec![torrent::CARRIED]);
+}
+
+/// Naming services none of which downloads asks nothing at all, as a form holding no
+/// client does.
+#[tokio::test]
+async fn naming_services_holding_no_client_asks_nothing_at_all() {
+    let fake = usenet::beside_torrents(&[torrent::carrying()], &[usenet::carrying()]);
+    let env = env_without_password("in-flight-unnamed");
+    let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
+
+    let found = in_flight(&ctx, &named(&["dl"]), &named(&["no-such-service"])).await;
+
+    assert!(found.is_empty(), "{found:?}");
+    assert!(
+        fake.requests().is_empty(),
+        "services holding no download client made requests anyway"
+    );
+}
+
 #[tokio::test]
 async fn a_download_that_has_finished_is_not_in_flight() {
     let fake = usenet::beside_torrents(&[torrent::finished()], &[]);
     let env = env_without_password("finished");
     let ctx = reaching(Arc::clone(&fake) as Arc<dyn Http>, Some(env.to_path_buf()));
 
-    assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
+    assert!(in_flight(&ctx, &named(&["dl"]), &[]).await.is_empty());
 }
 
 /// A client already on its way down cannot be asked, and a teardown blocked on
@@ -105,7 +140,7 @@ async fn a_download_that_has_finished_is_not_in_flight() {
 async fn a_client_that_will_not_answer_contributes_nothing() {
     let ctx = reaching(Fake::silent(), None);
 
-    assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
+    assert!(in_flight(&ctx, &named(&["dl"]), &[]).await.is_empty());
 }
 
 #[tokio::test]
@@ -120,14 +155,16 @@ async fn a_stack_that_cannot_be_read_finds_nothing() {
         .build()
         .with_http(Fake::silent());
 
-    assert!(in_flight(&ctx, &named(&["dl"])).await.is_empty());
+    assert!(in_flight(&ctx, &named(&["dl"]), &[]).await.is_empty());
 }
 
 #[tokio::test]
 async fn a_form_the_stack_does_not_declare_finds_nothing() {
     let ctx = reaching(Fake::silent(), None);
 
-    assert!(in_flight(&ctx, &named(&["no-such-form"])).await.is_empty());
+    assert!(in_flight(&ctx, &named(&["no-such-form"]), &[])
+        .await
+        .is_empty());
 }
 
 /// A plugin the bundle installs stops with the stack profile its bundle entry names,

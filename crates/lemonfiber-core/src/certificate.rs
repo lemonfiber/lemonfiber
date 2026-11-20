@@ -25,8 +25,10 @@ use lemonfiber_manifest::container::Certificate;
 use crate::ports::filesystem::{Confined, Readable};
 
 pub mod declared;
+pub mod described;
 pub mod fronted;
 pub mod internal;
+pub(crate) mod signature;
 
 /// The certificate, as it is written down.
 const CERTIFICATE: &str = "certificate.pem";
@@ -75,6 +77,12 @@ impl Kept {
     #[must_use]
     pub fn presented(&self) -> (Vec<u8>, Vec<u8>) {
         (self.certificate.clone(), self.key.clone())
+    }
+
+    /// What the certificate says about itself, or nothing where it does not read as one.
+    #[must_use]
+    pub fn described(&self) -> Option<described::Described> {
+        described::described(&self.certificate)
     }
 
     /// A certificate and key as they were written down where `laid` says, or why they are

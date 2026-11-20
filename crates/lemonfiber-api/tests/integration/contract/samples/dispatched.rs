@@ -4,6 +4,7 @@ use lemonfiber_core::app::admitting::{Admitted, Answer, Caller, Calling, SignInC
 use lemonfiber_core::app::password::PasswordReport;
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::{InFlightReport, LogsReport, Outcome, Unfinished};
+use lemonfiber_core::certificate::described::Described;
 use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::dashboard::Protocol;
 use lemonfiber_core::device_keys::Challenged;
@@ -27,9 +28,20 @@ pub(crate) fn samples() -> Vec<Outcome> {
             }],
         }),
         Outcome::Served(ServedReport {
-            fingerprint: Some("6642e3f45a1d89c0".to_owned()),
+            port: 8443,
+            encrypted: true,
+            network: true,
             named: Some("lemonfiber.local".to_owned()),
             unrecorded: None,
+            certificate: Some(Described {
+                fingerprint: "6642e3f45a1d89c0".repeat(4),
+                subject: "CN=lemonfiber.local".to_owned(),
+                issuer: "CN=lemonfiber.local".to_owned(),
+                self_signed: true,
+                names: vec!["lemonfiber.local".to_owned()],
+                valid_from: Instant::from_seconds(157_766_400),
+                valid_until: Instant::from_seconds(67_090_118_400),
+            }),
             presented: None,
         }),
         Outcome::Standing(StackStanding {

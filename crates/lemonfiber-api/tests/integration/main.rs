@@ -46,6 +46,7 @@ mod what_setup_answers;
 mod what_the_app_is_served_as;
 mod what_the_door_asks;
 mod what_the_kept_files_answer;
+mod what_the_machine_reads_answer;
 mod what_the_settings_answer;
 mod what_the_stream_says;
 mod who_the_stack_admits;

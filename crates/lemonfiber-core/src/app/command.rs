@@ -19,6 +19,7 @@ mod doorway;
 mod downloading;
 mod filling;
 mod gathering;
+mod halting;
 mod hosting;
 mod household;
 mod inviting;
@@ -47,6 +48,7 @@ pub use doorway::Doorway;
 pub use downloading::Downloading;
 pub use filling::{Filling, Linking};
 pub use gathering::Gathering;
+pub use halting::Halting;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision, Shelf, Whom};
 pub use inviting::Inviting;
@@ -124,12 +126,7 @@ pub enum Command {
     /// Apart from [`Command::Down`] because they are different requests, not one
     /// request with an argument: a teardown removes what a form started, and this
     /// stops services that stay where they are. Compose spells them differently too.
-    Halt {
-        /// The forms the services belong to; none means the whole stack.
-        forms: Vec<String>,
-        /// The services to stop.
-        services: Vec<String>,
-    },
+    Halt(Halting),
     /// Make these forms the active set, stopping only what falls outside them.
     Switch {
         /// The forms to switch to, resolved to the union of their closures.
@@ -494,11 +491,16 @@ pub enum Command {
     /// Settle how the web surface is served: the certificate it presents, the name it
     /// answers to, and the record pairing reads back.
     Served(crate::companion::served::Served),
-    /// Say what is still coming down inside the forms, which a teardown would interrupt.
+    /// Say what is still coming down inside what a stop would stop, which it would interrupt.
     InFlight {
-        /// The forms a teardown would stop, or none for the whole stack.
+        /// The forms a stop would stop, or none for the whole stack.
         forms: Vec<String>,
+        /// The services of those forms a stop would stop, or none for all of them.
+        services: Vec<String>,
     },
+    /// Say how this run serves the web surface, as [`Command::Served`] settled it when the
+    /// run began, making, replacing and writing nothing.
+    Serving,
     /// Wire the stack's services to each other, idempotently.
     Seed,
     /// Adopt the operator's current edits as lemonfiber's expected state, so they

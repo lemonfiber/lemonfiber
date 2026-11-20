@@ -5,7 +5,7 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, ReadingLogs, Teardown, Waiting};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, ReadingLogs, Waiting};
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
@@ -165,9 +165,16 @@ impl Narrator for Narrating {
 /// The question is put here and the waiting is not: an answer is what the teardown
 /// carries, and a surface that sat in the loop itself would be a wait only the
 /// command line could ask for.
-pub(crate) async fn settle(ctx: &Ctx, forms: &[String], wait: bool, yes: bool) -> Choice {
+pub(crate) async fn settle(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    wait: bool,
+    yes: bool,
+) -> Choice {
     let asked = Command::InFlight {
         forms: forms.to_vec(),
+        services: services.to_vec(),
     };
     let active = match dispatch(asked, ctx).await {
         Ok(Outcome::InFlight(report)) => report.downloads,
@@ -253,25 +260,18 @@ pub(crate) async fn halting(
     yes: bool,
     json: bool,
 ) -> Command {
-    // Stopping named services and tearing a form down are different requests rather
-    // than one request with an argument, and Compose spells them differently too.
-    // The command line refuses the two flags together for the same reason.
-    if !services.is_empty() {
-        return Command::Halt { forms, services };
+    if services.is_empty() {
+        announce(ctx, &forms, json, Doing::Stopping).await;
     }
-    announce(ctx, &forms, json, Doing::Stopping).await;
     // Asked only where there is somebody to ask. A machine-readable run is put no
     // prompt — it has nobody to answer one, and a report not in the envelope is noise
-    // on a stream something is parsing — so what it typed is what the teardown gets.
+    // on a stream something is parsing — so what it typed is what the stop gets.
     let waiting = if json {
         wait
     } else {
-        settle(ctx, &forms, wait, yes).await == Choice::Wait
+        settle(ctx, &forms, &services, wait, yes).await == Choice::Wait
     };
-    Command::Down(Teardown {
-        forms,
-        wait: Waiting::from(waiting),
-    })
+    Command::stopping(forms, services, Waiting::from(waiting))
 }
 
 /// The switch to `forms`, answering what it offers to install with the offer typed or the

@@ -265,7 +265,7 @@ async fn waiting(ctx: &Ctx, changes: &[Change]) -> Vec<String> {
     if changes.is_empty() {
         return Vec::new();
     }
-    named(&in_flight(ctx, &[]).await)
+    named(&in_flight(ctx, &[], &[]).await)
 }
 
 /// What is in flight, as an operator would read it.

@@ -92,5 +92,15 @@ codes! {
         remedy: "Ask again. If it keeps happening, send a support bundle, made with lemonfiber \
             support.",
         household: fault,
+    }    /// Raised when how the web surface is served is asked of a run that is not serving it.
+    NOT_SERVING = "SERVE-9" {
+        severity: Error,
+        status: 500,
+        since: "0.18.0",
+        meaning: "This run is not serving the web interface, so there is no way it is served to \
+            say. How it is served is what the run serving it settled when it began, and nothing \
+            here settled it.",
+        remedy: "Ask the run serving the web interface, at the address lemonfiber ui printed.",
+        household: fault,
     }
 }

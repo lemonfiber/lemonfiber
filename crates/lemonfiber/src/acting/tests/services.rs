@@ -55,10 +55,11 @@ fn some_of_a_forms_services_are_stopped_rather_than_the_whole_form() {
     assert!(question.contains("Stop Radarr?"), "{question}");
     assert_eq!(
         acting.pressed(&Press::Typed('y')),
-        Wanted::Carry(Command::Halt {
+        Wanted::Carry(Command::Halt(lemonfiber_core::app::Halting {
             forms: vec!["full".to_owned()],
             services: vec!["radarr".to_owned()],
-        })
+            wait: lemonfiber_core::app::Waiting::Never,
+        }))
     );
 }
 

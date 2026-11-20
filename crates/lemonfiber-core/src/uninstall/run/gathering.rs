@@ -109,7 +109,7 @@ pub(super) async fn gather(ctx: &Ctx, tier: Tier) -> Gathered {
         // its database while its directory goes is the corruption a backup exists to
         // undo — so what is in flight is something the operator is owed whichever
         // removal they chose.
-        coming: in_flight(ctx, &[])
+        coming: in_flight(ctx, &[], &[])
             .await
             .into_iter()
             .map(|download| Coming {

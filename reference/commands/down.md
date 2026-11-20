@@ -25,9 +25,7 @@ Options:
           Say what would happen, and change nothing
 
       --wait
-          Let anything still downloading finish before stopping.
-
-          Not for a stop of named services: what is in flight is a question about the download clients a form holds, so naming two services that are not download clients would wait on downloads stopping them cannot interrupt.
+          Let anything still downloading finish before stopping: inside the named services alone where services are named
 
       --force
           Take the stack from a run that claimed it and did not give it back
@@ -45,5 +43,5 @@ Options:
           Keep lemonfiber's own data under a directory of your own
 
   -h, --help
-          Print help (see a summary with '-h')
+          Print help
 ```

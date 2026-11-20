@@ -88,28 +88,30 @@ pub struct Unfinished {
     pub progress: u8,
 }
 
-/// What is still coming down inside the forms a teardown would stop.
+/// What is still coming down inside what a stop would stop.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct InFlightReport {
     /// Each download still coming down, with how far it has got.
     pub downloads: Vec<Unfinished>,
 }
 
-/// What is still coming down inside `forms`, as the answer to asking.
-pub async fn in_flight_report(ctx: &Ctx, forms: &[String]) -> InFlightReport {
+/// What is still coming down inside `forms`, or inside the named `services` of them, as the
+/// answer to asking.
+pub async fn in_flight_report(ctx: &Ctx, forms: &[String], services: &[String]) -> InFlightReport {
     InFlightReport {
-        downloads: in_flight(ctx, forms).await,
+        downloads: in_flight(ctx, forms, services).await,
     }
 }
 
-/// What the download clients inside these forms are still working on.
+/// What the download clients inside these forms are still working on: every one the forms
+/// hold where `services` names none, and only those it names where it names some.
 ///
 /// Empty where the forms hold no client, where the clients hold nothing, where none
 /// of them will answer, and where the stack cannot be read at all — the cases a
 /// teardown should proceed through without comment. Nothing here is worth failing a
 /// stop over: this exists to tell an operator something they would want to know, and
 /// a guard that cannot find out has nothing to tell them.
-pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Unfinished> {
+pub async fn in_flight(ctx: &Ctx, forms: &[String], services: &[String]) -> Vec<Unfinished> {
     let targets = {
         let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
             return Vec::new();
@@ -140,7 +142,11 @@ pub async fn in_flight(ctx: &Ctx, forms: &[String]) -> Vec<Unfinished> {
             project.as_deref(),
         )
         .numbered(crate::app::targets::ordinals(ctx));
-        download_targets(ctx, &fillers).await
+        download_targets(ctx, &fillers)
+            .await
+            .into_iter()
+            .filter(|target| services.is_empty() || stops(&fillers, &target.service, services))
+            .collect::<Vec<_>>()
     };
 
     // Asked at once rather than one client after another, for the reason the
@@ -191,6 +197,17 @@ pub(super) fn joining(ctx: &Ctx) -> Vec<crate::stack::closure::Joining> {
     crate::plugin::joining(&installed(ctx))
 }
 
+/// Whether stopping `services` stops the download client asked at `asked`: the service
+/// asked, or the one it stands in front of.
+fn stops(fillers: &Fillers, asked: &str, services: &[String]) -> bool {
+    let fronted = fillers
+        .service(asked)
+        .and_then(|adapter| fillers.fronted_by(adapter));
+    services
+        .iter()
+        .any(|named| named == asked || fronted.is_some_and(|upstream| upstream.id == *named))
+}
+
 /// Whether a download is still coming down.
 fn underway(download: &Download) -> bool {
     download.progress < 100
@@ -213,18 +230,42 @@ pub(crate) async fn teardown(
     forms: &[String],
     wait: Waiting,
 ) -> Result<LifecycleReport, Box<Problem>> {
+    stopped(ctx, forms, &[], wait, &Action::Down).await
+}
+
+/// Let anything still downloading inside the named `services` finish where that was asked
+/// for, then stop those services and leave the rest of the forms running.
+pub(crate) async fn halt(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    wait: Waiting,
+) -> Result<LifecycleReport, Box<Problem>> {
+    stopped(ctx, forms, services, wait, &Action::Stop(services.to_vec())).await
+}
+
+/// `action` carried out on `forms`, once anything still downloading inside `services` of
+/// them has finished where that was asked for.
+async fn stopped(
+    ctx: &Ctx,
+    forms: &[String],
+    services: &[String],
+    wait: Waiting,
+    action: &Action,
+) -> Result<LifecycleReport, Box<Problem>> {
     // A rehearsal does not sit through the wait. What it is being asked is what
     // stopping would come to, and the answer is the same whether it is given now or
     // in an hour — so waiting for downloads that are not going to be interrupted
     // would hold a terminal open for an hour to say something it already knows, while
     // signing in to every download client each ten seconds to find it out.
     if wait == Waiting::ForTheDownloads && !ctx.dry_run {
-        drained(ctx, forms).await;
+        drained(ctx, forms, services).await;
     }
-    super::lifecycle(ctx, forms, &Action::Down).await
+    super::lifecycle(ctx, forms, action).await
 }
 
-/// Hold on until nothing inside these forms is coming down any more.
+/// Hold on until nothing inside these forms, or inside the named `services` of them, is
+/// coming down any more.
 ///
 /// The waiting itself rather than the decision to wait: whoever asked has already
 /// settled that, and a surface that put the question is not the one that has to sit
@@ -234,10 +275,10 @@ pub(crate) async fn teardown(
 /// Said again only when the count changes, because a line repeated every ten seconds
 /// is one whoever is reading scrolls past — and the one moment it has news is the
 /// moment another download finishes.
-pub(crate) async fn drained(ctx: &Ctx, forms: &[String]) {
+pub(crate) async fn drained(ctx: &Ctx, forms: &[String], services: &[String]) {
     let mut counted = usize::MAX;
     loop {
-        let active = in_flight(ctx, forms).await;
+        let active = in_flight(ctx, forms, services).await;
         if active.is_empty() {
             ctx.narrator.say("downloads finished — stopping now").await;
             return;

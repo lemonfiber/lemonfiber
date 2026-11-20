@@ -212,7 +212,7 @@ async fn applying(
         && !ctx.dry_run
         && super::reconfiguring::waits_for_downloads(ctx, key, value)
     {
-        super::engine::drained(ctx, &[]).await;
+        super::engine::drained(ctx, &[], &[]).await;
     }
 
     let review = weighed(ctx, &held, key, value, asked.confirmed).await;

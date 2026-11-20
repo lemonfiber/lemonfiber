@@ -555,6 +555,7 @@ that it is a fault of the stack.
 | `SERVE-6` | `UNRENDERABLE` | error | 1 | 500 | 0.17.0 | Raised when an answer could not be rendered. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SERVE-7` | `NO_JOB_NAME` | error | 1 | 500 | 0.17.0 | Raised when this machine will not supply the randomness a job is named with. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `SERVE-8` | `UNANSWERED` | error | 1 | 500 | 0.18.0 | Raised when an action's work ended before it had an answer to give. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `SERVE-9` | `NOT_SERVING` | error | 1 | 500 | 0.18.0 | Raised when how the web surface is served is asked of a run that is not serving it. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `SETTING` — the settings a service reads
 

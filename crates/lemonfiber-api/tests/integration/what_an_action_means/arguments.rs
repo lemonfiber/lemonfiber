@@ -74,24 +74,21 @@ fn a_teardown_can_be_asked_to_let_the_downloads_finish_first() {
 }
 
 #[test]
-fn waiting_and_naming_services_are_refused_together_rather_than_one_being_dropped() {
-    // Two arguments, two requests: a teardown that waits, and a stop of named
-    // services that leaves the rest of the form running. A run given both would
-    // have to pick one, and what is in flight is a question about the download
-    // clients a form holds rather than about two named services.
+fn a_stop_of_named_services_can_be_asked_to_let_their_downloads_finish_first() {
     let both = Arguments {
         forms: vec!["tv".to_owned()],
-        services: vec!["sonarr".to_owned()],
+        services: vec!["qbittorrent".to_owned()],
         wait: Waiting::ForTheDownloads,
         ..Arguments::default()
     };
+    assert_eq!(refusal("down", both.clone()), None);
     assert_eq!(
-        refusal("down", both),
-        Some(Refused::Together {
-            action: "down".to_owned(),
-            argument: "wait".to_owned(),
-            alongside: "services".to_owned()
-        })
+        command("down", both),
+        Some(Command::Halt(lemonfiber_core::app::Halting {
+            forms: vec!["tv".to_owned()],
+            services: vec!["qbittorrent".to_owned()],
+            wait: Waiting::ForTheDownloads,
+        }))
     );
 }
 
@@ -104,10 +101,11 @@ fn stopping_named_services_is_a_different_request_from_tearing_a_form_down() {
     };
     assert_eq!(
         command("down", given),
-        Some(Command::Halt {
+        Some(Command::Halt(lemonfiber_core::app::Halting {
             forms: vec!["tv".to_owned()],
-            services: vec!["sonarr".to_owned()]
-        })
+            services: vec!["sonarr".to_owned()],
+            wait: Waiting::Never,
+        }))
     );
 }
 

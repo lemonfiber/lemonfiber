@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a certificate says about itself.",
+  "type": "object",
+  "properties": {
+    "fingerprint": {
+      "description": "What a phone pins: SHA-256 over the certificate's DER encoding, lower-case hex.",
+      "type": "string"
+    },
+    "issuer": {
+      "description": "Who signed it, as an RFC 4514 string.",
+      "type": "string"
+    },
+    "names": {
+      "description": "The names it is made out to: its subject alternative names.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "self_signed": {
+      "description": "Whether it was signed by its own key under its own name.",
+      "type": "boolean"
+    },
+    "subject": {
+      "description": "Who it is made out to, as an RFC 4514 string.",
+      "type": "string"
+    },
+    "valid_from": {
+      "description": "When it begins to hold.",
+      "$ref": "Instant.json"
+    },
+    "valid_until": {
+      "description": "When it stops holding.",
+      "$ref": "Instant.json"
+    }
+  },
+  "required": [
+    "fingerprint",
+    "subject",
+    "issuer",
+    "self_signed",
+    "names",
+    "valid_from",
+    "valid_until"
+  ]
+}

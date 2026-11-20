@@ -115,7 +115,13 @@ fn dispatched() -> Vec<(Command, Kind)> {
             }),
             kind::LOGS,
         ),
-        (Command::InFlight { forms: Vec::new() }, kind::IN_FLIGHT),
+        (
+            Command::InFlight {
+                forms: Vec::new(),
+                services: Vec::new(),
+            },
+            kind::IN_FLIGHT,
+        ),
         (
             Command::Served(crate::companion::served::Served {
                 port: 8443,
@@ -124,6 +130,7 @@ fn dispatched() -> Vec<(Command, Kind)> {
             }),
             kind::SERVED,
         ),
+        (Command::Serving, kind::SERVED),
         (Command::Standing, kind::STANDING),
         (
             Command::Admission(crate::app::admitting::Asked::Password(
