@@ -30,7 +30,7 @@ impl Locale {
             .map(|tag| Self(tag.to_owned()))
             .ok_or_else(|| {
                 format!(
-                    "{SETTING} is the house's language and region as a language-REGION tag, \
+                    "{SETTING} is the house's language and region as one tag, \
                      two or three lowercase letters, a hyphen, then two uppercase letters or \
                      three digits, such as {DEFAULT}, and {text} is not one"
                 )

@@ -346,8 +346,9 @@ fn the_house_s_locale_is_a_core_setting_taking_a_language_region_tag() {
     use crate::settings::own::LOCALE;
     assert!(is_core(LOCALE));
     assert_eq!(refusal(LOCALE, "nl-NL"), None);
-    assert!(refusal(LOCALE, "nl_NL.UTF-8")
-        .is_some_and(|said| said.starts_with(LOCALE) && said.contains("language-REGION")));
+    assert!(refusal(LOCALE, "nl_NL.UTF-8").is_some_and(
+        |said| said.starts_with(LOCALE) && said.contains("language and region as one tag")
+    ));
 }
 
 #[test]

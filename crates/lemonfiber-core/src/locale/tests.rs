@@ -28,7 +28,7 @@ fn anything_else_is_refused_naming_the_shape() {
         assert_eq!(
             Locale::read(text),
             Err(format!(
-                "LEMONFIBER_LOCALE is the house's language and region as a language-REGION tag, \
+                "LEMONFIBER_LOCALE is the house's language and region as one tag, \
                  two or three lowercase letters, a hyphen, then two uppercase letters or three \
                  digits, such as en-US, and {text} is not one"
             ))

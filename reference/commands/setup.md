@@ -96,6 +96,9 @@ Options:
 
           [possible values: true, false]
 
+      --locale <TAG>
+          The house's language and region as a `language-REGION` tag, such as `nl-NL`; the one the host's `LANG` names where it is not given
+
   -h, --help
           Print help (see a summary with '-h')
 ```
