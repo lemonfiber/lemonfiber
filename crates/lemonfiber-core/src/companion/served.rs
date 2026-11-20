@@ -7,6 +7,7 @@
 //! surface itself — rather than either of them guessing.
 
 use std::path::Path;
+use std::sync::PoisonError;
 
 use serde::Deserialize;
 
@@ -101,17 +102,18 @@ pub struct Settled(std::sync::RwLock<Option<ServedReport>>);
 impl Settled {
     /// Keep `report` as what this run settled, without the key it presents.
     fn keep(&self, report: &ServedReport) {
-        if let Ok(mut held) = self.0.write() {
-            *held = Some(ServedReport {
-                presented: None,
-                ..report.clone()
-            });
-        }
+        *self.0.write().unwrap_or_else(PoisonError::into_inner) = Some(ServedReport {
+            presented: None,
+            ..report.clone()
+        });
     }
 
     /// What this run settled, or nothing where it settled nothing.
     fn read(&self) -> Option<ServedReport> {
-        self.0.read().ok().and_then(|held| held.clone())
+        self.0
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 }
 

@@ -285,3 +285,44 @@ fn why_the_record_was_not_written_never_names_a_path() {
         assert!(!told.contains('/') && !told.contains('\\'), "{told}");
     }
 }
+
+/// What is kept where the certificate goes and does not read as a certificate is refused
+/// rather than served undescribed.
+#[tokio::test]
+async fn a_certificate_that_does_not_read_as_one_is_refused() {
+    use base64::Engine as _;
+    let at = Scratch::new("served-unreadable");
+    let Ok(key) = rcgen::KeyPair::generate() else {
+        unreachable!("rcgen makes a key")
+    };
+    let block = |label: &str, der: &[u8]| {
+        format!(
+            "-----BEGIN {label}-----\n{}\n-----END {label}-----\n",
+            base64::engine::general_purpose::STANDARD.encode(der)
+        )
+    };
+    let _ = std::fs::write(at.join("certificate.pem"), block("CERTIFICATE", b"not one"));
+    let _ = std::fs::write(
+        at.join("key.pem"),
+        block("PRIVATE KEY", &key.serialize_der()),
+    );
+    let ctx = keeping(&at);
+    let settled = answered(
+        crate::app::Command::Served(Served {
+            port: 8443,
+            encrypted: true,
+            network: false,
+        }),
+        &ctx,
+    )
+    .await;
+    assert_eq!(
+        settled.err().map(|problem| problem.code),
+        Some(crate::error::codes::serve::NO_CERTIFICATE)
+    );
+    let read = answered(crate::app::Command::Serving, &ctx).await;
+    assert_eq!(
+        read.err().map(|problem| problem.code),
+        Some(crate::error::codes::serve::NOT_SERVING)
+    );
+}
