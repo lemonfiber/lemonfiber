@@ -3079,6 +3079,13 @@
               "null"
             ]
           },
+          "decisions": {
+            "description": "Every answer setup writes, in the catalogue's order, whether or not anything holds\nit. Never a value: a value is read where it is held, withheld there as it is.",
+            "items": {
+              "$ref": "#/components/schemas/DecisionReport"
+            },
+            "type": "array"
+          },
           "rehearsed": {
             "description": "Whether this was a rehearsal, so a change that `changed` reports was one\nthat *would* be made rather than one that was.",
             "type": "boolean"
@@ -3104,6 +3111,7 @@
         },
         "required": [
           "settings",
+          "decisions",
           "changed",
           "rehearsed"
         ],
@@ -3867,6 +3875,123 @@
             "type": "object"
           }
         ]
+      },
+      "DecisionKey": {
+        "description": "The setting an answer setup writes is held in.",
+        "oneOf": [
+          {
+            "const": "DATA_ROOT",
+            "type": "string"
+          },
+          {
+            "const": "MEDIA_SERVER_MODE",
+            "type": "string"
+          },
+          {
+            "const": "LEMONFIBER_USENET",
+            "type": "string"
+          },
+          {
+            "const": "LEMONFIBER_TORRENT",
+            "type": "string"
+          },
+          {
+            "const": "LEMONFIBER_VPN",
+            "type": "string"
+          },
+          {
+            "const": "PUID",
+            "type": "string"
+          },
+          {
+            "const": "PGID",
+            "type": "string"
+          },
+          {
+            "const": "VPN_PROVIDER",
+            "type": "string"
+          },
+          {
+            "const": "INDEXER_URL",
+            "type": "string"
+          },
+          {
+            "const": "INDEXER_APIKEY",
+            "type": "string"
+          },
+          {
+            "const": "USENET_HOST",
+            "type": "string"
+          },
+          {
+            "const": "USENET_PORT",
+            "type": "string"
+          },
+          {
+            "const": "USENET_USER",
+            "type": "string"
+          },
+          {
+            "const": "USENET_PASS",
+            "type": "string"
+          },
+          {
+            "const": "USENET_TLS",
+            "type": "string"
+          },
+          {
+            "const": "LEMONFIBER_FRONT_DOOR",
+            "type": "string"
+          },
+          {
+            "const": "TZ",
+            "type": "string"
+          },
+          {
+            "const": "LEMONFIBER_LOCALE",
+            "type": "string"
+          }
+        ]
+      },
+      "DecisionReport": {
+        "description": "One answer setup writes, as it can be changed afterwards.",
+        "properties": {
+          "affects": {
+            "description": "What changing it affects, in the core's words.",
+            "type": "string"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/Cost",
+            "description": "What changing it costs."
+          },
+          "credential": {
+            "description": "Whether its value is withheld as a credential.",
+            "type": "boolean"
+          },
+          "held": {
+            "description": "Whether the answer is held, in the configuration or the settings store.",
+            "type": "boolean"
+          },
+          "key": {
+            "$ref": "#/components/schemas/DecisionKey",
+            "description": "The setting the answer is kept in."
+          },
+          "setting": {
+            "description": "The name `settings set` takes, where the settings store keeps the answer. Absent\nwhere `config set` takes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "cost",
+          "affects",
+          "held",
+          "credential"
+        ],
+        "type": "object"
       },
       "Described": {
         "description": "What a certificate says about itself.",

@@ -14,6 +14,13 @@
         "null"
       ]
     },
+    "decisions": {
+      "description": "Every answer setup writes, in the catalogue's order, whether or not anything holds\nit. Never a value: a value is read where it is held, withheld there as it is.",
+      "type": "array",
+      "items": {
+        "$ref": "DecisionReport.json"
+      }
+    },
     "rehearsed": {
       "description": "Whether this was a rehearsal, so a change that `changed` reports was one\nthat *would* be made rather than one that was.",
       "type": "boolean"
@@ -39,6 +46,7 @@
   },
   "required": [
     "settings",
+    "decisions",
     "changed",
     "rehearsed"
   ]

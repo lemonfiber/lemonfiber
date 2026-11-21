@@ -100,6 +100,9 @@ impl SettingReport {
 pub struct ConfigReport {
     /// The settings asked about — one for a lookup, all of them for a listing.
     pub settings: Vec<SettingReport>,
+    /// Every answer setup writes, in the catalogue's order, whether or not anything holds
+    /// it. Never a value: a value is read where it is held, withheld there as it is.
+    pub decisions: Vec<DecisionReport>,
     /// Whether this command changed, or would change, a setting.
     pub changed: bool,
     /// Whether this was a rehearsal, so a change that `changed` reports was one
@@ -117,6 +120,25 @@ pub struct ConfigReport {
     /// or nothing to do. Absent for a read, which proposes nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review: Option<crate::reconfigure::Review>,
+}
+
+/// One answer setup writes, as it can be changed afterwards.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct DecisionReport {
+    /// The setting the answer is kept in.
+    pub key: crate::reconfigure::DecisionKey,
+    /// What changing it costs.
+    pub cost: crate::reconfigure::Cost,
+    /// What changing it affects, in the core's words.
+    pub affects: String,
+    /// Whether the answer is held, in the configuration or the settings store.
+    pub held: bool,
+    /// Whether its value is withheld as a credential.
+    pub credential: bool,
+    /// The name `settings set` takes, where the settings store keeps the answer. Absent
+    /// where `config set` takes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setting: Option<String>,
 }
 
 /// What a quality command did to the stored choice.

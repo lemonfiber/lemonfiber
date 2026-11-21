@@ -42,15 +42,23 @@ pub(crate) fn settings_takes(name: &str, read: bool) -> Result<(), Box<Problem>>
 }
 
 pub(crate) fn config_takes(key: &str, writing: bool) -> Result<(), Box<Problem>> {
-    if own::is_core(key) {
-        return Err(Box::new(taken(key, "lemonfiber settings set")));
-    }
-    match legacy::keyed(key) {
-        Some(row) if writing && !row.secret => {
-            Err(Box::new(taken(row.name, "lemonfiber settings set")))
+    match setting_of(key) {
+        Some(name) if writing || own::is_core(key) => {
+            Err(Box::new(taken(name, "lemonfiber settings set")))
         }
         _ => Ok(()),
     }
+}
+
+/// The name `settings set` writes `key` under, where the settings store keeps it rather
+/// than the configuration.
+pub(crate) fn setting_of(key: &str) -> Option<&str> {
+    if own::is_core(key) {
+        return Some(key);
+    }
+    legacy::keyed(key)
+        .filter(|row| !row.secret)
+        .map(|row| row.name)
 }
 
 pub(crate) fn valued(name: &str, value: &str) -> Result<(), Box<Problem>> {

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The setting an answer setup writes is held in.",
+  "oneOf": [
+    {
+      "type": "string",
+      "const": "DATA_ROOT"
+    },
+    {
+      "type": "string",
+      "const": "MEDIA_SERVER_MODE"
+    },
+    {
+      "type": "string",
+      "const": "LEMONFIBER_USENET"
+    },
+    {
+      "type": "string",
+      "const": "LEMONFIBER_TORRENT"
+    },
+    {
+      "type": "string",
+      "const": "LEMONFIBER_VPN"
+    },
+    {
+      "type": "string",
+      "const": "PUID"
+    },
+    {
+      "type": "string",
+      "const": "PGID"
+    },
+    {
+      "type": "string",
+      "const": "VPN_PROVIDER"
+    },
+    {
+      "type": "string",
+      "const": "INDEXER_URL"
+    },
+    {
+      "type": "string",
+      "const": "INDEXER_APIKEY"
+    },
+    {
+      "type": "string",
+      "const": "USENET_HOST"
+    },
+    {
+      "type": "string",
+      "const": "USENET_PORT"
+    },
+    {
+      "type": "string",
+      "const": "USENET_USER"
+    },
+    {
+      "type": "string",
+      "const": "USENET_PASS"
+    },
+    {
+      "type": "string",
+      "const": "USENET_TLS"
+    },
+    {
+      "type": "string",
+      "const": "LEMONFIBER_FRONT_DOOR"
+    },
+    {
+      "type": "string",
+      "const": "TZ"
+    },
+    {
+      "type": "string",
+      "const": "LEMONFIBER_LOCALE"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "affects": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "cost": {
+      "type": [
+        "ref:Cost"
+      ],
+      "required": true
+    },
+    "credential": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "held": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "key": {
+      "type": [
+        "ref:DecisionKey"
+      ],
+      "required": true
+    },
+    "setting": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

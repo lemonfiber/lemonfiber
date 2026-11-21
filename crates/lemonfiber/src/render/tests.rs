@@ -44,6 +44,7 @@ fn an_archive() -> Manifest {
 /// A listing of settings, each carrying the origin given for it.
 fn listing(settings: Vec<(&str, Origin)>) -> ConfigReport {
     ConfigReport {
+        decisions: Vec::new(),
         settings: settings
             .into_iter()
             .map(|(key, origin)| SettingReport {
@@ -253,18 +254,7 @@ fn the_first_of_them() -> Vec<Outcome> {
         Outcome::Preview(a_plan("media", Vec::new())),
         // A setting to list: an empty, unchanged config renders nothing at all,
         // which is correct and is covered by its own test.
-        Outcome::Config(ConfigReport {
-            settings: vec![SettingReport {
-                key: "DATA_ROOT".to_owned(),
-                value: "/data".to_owned(),
-                secret: false,
-                origin: Origin::Operator,
-            }],
-            changed: false,
-            rehearsed: false,
-            review: None,
-            consequence: None,
-        }),
+        Outcome::Config(listing(vec![("DATA_ROOT", Origin::Operator)])),
         Outcome::Alerts(AlertReport {
             preset: "problems-only".to_owned(),
             means: "Told when something is wrong. Silence means healthy.".to_owned(),
