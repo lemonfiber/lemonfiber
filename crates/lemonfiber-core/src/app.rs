@@ -474,7 +474,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Undo { run } => undone(ctx, run).await,
         Command::Credentials(asked) => inventoried(ctx, asked).await,
         Command::Stored => stored::listing(ctx).map(Outcome::Stored),
-        Command::Plugins(action) => plugins::plugins(ctx, &action).await.map(Outcome::Plugins),
+        Command::Plugins(_) | Command::PluginCatalogue => plugins::routed(ctx, command).await,
         Command::Authoring(asked) => authoring::answered(ctx, asked).await,
         Command::Password => password::set(ctx).await,
         // The one read here that cannot fail, and the requirement is that it cannot:

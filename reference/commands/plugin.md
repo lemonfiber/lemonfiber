@@ -22,6 +22,7 @@ Commands:
   record            Take every recording the manifest names again, from its pins, and write each
   install           Install a plugin, recording what installing it decided
   installed         Say what is installed, and what each plugin is doing
+  catalogue         List what the plugin catalogue offers to install: each plugin's name, what it does, what the household is without it, its version, and whether it is installed here with whether the catalogue holds a newer version
   remove            Take a plugin off this machine, putting back everything installing it wrote
   prove             Ask an installed plugin's adapters again whether they speak what they declare, and run each proof it declares that runs its image's own program again
   run               Run one of an installed plugin's recipes that runs only when asked for by name
@@ -390,6 +391,38 @@ Read from the record rather than from the manifests, so it answers for a machine
 A record that is there and cannot be read is refused rather than answered as nothing installed: a stranger's service may be running, and *no plugins* is the one wrong answer that would be believed.
 
 Usage: lemonfiber plugin installed [OPTIONS]
+
+Options:
+      --json
+          Print machine-readable output
+
+      --dry-run
+          Say what would happen, and change nothing
+
+      --force
+          Take the stack from a run that claimed it and did not give it back
+
+      --stack-dir <PATH>
+          Operate a stack directory of your own instead of the built-in one
+
+      --config-dir <PATH>
+          Keep lemonfiber's own configuration under a directory of your own
+
+      --data-dir <PATH>
+          Keep lemonfiber's own data under a directory of your own
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lemonfiber plugin catalogue`
+
+```text
+List what the plugin catalogue offers to install: each plugin's name, what it does, what the household is without it, its version, and whether it is installed here with whether the catalogue holds a newer version.
+
+Read from the catalogue's index, fetched now and listed only where its signature verifies against the key this build carries. Where reaching the catalogue is switched off it is not asked, and the answer names the setting that turns it on; where the index cannot be fetched or verified the answer says why, and lists nothing rather than an empty catalogue. What a plugin would be granted is said by its install's rehearsal.
+
+Usage: lemonfiber plugin catalogue [OPTIONS]
 
 Options:
       --json

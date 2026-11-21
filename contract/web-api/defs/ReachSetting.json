@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A setting that keeps a request from being made, and the change that lets it be.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "description": "The action that writes it.",
+      "$ref": "SettingWrite.json"
+    },
+    "key": {
+      "description": "The setting.",
+      "type": "string"
+    },
+    "value": {
+      "description": "The value that lets the request be made.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "value",
+    "action"
+  ]
+}

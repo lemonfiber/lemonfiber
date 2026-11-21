@@ -120,6 +120,7 @@ fn removing_or_updating_a_plugin_takes_something_away_and_installing_one_does_no
             consent: crate::app::plugins::Consent::default(),
         }),
         Command::Plugins(Asked::Installed),
+        Command::PluginCatalogue,
     ] {
         assert_eq!(of(&quiet, WAITED), None, "{quiet:?} stops nothing");
     }

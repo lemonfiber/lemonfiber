@@ -1,0 +1,12 @@
+{
+  "api_version": 1,
+  "data": {
+    "entries": [],
+    "failure": {
+      "code": "PLUGIN-19",
+      "summary": "The catalogue's index could not be read"
+    },
+    "state": "failed"
+  },
+  "kind": "plugin-catalogue"
+}

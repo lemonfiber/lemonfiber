@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "code": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "summary": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

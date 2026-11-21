@@ -513,6 +513,7 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             consent: consented(offer, approved, &inputs)?,
         },
         PluginCommand::Authoring(read) => return Ok(crate::authoring::authored(read)),
+        PluginCommand::Catalogue => return Ok(Under::Dispatched(Command::PluginCatalogue)),
     };
     Ok(Under::Dispatched(Command::Plugins(asked)))
 }

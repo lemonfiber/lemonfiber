@@ -8,6 +8,7 @@ mod healing;
 mod installed;
 mod keys;
 mod notifying;
+mod offered;
 mod watching;
 
 use lemonfiber_core::app::Outcome;
@@ -237,6 +238,9 @@ fn diagnosing() -> Vec<Outcome> {
         // both entries is on it, which is all the shape comparison reads, and a
         // listing of nineteen would be nineteen copies of the same schema.
         Outcome::Plugins(what_is_installed()),
+        Outcome::PluginCatalogue(offered::listed()),
+        Outcome::PluginCatalogue(offered::off()),
+        Outcome::PluginCatalogue(offered::failed()),
         // One service rather than a whole stack: every field of the entry is on
         // it, which is all the shape comparison reads, and a listing of nineteen
         // would be nineteen copies of the same schema.

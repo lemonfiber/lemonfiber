@@ -396,6 +396,11 @@ pub enum Command {
     Stored,
     /// Install a plugin, or say what is installed already.
     Plugins(plugins::Asked),
+    /// Say what the plugin catalogue offers to install, from its verified index.
+    ///
+    /// A read with no arguments: the list is the whole index, and an operator choosing
+    /// what to add is choosing among all of it.
+    PluginCatalogue,
     /// Read a plugin's own source as its author would, with no stack.
     Authoring(authoring::Asked),
     /// Set the web interface's password the operator types twice, revoking every device

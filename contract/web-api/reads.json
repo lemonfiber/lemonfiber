@@ -522,6 +522,14 @@
     "file": false
   },
   {
+    "path": "/api/plugins/catalogue",
+    "parameters": [],
+    "kinds": [
+      "plugin-catalogue"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/wiring",
     "parameters": [],
     "kinds": [

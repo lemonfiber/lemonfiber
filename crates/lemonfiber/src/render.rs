@@ -284,6 +284,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Served(report) => companion::served(report),
         Outcome::Standing(report) => companion::standing(report),
         Outcome::Admitting(answer) => admitting::answered(answer),
+        Outcome::PluginCatalogue(report) => plugin::offered::listed(report),
         Outcome::PluginClaims(read) => plugin::claims(read),
         Outcome::PluginConformance(read) => plugin::conformance::judged(read),
         Outcome::PluginProvenance(read) => plugin::provenance(read),

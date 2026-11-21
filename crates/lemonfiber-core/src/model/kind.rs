@@ -175,6 +175,8 @@ kinds! {
     PASSWORD = "password",
     /// What pausing or resuming every download client came to, client by client.
     PAUSING = "pausing",
+    /// What the plugin catalogue offers to install, or why it was not read.
+    PLUGIN_CATALOGUE = "plugin-catalogue",
     /// What a plugin's source claims, held to what this build publishes.
     PLUGIN_CLAIMS = "plugin-claims",
     /// What a plugin's conformance recordings come to against the contracts it speaks.

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The action a setting is written with.",
+  "oneOf": [
+    {
+      "description": "`config-set`, which writes the configuration.",
+      "type": "string",
+      "const": "config-set"
+    }
+  ]
+}

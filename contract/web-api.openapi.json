@@ -2442,6 +2442,24 @@
         ],
         "type": "object"
       },
+      "CatalogueFailure": {
+        "description": "Why the catalogue's index was not read.",
+        "properties": {
+          "code": {
+            "description": "The problem code an install by name would be refused with.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "What went wrong, in one line.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "summary"
+        ],
+        "type": "object"
+      },
       "CatalogueReport": {
         "description": "What this stack holds, and what it used to.",
         "properties": {
@@ -2463,6 +2481,50 @@
         "required": [
           "services",
           "removed"
+        ],
+        "type": "object"
+      },
+      "CataloguedPlugin": {
+        "description": "One plugin the catalogue offers.",
+        "properties": {
+          "description": {
+            "description": "What it does, in its author's words.",
+            "type": "string"
+          },
+          "id": {
+            "description": "The plugin's id, which is the name it is installed by.",
+            "type": "string"
+          },
+          "installed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstalledVersion"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version installed on this machine. Absent where it is not installed."
+          },
+          "name": {
+            "description": "What it calls itself.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The version the catalogue reviewed.",
+            "type": "string"
+          },
+          "without_it": {
+            "description": "What the household is without it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "version",
+          "without_it"
         ],
         "type": "object"
       },
@@ -7158,6 +7220,24 @@
           }
         ]
       },
+      "InstalledVersion": {
+        "description": "The version of a catalogued plugin installed here, against the catalogue's.",
+        "properties": {
+          "newer": {
+            "description": "Whether the catalogue's version is above it by semver.",
+            "type": "boolean"
+          },
+          "version": {
+            "description": "The version installed.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "newer"
+        ],
+        "type": "object"
+      },
       "Instant": {
         "description": "A moment, as a whole number of seconds since the Unix epoch.",
         "format": "uint64",
@@ -11737,6 +11817,98 @@
         ],
         "type": "object"
       },
+      "PluginCatalogueReport": {
+        "description": "What the catalogue offers, or why it was not read.",
+        "properties": {
+          "entries": {
+            "description": "Every plugin the verified index offers, by id; empty where it was not read.",
+            "items": {
+              "$ref": "#/components/schemas/CataloguedPlugin"
+            },
+            "type": "array"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogueFailure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the index could not be read. Present where it failed."
+          },
+          "published": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the index listed was published. Present where it was read."
+          },
+          "serial": {
+            "description": "Which release of the catalogue the index listed is. Present where it was read.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "setting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReachSetting"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The setting that keeps the catalogue from being asked, and how to let it be.\nPresent where it is switched off."
+          },
+          "state": {
+            "$ref": "#/components/schemas/PluginCatalogueState",
+            "description": "Whether the catalogue was read, switched off, or could not be read."
+          },
+          "unreadable": {
+            "description": "How many entries the index holds that could not be listed, for lacking a fact an\nentry carries. Present where it was read.",
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "entries"
+        ],
+        "type": "object"
+      },
+      "PluginCatalogueState": {
+        "description": "Whether the catalogue was read.",
+        "oneOf": [
+          {
+            "const": "listed",
+            "description": "Its index was fetched and verified.",
+            "type": "string"
+          },
+          {
+            "const": "off",
+            "description": "Reaching it is switched off, and nothing was asked of it.",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "description": "Its index or signature could not be fetched, verified or read.",
+            "type": "string"
+          }
+        ]
+      },
       "PluginChange": {
         "description": "One change installing a plugin makes to the machine.\n\nA path and what goes at it, which is the whole of what an install touches. None is an\nedit to a file the stack already has: a plugin's route is the proxy's routing table\nand its dashboard entry the panel list's, each applied over its contract.",
         "properties": {
@@ -14746,6 +14918,29 @@
           "allows",
           "holds_back",
           "fell_back"
+        ],
+        "type": "object"
+      },
+      "ReachSetting": {
+        "description": "A setting that keeps a request from being made, and the change that lets it be.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/SettingWrite",
+            "description": "The action that writes it."
+          },
+          "key": {
+            "description": "The setting.",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value that lets the request be made.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "action"
         ],
         "type": "object"
       },
@@ -18046,6 +18241,16 @@
           "origin"
         ],
         "type": "object"
+      },
+      "SettingWrite": {
+        "description": "The action a setting is written with.",
+        "oneOf": [
+          {
+            "const": "config-set",
+            "description": "`config-set`, which writes the configuration.",
+            "type": "string"
+          }
+        ]
       },
       "SettingsReport": {
         "description": "Every setting and secret the stack's services read, and what changing a setting came to.",
@@ -24350,6 +24555,9 @@
             "$ref": "#/components/schemas/kind-playing"
           },
           {
+            "$ref": "#/components/schemas/kind-plugin-catalogue"
+          },
+          {
             "$ref": "#/components/schemas/kind-plugin-claims"
           },
           {
@@ -26915,6 +27123,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/PlayingReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-plugin-catalogue": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PluginCatalogueReport",
             "description": "The payload."
           },
           "host": {
@@ -34536,6 +34784,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/kind-plugins"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/plugins/catalogue": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-plugin-catalogue"
                 }
               }
             },

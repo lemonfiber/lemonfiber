@@ -416,6 +416,10 @@ fn the_words_about_this_machine_become_commands() {
         Some(Command::Plugins(plugins::Asked::Installed))
     );
     assert_eq!(
+        door(lemonfiber::cli::PluginCommand::Catalogue),
+        Some(Command::PluginCatalogue)
+    );
+    assert_eq!(
         door(lemonfiber::cli::PluginCommand::Remove {
             plugin: "komga".to_owned(),
             offer: None,

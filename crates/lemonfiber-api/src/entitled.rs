@@ -114,6 +114,7 @@ pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
                 if matches!(
                     command,
                     Command::Settings(_)
+                        | Command::PluginCatalogue
                         | Command::Stack
                         | Command::Settled
                         | Command::Migrate(MigrateAction::Survey)

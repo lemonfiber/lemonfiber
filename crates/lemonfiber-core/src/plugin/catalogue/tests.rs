@@ -115,6 +115,7 @@ fn an_entry_holds_only_the_manifest_it_names() {
         origin: "https://example.org/plugin-komga".to_owned(),
         revision: "8fa05ba718f70624f2c122f8c0371d47e6c90d0e".to_owned(),
         manifest: digest.to_owned(),
+        ..Entry::default()
     };
     let digest = format!(
         "sha256:{}",
@@ -133,7 +134,7 @@ fn only_a_whole_commit_is_pinned() {
         id: "komga".to_owned(),
         origin: "https://example.org/plugin-komga".to_owned(),
         revision: revision.to_owned(),
-        manifest: String::new(),
+        ..Entry::default()
     };
 
     assert!(entry("8fa05ba718f70624f2c122f8c0371d47e6c90d0e").pins_a_commit());

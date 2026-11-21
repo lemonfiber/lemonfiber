@@ -149,12 +149,12 @@
       },
       {
         "allowed": true,
-        "cost": "A plugin cannot be installed by name, and is refused before anything is fetched. Nothing installed stops, and installing from a git source or a directory you name is unaffected.",
+        "cost": "A plugin cannot be installed by name, and is refused before anything is fetched, and what the catalogue offers is not listed. Nothing installed stops, and installing from a git source or a directory you name is unaffected.",
         "destination": [
           "https://github.com/lemonfiber/lemonfiber-plugins/releases/latest/download/index.json",
           "https://github.com/lemonfiber/lemonfiber-plugins/releases/latest/download/index.json.sig"
         ],
-        "purpose": "Read the newest catalogue release's index and the signature over it, so a plugin you install by name is resolved only through an index this build has verified. Made only when you install one by name.",
+        "purpose": "Read the newest catalogue release's index and the signature over it, so a plugin you install by name is resolved only through an index this build has verified, and what you browse to install is listed from one. Made only when you install one by name or list what the catalogue offers.",
         "reach": "catalogue",
         "sends": "Two unauthenticated requests, one for the index and one for its signature, and the one GitHub answers each with: the address its download host serves that file from, which is asked in turn. No credential, nothing about this machine, and not the name you are installing — the whole index is fetched and the name is looked up here.",
         "switch": "LEMONFIBER_REACH_CATALOGUE"

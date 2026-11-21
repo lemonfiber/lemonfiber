@@ -560,6 +560,7 @@ fn entry_in(text: &str) -> String {
     }
 }
 
+mod browsing;
 mod building;
 mod cataloguing;
 mod crediting;

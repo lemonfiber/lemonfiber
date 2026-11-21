@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "action": {
+      "type": [
+        "ref:SettingWrite"
+      ],
+      "required": true
+    },
+    "key": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "value": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

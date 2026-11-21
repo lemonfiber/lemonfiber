@@ -39,6 +39,13 @@ use super::fetching::{self, Vouched};
 /// a bound is what keeps an address that hands on to itself from being asked for ever.
 const HOPS: usize = 3;
 
+/// The most bytes a release's file may hold before reading it is given up.
+///
+/// An index is a few hundred bytes for each plugin the catalogue registers, so a
+/// megabyte holds thousands of them; a bound is what keeps an address answering with
+/// something endless from being read into memory for ever.
+const MOST: usize = 1024 * 1024;
+
 /// Carry an errand out over the plugin the catalogue registers under `name`, at the
 /// commit it reviewed.
 ///
@@ -60,34 +67,7 @@ pub(super) async fn resolved(
     if !ctx.settings.reaching.allows(REACH_CATALOGUE_KEY) {
         return Err(Box::new(switched_off(name)));
     }
-    let index = asset(ctx, catalogue::INDEX)
-        .await
-        .map_err(|why| Box::new(unreachable(&why)))?
-        .ok_or_else(|| {
-            Box::new(unreachable(
-                "the catalogue has published no release, so there is no index to read",
-            ))
-        })?;
-    let signature = asset(ctx, catalogue::SIGNATURE)
-        .await
-        .map_err(|why| Box::new(unreachable(&why)))?
-        .unwrap_or_default();
-    let read = catalogue::verified(&index, &signature, ctx.catalogue_key.as_deref()).map_err(
-        |refused| {
-            Box::new(match refused {
-                Refused::Unverified(why) => unverified(&why),
-                Refused::Unreadable(why) => unreadable(&why),
-            })
-        },
-    )?;
-    // Before the name is looked up: a release the catalogue replaced still verifies, and
-    // what it reviewed may have been withdrawn since. Remembered only by a run that acts,
-    // because a reading and a rehearsal write nothing.
-    super::newest::held(
-        ctx,
-        read.serial(),
-        !ctx.dry_run && consent.agreement.is_some(),
-    )?;
+    let read = current(ctx, !ctx.dry_run && consent.agreement.is_some()).await?;
     let entry = read
         .entry(name)
         .ok_or_else(|| Box::new(not_catalogued(name)))?;
@@ -113,6 +93,45 @@ pub(super) async fn resolved(
     fetching::fetched(ctx, held, &source, errand, consent).await
 }
 
+/// The catalogue's newest index, fetched, verified against the key this build carries
+/// and held to the newest one this machine verified, which is remembered only where
+/// `acting`.
+///
+/// Asked only where reaching the catalogue is allowed; the caller asks that first.
+///
+/// # Errors
+///
+/// Where its index or signature cannot be fetched, where the signature does not verify
+/// or there is no key to verify it against, where the index cannot be read, and where
+/// it is older than the newest one this machine verified or that cannot be known.
+pub(super) async fn current(ctx: &Ctx, acting: bool) -> Result<catalogue::Index, Box<Problem>> {
+    let index = asset(ctx, catalogue::INDEX)
+        .await
+        .map_err(|why| Box::new(unreachable(&why)))?
+        .ok_or_else(|| {
+            Box::new(unreachable(
+                "the catalogue has published no release, so there is no index to read",
+            ))
+        })?;
+    let signature = asset(ctx, catalogue::SIGNATURE)
+        .await
+        .map_err(|why| Box::new(unreachable(&why)))?
+        .unwrap_or_default();
+    let read = catalogue::verified(&index, &signature, ctx.catalogue_key.as_deref()).map_err(
+        |refused| {
+            Box::new(match refused {
+                Refused::Unverified(why) => unverified(&why),
+                Refused::Unreadable(why) => unreadable(&why),
+            })
+        },
+    )?;
+    // A release the catalogue replaced still verifies, and what it reviewed may have been
+    // withdrawn since. Remembered only by a run that acts, because a reading and a
+    // rehearsal write nothing.
+    super::newest::held(ctx, read.serial(), acting)?;
+    Ok(read)
+}
+
 /// What one of the release's files holds, nothing where the release has no such file,
 /// or why it could not be read.
 ///
@@ -126,18 +145,26 @@ async fn asset(ctx: &Ctx, url: &str) -> Result<Option<String>, String> {
         let answer = ctx
             .seams
             .http
-            .send(&Request {
-                method: Method::Get,
-                url: at.clone(),
-                headers: vec![("User-Agent".to_owned(), crate::PRODUCT.to_owned())],
-                body: None,
-                pinned: None,
-                deadline: None,
-            })
+            .fetch(
+                &Request {
+                    method: Method::Get,
+                    url: at.clone(),
+                    headers: vec![("User-Agent".to_owned(), crate::PRODUCT.to_owned())],
+                    body: None,
+                    pinned: None,
+                    deadline: None,
+                },
+                MOST,
+            )
             .await
             .map_err(|failure| failure.to_string())?;
         if answer.is_success() {
-            return Ok(Some(answer.body));
+            let bytes = answer
+                .bytes
+                .ok_or_else(|| format!("{at} answered with more than {MOST} bytes"))?;
+            return String::from_utf8(bytes)
+                .map(Some)
+                .map_err(|_| format!("{at} answered with something other than text"));
         }
         if answer.status == 404 {
             return Ok(None);
@@ -200,7 +227,7 @@ fn unverified(why: &str) -> Problem {
 }
 
 /// Said where the index verified and cannot be read.
-fn unreadable(why: &str) -> Problem {
+pub(super) fn unreadable(why: &str) -> Problem {
     Problem::new(
         CATALOGUE_UNREADABLE,
         "The catalogue's index is signed and this build cannot read it",

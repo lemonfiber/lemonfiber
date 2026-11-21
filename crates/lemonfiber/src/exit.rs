@@ -283,6 +283,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         | Outcome::NotifyMine(_)
         | Outcome::Outbound(_)
         | Outcome::Provenance(_)
+        | Outcome::PluginCatalogue(_)
         | Outcome::Catalogue(_)
         // A substitution was recorded, or worked out and not written; one that
         // could not be made comes back as a problem.

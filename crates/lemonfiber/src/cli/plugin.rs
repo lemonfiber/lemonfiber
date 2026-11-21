@@ -102,6 +102,17 @@ pub enum PluginCommand {
     /// nothing installed: a stranger's service may be running, and *no plugins* is
     /// the one wrong answer that would be believed.
     Installed,
+    /// List what the plugin catalogue offers to install: each plugin's name, what it
+    /// does, what the household is without it, its version, and whether it is installed
+    /// here with whether the catalogue holds a newer version.
+    ///
+    /// Read from the catalogue's index, fetched now and listed only where its signature
+    /// verifies against the key this build carries. Where reaching the catalogue is
+    /// switched off it is not asked, and the answer names the setting that turns it on;
+    /// where the index cannot be fetched or verified the answer says why, and lists
+    /// nothing rather than an empty catalogue. What a plugin would be granted is said
+    /// by its install's rehearsal.
+    Catalogue,
     /// Take a plugin off this machine, putting back everything installing it wrote.
     ///
     /// The id rather than a path: the plugin's own source may be long gone, and what

@@ -62,6 +62,7 @@
     "pausing": "ref:PausingReport",
     "play": "ref:PlayReport",
     "playing": "ref:PlayingReport",
+    "plugin-catalogue": "ref:PluginCatalogueReport",
     "plugin-claims": "ref:Claimed",
     "plugin-conformance": "ref:Conformed",
     "plugin-provenance": "ref:Vouched",
