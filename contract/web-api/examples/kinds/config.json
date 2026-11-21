@@ -2,6 +2,136 @@
   "api_version": 1,
   "data": {
     "changed": false,
+    "decisions": [
+      {
+        "affects": "where every download and every library file lives. Each curator holds absolute paths to its root folders, so moving this without re-pointing them leaves a library that points at nothing",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "DATA_ROOT"
+      },
+      {
+        "affects": "whether the media server runs as a container or natively. Its configuration and its library paths differ between the two and have to be carried across",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "MEDIA_SERVER_MODE"
+      },
+      {
+        "affects": "whether Usenet runs at all. Turning it on opens the prerequisites and the credentials Usenet needs and nothing else; turning it off stops and removes its services and disables the forms that required them, and keeps everything already downloaded",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "LEMONFIBER_USENET"
+      },
+      {
+        "affects": "whether torrents run at all, and with them the VPN that carries them. Turning it off stops and removes the download client and the tunnel, and keeps everything already downloaded",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "LEMONFIBER_TORRENT"
+      },
+      {
+        "affects": "whether a VPN carries the torrents. Turning it off stops the tunnel and runs the torrent client on its own network, where every peer sees this connection's own address; turning it on puts the client back inside the tunnel",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "LEMONFIBER_VPN"
+      },
+      {
+        "affects": "which user the containers run as. Files already written stay owned by the previous one, so a change here can leave the stack unable to read its own library",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "PUID"
+      },
+      {
+        "affects": "which group the containers run as. Files already written stay owned by the previous one, so a change here can leave the stack unable to read its own library",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "PGID"
+      },
+      {
+        "affects": "which provider carries the torrents. The tunnel is rebuilt, and torrents do not move until it is up again",
+        "cost": "consequential",
+        "credential": false,
+        "held": false,
+        "key": "VPN_PROVIDER",
+        "setting": "gluetun:provider"
+      },
+      {
+        "affects": "where searches are sent. It is proven against the live indexer before the previous one is discarded",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "INDEXER_URL"
+      },
+      {
+        "affects": "the key searches are sent with. It is proven against the live indexer before the previous one is discarded",
+        "cost": "cheap",
+        "credential": true,
+        "held": false,
+        "key": "INDEXER_APIKEY"
+      },
+      {
+        "affects": "which Usenet provider articles are fetched from. The login is proven before the previous one is discarded",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "USENET_HOST"
+      },
+      {
+        "affects": "the port the provider is reached on. The login is proven before the previous one is discarded",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "USENET_PORT"
+      },
+      {
+        "affects": "the account articles are fetched with. The login is proven before the previous one is discarded",
+        "cost": "cheap",
+        "credential": true,
+        "held": false,
+        "key": "USENET_USER"
+      },
+      {
+        "affects": "the password the account is reached with. The login is proven before the previous one is discarded",
+        "cost": "cheap",
+        "credential": true,
+        "held": false,
+        "key": "USENET_PASS"
+      },
+      {
+        "affects": "whether the provider is reached over TLS. A password is never sent over a plaintext connection, so turning this off leaves the login unproven rather than proving it in the clear",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "USENET_TLS"
+      },
+      {
+        "affects": "which service the front door names",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "LEMONFIBER_FRONT_DOOR"
+      },
+      {
+        "affects": "the zone every service keeps its clock in, and the one a service presenting the house to the outside says it is in. Each service reads it again when it restarts",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "TZ"
+      },
+      {
+        "affects": "the language and region a service presenting the house to the outside says it has. Each service that reads it takes it again when it restarts",
+        "cost": "cheap",
+        "credential": false,
+        "held": false,
+        "key": "LEMONFIBER_LOCALE",
+        "setting": "LEMONFIBER_LOCALE"
+      }
+    ],
     "rehearsed": false,
     "settings": []
   },

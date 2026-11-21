@@ -1,0 +1,23 @@
+{
+  "fields": {},
+  "variants": [
+    "\"DATA_ROOT\"",
+    "\"INDEXER_APIKEY\"",
+    "\"INDEXER_URL\"",
+    "\"LEMONFIBER_FRONT_DOOR\"",
+    "\"LEMONFIBER_LOCALE\"",
+    "\"LEMONFIBER_TORRENT\"",
+    "\"LEMONFIBER_USENET\"",
+    "\"LEMONFIBER_VPN\"",
+    "\"MEDIA_SERVER_MODE\"",
+    "\"PGID\"",
+    "\"PUID\"",
+    "\"TZ\"",
+    "\"USENET_HOST\"",
+    "\"USENET_PASS\"",
+    "\"USENET_PORT\"",
+    "\"USENET_TLS\"",
+    "\"USENET_USER\"",
+    "\"VPN_PROVIDER\""
+  ]
+}

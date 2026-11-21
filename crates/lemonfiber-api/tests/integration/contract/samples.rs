@@ -14,10 +14,11 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
 use lemonfiber_core::model::{
     AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,
-    DoctorReport, FormsReport, HistoryReport, HostingReport, HouseholdReport, ImportReport,
-    LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport, RemovedService,
-    ReplaceReport, ResetReport, RunHealth, RunReport, ScheduledService, ServiceProvenance,
-    StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
+    DecisionReport, DoctorReport, FormsReport, HistoryReport, HostingReport, HouseholdReport,
+    ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport,
+    RemovedService, ReplaceReport, ResetReport, RunHealth, RunReport, ScheduledService,
+    ServiceProvenance, StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport,
+    VersionReport,
 };
 use lemonfiber_core::scheduled::kept::ScheduledRun;
 
@@ -98,6 +99,7 @@ fn running() -> Vec<Outcome> {
             forwarded: None,
         }),
         Outcome::Config(ConfigReport {
+            decisions: vec![a_decision()],
             settings: Vec::new(),
             changed: false,
             rehearsed: false,
@@ -442,6 +444,21 @@ fn a_failed_run() -> ScheduledRun {
         ended: lemonfiber_core::instant::Instant::from_seconds(1_759_400_042),
         exit: Some(1),
         log: vec!["sync failed: the quality guide could not be reached".to_owned()],
+    }
+}
+
+/// A decision the settings store keeps, every optional half filled.
+fn a_decision() -> DecisionReport {
+    use lemonfiber_core::reconfigure::{decision, Cost, DecisionKey};
+    let key = DecisionKey::VpnProvider;
+    let row = decision(key.as_str());
+    DecisionReport {
+        key,
+        cost: row.map_or(Cost::Cheap, |row| row.cost),
+        affects: row.map(|row| row.affects.to_owned()).unwrap_or_default(),
+        held: true,
+        credential: false,
+        setting: Some("gluetun:provider".to_owned()),
     }
 }
 

@@ -12,6 +12,12 @@
       ],
       "required": false
     },
+    "decisions": {
+      "type": [
+        "array[ref:DecisionReport]"
+      ],
+      "required": true
+    },
     "rehearsed": {
       "type": [
         "boolean"

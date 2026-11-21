@@ -127,7 +127,13 @@ async fn a_staged_change_serialises_with_its_difference_and_where_it_stands() {
 
     assert!(json.contains(r#""kind":"config""#), "{json}");
     assert!(json.contains(r#""stance":"pending""#), "{json}");
-    assert!(json.contains(r#""cost":"consequential""#), "{json}");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&json)
+            .ok()
+            .and_then(|read| read.pointer("/data/review/change/cost").cloned()),
+        Some(serde_json::Value::from("consequential")),
+        "{json}"
+    );
     assert!(json.contains(r#""from":"/srv/old""#), "{json}");
     assert!(json.contains(r#""to":"/srv/new""#), "{json}");
 }

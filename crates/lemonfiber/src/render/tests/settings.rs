@@ -62,6 +62,7 @@ fn proposal(stance: Stance) -> Review {
 /// A report over that proposal, listing the setting it names.
 fn proposing(stance: Stance) -> ConfigReport {
     ConfigReport {
+        decisions: Vec::new(),
         settings: vec![SettingReport {
             key: "DATA_ROOT".to_owned(),
             value: "/data".to_owned(),

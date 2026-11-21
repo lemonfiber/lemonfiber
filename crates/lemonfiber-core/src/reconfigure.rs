@@ -55,10 +55,101 @@ pub enum Cost {
     Consequential,
 }
 
+/// The setting an answer setup writes is held in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionKey {
+    /// Where the library and every download live.
+    DataRoot,
+    /// Whether the media server runs as a container or natively.
+    MediaServerMode,
+    /// Whether the stack downloads over Usenet.
+    Usenet,
+    /// Whether the stack torrents.
+    Torrent,
+    /// Whether a VPN carries the torrents.
+    Vpn,
+    /// The user the containers run as.
+    Puid,
+    /// The group the containers run as.
+    Pgid,
+    /// The provider the VPN reaches.
+    VpnProvider,
+    /// Where searches are sent.
+    IndexerUrl,
+    /// The key searches are sent with.
+    IndexerApikey,
+    /// The Usenet provider articles are fetched from.
+    ProviderHost,
+    /// The port the Usenet provider is reached on.
+    ProviderPort,
+    /// The account articles are fetched with.
+    ProviderUser,
+    /// The password that account is reached with.
+    ProviderPass,
+    /// Whether the Usenet provider is reached over TLS.
+    ProviderTls,
+    /// The service the front door names.
+    FrontDoor,
+    /// The house's time zone.
+    Zone,
+    /// The house's language and region.
+    Locale,
+}
+
+impl DecisionKey {
+    /// The name the setting is written under.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DataRoot => DATA_ROOT_KEY,
+            Self::MediaServerMode => MEDIA_SERVER_MODE_KEY,
+            Self::Usenet => USENET_KEY,
+            Self::Torrent => TORRENT_KEY,
+            Self::Vpn => VPN_KEY,
+            Self::Puid => PUID_KEY,
+            Self::Pgid => PGID_KEY,
+            Self::VpnProvider => VPN_PROVIDER_KEY,
+            Self::IndexerUrl => INDEXER_URL_KEY,
+            Self::IndexerApikey => INDEXER_APIKEY_KEY,
+            Self::ProviderHost => PROVIDER_HOST_KEY,
+            Self::ProviderPort => PROVIDER_PORT_KEY,
+            Self::ProviderUser => PROVIDER_USER_KEY,
+            Self::ProviderPass => PROVIDER_PASS_KEY,
+            Self::ProviderTls => PROVIDER_TLS_KEY,
+            Self::FrontDoor => FRONT_DOOR_KEY,
+            Self::Zone => ZONE_KEY,
+            Self::Locale => crate::locale::SETTING,
+        }
+    }
+}
+
+impl serde::Serialize for DecisionKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl schemars::JsonSchema for DecisionKey {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "DecisionKey".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let keys: Vec<serde_json::Value> = DECISIONS
+            .iter()
+            .map(|decision| serde_json::json!({ "type": "string", "const": decision.key.as_str() }))
+            .collect();
+        schemars::json_schema!({
+            "description": "The setting an answer setup writes is held in.",
+            "oneOf": keys,
+        })
+    }
+}
+
 /// One answer setup wrote, as it can be revisited afterwards.
 pub struct Decision {
     /// The setting the answer is held in.
-    pub key: &'static str,
+    pub key: DecisionKey,
     /// What changing it costs.
     pub cost: Cost,
     /// What changing it affects, in the operator's terms — stated before the write,
@@ -79,92 +170,92 @@ pub struct Decision {
 /// close. It is listed as owed rather than quietly left out.
 pub(crate) const DECISIONS: [Decision; 18] = [
     Decision {
-        key: DATA_ROOT_KEY,
+        key: DecisionKey::DataRoot,
         cost: Cost::Consequential,
         affects: "where every download and every library file lives. Each curator holds absolute paths to its root folders, so moving this without re-pointing them leaves a library that points at nothing",
     },
     Decision {
-        key: MEDIA_SERVER_MODE_KEY,
+        key: DecisionKey::MediaServerMode,
         cost: Cost::Consequential,
         affects: "whether the media server runs as a container or natively. Its configuration and its library paths differ between the two and have to be carried across",
     },
     Decision {
-        key: USENET_KEY,
+        key: DecisionKey::Usenet,
         cost: Cost::Consequential,
         affects: "whether Usenet runs at all. Turning it on opens the prerequisites and the credentials Usenet needs and nothing else; turning it off stops and removes its services and disables the forms that required them, and keeps everything already downloaded",
     },
     Decision {
-        key: TORRENT_KEY,
+        key: DecisionKey::Torrent,
         cost: Cost::Consequential,
         affects: "whether torrents run at all, and with them the VPN that carries them. Turning it off stops and removes the download client and the tunnel, and keeps everything already downloaded",
     },
     Decision {
-        key: VPN_KEY,
+        key: DecisionKey::Vpn,
         cost: Cost::Consequential,
         affects: "whether a VPN carries the torrents. Turning it off stops the tunnel and runs the torrent client on its own network, where every peer sees this connection's own address; turning it on puts the client back inside the tunnel",
     },
     Decision {
-        key: PUID_KEY,
+        key: DecisionKey::Puid,
         cost: Cost::Consequential,
         affects: "which user the containers run as. Files already written stay owned by the previous one, so a change here can leave the stack unable to read its own library",
     },
     Decision {
-        key: PGID_KEY,
+        key: DecisionKey::Pgid,
         cost: Cost::Consequential,
         affects: "which group the containers run as. Files already written stay owned by the previous one, so a change here can leave the stack unable to read its own library",
     },
     Decision {
-        key: VPN_PROVIDER_KEY,
+        key: DecisionKey::VpnProvider,
         cost: Cost::Consequential,
         affects: "which provider carries the torrents. The tunnel is rebuilt, and torrents do not move until it is up again",
     },
     Decision {
-        key: INDEXER_URL_KEY,
+        key: DecisionKey::IndexerUrl,
         cost: Cost::Cheap,
         affects: "where searches are sent. It is proven against the live indexer before the previous one is discarded",
     },
     Decision {
-        key: INDEXER_APIKEY_KEY,
+        key: DecisionKey::IndexerApikey,
         cost: Cost::Cheap,
         affects: "the key searches are sent with. It is proven against the live indexer before the previous one is discarded",
     },
     Decision {
-        key: PROVIDER_HOST_KEY,
+        key: DecisionKey::ProviderHost,
         cost: Cost::Cheap,
         affects: "which Usenet provider articles are fetched from. The login is proven before the previous one is discarded",
     },
     Decision {
-        key: PROVIDER_PORT_KEY,
+        key: DecisionKey::ProviderPort,
         cost: Cost::Cheap,
         affects: "the port the provider is reached on. The login is proven before the previous one is discarded",
     },
     Decision {
-        key: PROVIDER_USER_KEY,
+        key: DecisionKey::ProviderUser,
         cost: Cost::Cheap,
         affects: "the account articles are fetched with. The login is proven before the previous one is discarded",
     },
     Decision {
-        key: PROVIDER_PASS_KEY,
+        key: DecisionKey::ProviderPass,
         cost: Cost::Cheap,
         affects: "the password the account is reached with. The login is proven before the previous one is discarded",
     },
     Decision {
-        key: PROVIDER_TLS_KEY,
+        key: DecisionKey::ProviderTls,
         cost: Cost::Cheap,
         affects: "whether the provider is reached over TLS. A password is never sent over a plaintext connection, so turning this off leaves the login unproven rather than proving it in the clear",
     },
     Decision {
-        key: FRONT_DOOR_KEY,
+        key: DecisionKey::FrontDoor,
         cost: Cost::Cheap,
         affects: "which service the front door names",
     },
     Decision {
-        key: ZONE_KEY,
+        key: DecisionKey::Zone,
         cost: Cost::Cheap,
         affects: "the zone every service keeps its clock in, and the one a service presenting the house to the outside says it is in. Each service reads it again when it restarts",
     },
     Decision {
-        key: crate::locale::SETTING,
+        key: DecisionKey::Locale,
         cost: Cost::Cheap,
         affects: "the language and region a service presenting the house to the outside says it has. Each service that reads it takes it again when it restarts",
     },
@@ -173,7 +264,9 @@ pub(crate) const DECISIONS: [Decision; 18] = [
 /// What setup decided about `key`, where it decided anything.
 #[must_use]
 pub fn decision(key: &str) -> Option<&'static Decision> {
-    DECISIONS.iter().find(|decision| decision.key == key)
+    DECISIONS
+        .iter()
+        .find(|decision| decision.key.as_str() == key)
 }
 
 /// What changing `key` costs.

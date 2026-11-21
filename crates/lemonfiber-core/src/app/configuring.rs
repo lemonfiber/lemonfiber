@@ -18,7 +18,7 @@ mod proving;
 
 use crate::config::{env::EnvFile, port_forward_from_env, store};
 use crate::error::{Diagnose, Problem};
-use crate::model::{ConfigReport, SettingReport};
+use crate::model::{ConfigReport, DecisionReport, SettingReport};
 use crate::origin;
 use crate::reconfigure::{Consent, Review, Stance};
 use crate::validate::{Credential, Validation};
@@ -144,8 +144,8 @@ async fn settings(
             .map(|one| one.plugin.clone())
             .collect()
     });
-    let kept = crate::settings::Stores::of(ctx).secrets;
-    let keyed = |value: &str| kept.keyed(value);
+    let stores = crate::settings::Stores::of(ctx);
+    let keyed = |value: &str| stores.secrets.keyed(value);
     let settings = store::shown(&file)
         .into_iter()
         .filter(|setting| key.is_none_or(|wanted| setting.key == wanted))
@@ -167,11 +167,33 @@ async fn settings(
 
     Ok(ConfigReport {
         settings,
+        decisions: decisions(&file, &stores.settings),
         changed,
         rehearsed: ctx.dry_run,
         consequence,
         review,
     })
+}
+
+/// Every answer setup writes, each held where `file` or `settings` hold it.
+fn decisions(file: &EnvFile, settings: &crate::settings::Settings) -> Vec<DecisionReport> {
+    crate::reconfigure::DECISIONS
+        .iter()
+        .map(|decision| {
+            let key = decision.key.as_str();
+            let setting = crate::settings::fences::setting_of(key);
+            DecisionReport {
+                key: decision.key,
+                cost: decision.cost,
+                affects: decision.affects.to_owned(),
+                held: setting
+                    .map_or_else(|| file.get(key), |name| settings.value(name))
+                    .is_some_and(|value| !value.is_empty()),
+                credential: !crate::config::display::in_full(key),
+                setting: setting.map(str::to_owned),
+            }
+        })
+        .collect()
 }
 
 /// A proposed change, the sentence saying what making it costs, and the settings as

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One answer setup writes, as it can be changed afterwards.",
+  "type": "object",
+  "properties": {
+    "affects": {
+      "description": "What changing it affects, in the core's words.",
+      "type": "string"
+    },
+    "cost": {
+      "description": "What changing it costs.",
+      "$ref": "Cost.json"
+    },
+    "credential": {
+      "description": "Whether its value is withheld as a credential.",
+      "type": "boolean"
+    },
+    "held": {
+      "description": "Whether the answer is held, in the configuration or the settings store.",
+      "type": "boolean"
+    },
+    "key": {
+      "description": "The setting the answer is kept in.",
+      "$ref": "DecisionKey.json"
+    },
+    "setting": {
+      "description": "The name `settings set` takes, where the settings store keeps the answer. Absent\nwhere `config set` takes it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "key",
+    "cost",
+    "affects",
+    "held",
+    "credential"
+  ]
+}
