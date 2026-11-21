@@ -11,7 +11,7 @@
 //! **A reading remembers nothing.** The index is held to the newest one this machine
 //! verified, and the newest is left as it was.
 
-use crate::app::Ctx;
+use crate::app::{Command, Ctx, Outcome};
 use crate::config::REACH_CATALOGUE_KEY;
 use crate::error::Problem;
 use crate::migration::version::{among_versions, Standing};
@@ -22,13 +22,26 @@ use crate::model::{
 use crate::plugin::catalogue::{Entry, Index};
 use crate::plugin::Installed;
 
+/// What a plugin command came to: what is installed or what installing one came to, or
+/// what the catalogue offers.
+///
+/// # Errors
+///
+/// As [`super::plugins`] and [`offered`].
+pub(crate) async fn routed(ctx: &Ctx, command: Command) -> Result<Outcome, Box<Problem>> {
+    match command {
+        Command::Plugins(action) => super::plugins(ctx, &action).await.map(Outcome::Plugins),
+        _ => offered(ctx).await.map(Outcome::PluginCatalogue),
+    }
+}
+
 /// What the catalogue offers, or why it was not read.
 ///
 /// # Errors
 ///
 /// Where the record of what is installed cannot be read. Every way the catalogue
 /// itself is not read is an answer.
-pub(crate) async fn offered(ctx: &Ctx) -> Result<PluginCatalogueReport, Box<Problem>> {
+async fn offered(ctx: &Ctx) -> Result<PluginCatalogueReport, Box<Problem>> {
     if let Some((key, value)) = ctx.settings.reaching.held_by(REACH_CATALOGUE_KEY) {
         return Ok(unread(
             PluginCatalogueState::Off,

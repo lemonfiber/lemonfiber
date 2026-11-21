@@ -79,7 +79,7 @@ mod listing;
 mod newest;
 // The install recipes an install or an update runs, and the values they are given.
 mod following;
-pub(crate) use browsing::offered;
+pub(crate) use browsing::routed;
 pub(crate) use embedding::{from_this_build, read_after};
 pub(crate) use following::diagnosed;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.
@@ -249,22 +249,6 @@ pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<P
         unproxied: listing::unproxied(ctx),
         ..installs
     })
-}
-
-/// What a plugin command came to: what is installed or what installing one came to, or
-/// what the catalogue offers.
-///
-/// # Errors
-///
-/// As [`plugins`] and [`offered`].
-pub(crate) async fn routed(
-    ctx: &Ctx,
-    command: super::Command,
-) -> Result<super::Outcome, Box<Problem>> {
-    match command {
-        super::Command::Plugins(action) => plugins(ctx, &action).await.map(super::Outcome::Plugins),
-        _ => offered(ctx).await.map(super::Outcome::PluginCatalogue),
-    }
 }
 
 /// What is installed, or what installing one came to, with no guard moved beside it:

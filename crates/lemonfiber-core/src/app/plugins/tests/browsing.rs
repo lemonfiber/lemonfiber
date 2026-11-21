@@ -64,7 +64,10 @@ fn browsing(name: &str, http: Arc<Fake>, signing: Option<&Signing>) -> Ctx {
 
 /// What the catalogue offers, where the read is answered at all.
 async fn offered(ctx: &Ctx) -> Option<PluginCatalogueReport> {
-    super::super::offered(ctx).await.ok()
+    match super::super::routed(ctx, crate::app::Command::PluginCatalogue).await {
+        Ok(crate::app::Outcome::PluginCatalogue(report)) => Some(report),
+        _ => None,
+    }
 }
 
 /// Every entry the signed index carries in full is listed with its facts, an entry that

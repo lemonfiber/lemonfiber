@@ -39,34 +39,18 @@ mod uninstall;
 mod viewing;
 mod wishing;
 
-pub use alerts::AlertAction;
-pub use allowance::Allowance;
-pub use bandwidth::BandwidthAsked;
-pub use credentials::Asking;
-pub use diagnosing::Diagnosing;
-pub use doorway::Doorway;
-pub use downloading::Downloading;
+pub use self::{
+    alerts::AlertAction, allowance::Allowance, bandwidth::BandwidthAsked, credentials::Asking,
+    diagnosing::Diagnosing, doorway::Doorway, downloading::Downloading, gathering::Gathering,
+    halting::Halting, inviting::Inviting, letting_go::LettingGo, migrate::MigrateAction,
+    quality::QualityAction, queueing::Queueing, reading_logs::ReadingLogs, reclaiming::Reclaiming,
+    restarting::Restarting, restoring::Restoring, setting::Setting, settling::Settling,
+    teardown::Teardown, tracing::Tracing, uninstall::Removing, wishing::Wishing,
+};
 pub use filling::{Filling, Linking};
-pub use gathering::Gathering;
-pub use halting::Halting;
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision, Shelf, Whom};
-pub use inviting::Inviting;
-pub use letting_go::LettingGo;
-pub use migrate::MigrateAction;
-pub use quality::QualityAction;
-pub use queueing::Queueing;
-pub use reading_logs::ReadingLogs;
-pub use reclaiming::Reclaiming;
-pub use restarting::Restarting;
-pub use restoring::Restoring;
-pub use setting::Setting;
-pub use settling::Settling;
-pub use teardown::Teardown;
-pub use tracing::Tracing;
-pub use uninstall::Removing;
 pub use viewing::{Live, PlayFrom, Viewing};
-pub use wishing::Wishing;
 
 /// What a surface is asking for.
 ///
@@ -397,9 +381,6 @@ pub enum Command {
     /// Install a plugin, or say what is installed already.
     Plugins(plugins::Asked),
     /// Say what the plugin catalogue offers to install, from its verified index.
-    ///
-    /// A read with no arguments: the list is the whole index, and an operator choosing
-    /// what to add is choosing among all of it.
     PluginCatalogue,
     /// Read a plugin's own source as its author would, with no stack.
     Authoring(authoring::Asked),
