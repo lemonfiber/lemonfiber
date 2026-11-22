@@ -42,6 +42,10 @@ fn a_listing_says_each_plugin_what_is_installed_of_it_and_which_release_it_is() 
                 version: "1.2.0".to_owned(),
                 newer: true,
             })),
+            komga(Some(InstalledVersion {
+                version: "1.3.0".to_owned(),
+                newer: false,
+            })),
         ],
         unreadable: Some(2),
         ..bare(PluginCatalogueState::Listed)
@@ -55,6 +59,7 @@ fn a_listing_says_each_plugin_what_is_installed_of_it_and_which_release_it_is() 
         "version    1.3.0",
         "installed  no",
         "installed  1.2.0, and the catalogue holds a newer one",
+        "installed  1.3.0\n",
         "2 more could not be listed",
         "Release 176 of the catalogue, published 2026-11-20T14:24:16 UTC.",
     ] {
@@ -119,4 +124,22 @@ fn a_listing_with_nothing_it_can_list_says_so_through_the_outcome() {
         "{said}"
     );
     assert!(!said.contains("could not be listed"), "{said}");
+}
+
+#[test]
+fn a_catalogue_off_or_failed_with_nothing_more_to_say_says_only_that() {
+    for (state, headline) in [
+        (
+            PluginCatalogueState::Off,
+            "Asking the plugin catalogue is switched off, so it was not read.",
+        ),
+        (
+            PluginCatalogueState::Failed,
+            "The plugin catalogue could not be read, so nothing is listed.",
+        ),
+    ] {
+        let said = listed(&bare(state)).text();
+
+        assert_eq!(said.trim(), headline, "{said}");
+    }
 }
