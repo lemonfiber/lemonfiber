@@ -45,6 +45,8 @@ fn an_archive() -> Manifest {
 fn listing(settings: Vec<(&str, Origin)>) -> ConfigReport {
     ConfigReport {
         decisions: Vec::new(),
+        unmanaged: Vec::new(),
+        unmanaged_more: 0,
         settings: settings
             .into_iter()
             .map(|(key, origin)| SettingReport {

@@ -42,11 +42,26 @@
       "items": {
         "$ref": "SettingReport.json"
       }
+    },
+    "unmanaged": {
+      "description": "Each area the operator declared unmanaged, in the order written, with what it\ncovers now. Empty where nothing is declared. An area and a reason are the\noperator's own text, to be shown as plain text.",
+      "type": "array",
+      "items": {
+        "$ref": "UnmanagedReport.json"
+      }
+    },
+    "unmanaged_more": {
+      "description": "How many declared areas `unmanaged` leaves out for being too many.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
     }
   },
   "required": [
     "settings",
     "decisions",
+    "unmanaged",
+    "unmanaged_more",
     "changed",
     "rehearsed"
   ]

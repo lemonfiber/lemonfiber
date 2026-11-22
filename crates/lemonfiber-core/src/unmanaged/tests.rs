@@ -1,4 +1,4 @@
-use super::{covering, covers, parse};
+use super::{covered, covering, covers, parse, CoveredKind};
 
 /// One declaration, with a reason long enough to be one.
 fn declared(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
@@ -89,4 +89,28 @@ fn a_name_is_a_name_whether_it_looks_like_a_path_or_a_service() {
     assert!(covers(&theirs, "DATA_ROOT"));
     assert!(covers(&theirs, "compose.yml"));
     assert!(!covers(&theirs, "DATA_ROOT_BACKUP"));
+}
+
+#[test]
+fn what_an_area_covers_keeps_the_kind_each_thing_was_found_as() {
+    let things = vec![
+        (CoveredKind::Service, "config".to_owned()),
+        (CoveredKind::Setting, "CONFIG_ROOT".to_owned()),
+        (
+            CoveredKind::Path,
+            "config/recyclarr/recyclarr.yml".to_owned(),
+        ),
+        (CoveredKind::Path, "configuration.yml".to_owned()),
+    ];
+    let found: Vec<(CoveredKind, &str)> = covered("config", &things)
+        .map(|(kind, name)| (*kind, name.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (CoveredKind::Service, "config"),
+            (CoveredKind::Path, "config/recyclarr/recyclarr.yml")
+        ],
+        "one name covers a service and a file beneath it, and nothing that only starts with it"
+    );
 }

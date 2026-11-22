@@ -97,6 +97,29 @@ pub fn covers(declared: &[(String, String)], what: &str) -> bool {
     covering(declared, what).is_some()
 }
 
+/// What a thing a declaration covers is, read off where it was found.
+///
+/// Never off its name, since a stack may name a service `config`: one area can cover a
+/// service, a file and a setting at once, each listed as what it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum CoveredKind {
+    /// A service the stack runs, which is not seeded and is observed rather than wired.
+    Service,
+    /// A file lemonfiber writes, which is not written on any run.
+    Path,
+    /// A setting, which `config set` refuses with the operator's reason.
+    Setting,
+}
+
+/// Each of `things` that `area` covers, in their order.
+pub fn covered<'a>(
+    area: &'a str,
+    things: &'a [(CoveredKind, String)],
+) -> impl Iterator<Item = &'a (CoveredKind, String)> {
+    things.iter().filter(move |(_, what)| beneath(area, what))
+}
+
 /// Whether `what` is the declared area, or sits beneath it.
 ///
 /// Beneath means separated by a slash, which is what keeps `config` from covering

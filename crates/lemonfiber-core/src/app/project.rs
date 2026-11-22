@@ -59,6 +59,10 @@ pub(crate) use sweeping::{swept, Sweep};
 /// The operation what the project's own upkeep changes is journalled under.
 pub(crate) const OPERATION: &str = "project";
 
+/// The files beneath the project directory lemonfiber writes, each by its name: the
+/// project itself and the profiles a start reads beside it.
+pub(crate) const WRITTEN: [&str; 2] = [FILE, profiled::FILE];
+
 /// The directory the project is kept in and Compose resolves it against.
 pub(crate) fn directory(ctx: &Ctx) -> Option<PathBuf> {
     super::targets::project_directory(&ctx.stack, ctx.settings.stack_dir.as_deref())

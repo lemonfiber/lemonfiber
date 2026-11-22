@@ -258,5 +258,7 @@ pub fn fitted(text: &str, width: usize) -> String {
     format!("{front}{MARKER}{back}")
 }
 
+pub mod shown;
+
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,5 @@
-//! What a stop would interrupt, how the surface is served and what setup decided, as a
-//! client reaches them: who is answered, who is refused, and what the answer never carries.
+//! What a stop would interrupt, how the surface is served, what setup decided and what the
+//! operator said to leave alone, as a client reaches them: who is answered, who is refused, and what the answer never carries.
 
 use base64::Engine as _;
 use lemonfiber_core::companion::served::Served;
@@ -236,11 +236,11 @@ async fn a_read_key_is_answered_both_reads_and_a_member_key_neither() {
     }
 }
 
-/// The decisions a `config` answer lists, where it lists any.
-fn decisions(body: &str) -> Option<Vec<serde_json::Value>> {
+/// What a `config` answer lists under `field`, where it lists anything there.
+fn listed(body: &str, field: &str) -> Option<Vec<serde_json::Value>> {
     serde_json::from_str::<serde_json::Value>(body)
         .ok()?
-        .pointer("/data/decisions")?
+        .pointer(&format!("/data/{field}"))?
         .as_array()
         .cloned()
 }
@@ -277,7 +277,7 @@ async fn what_setup_decided_is_answered_to_the_operator_and_read_keys_and_refuse
         .await;
         assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
         assert_eq!(kind(&answer.body), "config");
-        let held: Vec<(String, bool)> = decisions(&answer.body)
+        let held: Vec<(String, bool)> = listed(&answer.body, "decisions")
             .unwrap_or_default()
             .iter()
             .filter_map(|one| {
@@ -309,10 +309,104 @@ async fn what_setup_decided_is_answered_to_the_operator_and_read_keys_and_refuse
     .await;
     assert_eq!(theirs.status, StatusCode::FORBIDDEN, "{}", theirs.body);
     assert_eq!(code(&theirs), "ADMIT-6", "{}", theirs.body);
-    assert!(decisions(&theirs.body).is_none(), "{}", theirs.body);
+    assert!(
+        listed(&theirs.body, "decisions").is_none(),
+        "{}",
+        theirs.body
+    );
 
     let (router, carried, _kept) = as_a_member("machine-decisions-member").await;
     let answer = crate::door::asked(router, "GET", "/api/config", &carried, "").await;
     assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
-    assert!(decisions(&answer.body).is_none(), "{}", answer.body);
+    assert!(
+        listed(&answer.body, "decisions").is_none(),
+        "{}",
+        answer.body
+    );
+}
+
+/// The areas the operator declared unmanaged are answered to the operator's session and to
+/// a read or act key, each with its reason and what it covers, and refused to a member's
+/// session and a member's key with the rest of the read.
+#[tokio::test]
+async fn what_was_left_alone_is_answered_to_the_operator_and_read_keys_and_refused_to_members() {
+    let keys = keeping_keys("machine-unmanaged");
+    let admission = keeping("machine-unmanaged");
+    assert!(
+        std::fs::write(
+            keys.kept.with_file_name(".env"),
+            "DATA_ROOT=/srv\nLEMONFIBER_UNMANAGED=DATA_ROOT=the disks are mine,radar=a typo\n",
+        )
+        .is_ok(),
+        "the scratch environment file is written"
+    );
+    let ctx = keeping_at(
+        crate::door::world(Some(admission.to_path_buf()), Chance::cycling()),
+        &keys.kept,
+    );
+    let (router, _) = surface(ctx, &housed(Recognising::knowing(MEMBER)));
+    let opened = session(
+        &offered_from(router.clone(), HERE, &offering(&chosen()))
+            .await
+            .body,
+    );
+    for secret in [opened.as_str(), keys.read.as_str(), keys.act.as_str()] {
+        let answer = presented(
+            router.clone(),
+            "GET",
+            "/api/config",
+            secret,
+            Some((HERE, false)),
+        )
+        .await;
+        assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
+        let areas = listed(&answer.body, "unmanaged").unwrap_or_default();
+        let read: Vec<(&str, &str, usize)> = areas
+            .iter()
+            .filter_map(|one| {
+                Some((
+                    one.get("area")?.as_str()?,
+                    one.get("why")?.as_str()?,
+                    one.get("covers")?.as_array()?.len(),
+                ))
+            })
+            .collect();
+        assert_eq!(
+            read,
+            [
+                ("DATA_ROOT", "the disks are mine", 1),
+                ("radar", "a typo", 0)
+            ],
+            "{}",
+            answer.body
+        );
+        assert!(
+            answer.body.contains(r#""unmanaged_more":0"#),
+            "{}",
+            answer.body
+        );
+    }
+    let theirs = presented(
+        router,
+        "GET",
+        "/api/config",
+        keys.member.as_str(),
+        Some((HERE, false)),
+    )
+    .await;
+    assert_eq!(theirs.status, StatusCode::FORBIDDEN, "{}", theirs.body);
+    assert!(
+        !theirs.body.contains("the disks are mine"),
+        "{}",
+        theirs.body
+    );
+
+    let (router, carried, _kept) = as_a_member("machine-unmanaged-member").await;
+    let answer = crate::door::asked(router, "GET", "/api/config", &carried, "").await;
+    assert_eq!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert!(
+        listed(&answer.body, "unmanaged").is_none(),
+        "{}",
+        answer.body
+    );
 }

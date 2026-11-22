@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a thing a declaration covers is, read off where it was found.\n\nNever off its name, since a stack may name a service `config`: one area can cover a\nservice, a file and a setting at once, each listed as what it is.",
+  "oneOf": [
+    {
+      "description": "A service the stack runs, which is not seeded and is observed rather than wired.",
+      "type": "string",
+      "const": "service"
+    },
+    {
+      "description": "A file lemonfiber writes, which is not written on any run.",
+      "type": "string",
+      "const": "path"
+    },
+    {
+      "description": "A setting, which `config set` refuses with the operator's reason.",
+      "type": "string",
+      "const": "setting"
+    }
+  ]
+}
