@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Why the catalogue's index was not read.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "description": "The problem code an install by name would be refused with.",
+      "type": "string"
+    },
+    "summary": {
+      "description": "What went wrong, in one line.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "summary"
+  ]
+}

@@ -289,6 +289,11 @@ pub const BANDWIDTH: &str = "/api/bandwidth";
 /// opens by asking.
 pub const PLUGINS: &str = "/api/plugins";
 
+/// What the plugin catalogue offers to install, from its verified index.
+///
+/// The operator's alone, as installing is: a key and a member are refused.
+pub const PLUGIN_CATALOGUE: &str = "/api/plugins/catalogue";
+
 /// What this stack wires to what, how each link was settled, and what nothing fills.
 ///
 /// The reading half again. Choosing which service fills a capability is a setting
@@ -378,6 +383,7 @@ pub const OFFERED: &[&str] = &[
     HISTORY,
     UPDATE,
     PLUGINS,
+    PLUGIN_CATALOGUE,
     WIRING,
     SETTINGS,
 ];
@@ -499,6 +505,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         // properties of the machine rather than of the caller. A record that will not
         // read is refused by the command, never answered as an empty one.
         PLUGINS => Ok(Command::Plugins(Installing::Installed)),
+        PLUGIN_CATALOGUE => Ok(Command::PluginCatalogue),
         WIRING => Ok(Command::Wiring(Linking::Read)),
         SETTINGS => Ok(Command::Settings(Settling::Read)),
         _ => Err(Refusal::NoSuchRead),

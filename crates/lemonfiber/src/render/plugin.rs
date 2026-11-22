@@ -26,6 +26,7 @@ use lemonfiber_core::plugin::{
 // record — and because two readers in one file is two files nobody split.
 pub(crate) mod conformance;
 mod machine;
+pub(crate) mod offered;
 pub(crate) mod recording;
 
 pub(crate) use machine::installs;

@@ -152,7 +152,8 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
     // a member's search, the kinds they may ask for, the poster of what it found and
     // what they are told on, which are a member's own and the operator's, and the
     // settings, how the stack runs, what setup settled, where the services on this
-    // machine keep their files and where its alerts go, which are the operator's alone.
+    // machine keep their files, where its alerts go and what the plugin catalogue offers,
+    // which are the operator's alone.
     let reads: Vec<String> = crate::read::table::OFFERED
         .iter()
         .chain(BESIDE.iter().map(|(read, _)| read))
@@ -163,6 +164,7 @@ fn a_key_is_offered_what_its_scope_admits_at_each_door() {
                 crate::read::table::ASKABLE_POSTER,
                 crate::read::table::REQUEST_POSTER,
                 crate::read::table::SETTINGS,
+                crate::read::table::PLUGIN_CATALOGUE,
                 crate::read::table::STACK,
                 crate::read::table::SETTLED,
                 crate::read::table::MIGRATION,

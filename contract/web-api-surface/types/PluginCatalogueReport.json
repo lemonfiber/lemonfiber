@@ -1,0 +1,47 @@
+{
+  "fields": {
+    "entries": {
+      "type": [
+        "array[ref:CataloguedPlugin]"
+      ],
+      "required": true
+    },
+    "failure": {
+      "type": [
+        "anyOf(null,ref:CatalogueFailure)"
+      ],
+      "required": false
+    },
+    "published": {
+      "type": [
+        "anyOf(null,ref:Instant)"
+      ],
+      "required": false
+    },
+    "serial": {
+      "type": [
+        "integer|null/uint64"
+      ],
+      "required": false
+    },
+    "setting": {
+      "type": [
+        "anyOf(null,ref:ReachSetting)"
+      ],
+      "required": false
+    },
+    "state": {
+      "type": [
+        "ref:PluginCatalogueState"
+      ],
+      "required": true
+    },
+    "unreadable": {
+      "type": [
+        "integer|null/uint"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

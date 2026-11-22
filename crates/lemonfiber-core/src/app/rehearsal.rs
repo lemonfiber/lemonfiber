@@ -343,7 +343,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Restart(_) => reports("restart", LIFECYCLE).disturbing(Situation::Restarting),
         Command::Pull { .. } => reports("pull", LIFECYCLE).disturbing(Situation::Fetching),
         Command::ConfigSet(_) => reports("config set", &[kind::CONFIG]),
-        Command::Plugins(asked) => plugin(asked),
+        Command::Plugins(_) | Command::PluginCatalogue => plugin(command),
         Command::Authoring(asked) => authored(asked),
         Command::Password => cannot("ui --set-password", A_PASSWORD_IS_TYPED),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
@@ -495,7 +495,10 @@ const fn authored(asked: &authoring::Asked) -> Asked {
 }
 
 /// What a run of a plugin command reads, writes and disturbs.
-const fn plugin(asked: &plugins::Asked) -> Asked {
+const fn plugin(command: &Command) -> Asked {
+    let Command::Plugins(asked) = command else {
+        return reads("plugin catalogue");
+    };
     match asked {
         plugins::Asked::Installed => reads("plugin installed"),
         // Everything it changes is settled before anything is touched: the manifest

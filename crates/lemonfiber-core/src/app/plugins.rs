@@ -71,12 +71,15 @@ pub(crate) mod git;
 mod reach;
 // Installing by name: the catalogue's index verified, and the name resolved through it.
 mod cataloguing;
+// What the catalogue offers, read from its verified index as the operator browses it.
+mod browsing;
 // What is installed, read off the record alone or with each source asked.
 mod listing;
 // The newest catalogue index this machine verified, and the refusal of any older.
 mod newest;
 // The install recipes an install or an update runs, and the values they are given.
 mod following;
+pub(crate) use browsing::routed;
 pub(crate) use embedding::{from_this_build, read_after};
 pub(crate) use following::diagnosed;
 // Installing from a directory: what it settles, its offer, and its writes and proofs.

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether the catalogue was read.",
+  "oneOf": [
+    {
+      "description": "Its index was fetched and verified.",
+      "type": "string",
+      "const": "listed"
+    },
+    {
+      "description": "Reaching it is switched off, and nothing was asked of it.",
+      "type": "string",
+      "const": "off"
+    },
+    {
+      "description": "Its index or signature could not be fetched, verified or read.",
+      "type": "string",
+      "const": "failed"
+    }
+  ]
+}

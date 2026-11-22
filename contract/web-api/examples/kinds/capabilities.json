@@ -97,6 +97,7 @@
       "/api/outbound": "available",
       "/api/playing": "available",
       "/api/plugins": "available",
+      "/api/plugins/catalogue": "available",
       "/api/provenance": "available",
       "/api/quality": "available",
       "/api/queue": "available",

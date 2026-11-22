@@ -96,6 +96,12 @@ pub const SWITCHES: &[&str] = &[
     REACH_APPRISE_KEY,
 ];
 
+/// What a switch is written as to let the request it names be made.
+pub const SWITCHED_ON: &str = "on";
+
+/// What the blanket switch is written as to let requests be made again.
+pub const SWITCHED_OFF: &str = "off";
+
 /// Whether this operator has asked that nothing leave the machine.
 #[must_use]
 pub fn offline(file: &env::EnvFile) -> bool {
@@ -108,6 +114,8 @@ pub struct Reaching {
     /// The settings that were switched off. Empty is every request allowed, which
     /// is what a file that says nothing about any of them means.
     refused: BTreeSet<&'static str>,
+    /// Whether the blanket switch refused them, rather than each its own.
+    offline: bool,
 }
 
 impl Reaching {
@@ -116,6 +124,7 @@ impl Reaching {
     pub fn none() -> Self {
         Self {
             refused: SWITCHES.iter().copied().collect(),
+            offline: true,
         }
     }
 
@@ -124,6 +133,7 @@ impl Reaching {
     pub fn without(switch: &'static str) -> Self {
         Self {
             refused: std::iter::once(switch).collect(),
+            offline: false,
         }
     }
 
@@ -137,6 +147,19 @@ impl Reaching {
     #[must_use]
     pub fn allows(&self, switch: &str) -> bool {
         !self.refused.contains(switch)
+    }
+
+    /// The setting that keeps the request `switch` names from being made, and the value
+    /// that lets it be made again, where one does.
+    ///
+    /// The blanket switch where it is on, because turning the request's own switch on
+    /// would leave it refused all the same.
+    #[must_use]
+    pub fn held_by(&self, switch: &str) -> Option<(&'static str, &'static str)> {
+        if self.offline {
+            return Some((OFFLINE_KEY, SWITCHED_OFF));
+        }
+        self.refused.get(switch).map(|held| (*held, SWITCHED_ON))
     }
 
     /// What the operator recorded.
@@ -155,6 +178,7 @@ impl Reaching {
                 .copied()
                 .filter(|switch| file.get(switch).is_some_and(reads_as_off))
                 .collect(),
+            offline: false,
         }
     }
 }

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One plugin the catalogue offers.",
+  "type": "object",
+  "properties": {
+    "description": {
+      "description": "What it does, in its author's words.",
+      "type": "string"
+    },
+    "id": {
+      "description": "The plugin's id, which is the name it is installed by.",
+      "type": "string"
+    },
+    "installed": {
+      "description": "The version installed on this machine. Absent where it is not installed.",
+      "anyOf": [
+        {
+          "$ref": "InstalledVersion.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "description": "What it calls itself.",
+      "type": "string"
+    },
+    "version": {
+      "description": "The version the catalogue reviewed.",
+      "type": "string"
+    },
+    "without_it": {
+      "description": "What the household is without it.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "description",
+    "version",
+    "without_it"
+  ]
+}

@@ -65,6 +65,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::History => &[kind::HISTORY],
         Command::SelfUpdate { .. } => &[kind::SELF_UPDATE],
         Command::Plugins(plugins::Asked::Installed) => &[kind::PLUGINS],
+        Command::PluginCatalogue => &[kind::PLUGIN_CATALOGUE],
         Command::Authoring(authoring::Asked::Claims { .. }) => &[kind::PLUGIN_CLAIMS],
         Command::Authoring(authoring::Asked::Conform { .. }) => &[kind::PLUGIN_CONFORMANCE],
         Command::Authoring(authoring::Asked::Provenance { .. }) => &[kind::PLUGIN_PROVENANCE],

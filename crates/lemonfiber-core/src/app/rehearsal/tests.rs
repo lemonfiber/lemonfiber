@@ -298,6 +298,7 @@ fn reads() -> Vec<Command> {
         Command::Provenance,
         Command::Stored,
         Command::Plugins(plugins::Asked::Installed),
+        Command::PluginCatalogue,
         Command::Authoring(authoring::Asked::Claims {
             path: "komga".into(),
         }),

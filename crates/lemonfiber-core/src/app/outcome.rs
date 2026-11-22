@@ -242,6 +242,8 @@ outcomes! {
     Plugins(crate::plugin::Installs) => PLUGINS [rehearsed],
     /// What setting the web interface's password came to.
     Password(super::password::PasswordReport) => PASSWORD,
+    /// What the plugin catalogue offers to install, or why it was not read.
+    PluginCatalogue(crate::model::PluginCatalogueReport) => PLUGIN_CATALOGUE,
     /// What a plugin's source claims, held to what this build publishes.
     PluginClaims(crate::plugin::Claimed) => PLUGIN_CLAIMS,
     /// What a plugin's conformance recordings come to against the contracts it speaks.

@@ -105,8 +105,8 @@ async fn a_wiring_over_a_stack_that_will_not_read_is_refused() {
 }
 
 #[tokio::test]
-async fn neither_read_takes_a_parameter() {
-    for read in [table::PLUGINS, table::WIRING] {
+async fn no_plugin_read_takes_a_parameter() {
+    for read in [table::PLUGINS, table::PLUGIN_CATALOGUE, table::WIRING] {
         let seen = asked(recording("plugins-asked", ""), &format!("{read}?plugin=x")).await;
         assert!(
             seen.as_ref()
@@ -114,4 +114,29 @@ async fn neither_read_takes_a_parameter() {
             "{read}: {seen:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn what_the_catalogue_offers_is_the_envelope_the_command_renders() {
+    let switched_off = |named: &str| {
+        let mut ctx = recording(named, "");
+        ctx.settings.reaching = lemonfiber_core::config::Reaching::without(
+            lemonfiber_core::config::REACH_CATALOGUE_KEY,
+        );
+        ctx
+    };
+    let expected =
+        as_the_command_renders_it(&switched_off("catalogue-off"), Command::PluginCatalogue).await;
+
+    let seen = asked(switched_off("catalogue-off"), table::PLUGIN_CATALOGUE).await;
+
+    assert!(
+        expected.as_ref().is_some_and(|body| body
+            .starts_with(r#"{"api_version":1,"kind":"plugin-catalogue","data":{"#)
+            && body.contains(r#""state":"off""#)
+            && body.contains(r#""key":"LEMONFIBER_REACH_CATALOGUE""#)
+            && body.contains(r#""entries":[]"#)),
+        "{expected:?}"
+    );
+    assert_eq!(seen, expected.map(|body| (StatusCode::OK, body)));
 }

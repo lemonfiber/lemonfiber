@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What the catalogue offers, or why it was not read.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "description": "Every plugin the verified index offers, by id; empty where it was not read.",
+      "type": "array",
+      "items": {
+        "$ref": "CataloguedPlugin.json"
+      }
+    },
+    "failure": {
+      "description": "Why the index could not be read. Present where it failed.",
+      "anyOf": [
+        {
+          "$ref": "CatalogueFailure.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "published": {
+      "description": "When the index listed was published. Present where it was read.",
+      "anyOf": [
+        {
+          "$ref": "Instant.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "serial": {
+      "description": "Which release of the catalogue the index listed is. Present where it was read.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "setting": {
+      "description": "The setting that keeps the catalogue from being asked, and how to let it be.\nPresent where it is switched off.",
+      "anyOf": [
+        {
+          "$ref": "ReachSetting.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "description": "Whether the catalogue was read, switched off, or could not be read.",
+      "$ref": "PluginCatalogueState.json"
+    },
+    "unreadable": {
+      "description": "How many entries the index holds that could not be listed, for lacking a fact an\nentry carries. Present where it was read.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "state",
+    "entries"
+  ]
+}

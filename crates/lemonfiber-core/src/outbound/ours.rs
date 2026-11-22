@@ -273,8 +273,9 @@ pub fn purpose(reach: Reach) -> &'static str {
         }
         Reach::Catalogue => {
             "Read the newest catalogue release's index and the signature over it, so a plugin \
-             you install by name is resolved only through an index this build has verified. \
-             Made only when you install one by name."
+             you install by name is resolved only through an index this build has verified, \
+             and what you browse to install is listed from one. Made only when you install one \
+             by name or list what the catalogue offers."
         }
     }
 }
@@ -430,9 +431,9 @@ pub fn cost(reach: Reach) -> &'static str {
              the catalogue, is refused before anything is fetched."
         }
         Reach::Catalogue => {
-            "A plugin cannot be installed by name, and is refused before anything is fetched. \
-             Nothing installed stops, and installing from a git source or a directory you name \
-             is unaffected."
+            "A plugin cannot be installed by name, and is refused before anything is fetched, \
+             and what the catalogue offers is not listed. Nothing installed stops, and \
+             installing from a git source or a directory you name is unaffected."
         }
     }
 }

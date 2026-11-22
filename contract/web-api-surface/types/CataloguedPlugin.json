@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "description": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "id": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "installed": {
+      "type": [
+        "anyOf(null,ref:InstalledVersion)"
+      ],
+      "required": false
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "version": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "without_it": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

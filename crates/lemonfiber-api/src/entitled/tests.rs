@@ -572,6 +572,30 @@ fn only_the_operator_reads_or_changes_the_settings() {
     }
 }
 
+/// What the plugin catalogue offers is the operator's alone, as installing is: a member,
+/// a key scoped to one, and a `read` or an `act` key are refused it.
+#[test]
+fn only_the_operator_browses_the_plugin_catalogue() {
+    use lemonfiber_core::keys::Scope;
+    for caller in [Caller::Machine, Caller::Operator] {
+        assert_eq!(
+            may(&caller, Door::Reading, Command::PluginCatalogue),
+            Permitted::This(Command::PluginCatalogue)
+        );
+    }
+    let member_key = key(Scope::Member {
+        id: ASKING.to_owned(),
+        name: "ana".to_owned(),
+    });
+    for caller in [member(), member_key, key(Scope::Read), key(Scope::Act)] {
+        assert_eq!(
+            may(&caller, Door::Reading, Command::PluginCatalogue),
+            Permitted::Nothing,
+            "{caller:?}"
+        );
+    }
+}
+
 /// What a member is told on, their choice of it and their phone's word that a wake
 /// arrived are theirs whatever the request named, and a key reaches none of them.
 #[test]

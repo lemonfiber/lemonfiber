@@ -66,3 +66,24 @@ fn a_blanket_switch_that_is_off_leaves_the_individual_answers_alone() {
 fn a_setting_this_product_does_not_read_is_not_something_anybody_switched_off() {
     assert!(Reaching::none().allows("LEMONFIBER_REACH_SOMETHING_ELSE"));
 }
+
+#[test]
+fn what_holds_a_request_off_is_its_own_switch_or_the_blanket_one() {
+    let usenet = Reaching::from_env(&EnvFile::parse(&format!("{REACH_USENET_KEY}=off\n")));
+    assert_eq!(
+        usenet.held_by(REACH_USENET_KEY),
+        Some((REACH_USENET_KEY, super::SWITCHED_ON))
+    );
+    assert_eq!(usenet.held_by(REACH_GUIDES_KEY), None);
+    let offline = Reaching::from_env(&EnvFile::parse(&format!(
+        "{OFFLINE_KEY}=on\n{REACH_USENET_KEY}=off\n"
+    )));
+    for switch in [REACH_USENET_KEY, REACH_GUIDES_KEY] {
+        assert_eq!(
+            offline.held_by(switch),
+            Some((OFFLINE_KEY, super::SWITCHED_OFF)),
+            "{switch}"
+        );
+    }
+    assert_eq!(Reaching::default().held_by(REACH_USENET_KEY), None);
+}

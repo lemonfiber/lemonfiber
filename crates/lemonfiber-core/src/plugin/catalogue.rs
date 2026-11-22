@@ -1,8 +1,9 @@
 //! The catalogue's index, whether its signature holds, and what a name resolves to.
 //!
 //! A catalogue release is a tag whose assets are an index — each plugin's id, the
-//! origin it is fetched from, the commit that was reviewed and the digest of its
-//! manifest there — and a signature over exactly the index's bytes. A name is resolved
+//! origin it is fetched from, the commit that was reviewed, the digest of its
+//! manifest there and what that manifest says the plugin is — and a signature over
+//! exactly the index's bytes. A name is resolved
 //! through an index whose signature verified against the key this build carries, and
 //! through nothing else: an index with no signature, one whose signature does not
 //! verify, and one read by a build that carries no key are all refused the same way,
@@ -55,12 +56,16 @@ pub struct Index {
     schema: u32,
     /// Which release of the catalogue it is, raised by each release above the last.
     serial: u64,
+    /// When the release was cut, as UTC text; absent from an index cut before it was
+    /// carried.
+    #[serde(default)]
+    published: Option<String>,
     /// One entry per registered plugin.
     plugins: Vec<Entry>,
 }
 
 /// One plugin, as the catalogue registered and reviewed it.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Entry {
     /// The plugin's id, which is the name it is installed by.
     pub id: String,
@@ -70,6 +75,19 @@ pub struct Entry {
     pub revision: String,
     /// The digest of its manifest at that commit.
     pub manifest: String,
+    /// What that manifest calls the plugin; absent from an index cut before it was
+    /// carried, as are the three below.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// What it does, in its author's words.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Its own content version.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// What the household is without it.
+    #[serde(default)]
+    pub without_it: Option<String>,
 }
 
 impl Index {
@@ -77,6 +95,20 @@ impl Index {
     #[must_use]
     pub const fn serial(&self) -> u64 {
         self.serial
+    }
+
+    /// When the release was cut, where the index says so in a form this reads.
+    #[must_use]
+    pub fn published(&self) -> Option<crate::instant::Instant> {
+        self.published
+            .as_deref()
+            .and_then(crate::instant::Instant::from_service_text)
+    }
+
+    /// Every entry, in the order the index holds them.
+    #[must_use]
+    pub fn plugins(&self) -> &[Entry] {
+        &self.plugins
     }
 
     /// The entry for one name, where the index holds one.

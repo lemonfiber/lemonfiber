@@ -43,6 +43,7 @@ const STACK: &[&str] = &[
     "/api/update",
     "/api/update?what=self",
     "/api/plugins",
+    "/api/plugins/catalogue",
     "/api/wiring",
     "/api/settings",
     "/api/settled",

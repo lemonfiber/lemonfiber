@@ -227,6 +227,7 @@ fn lifecycle(outcome: Outcome) -> Option<crate::model::LifecycleReport> {
         | Outcome::Served(_)
         | Outcome::Standing(_)
         | Outcome::Admitting(_)
+        | Outcome::PluginCatalogue(_)
         | Outcome::PluginClaims(_)
         | Outcome::PluginConformance(_)
         | Outcome::PluginProvenance(_)
