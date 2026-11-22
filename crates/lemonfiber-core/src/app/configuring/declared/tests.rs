@@ -1,4 +1,4 @@
-use super::{declared, Declared, LONGEST, MOST_COVERED, MOST_DECLARED};
+use super::{declared, things, Declared, LONGEST, MOST_COVERED, MOST_DECLARED};
 use crate::config::env::EnvFile;
 use crate::unmanaged::CoveredKind;
 
@@ -109,4 +109,25 @@ fn the_things_past_the_most_covered_are_counted_rather_than_listed() {
     let area = read.listed.first();
     assert_eq!(area.map(|one| one.covers.len()), Some(MOST_COVERED));
     assert_eq!(area.map(|one| one.covers_more), Some(3));
+}
+
+#[test]
+fn a_service_an_installed_plugin_brought_is_one_an_area_can_cover_and_is_listed_once() {
+    let ctx = crate::test_support::a_context().build();
+    let brought = [crate::test_support::an_installed(
+        "shelf",
+        vec![
+            crate::test_support::a_placed("shelf-reader", &[], None),
+            crate::test_support::a_placed("shelf-reader", &[], None),
+        ],
+    )];
+    let found = things(&ctx, &EnvFile::parse(""), Some(&brought));
+    assert_eq!(
+        found
+            .iter()
+            .filter(|thing| **thing == (CoveredKind::Service, "shelf-reader".to_owned()))
+            .count(),
+        1,
+        "{found:?}"
+    );
 }

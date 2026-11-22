@@ -3,6 +3,7 @@
 
 mod authoring;
 mod built;
+mod configured;
 mod dispatched;
 mod healing;
 mod installed;
@@ -14,12 +15,11 @@ mod watching;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
 use lemonfiber_core::model::{
-    AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,
-    CoveredReport, DecisionReport, DoctorReport, FormsReport, HistoryReport, HostingReport,
-    HouseholdReport, ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
-    QualityReport, RemovedService, ReplaceReport, ResetReport, RunHealth, RunReport,
-    ScheduledService, ServiceProvenance, StatusReport, StuckReport, SupervisionReport, TraceReport,
-    UnmanagedReport, UpgradeReport, VersionReport,
+    AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, DoctorReport,
+    FormsReport, HistoryReport, HostingReport, HouseholdReport, ImportReport, LifecycleReport,
+    MigrationReport, MusicReport, ProvenanceReport, QualityReport, RemovedService, ReplaceReport,
+    ResetReport, RunHealth, RunReport, ScheduledService, ServiceProvenance, StatusReport,
+    StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::scheduled::kept::ScheduledRun;
 
@@ -28,6 +28,7 @@ use built::{
     a_setup_part_way, a_shared_line, a_stack, a_substitution, a_walk, a_word, an_update, manifest,
     plan, what_is_wired, what_leaves, where_this_copy_stands,
 };
+use configured::the_configuration;
 use installed::what_is_installed;
 use keys::{a_device_key, a_key_claim, a_minted_key, every_device_key, every_key};
 use watching::{a_play, a_tune, the_channels, the_guide};
@@ -99,16 +100,7 @@ fn running() -> Vec<Outcome> {
             guards: Vec::new(),
             forwarded: None,
         }),
-        Outcome::Config(ConfigReport {
-            decisions: vec![a_decision()],
-            unmanaged: areas_left_alone(),
-            unmanaged_more: 0,
-            settings: Vec::new(),
-            changed: false,
-            rehearsed: false,
-            consequence: None,
-            review: None,
-        }),
+        Outcome::Config(the_configuration()),
         Outcome::Status(StatusReport {
             forms: Vec::new(),
             active_forms: Vec::new(),
@@ -450,61 +442,6 @@ fn a_failed_run() -> ScheduledRun {
         ended: lemonfiber_core::instant::Instant::from_seconds(1_759_400_042),
         exit: Some(1),
         log: vec!["sync failed: the quality guide could not be reached".to_owned()],
-    }
-}
-
-/// Areas declared unmanaged: one covering a thing of each kind, and a misspelt one
-/// covering nothing.
-fn areas_left_alone() -> Vec<UnmanagedReport> {
-    use lemonfiber_core::unmanaged::CoveredKind;
-    [
-        (
-            "sonarr",
-            "I tune this one by hand",
-            Some((CoveredKind::Service, "sonarr")),
-        ),
-        (
-            "config/recyclarr",
-            "my own profiles live in here",
-            Some((CoveredKind::Path, "config/recyclarr/recyclarr.yml")),
-        ),
-        (
-            "DATA_ROOT",
-            "the disks are mine to move",
-            Some((CoveredKind::Setting, "DATA_ROOT")),
-        ),
-        ("radar", "I tune this one by hand too", None),
-    ]
-    .into_iter()
-    .map(|(area, why, covered)| UnmanagedReport {
-        area: area.to_owned(),
-        area_cut: false,
-        why: why.to_owned(),
-        why_cut: false,
-        covers: covered
-            .into_iter()
-            .map(|(kind, name)| CoveredReport {
-                kind,
-                name: name.to_owned(),
-            })
-            .collect(),
-        covers_more: 0,
-    })
-    .collect()
-}
-
-/// A decision the settings store keeps, every optional half filled.
-fn a_decision() -> DecisionReport {
-    use lemonfiber_core::reconfigure::{decision, Cost, DecisionKey};
-    let key = DecisionKey::VpnProvider;
-    let row = decision(key.as_str());
-    DecisionReport {
-        key,
-        cost: row.map_or(Cost::Cheap, |row| row.cost),
-        affects: row.map(|row| row.affects.to_owned()).unwrap_or_default(),
-        held: true,
-        credential: false,
-        setting: Some("gluetun:provider".to_owned()),
     }
 }
 
