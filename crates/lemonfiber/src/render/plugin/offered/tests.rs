@@ -99,3 +99,24 @@ fn a_catalogue_not_read_says_why_and_lists_nothing() {
     assert!(said.contains("(PLUGIN-19)"), "{said}");
     assert!(!said.contains("What the plugin catalogue offers"), "{said}");
 }
+
+#[test]
+fn a_listing_with_nothing_it_can_list_says_so_through_the_outcome() {
+    let said = crate::render::shaped(&lemonfiber_core::app::Outcome::PluginCatalogue(
+        PluginCatalogueReport {
+            unreadable: Some(0),
+            ..bare(PluginCatalogueState::Listed)
+        },
+    ))
+    .text();
+
+    assert!(
+        said.contains("What the plugin catalogue offers to install:"),
+        "{said}"
+    );
+    assert!(
+        said.contains("offers no plugin this build can list"),
+        "{said}"
+    );
+    assert!(!said.contains("could not be listed"), "{said}");
+}

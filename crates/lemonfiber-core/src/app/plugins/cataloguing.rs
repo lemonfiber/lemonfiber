@@ -162,9 +162,7 @@ async fn asset(ctx: &Ctx, url: &str) -> Result<Option<String>, String> {
             let bytes = answer
                 .bytes
                 .ok_or_else(|| format!("{at} answered with more than {MOST} bytes"))?;
-            return String::from_utf8(bytes)
-                .map(Some)
-                .map_err(|_| format!("{at} answered with something other than text"));
+            return Ok(Some(String::from_utf8_lossy(&bytes).into_owned()));
         }
         if answer.status == 404 {
             return Ok(None);
