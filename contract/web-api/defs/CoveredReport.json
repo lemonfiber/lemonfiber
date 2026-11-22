@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One thing a declaration covers.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "What it is.",
+      "$ref": "CoveredKind.json"
+    },
+    "name": {
+      "description": "Its name: a service's id, a file's place in the stack or the project, or a\nsetting's key.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "name"
+  ]
+}

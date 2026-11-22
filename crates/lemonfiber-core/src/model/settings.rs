@@ -103,6 +103,12 @@ pub struct ConfigReport {
     /// Every answer setup writes, in the catalogue's order, whether or not anything holds
     /// it. Never a value: a value is read where it is held, withheld there as it is.
     pub decisions: Vec<DecisionReport>,
+    /// Each area the operator declared unmanaged, in the order written, with what it
+    /// covers now. Empty where nothing is declared. An area and a reason are the
+    /// operator's own text, to be shown as plain text.
+    pub unmanaged: Vec<UnmanagedReport>,
+    /// How many declared areas `unmanaged` leaves out for being too many.
+    pub unmanaged_more: usize,
     /// Whether this command changed, or would change, a setting.
     pub changed: bool,
     /// Whether this was a rehearsal, so a change that `changed` reports was one
@@ -139,6 +145,34 @@ pub struct DecisionReport {
     /// where `config set` takes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub setting: Option<String>,
+}
+
+/// One area the operator declared unmanaged, as it covers things now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct UnmanagedReport {
+    /// The area as written, a control or layout character written as its bytes in hex.
+    pub area: String,
+    /// Whether `area` was cut short.
+    pub area_cut: bool,
+    /// The reason the operator gave, written as `area` is.
+    pub why: String,
+    /// Whether `why` was cut short.
+    pub why_cut: bool,
+    /// Each thing the area covers now, in the order the stack holds them. Empty where it
+    /// covers nothing.
+    pub covers: Vec<CoveredReport>,
+    /// How many covered things `covers` leaves out for being too many.
+    pub covers_more: usize,
+}
+
+/// One thing a declaration covers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct CoveredReport {
+    /// What it is.
+    pub kind: crate::unmanaged::CoveredKind,
+    /// Its name: a service's id, a file's place in the stack or the project, or a
+    /// setting's key.
+    pub name: String,
 }
 
 /// What a quality command did to the stored choice.

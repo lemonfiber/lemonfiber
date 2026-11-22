@@ -63,6 +63,8 @@ fn proposal(stance: Stance) -> Review {
 fn proposing(stance: Stance) -> ConfigReport {
     ConfigReport {
         decisions: Vec::new(),
+        unmanaged: Vec::new(),
+        unmanaged_more: 0,
         settings: vec![SettingReport {
             key: "DATA_ROOT".to_owned(),
             value: "/data".to_owned(),

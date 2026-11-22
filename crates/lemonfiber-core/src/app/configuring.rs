@@ -14,6 +14,7 @@
 
 mod allowed;
 mod data_root;
+mod declared;
 mod proving;
 
 use crate::config::{env::EnvFile, port_forward_from_env, store};
@@ -137,7 +138,8 @@ async fn settings(
         .and_then(|paths| super::recover::journal_at(&paths.journal()).ok())
         .map(|journal| journal.changes().to_vec())
         .unwrap_or_default();
-    let installed: Option<Vec<String>> = super::plugins::read(ctx).ok().map(|register| {
+    let register = super::plugins::read(ctx).ok();
+    let installed: Option<Vec<String>> = register.as_ref().map(|register| {
         register
             .installed()
             .iter()
@@ -165,9 +167,18 @@ async fn settings(
         })
         .collect();
 
+    let things = declared::things(
+        ctx,
+        &file,
+        register.as_ref().map(crate::plugin::Register::installed),
+    );
+    let declared = declared::declared(&file, &things);
+
     Ok(ConfigReport {
         settings,
         decisions: decisions(&file, &stores.settings),
+        unmanaged: declared.listed,
+        unmanaged_more: declared.more,
         changed,
         rehearsed: ctx.dry_run,
         consequence,

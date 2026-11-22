@@ -35,6 +35,18 @@
         "array[ref:SettingReport]"
       ],
       "required": true
+    },
+    "unmanaged": {
+      "type": [
+        "array[ref:UnmanagedReport]"
+      ],
+      "required": true
+    },
+    "unmanaged_more": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
     }
   },
   "variants": []

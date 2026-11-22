@@ -3169,11 +3169,26 @@
               "$ref": "#/components/schemas/SettingReport"
             },
             "type": "array"
+          },
+          "unmanaged": {
+            "description": "Each area the operator declared unmanaged, in the order written, with what it\ncovers now. Empty where nothing is declared. An area and a reason are the\noperator's own text, to be shown as plain text.",
+            "items": {
+              "$ref": "#/components/schemas/UnmanagedReport"
+            },
+            "type": "array"
+          },
+          "unmanaged_more": {
+            "description": "How many declared areas `unmanaged` leaves out for being too many.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
           "settings",
           "decisions",
+          "unmanaged",
+          "unmanaged_more",
           "changed",
           "rehearsed"
         ],
@@ -3539,6 +3554,44 @@
           "have",
           "wanted",
           "unmonitored"
+        ],
+        "type": "object"
+      },
+      "CoveredKind": {
+        "description": "What a thing a declaration covers is, read off where it was found.\n\nNever off its name, since a stack may name a service `config`: one area can cover a\nservice, a file and a setting at once, each listed as what it is.",
+        "oneOf": [
+          {
+            "const": "service",
+            "description": "A service the stack runs, which is not seeded and is observed rather than wired.",
+            "type": "string"
+          },
+          {
+            "const": "path",
+            "description": "A file lemonfiber writes, which is not written on any run.",
+            "type": "string"
+          },
+          {
+            "const": "setting",
+            "description": "A setting, which `config set` refuses with the operator's reason.",
+            "type": "string"
+          }
+        ]
+      },
+      "CoveredReport": {
+        "description": "One thing a declaration covers.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CoveredKind",
+            "description": "What it is."
+          },
+          "name": {
+            "description": "Its name: a service's id, a file's place in the stack or the project, or a\nsetting's key.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
         ],
         "type": "object"
       },
@@ -21837,6 +21890,49 @@
             "type": "object"
           }
         ]
+      },
+      "UnmanagedReport": {
+        "description": "One area the operator declared unmanaged, as it covers things now.",
+        "properties": {
+          "area": {
+            "description": "The area as written, a control or layout character written as its bytes in hex.",
+            "type": "string"
+          },
+          "area_cut": {
+            "description": "Whether `area` was cut short.",
+            "type": "boolean"
+          },
+          "covers": {
+            "description": "Each thing the area covers now, in the order the stack holds them. Empty where it\ncovers nothing.",
+            "items": {
+              "$ref": "#/components/schemas/CoveredReport"
+            },
+            "type": "array"
+          },
+          "covers_more": {
+            "description": "How many covered things `covers` leaves out for being too many.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "why": {
+            "description": "The reason the operator gave, written as `area` is.",
+            "type": "string"
+          },
+          "why_cut": {
+            "description": "Whether `why` was cut short.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "area",
+          "area_cut",
+          "why",
+          "why_cut",
+          "covers",
+          "covers_more"
+        ],
+        "type": "object"
       },
       "Unrated": {
         "description": "What is to happen to content the media server has no rating for.\n\nA choice rather than a default, because a great deal of content carries no rating\nand either answer is wrong for somebody: holding it back makes legitimate content\ninvisible, and letting it through lets through the one thing nobody vetted.\n\nSpelled `HeldBack` and `LetThrough` rather than blocked and allowed, because\n[`Allowed`] is the shape this sits on and a field called `unrated: Allowed` would\nread as the opposite of what it is.\n\nA word rather than a flag on both the read and the write, so the setting is named\nthe same in the answer that reports it as in the call that made it — and so neither\n[`Access`] nor the report built from it becomes a row of four unlabelled booleans.\n\nLetting it through is the default because it is the media server's: a new account\nis made holding nothing back, so that is the state an account is found in rather\nthan a decision anybody took.",

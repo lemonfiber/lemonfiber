@@ -15,11 +15,11 @@ use lemonfiber_core::app::Outcome;
 use lemonfiber_core::glossary::Vocabulary;
 use lemonfiber_core::model::{
     AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, ConfigReport,
-    DecisionReport, DoctorReport, FormsReport, HistoryReport, HostingReport, HouseholdReport,
-    ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport, QualityReport,
-    RemovedService, ReplaceReport, ResetReport, RunHealth, RunReport, ScheduledService,
-    ServiceProvenance, StatusReport, StuckReport, SupervisionReport, TraceReport, UpgradeReport,
-    VersionReport,
+    CoveredReport, DecisionReport, DoctorReport, FormsReport, HistoryReport, HostingReport,
+    HouseholdReport, ImportReport, LifecycleReport, MigrationReport, MusicReport, ProvenanceReport,
+    QualityReport, RemovedService, ReplaceReport, ResetReport, RunHealth, RunReport,
+    ScheduledService, ServiceProvenance, StatusReport, StuckReport, SupervisionReport, TraceReport,
+    UnmanagedReport, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::scheduled::kept::ScheduledRun;
 
@@ -101,6 +101,8 @@ fn running() -> Vec<Outcome> {
         }),
         Outcome::Config(ConfigReport {
             decisions: vec![a_decision()],
+            unmanaged: areas_left_alone(),
+            unmanaged_more: 0,
             settings: Vec::new(),
             changed: false,
             rehearsed: false,
@@ -449,6 +451,46 @@ fn a_failed_run() -> ScheduledRun {
         exit: Some(1),
         log: vec!["sync failed: the quality guide could not be reached".to_owned()],
     }
+}
+
+/// Areas declared unmanaged: one covering a thing of each kind, and a misspelt one
+/// covering nothing.
+fn areas_left_alone() -> Vec<UnmanagedReport> {
+    use lemonfiber_core::unmanaged::CoveredKind;
+    [
+        (
+            "sonarr",
+            "I tune this one by hand",
+            Some((CoveredKind::Service, "sonarr")),
+        ),
+        (
+            "config/recyclarr",
+            "my own profiles live in here",
+            Some((CoveredKind::Path, "config/recyclarr/recyclarr.yml")),
+        ),
+        (
+            "DATA_ROOT",
+            "the disks are mine to move",
+            Some((CoveredKind::Setting, "DATA_ROOT")),
+        ),
+        ("radar", "I tune this one by hand too", None),
+    ]
+    .into_iter()
+    .map(|(area, why, covered)| UnmanagedReport {
+        area: area.to_owned(),
+        area_cut: false,
+        why: why.to_owned(),
+        why_cut: false,
+        covers: covered
+            .into_iter()
+            .map(|(kind, name)| CoveredReport {
+                kind,
+                name: name.to_owned(),
+            })
+            .collect(),
+        covers_more: 0,
+    })
+    .collect()
 }
 
 /// A decision the settings store keeps, every optional half filled.

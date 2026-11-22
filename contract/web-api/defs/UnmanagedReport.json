@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One area the operator declared unmanaged, as it covers things now.",
+  "type": "object",
+  "properties": {
+    "area": {
+      "description": "The area as written, a control or layout character written as its bytes in hex.",
+      "type": "string"
+    },
+    "area_cut": {
+      "description": "Whether `area` was cut short.",
+      "type": "boolean"
+    },
+    "covers": {
+      "description": "Each thing the area covers now, in the order the stack holds them. Empty where it\ncovers nothing.",
+      "type": "array",
+      "items": {
+        "$ref": "CoveredReport.json"
+      }
+    },
+    "covers_more": {
+      "description": "How many covered things `covers` leaves out for being too many.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "why": {
+      "description": "The reason the operator gave, written as `area` is.",
+      "type": "string"
+    },
+    "why_cut": {
+      "description": "Whether `why` was cut short.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "area",
+    "area_cut",
+    "why",
+    "why_cut",
+    "covers",
+    "covers_more"
+  ]
+}

@@ -20,6 +20,7 @@ use x509_parser::prelude::{
 
 use super::signature::signed_by;
 use crate::instant::Instant;
+use crate::text::shown::{bounded, hidden, shown, Bounded};
 
 /// The attribute types RFC 4514 writes by a short name, and those names.
 const SHORT_NAMES: [(Oid<'static>, &str); 9] = [
@@ -40,33 +41,6 @@ const MOST_NAMES: usize = 64;
 /// The most characters, as written, any one text in a description holds: a subject or an
 /// issuer past it is cut and says so, and a name past it is left out and counted.
 const LONGEST: usize = 512;
-
-/// The characters that lay text out rather than being shown, first and last of each run:
-/// Unicode's format characters, the line and paragraph separators and the direction
-/// overrides and isolates among them.
-const LAYING_OUT: [(char, char); 21] = [
-    ('\u{ad}', '\u{ad}'),
-    ('\u{600}', '\u{605}'),
-    ('\u{61c}', '\u{61c}'),
-    ('\u{6dd}', '\u{6dd}'),
-    ('\u{70f}', '\u{70f}'),
-    ('\u{890}', '\u{891}'),
-    ('\u{8e2}', '\u{8e2}'),
-    ('\u{180e}', '\u{180e}'),
-    ('\u{200b}', '\u{200f}'),
-    ('\u{2028}', '\u{202e}'),
-    ('\u{2060}', '\u{2064}'),
-    ('\u{2066}', '\u{206f}'),
-    ('\u{feff}', '\u{feff}'),
-    ('\u{fff9}', '\u{fffb}'),
-    ('\u{110bd}', '\u{110bd}'),
-    ('\u{110cd}', '\u{110cd}'),
-    ('\u{13430}', '\u{1343f}'),
-    ('\u{1bca0}', '\u{1bca3}'),
-    ('\u{1d173}', '\u{1d17a}'),
-    ('\u{e0001}', '\u{e0001}'),
-    ('\u{e0020}', '\u{e007f}'),
-];
 
 /// The characters RFC 4514 escapes wherever they stand in a value.
 const ESCAPED: [char; 7] = ['"', '+', ',', ';', '<', '>', '\\'];
@@ -144,7 +118,7 @@ fn names(certificate: &X509Certificate<'_>) -> Named {
         .into_iter()
         .map(|name| match name {
             GeneralName::DNSName(text) | GeneralName::RFC822Name(text) | GeneralName::URI(text) => {
-                Some(bounded(&shown(text)))
+                Some(bounded(&shown(text), LONGEST))
             }
             GeneralName::IPAddress(octets) => {
                 address(octets).map(|text| Bounded { text, cut: false })
@@ -172,14 +146,6 @@ struct Named {
     kept: Vec<String>,
     /// How many are left out.
     more: usize,
-}
-
-/// A text as it is shown, and whether it is the start of a longer one.
-struct Bounded {
-    /// The text, at most [`LONGEST`] characters.
-    text: String,
-    /// Whether the text went on past it.
-    cut: bool,
 }
 
 /// `certificate`'s subject alternative names, or none where it carries none it can read.
@@ -228,7 +194,7 @@ fn written(name: &X509Name<'_>) -> Bounded {
         .map(|part| joined(part.iter().map(attribute).collect(), "+"))
         .collect();
     parts.reverse();
-    bounded(&joined(parts, ","))
+    bounded(&joined(parts, ","), LONGEST)
 }
 
 /// `groups` one after another, with `between` between each two.
@@ -287,44 +253,6 @@ fn escaped(value: &str) -> Vec<String> {
             })
         })
         .collect()
-}
-
-/// `text` a character at a time, each as it is shown.
-fn shown(text: &str) -> Vec<String> {
-    text.chars()
-        .map(|letter| hidden(letter).unwrap_or_else(|| letter.to_string()))
-        .collect()
-}
-
-/// `letter` as its UTF-8 in hex, each byte `\xx` as RFC 4514 writes one, where it is a
-/// control character or one that lays text out rather than being shown; nothing otherwise.
-fn hidden(letter: char) -> Option<String> {
-    let lays_out = LAYING_OUT
-        .iter()
-        .any(|(first, last)| (*first..=*last).contains(&letter));
-    (letter.is_control() || lays_out).then(|| {
-        let mut bytes = [0; 4];
-        letter
-            .encode_utf8(&mut bytes)
-            .bytes()
-            .map(|byte| format!("\\{byte:02x}"))
-            .collect::<Vec<_>>()
-            .concat()
-    })
-}
-
-/// `units` written out, up to [`LONGEST`] characters, and whether there were more.
-fn bounded(units: &[String]) -> Bounded {
-    let mut text = String::new();
-    let mut width = 0;
-    for unit in units {
-        width += unit.chars().count();
-        if width > LONGEST {
-            return Bounded { text, cut: true };
-        }
-        text.push_str(unit);
-    }
-    Bounded { text, cut: false }
 }
 
 #[cfg(test)]

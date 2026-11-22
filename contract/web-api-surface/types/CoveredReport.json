@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "kind": {
+      "type": [
+        "ref:CoveredKind"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

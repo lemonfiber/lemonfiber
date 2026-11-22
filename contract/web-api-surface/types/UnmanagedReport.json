@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "area": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "area_cut": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "covers": {
+      "type": [
+        "array[ref:CoveredReport]"
+      ],
+      "required": true
+    },
+    "covers_more": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    },
+    "why": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "why_cut": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}
