@@ -88,7 +88,9 @@ fn minute_of_day(at: SystemTime, zone: &str) -> Option<Minute> {
     let seconds = at.duration_since(SystemTime::UNIX_EPOCH).ok()?.as_secs();
     let seconds = i64::try_from(seconds).ok()?;
     let zone = jiff::tz::TimeZone::get(zone).ok()?;
-    let zoned = jiff::Timestamp::from_second(seconds).ok()?.to_zoned(zone);
+    let zoned = jiff::Timestamp::from_second(seconds)
+        .ok()?
+        .to_zoned_datetime(zone);
     let hour = u16::try_from(zoned.hour()).ok()?;
     let minute = u16::try_from(zoned.minute()).ok()?;
     Some(Minute(hour * 60 + minute))

@@ -58,7 +58,7 @@ fn wall_clock(at: Instant, zone: &TimeZone) -> Option<WallClock> {
     let seconds = i64::try_from(at.seconds()).ok()?;
     let zoned = jiff::Timestamp::from_second(seconds)
         .ok()?
-        .to_zoned(zone.clone());
+        .to_zoned_datetime(zone.clone());
     Some(WallClock {
         minute: u8::try_from(zoned.minute()).ok()?,
         hour: u8::try_from(zoned.hour()).ok()?,
