@@ -63,7 +63,7 @@ bollard = { version = "0.21", features = ["ssh"] }
 # time of day: the hours an operator does not want waking for. Everything else here is
 # instants and calendar days on purpose. Its own tzdb is left to the platform's, so the
 # zone the stack already names in `TZ` is read from the same database the containers use.
-jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-zoneinfo"] }
+jiff = { version = "1.0", default-features = false, features = ["std", "tzdb-zoneinfo"] }
 clap = { version = "4", features = ["derive"] }
 etcetera = "0.11"
 # The operating system's CSPRNG, for every secret lemonfiber mints itself.
