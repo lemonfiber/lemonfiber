@@ -48,7 +48,7 @@ async fn silent(listening: &mut lemonfiber_api::events::live::Listening) -> bool
 #[tokio::test]
 async fn the_operator_arriving_hears_the_settings_as_the_read_answers_them() {
     let ctx = configured("settings-stream-arriving", "");
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await.heard_as(Audience::Operator);
     live.refresh(&Settings::against(Arc::new(ctx.clone())))
         .await;
@@ -64,7 +64,7 @@ async fn the_operator_arriving_hears_the_settings_as_the_read_answers_them() {
 #[tokio::test]
 async fn the_settings_are_said_again_only_when_one_changes() {
     let ctx = configured("settings-stream-changed", "");
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let settings = Settings::against(Arc::new(ctx.clone()));
     let mut listening = live.listening(None).await.heard_as(Audience::Operator);
     live.refresh(&settings).await;
@@ -94,7 +94,7 @@ async fn the_settings_are_said_again_only_when_one_changes() {
 #[tokio::test]
 async fn a_listener_hearing_as_anyone_never_hears_the_settings() {
     let ctx = Arc::new(configured("settings-stream-anyone", ""));
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut operator = live.listening(None).await.heard_as(Audience::Operator);
     let mut anyone = live.listening(None).await;
     live.refresh(&Together::in_a_run(&ctx)).await;
@@ -145,12 +145,11 @@ fn only_the_per_run_token_and_an_operator_session_hear_as_the_operator() {
 
 /// A stream opened over the route with `secret`, and the gather it listens to.
 async fn opened(secret: &str, reading: Ctx, token: Token) -> (Response<Body>, Arc<Live>) {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let streaming = Arc::new(Streaming {
         token: Arc::new(token),
         bound: Binding::here(8471),
         live: Arc::clone(&live),
-        clock: Stopped::at(0),
         reading: Arc::new(reading),
     });
     let mut headers = HeaderMap::new();
@@ -218,7 +217,7 @@ async fn the_per_run_token_on_the_stream_hears_what_is_said_to_the_operator() {
 
 #[tokio::test]
 async fn a_listener_coming_back_is_not_handed_what_was_said_to_the_operator_alone() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let record = |what: &'static str| Rendered::of(EventKind::Log, &what);
     let Some(before) = record("before") else {
         unreachable!("a log line renders");
@@ -233,6 +232,10 @@ async fn a_listener_coming_back_is_not_handed_what_was_said_to_the_operator_alon
         .listening(Some(seen.id()))
         .await
         .heard_as(Audience::Operator);
+    for replay in [anyone.next().await, operator.next().await] {
+        let replay = replay.unwrap_or_default();
+        assert!(replay.starts_with("event: replay\n"), "{replay}");
+    }
     for missed in [anyone.next().await, operator.next().await] {
         let missed = missed.unwrap_or_default();
         assert!(missed.contains("anyone's"), "{missed}");

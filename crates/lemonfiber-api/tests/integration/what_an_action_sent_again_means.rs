@@ -45,7 +45,7 @@ fn serving(ctx: Ctx) -> Serving {
         Arc::new(token),
         lemonfiber_api::guard::Binding::here(8471),
         Jobs::default(),
-        Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        Arc::new(Live::opening(Stopped::at(0))),
     )
 }
 

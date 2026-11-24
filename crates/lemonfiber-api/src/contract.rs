@@ -69,6 +69,7 @@ use lemonfiber_core::wiring;
 use crate::actions::published::Action;
 use crate::actions::{self, named, Arguments, KEY_CALLABLE};
 use crate::capabilities::Capabilities;
+use crate::events::backlog::Replay;
 use crate::events::wire::{Audience, EventKind, Nature, BEAT};
 use crate::jobs::ended::Ended;
 use crate::jobs::started::Started;
@@ -258,8 +259,9 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 
 /// The shapes that belong to no command's answer.
 ///
-/// A failure, a name for work that outlives its request, and the lines a long run says
-/// while it is still running — none of which any [`Outcome`] carries,
+/// A failure, a name for work that outlives its request, the lines a long run says
+/// while it is still running, and what a stream opened again is told of its alerts —
+/// none of which any [`Outcome`] carries,
 /// and each of which a caller still has to parse.
 ///
 /// The walkthrough and the supervision report sat here and are carried by an outcome,
@@ -279,6 +281,7 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));
     describing(kinds, kind::NEWS, schema_for!(Envelope<Newest>));
     describing(kinds, kind::PULL, schema_for!(Envelope<String>));
+    describing(kinds, kind::REPLAY, schema_for!(Envelope<Replay>));
     describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
     describing(kinds, kind::START, schema_for!(Envelope<String>));
     describing(kinds, kind::STEP, schema_for!(Envelope<Line>));

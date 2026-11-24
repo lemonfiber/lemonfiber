@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a replay holds every alert raised since the id it was asked from.",
+  "oneOf": [
+    {
+      "description": "Every one.",
+      "type": "string",
+      "const": "whole"
+    },
+    {
+      "description": "Those still kept, and some raised since are not.",
+      "type": "string",
+      "const": "partial"
+    }
+  ]
+}

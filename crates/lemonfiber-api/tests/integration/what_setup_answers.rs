@@ -63,7 +63,7 @@ fn serving(paths: &Paths) -> Option<Serving> {
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
         jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        live: Arc::new(Live::opening(Stopped::at(0))),
         kept: Arc::default(),
         answered: Arc::default(),
     })
@@ -84,7 +84,7 @@ fn homeless() -> Option<axum::Router> {
         token: Arc::new(Token::mint(&Chance::cycling())?),
         bound: bound(),
         jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+        live: Arc::new(Live::opening(Stopped::at(0))),
         kept: Arc::default(),
         answered: Arc::default(),
     };
@@ -484,8 +484,7 @@ async fn no_setup_endpoint_is_reachable_without_this_run_s_token() {
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&serving.token),
         bound: bound(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
-        clock: Stopped::at(0),
+        live: Arc::new(Live::opening(Stopped::at(0))),
         reading: Arc::new(crate::idle::ctx()),
     });
     let surface = lemonfiber_api::router::routes(serving, streaming);
@@ -529,8 +528,7 @@ async fn a_token_from_this_run_is_admitted() {
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&serving.token),
         bound: bound(),
-        live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
-        clock: Stopped::at(0),
+        live: Arc::new(Live::opening(Stopped::at(0))),
         reading: Arc::new(crate::idle::ctx()),
     });
     let surface = lemonfiber_api::router::routes(serving, streaming);

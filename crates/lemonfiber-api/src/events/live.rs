@@ -20,7 +20,7 @@ use lemonfiber_core::ports::Clock;
 use tokio::sync::{broadcast, mpsc, watch, Mutex, Notify};
 
 use super::backlog::Backlog;
-use super::wire::{Audience, Event, Rendered, BEAT, BEAT_SAID};
+use super::wire::{framed, Audience, Event, EventKind, Rendered, BEAT, BEAT_SAID};
 
 /// How often the source is gathered from when nobody has asked sooner: the
 /// screen's own tick, read from it rather than restated, because it is the same
@@ -89,6 +89,8 @@ pub struct Live {
     said: broadcast::Sender<Event>,
     /// What has been said, for whoever was not.
     backlog: Mutex<Backlog>,
+    /// When each thing is said, and how long ago what was kept was.
+    clock: Arc<dyn Clock>,
     /// A listener asking for a gather now rather than at the next tick.
     wanted: Notify,
     /// Whether a listener has opened since the last gather.
@@ -104,11 +106,12 @@ pub struct Live {
 impl Live {
     /// A stream opening now, which has said nothing yet.
     #[must_use]
-    pub fn opening(clock: &dyn Clock) -> Self {
+    pub fn opening(clock: Arc<dyn Clock>) -> Self {
         let (said, _) = broadcast::channel(CARRIED);
         Self {
             said,
-            backlog: Mutex::new(Backlog::opening(clock)),
+            backlog: Mutex::new(Backlog::opening(clock.as_ref())),
+            clock,
             wanted: Notify::new(),
             joined: AtomicBool::new(false),
             arrived: Notify::new(),
@@ -123,10 +126,10 @@ impl Live {
     /// nothing on that is narrowed to them, but it is bound to this run's binding as
     /// that is: a member is not left listening after the surface stopped serving.
     #[must_use]
-    pub fn beside(&self, clock: &dyn Clock) -> Self {
+    pub fn beside(&self) -> Self {
         Self {
             ended: Arc::clone(&self.ended),
-            ..Self::opening(clock)
+            ..Self::opening(Arc::clone(&self.clock))
         }
     }
 
@@ -136,7 +139,7 @@ impl Live {
     /// between the two is neither told twice nor left with a hole.
     pub async fn say(&self, said: Rendered) -> Event {
         let mut backlog = self.backlog.lock().await;
-        let event = backlog.say(said);
+        let event = backlog.say(said, self.clock.now());
         // Nobody listening is not a failure: the stream exists whether or not a
         // browser is open, and what was said is in the backlog either way.
         let _sent = self.said.send(event.clone());
@@ -162,8 +165,13 @@ impl Live {
         let said = self.said.subscribe();
         self.joined.store(true, Ordering::SeqCst);
         self.arrived.notify_one();
+        let handed = backlog.since(seen, self.clock.now());
         Listening {
-            missed: backlog.since(seen).into(),
+            replay: handed
+                .replay
+                .and_then(|replay| Rendered::of(EventKind::Replay, &replay))
+                .map(|replay| framed(None, &replay)),
+            missed: handed.missed.into(),
             said,
             ended: self.ended.subscribe(),
             hearing: Audience::Anyone,
@@ -242,6 +250,9 @@ impl Live {
 
 /// One client's place in the stream.
 pub struct Listening {
+    /// Whether what it is handed again holds every alert raised since its id, as it
+    /// goes down the wire, still to be said before the rest.
+    replay: Option<String>,
     /// The record it missed, oldest first, still to be handed over.
     missed: VecDeque<Event>,
     /// What is said from here on.
@@ -269,6 +280,9 @@ impl Listening {
     /// said — so a busy stream beats only when it has gone quiet. What is said to an
     /// audience this client is not part of is passed over.
     pub async fn next(&mut self) -> Option<String> {
+        if let Some(replay) = self.replay.take() {
+            return Some(replay);
+        }
         let hearing = self.hearing;
         if let Some(event) = std::iter::from_fn(|| self.missed.pop_front())
             .find(|event| hearing.hears(event.audience()))

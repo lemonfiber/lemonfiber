@@ -79,6 +79,7 @@
     "removal": "ref:HouseholdRemoval",
     "repair": "ref:RepairReport",
     "replacement": "ref:ReplaceReport",
+    "replay": "ref:Replay",
     "reset": "ref:ResetReport",
     "restore": "ref:Restoration",
     "seed": "ref:SeedReport",

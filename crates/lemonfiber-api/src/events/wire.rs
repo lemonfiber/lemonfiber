@@ -19,6 +19,8 @@ use lemonfiber_core::walkthrough::Line as StepLine;
 use schemars::{schema_for, Schema};
 use serde::Serialize;
 
+use super::backlog::Replay;
+
 /// The longest the stream may say nothing before saying it is still there.
 ///
 /// A client treats twice this in silence as a broken connection, which tolerates
@@ -49,6 +51,8 @@ pub enum Nature {
 pub enum Replayed {
     /// Every one the run still keeps.
     Every,
+    /// Every one said lately that the run still keeps, handed back even where the rest is not.
+    Recent,
     /// The newest of each item the run still keeps.
     NewestOfEach,
     /// None.
@@ -148,6 +152,7 @@ macro_rules! event_kinds {
             pub const fn replayed(self) -> Replayed {
                 match (self, self.nature()) {
                     (Self::Start | Self::Pull, _) => Replayed::NewestOfEach,
+                    (Self::Alert, _) => Replayed::Recent,
                     (_, Nature::Record) => Replayed::Every,
                     (_, Nature::State) => Replayed::Never,
                 }
@@ -191,6 +196,8 @@ event_kinds! {
     Plugins(Installs) = PLUGINS, State, Anyone;
     /// One line the container engine wrote while pulling images.
     Pull(String) = PULL, State, Anyone;
+    /// Whether what a stream opened again hands back holds every alert raised since.
+    Replay(Replay) = REPLAY, State, Anyone;
     /// Every setting.
     Settings(SettingsReport) = SETTINGS, State, Operator;
     /// One line said while services are starting.
@@ -301,19 +308,32 @@ impl Event {
     }
 
     /// This event as it goes down the wire.
-    ///
-    /// The payload occupies as many `data` lines as it has lines, which a client
-    /// rejoins with the newlines it split on. Rendered JSON has none of its own —
-    /// a newline inside a value is escaped — so in practice this is one line.
     #[must_use]
     pub fn framed(&self) -> String {
-        let mut wire = format!("id: {}\nevent: {}\n", self.id, self.said.kind());
-        for line in self.said.said.lines() {
-            wire.push_str("data: ");
-            wire.push_str(line);
-            wire.push('\n');
-        }
-        wire.push('\n');
-        wire
+        framed(Some(&self.id), &self.said)
     }
+}
+
+/// An envelope as it goes down the wire, under `id` where it has a place in the run.
+///
+/// The payload occupies as many `data` lines as it has lines, which a client
+/// rejoins with the newlines it split on. Rendered JSON has none of its own —
+/// a newline inside a value is escaped — so in practice this is one line.
+pub(crate) fn framed(id: Option<&str>, said: &Rendered) -> String {
+    let mut wire = String::new();
+    if let Some(id) = id {
+        wire.push_str("id: ");
+        wire.push_str(id);
+        wire.push('\n');
+    }
+    wire.push_str("event: ");
+    wire.push_str(said.kind().as_str());
+    wire.push('\n');
+    for line in said.said.lines() {
+        wire.push_str("data: ");
+        wire.push_str(line);
+        wire.push('\n');
+    }
+    wire.push('\n');
+    wire
 }

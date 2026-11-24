@@ -75,13 +75,12 @@ struct Serving {
 impl Serving {
     /// A server opening now, with a token a test can carry.
     fn opening() -> Self {
-        let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+        let live = Arc::new(Live::opening(Stopped::at(0)));
         let streaming = Token::mint(&given()).map(|token| {
             Arc::new(Streaming {
                 token: Arc::new(token),
                 bound: lemonfiber_api::guard::Binding::here(8471),
                 live: Arc::clone(&live),
-                clock: Stopped::at(0),
                 reading: Arc::new(crate::idle::ctx()),
             })
         });
@@ -249,15 +248,28 @@ async fn a_listener_that_comes_back_is_handed_the_record_it_missed_first() {
     let mut carried = welcome(&token);
     let id = seen.as_ref().map(Event::id).unwrap_or_default();
     carried.push((LAST_EVENT_ID, id));
-    let heard = first(serving.answering(&carried).await).await;
+    let Some(answer) = serving.answering(&carried).await else {
+        unreachable!("a welcomed client is answered");
+    };
+    let mut body = answer.into_body().into_data_stream();
+    let mut next = async || {
+        body.next()
+            .await
+            .and_then(Result::ok)
+            .map(|said| String::from_utf8_lossy(&said).into_owned())
+            .unwrap_or_default()
+    };
 
+    let replay = next().await;
+    assert!(replay.starts_with("event: replay\n"), "{replay}");
+    let heard = next().await;
     assert!(heard.contains("during the gap"), "{heard}");
     assert!(!heard.contains("before the gap"), "{heard}");
 }
 
 #[tokio::test(start_paused = true)]
 async fn a_stream_that_has_said_nothing_says_so_within_fifteen_seconds() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
 
     let began = Instant::now();
@@ -273,7 +285,7 @@ async fn a_stream_that_has_said_nothing_says_so_within_fifteen_seconds() {
 
 #[tokio::test(start_paused = true)]
 async fn a_stream_that_has_just_spoken_waits_the_whole_interval_again() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     say(&live, "a service restarted").await;
 
@@ -288,7 +300,7 @@ async fn a_stream_that_has_just_spoken_waits_the_whole_interval_again() {
 
 #[tokio::test(start_paused = true)]
 async fn a_listener_that_cannot_keep_up_is_ended_rather_than_told_less_than_it_missed() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     for _ in 0..FLOOD {
         say(&live, "another one").await;
@@ -302,7 +314,7 @@ async fn a_listener_that_cannot_keep_up_is_ended_rather_than_told_less_than_it_m
 
 #[tokio::test(start_paused = true)]
 async fn a_stream_that_has_ended_ends_the_listener_with_it() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     drop(live);
 
@@ -311,7 +323,7 @@ async fn a_stream_that_has_ended_ends_the_listener_with_it() {
 
 #[tokio::test(start_paused = true)]
 async fn a_source_with_nothing_to_say_leaves_the_stream_silent() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
 
     live.refresh(&Mute).await;
@@ -325,7 +337,7 @@ async fn a_source_with_nothing_to_say_leaves_the_stream_silent() {
 
 #[tokio::test(start_paused = true)]
 async fn the_gather_comes_round_again_on_the_tick() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
     let gathering =
         tokio::spawn(Arc::clone(&live).gathering(Arc::new(Counting(AtomicUsize::new(0)))));
@@ -349,7 +361,7 @@ async fn the_gather_comes_round_again_on_the_tick() {
 /// with no browser open must not ask them every second for a screen nobody sees.
 #[tokio::test(start_paused = true)]
 async fn nothing_is_gathered_while_nobody_is_listening() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let counting = Arc::new(Counting(AtomicUsize::new(0)));
     let gathering =
         tokio::spawn(Arc::clone(&live).gathering(Arc::clone(&counting) as Arc<dyn Gathers>));
@@ -377,7 +389,7 @@ async fn nothing_is_gathered_while_nobody_is_listening() {
 
 #[tokio::test(start_paused = true)]
 async fn a_listener_arriving_is_gathered_for_rather_than_made_to_wait() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
     live.nudge();
     let gathering =
@@ -398,7 +410,7 @@ async fn a_listener_arriving_is_gathered_for_rather_than_made_to_wait() {
 
 #[tokio::test]
 async fn the_stream_is_fed_by_the_gather_that_answers_the_dashboard() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     let dashboard = Dashboard::against(Arc::new(nowhere()));
 
@@ -419,7 +431,7 @@ async fn the_stream_is_fed_by_the_gather_that_answers_the_dashboard() {
 /// household's panel ready, and what is newest is said from that same reading.
 #[tokio::test]
 async fn a_household_that_reads_is_heard_from_the_gather_that_read_it() {
-    let live = Live::opening(Stopped::today().as_ref());
+    let live = Live::opening(Stopped::today());
     let mut listening = live.listening(None).await;
     let ctx = lemonfiber_testing::a_context()
         .runner(Arc::new(Idle))
@@ -445,7 +457,7 @@ fn named(said: &str) -> Option<&str> {
 /// is nothing to wake it for. What is playing is said on the same terms, after it.
 #[tokio::test]
 async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let dashboard = Dashboard::against(Arc::new(nowhere()));
 
     let mut first = live.listening(None).await;
@@ -499,7 +511,7 @@ async fn what_is_new_is_said_to_a_listener_arriving_and_not_on_every_tick() {
 /// start's narration already carries.
 #[tokio::test]
 async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
     let waiting = Saying::onto(Arc::clone(&live));
 
@@ -525,7 +537,7 @@ async fn a_wait_says_what_it_is_waiting_for_to_whoever_is_listening() {
 /// ties each line to that start by it.
 #[tokio::test]
 async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
 
     Saying::for_job(Arc::clone(&live), "9f2c1a7e04b3d815")
@@ -547,7 +559,7 @@ async fn a_wait_names_the_job_it_belongs_to_and_an_untied_one_names_none() {
 
 #[tokio::test]
 async fn each_line_a_pull_writes_reaches_the_stream_as_a_pull_event_of_its_job() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
 
     Saying::for_job(Arc::clone(&live), "9f2c1a7e04b3d815")
@@ -566,7 +578,7 @@ async fn each_line_a_pull_writes_reaches_the_stream_as_a_pull_event_of_its_job()
 /// a client asked for and nothing is left carrying once the walk is over.
 #[tokio::test]
 async fn a_walks_steps_name_its_job_and_stop_being_carried_when_it_ends() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let (walking, carrying) = Stepping::for_job(Arc::clone(&live), "9f2c1a7e04b3d815");
 
     walking.said(&Line::searched(3, 12));
@@ -574,6 +586,8 @@ async fn a_walks_steps_name_its_job_and_stop_being_carried_when_it_ends() {
     carrying.carrying().await;
 
     let mut listening = live.listening(Some("0-0")).await;
+    let replay = listening.next().await.unwrap_or_default();
+    assert!(replay.starts_with("event: replay\n"), "{replay}");
     let heard = listening.next().await.unwrap_or_default();
     assert!(heard.contains("\nevent: step\n"), "{heard}");
     assert!(heard.contains(r#""job":"9f2c1a7e04b3d815""#), "{heard}");
@@ -590,7 +604,7 @@ async fn a_walks_steps_name_its_job_and_stop_being_carried_when_it_ends() {
 /// be a second copy of the walk's own prose beside the one the terminal draws.
 #[tokio::test]
 async fn a_walk_says_each_step_to_whoever_is_listening() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
     let (walking, carrying) = Stepping::onto(Arc::clone(&live));
     let saying = tokio::spawn(carrying.carrying());
@@ -617,7 +631,7 @@ async fn a_walk_says_each_step_to_whoever_is_listening() {
 /// added to it.
 #[tokio::test]
 async fn a_step_said_after_the_surface_has_gone_is_not_a_walk_that_failed() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let (walking, carrying) = Stepping::onto(Arc::clone(&live));
     drop(carrying);
 
@@ -637,7 +651,7 @@ async fn a_step_said_after_the_surface_has_gone_is_not_a_walk_that_failed() {
 /// must leave it open for the next one — and only the surface going away closes it.
 #[tokio::test]
 async fn carrying_the_steps_ends_when_there_is_nothing_left_to_say_them() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let (walking, carrying) = Stepping::onto(Arc::clone(&live));
 
     walking.said(&Line::searched(2, 9));
@@ -645,6 +659,8 @@ async fn carrying_the_steps_ends_when_there_is_nothing_left_to_say_them() {
     carrying.carrying().await;
 
     let mut listening = live.listening(Some("0-0")).await;
+    let replay = listening.next().await.unwrap_or_default();
+    assert!(replay.starts_with("event: replay\n"), "{replay}");
     let heard = listening.next().await.unwrap_or_default();
     assert!(heard.contains("\nevent: step\n"), "{heard}");
     assert!(
@@ -656,7 +672,7 @@ async fn carrying_the_steps_ends_when_there_is_nothing_left_to_say_them() {
 /// An envelope that will not render is not said, rather than said as something else.
 #[tokio::test]
 async fn nothing_rendered_is_nothing_said() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     live.say_if_rendered(None).await;
 
     let mut listening = live.listening(None).await;
@@ -671,7 +687,7 @@ async fn nothing_rendered_is_nothing_said() {
 /// once, and not the lines that line replaced.
 #[tokio::test(start_paused = true)]
 async fn a_client_that_comes_back_is_handed_the_newest_line_of_a_wait() {
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let seen = say(&live, "one line it did read").await;
     let waiting = Saying::onto(Arc::clone(&live));
     waiting
@@ -683,6 +699,8 @@ async fn a_client_that_comes_back_is_handed_the_newest_line_of_a_wait() {
 
     let mut arriving = live.listening(seen.as_ref().map(Event::id)).await;
 
+    let replay = arriving.next().await.unwrap_or_default();
+    assert!(replay.starts_with("event: replay\n"), "{replay}");
     let handed = arriving.next().await.unwrap_or_default();
     assert!(handed.contains("event: start"), "{handed}");
     assert!(handed.contains("10 seconds so far"), "{handed}");
@@ -725,12 +743,11 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     let Some(token) = Token::mint(&given()) else {
         unreachable!("a cycling source always mints one");
     };
-    let live = Arc::new(Live::opening(clock.as_ref()));
+    let live = Arc::new(Live::opening(clock));
     let streaming = Arc::new(Streaming {
         token: Arc::new(token),
         bound: lemonfiber_api::guard::Binding::here(8471),
         live: Arc::clone(&live),
-        clock,
         reading: Arc::new(reading),
     });
     let answer = stream(State(streaming), None, saying(&welcome(&admitted.token))).await;

@@ -154,7 +154,7 @@ pub(crate) async fn sent(
     said: &[(&str, &str)],
 ) -> Option<(StatusCode, String)> {
     let token = Arc::new(Token::mint(&given())?);
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(0)));
     let router = routes(
         Serving {
             ctx: Arc::new(ctx),
@@ -169,7 +169,6 @@ pub(crate) async fn sent(
             token,
             bound: bound(),
             live,
-            clock: Stopped::at(0),
             reading: Arc::new(crate::idle::ctx()),
         }),
     );

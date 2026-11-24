@@ -39,7 +39,7 @@ fn carried(said: &str) -> String {
 #[tokio::test]
 async fn a_listener_arriving_hears_what_is_installed_and_what_is_wired() {
     let ctx = recording("stream-arriving", "");
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     live.refresh(&Extending::against(Arc::new(ctx.clone())))
         .await;
@@ -62,7 +62,7 @@ async fn a_listener_arriving_hears_what_is_installed_and_what_is_wired() {
 #[tokio::test]
 async fn neither_is_said_again_until_it_changes() {
     let ctx = recording("stream-unchanged", "");
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let extending = Extending::against(Arc::new(ctx.clone()));
     let mut listening = live.listening(None).await;
     live.refresh(&extending).await;
@@ -93,7 +93,7 @@ async fn neither_is_said_again_until_it_changes() {
 #[tokio::test]
 async fn a_record_that_will_not_read_is_not_said_as_nothing_installed() {
     let ctx = recording("stream-damaged", "{ not json");
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     live.refresh(&Extending::against(Arc::new(ctx))).await;
 
@@ -111,7 +111,7 @@ async fn several_sources_are_gathered_as_one_in_the_order_given() {
     use lemonfiber_api::events::extending::Together;
 
     let ctx = Arc::new(recording("stream-together", ""));
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
     let together = Together::in_a_run(&ctx);
     live.refresh(&together).await;

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a stream opened again from an id says of what it is handed before going on.",
+  "type": "object",
+  "properties": {
+    "alerts": {
+      "description": "Whether it holds every alert raised since the id.",
+      "$ref": "ReplayAlerts.json"
+    }
+  },
+  "required": [
+    "alerts"
+  ]
+}
