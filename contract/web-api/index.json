@@ -123,6 +123,11 @@
         "nature": "state",
         "audience": "anyone"
       },
+      "replay": {
+        "schema": "kinds/replay.json",
+        "nature": "state",
+        "audience": "anyone"
+      },
       "settings": {
         "schema": "kinds/settings.json",
         "nature": "state",
@@ -225,6 +230,7 @@
     "removal": "kinds/removal.json",
     "repair": "kinds/repair.json",
     "replacement": "kinds/replacement.json",
+    "replay": "kinds/replay.json",
     "reset": "kinds/reset.json",
     "restore": "kinds/restore.json",
     "seed": "kinds/seed.json",
@@ -377,6 +383,7 @@
       "removal": "examples/kinds/removal.json",
       "repair": "examples/kinds/repair.json",
       "replacement": "examples/kinds/replacement.json",
+      "replay": "examples/kinds/replay.json",
       "reset": "examples/kinds/reset.json",
       "restore": "examples/kinds/restore.json",
       "seed": "examples/kinds/seed.json",

@@ -80,6 +80,7 @@ async fn routes(seen: &mut Seen) -> Option<()> {
     let _ = tokio::fs::remove_dir_all(surface.world().root().join("data")).await;
     surface.live().refresh(&dashboard).await;
     seen.answered(surface.heard().await);
+    seen.answered(surface.resumed("0-0").await);
     let replacing = Command::Companion(Paired::Certificate { confirm: false });
     let replaced = dispatch(replacing, &surface.world().ctx).await;
     seen.answered(

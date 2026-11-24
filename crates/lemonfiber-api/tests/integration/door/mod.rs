@@ -190,7 +190,7 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
     let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
         unreachable!("a cycling source always mints one")
     };
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(NOW)));
     let serving = Serving {
         ctx: Arc::new(admitted_by(ctx, admitting)),
         token: Arc::clone(&token),
@@ -204,7 +204,6 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         token: Arc::clone(&token),
         bound: bound(),
         live,
-        clock: Stopped::at(NOW),
         reading: Arc::clone(&serving.ctx),
     });
     (routes(serving, streaming), token)
@@ -225,12 +224,11 @@ pub(crate) fn stream_reading(admitting: &Arc<Admitting>, reading: Ctx) -> axum::
     let Some(token) = Token::mint(&Chance::cycling()).map(Arc::new) else {
         unreachable!("a cycling source always mints one")
     };
-    let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = Arc::new(Live::opening(Stopped::at(NOW)));
     lemonfiber_api::events::routes(Arc::new(Streaming {
         token,
         bound: bound(),
         live,
-        clock: Stopped::at(NOW),
         reading: Arc::new(at_the_doors_moment(admitted_by(reading, admitting))),
     }))
 }

@@ -10,7 +10,7 @@ use crate::events::wire::{EventKind, Rendered};
 /// A stream open when every stream is told to end, ends; one opened afterwards does not.
 #[tokio::test]
 async fn a_stream_open_when_they_are_ended_ends_and_a_later_one_does_not() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut open = live.listening(None).await;
 
     live.end_every_stream();
@@ -34,8 +34,8 @@ async fn a_stream_open_when_they_are_ended_ends_and_a_later_one_does_not() {
 #[tokio::test]
 async fn a_stream_beside_this_one_hears_none_of_it_and_ends_with_it() {
     let clock = Stopped::at(0);
-    let live = Live::opening(clock.as_ref());
-    let beside = live.beside(clock.as_ref());
+    let live = Live::opening(clock.clone());
+    let beside = live.beside();
     let mut theirs = beside.listening(None).await;
 
     live.say_if_rendered(Rendered::of(EventKind::Playing, &PlayingReport::default()))
@@ -81,7 +81,7 @@ impl super::Gathers for Counting {
 #[tokio::test]
 async fn a_source_that_wants_it_is_gathered_with_nobody_listening_once_roused() {
     use std::sync::atomic::Ordering;
-    let live = std::sync::Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
     let source = std::sync::Arc::new(Counting {
         wanted: false.into(),
         gathered: 0.into(),
@@ -130,7 +130,7 @@ impl super::Gathers for InWaves {
 /// and the rest follows.
 #[tokio::test(start_paused = true)]
 async fn what_a_source_hands_over_early_is_heard_before_the_rest_of_its_gather() {
-    let live = std::sync::Arc::new(Live::opening(Stopped::at(0).as_ref()));
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
     let mut listening = live.listening(None).await;
     let refreshing = tokio::spawn({
         let live = std::sync::Arc::clone(&live);
@@ -172,7 +172,7 @@ impl super::Gathers for AtOnce {
 /// before anything was heard.
 #[tokio::test(start_paused = true)]
 async fn what_is_handed_over_early_is_heard_first_even_from_a_gather_already_done() {
-    let live = Live::opening(Stopped::at(0).as_ref());
+    let live = Live::opening(Stopped::at(0));
     let mut listening = live.listening(None).await;
 
     live.refresh(&AtOnce).await;
@@ -246,4 +246,67 @@ async fn sources_gathered_together_are_wanted_unheard_once_any_is() {
 
     assert!(!none.wanted_unheard().await);
     assert!(one.wanted_unheard().await);
+}
+
+/// A stream opened again is told first, outside the run's places, whether it is handed
+/// every alert raised since its id, and then handed them.
+#[tokio::test]
+async fn a_stream_opened_again_is_told_first_whether_its_alerts_are_whole() {
+    let live = Live::opening(Stopped::at(0));
+    live.say_if_rendered(Rendered::of(EventKind::Log, &"heard"))
+        .await;
+    live.say_if_rendered(Rendered::of(EventKind::Alert, &"missed"))
+        .await;
+
+    let mut again = live.listening(Some("0-1")).await;
+    assert_eq!(
+        again.next().await.as_deref(),
+        Some("event: replay\ndata: {\"api_version\":1,\"kind\":\"replay\",\"data\":{\"alerts\":\"whole\"}}\n\n")
+    );
+    let missed = again.next().await.unwrap_or_default();
+    assert!(missed.starts_with("id: 0-2\nevent: alert\n"), "{missed}");
+}
+
+/// A stream opened again from another run is handed the alerts kept, said to be partial.
+#[tokio::test]
+async fn a_stream_opened_again_from_another_run_is_told_its_alerts_are_partial() {
+    let live = Live::opening(Stopped::at(0));
+    live.say_if_rendered(Rendered::of(EventKind::Alert, &"kept"))
+        .await;
+
+    let mut again = live.listening(Some("elsewhere-7")).await;
+    let replay = again.next().await.unwrap_or_default();
+    assert!(replay.contains(r#""alerts":"partial""#), "{replay}");
+    let kept = again.next().await.unwrap_or_default();
+    assert!(kept.contains(r#""data":"kept""#), "{kept}");
+}
+
+/// A stream opened afresh is told nothing of alerts, and handed none.
+#[tokio::test(start_paused = true)]
+async fn a_stream_opened_afresh_is_told_nothing_of_alerts() {
+    let live = Live::opening(Stopped::at(0));
+    live.say_if_rendered(Rendered::of(EventKind::Alert, &"before"))
+        .await;
+
+    let mut afresh = live.listening(None).await;
+    assert_eq!(afresh.next().await.as_deref(), Some(super::BEAT_SAID));
+}
+
+/// What a stream keeps of alerts is aged by its own clock, read when it is opened again.
+#[tokio::test]
+async fn alerts_are_aged_by_the_clock_the_stream_opened_with() {
+    let step = crate::events::backlog::ALERTS_FOR + Duration::from_secs(1);
+    let live = Live::opening(std::sync::Arc::new(
+        lemonfiber_fixtures::ports::Ticking::by(step),
+    ));
+    let Some(heard) = Rendered::of(EventKind::Log, &"heard") else {
+        unreachable!("a log line renders");
+    };
+    let heard = live.say(heard).await;
+    live.say_if_rendered(Rendered::of(EventKind::Alert, &"long ago"))
+        .await;
+
+    let mut again = live.listening(Some(heard.id())).await;
+    let replay = again.next().await.unwrap_or_default();
+    assert!(replay.contains(r#""alerts":"partial""#), "{replay}");
 }

@@ -27,7 +27,7 @@ fn routed(caller: Caller) -> axum::Router {
             token: Arc::new(token),
             bound: lemonfiber_api::guard::Binding::here(8471),
             jobs: Jobs::default(),
-            live: Arc::new(Live::opening(Stopped::at(0).as_ref())),
+            live: Arc::new(Live::opening(Stopped::at(0))),
             kept: Arc::default(),
             answered: Arc::default(),
         })

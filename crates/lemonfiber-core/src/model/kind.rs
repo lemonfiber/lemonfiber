@@ -199,6 +199,8 @@ kinds! {
     REPAIR = "repair",
     /// What standing in place of a setup already here came to.
     REPLACEMENT = "replacement",
+    /// Whether what a stream opened again hands back holds every alert raised since.
+    REPLAY = "replay",
     /// What a full reset did, or would do.
     RESET = "reset",
     /// What a restore would overwrite, or what it put back.

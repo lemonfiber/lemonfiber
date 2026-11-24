@@ -31,7 +31,6 @@ use axum::routing::get;
 use axum::Router;
 
 use lemonfiber_core::app::Ctx;
-use lemonfiber_core::ports::time::Clock;
 
 use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
@@ -65,8 +64,6 @@ pub struct Streaming {
     pub bound: Binding,
     /// The one gather, and everyone already listening to it.
     pub live: Arc<Live>,
-    /// The clock the rest of the surface reads, which a member's own stream is timed by.
-    pub clock: Arc<dyn Clock>,
     /// The context the rest of the surface dispatches through: who a listener is, and
     /// the world a household member's own stream reads in.
     pub reading: Arc<Ctx>,
@@ -155,7 +152,7 @@ async fn theirs(
     seen: Option<&str>,
     mut staying: Staying,
 ) -> Response<Body> {
-    let live = Arc::new(streaming.live.beside(streaming.clock.as_ref()));
+    let live = Arc::new(streaming.live.beside());
     let listening = live.listening(seen).await;
     let source = Arc::new(source);
     staying.gathering = Some(Gathering(tokio::spawn(live.gathering(source))));

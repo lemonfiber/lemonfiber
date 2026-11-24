@@ -69,7 +69,7 @@ impl Run {
     fn over(ctx: Ctx) -> Option<Self> {
         // At the epoch, so the run names its first event `0-1` and a listener can
         // ask for everything since `0-0` without guessing what the run calls itself.
-        let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
+        let live = Arc::new(Live::opening(Stopped::at(0)));
         Some(Self {
             serving: Serving {
                 ctx: Arc::new(ctx),

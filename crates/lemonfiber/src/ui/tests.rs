@@ -355,9 +355,7 @@ async fn a_machine_that_will_not_supply_randomness_serves_nothing() {
 /// this module is under the same coverage gate as the code it tests.
 fn as_served(random: &Chance) -> Option<Router> {
     let token = Arc::new(Token::mint(random)?);
-    let live = Arc::new(Live::opening(
-        lemonfiber_fixtures::ports::Stopped::at(0).as_ref(),
-    ));
+    let live = Arc::new(Live::opening(lemonfiber_fixtures::ports::Stopped::at(0)));
     let serving = Serving {
         ctx: Arc::new(ctx(Some(enough()))),
         token: Arc::clone(&token),
@@ -371,7 +369,6 @@ fn as_served(random: &Chance) -> Option<Router> {
         token,
         bound: Binding::here(bound().port()),
         live,
-        clock: Arc::clone(&serving.ctx.seams.clock),
         reading: Arc::clone(&serving.ctx),
     });
     Some(surface(serving, streaming, None))

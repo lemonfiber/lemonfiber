@@ -348,7 +348,7 @@ async fn serving(
     // waits a command runs into have somewhere to say what they are waiting for:
     // a browser is told the name of the work and nothing else, and everything it
     // learns after that arrives here.
-    let live = Arc::new(Live::opening(ctx.seams.clock.as_ref()));
+    let live = Arc::new(Live::opening(Arc::clone(&ctx.seams.clock)));
     // A walk's steps go down the same stream, whole rather than rendered: the words
     // are the core's, and a second rendering of them here would be a second copy of
     // the walk's own prose beside the one the terminal draws.
@@ -426,7 +426,6 @@ async fn serving(
             token: Arc::clone(&token),
             bound,
             live: Arc::clone(&live),
-            clock: Arc::clone(&ctx.seams.clock),
             reading: Arc::clone(&ctx),
         });
         let surface = surface(serving, streaming, app);

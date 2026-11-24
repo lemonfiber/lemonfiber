@@ -86,8 +86,7 @@ impl Surface {
     /// The surface over `world`, dispatching through `ctx`.
     async fn serving(world: World, ctx: Ctx) -> Option<Self> {
         let token = Arc::new(Token::mint(&Chance::repeating(RUN.to_vec()))?);
-        let clock = Stopped::at(AT);
-        let live = Arc::new(Live::opening(clock.as_ref()));
+        let live = Arc::new(Live::opening(Stopped::at(AT)));
         let listening = live.listening(None).await;
         let ctx = Arc::new(ctx);
         let serving = Serving::for_run(
@@ -101,7 +100,6 @@ impl Surface {
             token: Arc::clone(&token),
             bound: Binding::here(PORT),
             live: Arc::clone(&live),
-            clock,
             reading: ctx,
         });
         Some(Self {
@@ -206,18 +204,15 @@ impl Surface {
 
     /// Every envelope said on the stream since this was last asked.
     pub(crate) async fn heard(&mut self) -> Vec<Value> {
-        let mut heard = Vec::new();
-        while let Some(said) = self.listening.next().await {
-            if said == BEAT_SAID {
-                break;
-            }
-            let data: Vec<&str> = said
-                .lines()
-                .filter_map(|line| line.strip_prefix("data: "))
-                .collect();
-            heard.extend(self.read(&data.join("\n")));
-        }
-        heard
+        let said = until_quiet(&mut self.listening).await;
+        self.read(&said)
+    }
+
+    /// Every envelope a stream opened again from `seen` is handed before it goes quiet.
+    pub(crate) async fn resumed(&self, seen: &str) -> Vec<Value> {
+        let mut listening = self.live.listening(Some(seen)).await;
+        let said = until_quiet(&mut listening).await;
+        self.read(&said)
     }
 
     /// Every envelope in `text`, one to a line, with the world's directory placed.
@@ -228,6 +223,22 @@ impl Surface {
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect()
     }
+}
+
+/// What `listening` says until it beats, each envelope on a line of its own.
+async fn until_quiet(listening: &mut Listening) -> String {
+    let mut heard = Vec::new();
+    while let Some(said) = listening.next().await {
+        if said == BEAT_SAID {
+            break;
+        }
+        let data: Vec<&str> = said
+            .lines()
+            .filter_map(|line| line.strip_prefix("data: "))
+            .collect();
+        heard.push(data.join("\n"));
+    }
+    heard.join("\n")
 }
 
 /// The name of the work `envelope` stands for, where it is a `job`.

@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "alerts": {
+      "type": [
+        "ref:ReplayAlerts"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

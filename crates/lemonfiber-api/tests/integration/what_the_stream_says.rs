@@ -3,9 +3,9 @@
 //! Both are decisions rather than behaviours, so a gap here is something a test
 //! makes rather than something it waits for.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
-use lemonfiber_api::events::backlog::{Backlog, HELD, ITEMS};
+use lemonfiber_api::events::backlog::{Backlog, ReplayAlerts, ALERTS, ALERTS_FOR, HELD, ITEMS};
 use lemonfiber_api::events::wire::{Event, EventKind, Nature, Rendered, Replayed, BEAT, BEAT_SAID};
 use lemonfiber_core::ports::Clock;
 use lemonfiber_fixtures::ports::Stopped;
@@ -29,6 +29,7 @@ impl Serialize for Awkward {
 struct Run {
     backlog: Backlog,
     said: Vec<Event>,
+    now: SystemTime,
 }
 
 impl Run {
@@ -45,7 +46,31 @@ impl Run {
         Self {
             backlog: Backlog::opening(clock),
             said: Vec::new(),
+            now: clock.now(),
         }
+    }
+
+    /// The run, `lasted` later.
+    fn after(mut self, lasted: Duration) -> Self {
+        self.now += lasted;
+        self
+    }
+
+    /// The run, having also raised this alert.
+    fn raised(mut self, what: &str) -> Self {
+        if let Some(said) = Rendered::of(EventKind::Alert, &what) {
+            let event = self.backlog.say(said, self.now);
+            self.said.push(event);
+        }
+        self
+    }
+
+    /// Whether what a client that last saw `seen` is handed holds every alert since.
+    fn alerts(&self, seen: Option<&str>) -> Option<ReplayAlerts> {
+        self.backlog
+            .since(seen, self.now)
+            .replay
+            .map(|replay| replay.alerts)
     }
 
     /// The run, having also said this.
@@ -55,7 +80,7 @@ impl Run {
             Nature::Record => EventKind::Log,
         };
         if let Some(said) = Rendered::of(event, &what) {
-            let event = self.backlog.say(said);
+            let event = self.backlog.say(said, self.now);
             self.said.push(event);
         }
         self
@@ -64,7 +89,7 @@ impl Run {
     /// The run, having also said this line of a start or a pull, for the work `job` names.
     fn line(mut self, event: EventKind, job: Option<&str>, line: &str) -> Self {
         if let Some(said) = Rendered::line(event, line, job) {
-            let event = self.backlog.say(said);
+            let event = self.backlog.say(said, self.now);
             self.said.push(event);
         }
         self
@@ -96,7 +121,7 @@ impl Run {
 
     /// What a client that last saw `seen` is handed.
     fn since(&self, seen: Option<&str>) -> Vec<Event> {
-        self.backlog.since(seen)
+        self.backlog.since(seen, self.now).missed
     }
 
     /// What a client that last saw `seen` is handed, as it goes down the wire.
@@ -333,10 +358,8 @@ fn records_are_handed_back_every_one_and_start_and_pull_lines_newest_of_each() {
             .collect()
     };
 
-    assert_eq!(
-        of(Replayed::Every),
-        [EventKind::Alert, EventKind::Log, EventKind::Step]
-    );
+    assert_eq!(of(Replayed::Every), [EventKind::Log, EventKind::Step]);
+    assert_eq!(of(Replayed::Recent), [EventKind::Alert]);
     assert_eq!(
         of(Replayed::NewestOfEach),
         [EventKind::Pull, EventKind::Start]
@@ -469,4 +492,128 @@ fn a_client_that_heard_only_gathers_is_handed_the_record_said_after() {
         .said(Nature::Record, "after the gap");
 
     assert_eq!(run.handed(run.id(0)), ["after the gap"]);
+}
+
+#[test]
+fn alerts_are_kept_for_a_day_and_two_hundred_of_them() {
+    assert_eq!(ALERTS, 200);
+    assert_eq!(ALERTS_FOR, Duration::from_secs(24 * 60 * 60));
+}
+
+#[test]
+fn a_client_with_no_id_is_handed_no_alert_and_told_nothing_of_them() {
+    let run = Run::opened().raised("disk full");
+
+    assert!(run.since(None).is_empty());
+    assert_eq!(run.alerts(None), None);
+}
+
+#[test]
+fn a_client_that_missed_nothing_kept_is_told_its_alerts_are_whole() {
+    let run = Run::opened()
+        .raised("heard")
+        .said(Nature::Record, "between")
+        .raised("missed");
+
+    assert_eq!(run.handed(run.id(0)), ["between", "missed"]);
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Whole));
+    assert_eq!(run.alerts(run.id(2)), Some(ReplayAlerts::Whole));
+}
+
+#[test]
+fn alerts_are_handed_back_where_the_rest_of_the_record_is_not() {
+    let mut run = Run::opened().said(Nature::Record, "heard").raised("missed");
+    for _ in 0..HELD {
+        run = run.said(Nature::Record, "since");
+    }
+
+    assert_eq!(run.handed(run.id(0)), ["missed"]);
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Whole));
+}
+
+#[test]
+fn an_alert_takes_a_place_among_the_records_kept() {
+    let mut run = Run::opened().said(Nature::Record, "heard").raised("first");
+    for _ in 1..HELD {
+        run = run.said(Nature::Record, "since");
+    }
+    assert_eq!(run.handed(run.id(0)).len(), HELD);
+
+    let run = run.said(Nature::Record, "one more");
+    assert_eq!(
+        run.handed(run.id(0)),
+        ["first"],
+        "the alert pushed out of the records leaves the rest no longer whole"
+    );
+}
+
+#[test]
+fn past_two_hundred_alerts_the_oldest_goes_and_the_replay_is_partial() {
+    let mut run = Run::opened().said(Nature::Record, "heard");
+    for nth in 0..=ALERTS {
+        run = run.raised(&format!("alert {nth}"));
+    }
+
+    let handed = run.handed(run.id(0));
+    assert_eq!(handed.len(), ALERTS);
+    assert_eq!(handed.first().map(String::as_str), Some("alert 1"));
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Partial));
+    assert_eq!(
+        run.alerts(run.id(1)),
+        Some(ReplayAlerts::Whole),
+        "a client that heard the alert now gone misses none"
+    );
+}
+
+#[test]
+fn an_alert_older_than_a_day_is_not_handed_back_and_the_replay_is_partial() {
+    let run = Run::opened()
+        .said(Nature::Record, "heard")
+        .raised("yesterday")
+        .after(ALERTS_FOR)
+        .raised("today");
+
+    assert_eq!(
+        run.handed(run.id(0)),
+        ["yesterday", "today"],
+        "a day to the second is still the last day"
+    );
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Whole));
+
+    let run = run.after(Duration::from_secs(1));
+    assert_eq!(run.handed(run.id(0)), ["today"]);
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Partial));
+    assert_eq!(run.alerts(run.id(1)), Some(ReplayAlerts::Whole));
+}
+
+#[test]
+fn an_alert_aged_out_while_nothing_was_said_is_still_gone() {
+    let run = Run::opened()
+        .said(Nature::Record, "heard")
+        .raised("long ago")
+        .after(ALERTS_FOR + Duration::from_secs(1))
+        .raised("now");
+
+    assert_eq!(run.handed(run.id(0)), ["now"]);
+    assert_eq!(run.alerts(run.id(0)), Some(ReplayAlerts::Partial));
+}
+
+#[test]
+fn a_client_from_another_run_is_handed_the_alerts_kept_marked_partial() {
+    let run = Run::opened()
+        .said(Nature::Record, "not for it")
+        .raised("kept");
+
+    assert_eq!(run.handed(Some("elsewhere-9")), ["kept"]);
+    assert_eq!(run.alerts(Some("elsewhere-9")), Some(ReplayAlerts::Partial));
+    assert_eq!(run.alerts(Some("0-99")), Some(ReplayAlerts::Partial));
+    assert_eq!(run.alerts(Some("unreadable")), Some(ReplayAlerts::Partial));
+}
+
+#[test]
+fn a_client_from_another_run_of_a_run_that_kept_none_is_still_told_partial() {
+    let run = Run::opened();
+
+    assert!(run.since(Some("elsewhere-9")).is_empty());
+    assert_eq!(run.alerts(Some("elsewhere-9")), Some(ReplayAlerts::Partial));
 }

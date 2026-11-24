@@ -16009,6 +16009,34 @@
         ],
         "type": "object"
       },
+      "Replay": {
+        "description": "What a stream opened again from an id says of what it is handed before going on.",
+        "properties": {
+          "alerts": {
+            "$ref": "#/components/schemas/ReplayAlerts",
+            "description": "Whether it holds every alert raised since the id."
+          }
+        },
+        "required": [
+          "alerts"
+        ],
+        "type": "object"
+      },
+      "ReplayAlerts": {
+        "description": "Whether a replay holds every alert raised since the id it was asked from.",
+        "oneOf": [
+          {
+            "const": "whole",
+            "description": "Every one.",
+            "type": "string"
+          },
+          {
+            "const": "partial",
+            "description": "Those still kept, and some raised since are not.",
+            "type": "string"
+          }
+        ]
+      },
       "RequestState": {
         "description": "Where one request stands, in the words the person who made it would use.\n\nDeliberately coarser than a [`crate::trace::Stage`]: a member does not need to know\nthat a release was grabbed but not imported, only that it is on its way. The trace is\nwhere that detail stays, and a request names the item so it can be asked for.",
         "oneOf": [
@@ -24702,6 +24730,9 @@
             "$ref": "#/components/schemas/kind-replacement"
           },
           {
+            "$ref": "#/components/schemas/kind-replay"
+          },
+          {
             "$ref": "#/components/schemas/kind-reset"
           },
           {
@@ -27899,6 +27930,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/ReplaceReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-replay": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Replay",
             "description": "The payload."
           },
           "host": {
@@ -33950,6 +34021,13 @@
               "nature": "state",
               "schema": {
                 "$ref": "#/components/schemas/kind-pull"
+              }
+            },
+            "replay": {
+              "audience": "anyone",
+              "nature": "state",
+              "schema": {
+                "$ref": "#/components/schemas/kind-replay"
               }
             },
             "settings": {
