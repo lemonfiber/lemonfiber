@@ -135,3 +135,28 @@ async fn nobody_is_told_of_an_ask_still_on_its_way() {
 
     assert!(heard.arrivals().is_empty());
 }
+
+#[tokio::test]
+async fn an_ask_held_in_part_is_told_once_and_not_again_when_the_rest_arrives() {
+    let transport = super::flows::the_house(vec![
+        call("requesting", account(true)),
+        (
+            at("candidate"),
+            None,
+            vec![
+                answered(&Some(candidate(CandidateState::MayAsk))),
+                answered(&Some(candidate(CandidateState::PartlyHere))),
+                answered(&Some(candidate(CandidateState::Here))),
+            ],
+        ),
+    ]);
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = ctx(&transport, "arrived-in-part").with_narrator(heard.clone());
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+
+    let _ = listed(&ctx).await;
+    let _ = listed(&ctx).await;
+
+    assert_eq!(kept(&ctx), [("music-1".to_owned(), Standing::Here)]);
+    assert_eq!(heard.arrivals().len(), 1, "{:?}", heard.arrivals());
+}
