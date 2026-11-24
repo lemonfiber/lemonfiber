@@ -88,6 +88,7 @@ pub(crate) async fn remove(
         return Err(Box::new(would_not_remove(&member.name)));
     }
     crate::screening::grants::forgotten(ctx, &member.id);
+    ctx.narrator.removed(&member.id).await;
     let revoked =
         also_from_the_request_service(asking.as_ref(), &cost.held, &mut cost.findings).await;
 

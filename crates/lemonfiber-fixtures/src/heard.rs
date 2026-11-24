@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lemonfiber_ports::docker::LogLine;
-use lemonfiber_ports::narration::Narrator;
+use lemonfiber_ports::narration::{Arrival, Narrator};
 
 /// What a narrator watching something answers as each line is said.
 type Watched = Box<dyn Fn() -> bool + Send + Sync>;
@@ -18,6 +18,10 @@ pub struct Heard {
     pulled: Mutex<Vec<String>>,
     /// What each service wrote to its log, as it was handed on.
     logged: Mutex<Vec<String>>,
+    /// Each arrival a member was told of: who, which ask, and its title.
+    arrived: Mutex<Vec<[String; 3]>>,
+    /// Each member let go of.
+    removed: Mutex<Vec<String>>,
     /// What it asks as each line is said, where it watches something.
     watching: Option<Watched>,
     /// What that answered for each line said.
@@ -67,6 +71,24 @@ impl Heard {
             .unwrap_or_default()
     }
 
+    /// Every arrival told so far: the member, the ask and the title.
+    #[must_use]
+    pub fn arrivals(&self) -> Vec<[String; 3]> {
+        self.arrived
+            .lock()
+            .map(|arrived| arrived.clone())
+            .unwrap_or_default()
+    }
+
+    /// Every member let go of so far.
+    #[must_use]
+    pub fn removals(&self) -> Vec<String> {
+        self.removed
+            .lock()
+            .map(|removed| removed.clone())
+            .unwrap_or_default()
+    }
+
     /// Every log line handed on so far.
     #[must_use]
     pub fn log_lines(&self) -> Vec<String> {
@@ -89,6 +111,17 @@ impl Narrator for Heard {
 
     async fn logged(&self, line: &LogLine) {
         crate::noted(&self.logged, line.line.clone());
+    }
+
+    async fn arrived(&self, arrival: &Arrival<'_>) {
+        crate::noted(
+            &self.arrived,
+            [arrival.member, arrival.ask, arrival.title].map(str::to_owned),
+        );
+    }
+
+    async fn removed(&self, member: &str) {
+        crate::noted(&self.removed, member.to_owned());
     }
 }
 

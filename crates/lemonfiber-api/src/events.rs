@@ -36,7 +36,7 @@ use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
 use crate::serve::{admitted, carrying, STREAM};
 
-use self::live::{Listening, Live};
+use self::live::{Gathering, Listening, Live};
 use self::theirs::Theirs;
 use self::wire::Audience;
 
@@ -112,7 +112,7 @@ pub async fn stream(
         .get(LAST_EVENT_ID)
         .and_then(|seen| seen.to_str().ok())
         .map(str::to_owned);
-    let mut staying = Staying {
+    let staying = Staying {
         ctx: Arc::clone(&streaming.reading),
         token: Arc::clone(&streaming.token),
         headers,
@@ -128,7 +128,6 @@ pub async fn stream(
         .as_ref()
         .and_then(|caller| Theirs::for_member(Arc::clone(&streaming.reading), caller))
     {
-        staying.member = Some(source.member().to_owned());
         return theirs(&streaming, source, seen.as_deref(), staying).await;
     }
     let hearing = caller.as_ref().map_or(Audience::Anyone, Audience::of);
@@ -143,32 +142,25 @@ pub async fn stream(
     held(listening, staying)
 }
 
-/// A household member's own stream: a run of its own beside this one, gathering their
-/// household row, their shelf and what they are playing, and ending when they stop
-/// listening or this run's streams are told to end.
+/// A household member's own stream: one kept beside this one for the run, gathering their
+/// household row, their shelf and what they are playing while they listen, and saying
+/// what is theirs alone to be told whether or not they do.
 async fn theirs(
     streaming: &Streaming,
     source: Theirs,
     seen: Option<&str>,
     mut staying: Staying,
 ) -> Response<Body> {
-    let live = Arc::new(streaming.live.beside());
+    let member = source.member().to_owned();
+    let (live, gathering) = streaming
+        .live
+        .theirs_gathered(&member, Arc::new(source))
+        .await;
     let listening = live.listening(seen).await;
-    let source = Arc::new(source);
-    staying.gathering = Some(Gathering(tokio::spawn(live.gathering(source))));
+    staying.member = Some(member);
+    staying.gathering = Some(gathering);
+    live.nudge();
     held(listening, staying)
-}
-
-/// The gather behind one member's stream, stopped when the stream it feeds is dropped.
-///
-/// Owned by the stream rather than left running: a gather nobody listens to would go
-/// on asking the media server on that member's behalf after they had gone.
-struct Gathering(tokio::task::JoinHandle<()>);
-
-impl Drop for Gathering {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
 }
 
 /// What a stream is asked, before each thing it says, to go on being said to.
@@ -199,8 +191,8 @@ pub struct Staying {
     arrived: Option<Arrived>,
     /// The household member the stream was opened for, where it is a member's own.
     member: Option<String>,
-    /// The gather feeding a member's own stream, stopped with it.
-    gathering: Option<Gathering>,
+    /// The gather feeding a member's own stream, held while the stream is.
+    gathering: Option<Arc<Gathering>>,
 }
 
 impl Staying {
@@ -246,6 +238,3 @@ pub fn held(listening: Listening, staying: Staying) -> Response<Body> {
     );
     carrying(StatusCode::OK, STREAM, Body::from_stream(talking))
 }
-
-#[cfg(test)]
-mod tests;

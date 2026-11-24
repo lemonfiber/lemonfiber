@@ -109,6 +109,26 @@ impl Alert {
         })
     }
 
+    /// What a household member is told on their own stream when something they asked
+    /// for arrives: the household's words, naming the title, and nothing of the stack.
+    #[must_use]
+    pub fn ready(ask: &str, title: &str) -> Self {
+        let check = Notification::Ready.word();
+        Self {
+            id: Some(Self::named(check, ask)),
+            check: check.to_owned(),
+            kind: check.to_owned(),
+            notification: Notification::Ready,
+            moment: Moment::Onset,
+            severity: Severity::Advisory,
+            summary: format!("{}: {title}", crate::notify::fanning::READY),
+            meaning: "It is in the library now.".to_owned(),
+            remedies: vec!["Open it from the library.".to_owned()],
+            affected: Vec::new(),
+            exit: None,
+        }
+    }
+
     /// What names the alert a check raises at one recurrence of it.
     #[must_use]
     pub fn named(check: &str, recurrence: impl std::fmt::Display) -> String {

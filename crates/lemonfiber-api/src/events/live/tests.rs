@@ -310,3 +310,144 @@ async fn alerts_are_aged_by_the_clock_the_stream_opened_with() {
     let replay = again.next().await.unwrap_or_default();
     assert!(replay.contains(r#""alerts":"partial""#), "{replay}");
 }
+
+/// What one arrival tells: the member, the ask and its title.
+fn arrival<'a>(
+    member: &'a str,
+    ask: &'a str,
+    title: &'a str,
+) -> lemonfiber_core::ports::Arrival<'a> {
+    lemonfiber_core::ports::Arrival { member, ask, title }
+}
+
+/// Everything a stream hands over before it goes quiet.
+async fn until_quiet(listening: &mut super::Listening) -> Vec<String> {
+    let mut heard = Vec::new();
+    while let Some(said) = listening.next().await {
+        if said == super::BEAT_SAID {
+            break;
+        }
+        heard.push(said);
+    }
+    heard
+}
+
+/// Each member coming back is handed what they alone were told, and nobody else's.
+#[tokio::test(start_paused = true)]
+async fn each_member_coming_back_is_handed_their_own_arrivals_alone() {
+    use lemonfiber_core::ports::Narrator as _;
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
+    let saying = crate::events::saying::Saying::onto(std::sync::Arc::clone(&live));
+    saying
+        .arrived(&arrival("ana", "music-1", "Kind of Blue"))
+        .await;
+    saying
+        .arrived(&arrival("ben", "music-2", "Blue Train"))
+        .await;
+
+    let mut hers = live.theirs("ana").await.listening(Some("before")).await;
+    let hers = until_quiet(&mut hers).await;
+    let [replay, ready] = hers.as_slice() else {
+        unreachable!("a replay and one alert: {hers:?}");
+    };
+    assert!(replay.contains(r#""alerts":"partial""#), "{replay}");
+    assert!(ready.contains(r#""notification":"ready""#), "{ready}");
+    assert!(ready.contains("Kind of Blue"), "{ready}");
+    assert!(!ready.contains("Blue Train"), "{ready}");
+
+    let mut his = live.theirs("ben").await.listening(Some("before")).await;
+    let his = until_quiet(&mut his).await.join("");
+    assert!(his.contains("Blue Train"), "{his}");
+    assert!(!his.contains("Kind of Blue"), "{his}");
+
+    let mut operators = live.listening(Some("before")).await;
+    let operators = until_quiet(&mut operators).await.join("");
+    assert!(!operators.contains("ready"), "{operators}");
+}
+
+/// A member nothing was said to, and one let go of, are handed no arrival.
+#[tokio::test(start_paused = true)]
+async fn a_member_unknown_or_let_go_of_is_handed_no_arrival() {
+    use lemonfiber_core::ports::Narrator as _;
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
+    let saying = crate::events::saying::Saying::onto(std::sync::Arc::clone(&live));
+    saying
+        .arrived(&arrival("ana", "music-1", "Kind of Blue"))
+        .await;
+    saying.removed("ana").await;
+
+    for member in ["ana", "nobody"] {
+        let mut again = live.theirs(member).await.listening(Some("before")).await;
+        let heard = until_quiet(&mut again).await.join("");
+        assert!(!heard.contains("event: alert"), "{member}: {heard}");
+    }
+}
+
+/// A member coming back from where they got to is handed only what was said after it.
+#[tokio::test(start_paused = true)]
+async fn a_member_is_handed_only_the_arrivals_after_where_they_got_to() {
+    use lemonfiber_core::ports::Narrator as _;
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
+    let saying = crate::events::saying::Saying::onto(std::sync::Arc::clone(&live));
+    saying
+        .arrived(&arrival("ana", "music-1", "Kind of Blue"))
+        .await;
+    saying
+        .arrived(&arrival("ana", "music-2", "Blue Train"))
+        .await;
+
+    let mut again = live.theirs("ana").await.listening(Some("0-1")).await;
+    let heard = until_quiet(&mut again).await;
+    let [replay, ready] = heard.as_slice() else {
+        unreachable!("a replay and one alert: {heard:?}");
+    };
+    assert!(replay.contains(r#""alerts":"whole""#), "{replay}");
+    assert!(ready.starts_with("id: 0-2\n"), "{ready}");
+    assert!(ready.contains("Blue Train"), "{ready}");
+}
+
+/// Past so many members, the one asked for least lately is let go of, and the rest kept.
+#[tokio::test(start_paused = true)]
+async fn past_so_many_members_the_one_asked_for_least_lately_goes() {
+    use lemonfiber_core::ports::Narrator as _;
+    let live = std::sync::Arc::new(Live::opening(Stopped::at(0)));
+    let saying = crate::events::saying::Saying::onto(std::sync::Arc::clone(&live));
+    saying
+        .arrived(&arrival("first", "music-1", "Kind of Blue"))
+        .await;
+    saying
+        .arrived(&arrival("second", "music-2", "Blue Train"))
+        .await;
+    for nth in 2..super::MEMBERS {
+        let _ = live.theirs(&format!("member-{nth}")).await;
+    }
+    let _ = live.theirs("first").await;
+    let _ = live.theirs("one more").await;
+
+    let mut first = live.theirs("first").await.listening(Some("before")).await;
+    let first = until_quiet(&mut first).await.join("");
+    assert!(first.contains("Kind of Blue"), "{first}");
+    let mut second = live.theirs("second").await.listening(Some("0-1")).await;
+    let second = until_quiet(&mut second).await.join("");
+    assert!(second.contains(r#""alerts":"partial""#), "{second}");
+    assert!(!second.contains("event: alert"), "{second}");
+}
+
+/// A member's gather stops when the stream it feeds is let go, rather than going on
+/// asking the media server on their behalf after they have gone.
+#[tokio::test(start_paused = true)]
+async fn a_gather_stops_with_the_stream_it_feeds() {
+    let asked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let later = std::sync::Arc::clone(&asked);
+    let gathering = super::Gathering(tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        later.store(true, std::sync::atomic::Ordering::SeqCst);
+    }));
+
+    drop(gathering);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert!(
+        !asked.load(std::sync::atomic::Ordering::SeqCst),
+        "the gather went on after its stream was let go"
+    );
+}

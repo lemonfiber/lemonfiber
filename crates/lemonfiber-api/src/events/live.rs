@@ -11,7 +11,7 @@
 //! first listener to arrive is gathered for at once, so it is not left waiting on a
 //! tick.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -34,6 +34,13 @@ pub use lemonfiber_core::dashboard::TICK;
 /// client cannot hold up the others. It comes back saying where it got to, and
 /// the backlog answers that properly.
 const CARRIED: usize = 64;
+
+/// How many household members' own streams a run keeps.
+///
+/// One for each member who has listened or been told something since the run began, and
+/// a household is a few people. Past this many, the one asked for least lately goes,
+/// so sign-ins in any number cannot make the run hold more.
+pub const MEMBERS: usize = 64;
 
 /// Where the stream's events come from.
 ///
@@ -91,6 +98,8 @@ pub struct Live {
     backlog: Mutex<Backlog>,
     /// When each thing is said, and how long ago what was kept was.
     clock: Arc<dyn Clock>,
+    /// The streams kept beside this one for the run, one for each household member.
+    members: Mutex<Members>,
     /// A listener asking for a gather now rather than at the next tick.
     wanted: Notify,
     /// Whether a listener has opened since the last gather.
@@ -112,6 +121,7 @@ impl Live {
             said,
             backlog: Mutex::new(Backlog::opening(clock.as_ref())),
             clock,
+            members: Mutex::new(Members::default()),
             wanted: Notify::new(),
             joined: AtomicBool::new(false),
             arrived: Notify::new(),
@@ -131,6 +141,34 @@ impl Live {
             ended: Arc::clone(&self.ended),
             ..Self::opening(Arc::clone(&self.clock))
         }
+    }
+
+    /// The stream of the household member `member`, kept beside this one for the run.
+    pub async fn theirs(&self, member: &str) -> Arc<Self> {
+        let mut members = self.members.lock().await;
+        Arc::clone(&members.asked_for(member, || self.beside()).live)
+    }
+
+    /// The stream of the household member `member`, gathered from `source` while anybody
+    /// listens to it, and the gather, which goes on while the run or a connection holds it.
+    pub async fn theirs_gathered(
+        &self,
+        member: &str,
+        source: Arc<dyn Gathers>,
+    ) -> (Arc<Self>, Arc<Gathering>) {
+        let mut members = self.members.lock().await;
+        let theirs = members.asked_for(member, || self.beside());
+        let live = Arc::clone(&theirs.live);
+        let gathering = theirs.gathering.get_or_insert_with(|| {
+            Arc::new(Gathering(tokio::spawn(Arc::clone(&live).gathering(source))))
+        });
+        (live, Arc::clone(gathering))
+    }
+
+    /// Let go of the stream of the household member `member`: what was kept to tell them
+    /// goes, and a connection still open to it ends once their admission does.
+    pub async fn forget(&self, member: &str) {
+        self.members.lock().await.each.remove(member);
     }
 
     /// Say one thing to everyone listening, and to whoever comes next.
@@ -245,6 +283,67 @@ impl Live {
         while self.said.receiver_count() == 0 && !source.wanted_unheard().await {
             self.arrived.notified().await;
         }
+    }
+}
+
+/// The streams kept beside a run, one for each household member, and how lately each
+/// was asked for.
+#[derive(Default)]
+struct Members {
+    /// Each member's stream, by their id.
+    each: BTreeMap<String, Member>,
+    /// How many times any was asked for, which orders them by how lately each was.
+    asked: u64,
+}
+
+/// One household member's stream, kept beside a run.
+struct Member {
+    /// What is said to them.
+    live: Arc<Live>,
+    /// The gather feeding it, once they have listened.
+    gathering: Option<Arc<Gathering>>,
+    /// When it was last asked for, in the count of its run's askings.
+    asked: u64,
+}
+
+impl Members {
+    /// The stream of `member`, opened with `opening` where there is none, letting the one
+    /// asked for least lately go past [`MEMBERS`].
+    fn asked_for(&mut self, member: &str, opening: impl FnOnce() -> Live) -> &mut Member {
+        self.asked = self.asked.saturating_add(1);
+        if !self.each.contains_key(member) && self.each.len() >= MEMBERS {
+            let least = self
+                .each
+                .iter()
+                .min_by_key(|(_, kept)| kept.asked)
+                .map(|(id, _)| id.clone());
+            if let Some(least) = least {
+                self.each.remove(&least);
+            }
+        }
+        let theirs = self
+            .each
+            .entry(member.to_owned())
+            .or_insert_with(|| Member {
+                live: Arc::new(opening()),
+                gathering: None,
+                asked: 0,
+            });
+        theirs.asked = self.asked;
+        theirs
+    }
+}
+
+/// The gather behind one member's stream, stopped once neither the run nor a connection
+/// of theirs holds it.
+///
+/// Owned rather than left running: a gather for a member nobody keeps and nobody listens
+/// as would go on asking the media server on their behalf.
+pub struct Gathering(tokio::task::JoinHandle<()>);
+
+impl Drop for Gathering {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 

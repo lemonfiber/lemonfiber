@@ -107,3 +107,31 @@ async fn an_ask_still_wanted_unread_or_rehearsed_stays_on_its_way() {
         );
     }
 }
+
+#[tokio::test]
+async fn the_member_who_asked_is_told_once_what_arrived_by_its_title() {
+    let transport = read_back(answered(&Some(candidate(CandidateState::Here))));
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = ctx(&transport, "arrived-told").with_narrator(heard.clone());
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+
+    let _ = listed(&ctx).await;
+    let _ = listed(&ctx).await;
+
+    assert_eq!(
+        heard.arrivals(),
+        [["a7f3", "music-1", "Kind of Blue"].map(str::to_owned)]
+    );
+}
+
+#[tokio::test]
+async fn nobody_is_told_of_an_ask_still_on_its_way() {
+    let transport = read_back(answered(&Some(candidate(CandidateState::MayAsk))));
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = ctx(&transport, "arrived-untold").with_narrator(heard.clone());
+    let _ = asked(&ctx, "Ada", ALBUM).await;
+
+    let _ = listed(&ctx).await;
+
+    assert!(heard.arrivals().is_empty());
+}

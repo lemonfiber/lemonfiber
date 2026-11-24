@@ -28,6 +28,24 @@ pub trait Narrator: Send + Sync {
 
     /// Hand on one line a service wrote to its log, as it arrived.
     async fn logged(&self, _line: &crate::docker::LogLine) {}
+
+    /// Tell the household member who asked for something that the house now holds it,
+    /// on what they alone hear.
+    async fn arrived(&self, _arrival: &Arrival<'_>) {}
+
+    /// Let go of whatever is kept to tell a household member who has been removed.
+    async fn removed(&self, _member: &str) {}
+}
+
+/// Something a household member asked for that the house now holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Arrival<'a> {
+    /// The member who asked.
+    pub member: &'a str,
+    /// What names the ask, the same each time it is named.
+    pub ask: &'a str,
+    /// What they asked for, by its title.
+    pub title: &'a str,
 }
 
 /// The narrator for a run nobody is listening to.
