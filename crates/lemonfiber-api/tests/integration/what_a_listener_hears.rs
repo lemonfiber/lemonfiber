@@ -667,26 +667,29 @@ async fn nothing_rendered_is_nothing_said() {
     );
 }
 
-/// A wait from before a gap is never handed to a client that comes back.
-///
-/// Only the newest line describes what a wait is waiting for now, so the lines are
-/// carried as state rather than as a record — a client returning is caught up by the
-/// next line the wait says, not replayed every second of the one it missed. The
-/// record it did miss is a different question, answered above.
+/// A client that comes back is handed the newest line a wait said while it was away,
+/// once, and not the lines that line replaced.
 #[tokio::test(start_paused = true)]
-async fn a_wait_from_before_a_gap_is_never_handed_to_a_client_that_comes_back() {
+async fn a_client_that_comes_back_is_handed_the_newest_line_of_a_wait() {
     let live = Arc::new(Live::opening(Stopped::at(0).as_ref()));
     let seen = say(&live, "one line it did read").await;
-    Saying::onto(Arc::clone(&live))
+    let waiting = Saying::onto(Arc::clone(&live));
+    waiting
         .say("Still starting: jellyfin — 5 seconds so far, of 180.")
+        .await;
+    waiting
+        .say("Still starting: jellyfin — 10 seconds so far, of 180.")
         .await;
 
     let mut arriving = live.listening(seen.as_ref().map(Event::id)).await;
 
+    let handed = arriving.next().await.unwrap_or_default();
+    assert!(handed.contains("event: start"), "{handed}");
+    assert!(handed.contains("10 seconds so far"), "{handed}");
     assert_eq!(
         arriving.next().await.as_deref(),
         Some(BEAT_SAID),
-        "a wait it missed is over, and saying so would be saying it is not"
+        "the line it replaced is not handed back as well"
     );
 }
 

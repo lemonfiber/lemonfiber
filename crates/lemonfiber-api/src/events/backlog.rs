@@ -1,43 +1,40 @@
 //! What the stream can still hand back to a client that comes again.
-//!
-//! A client that reconnects says where it got to, and there are two honest
-//! answers: the record it missed, or nothing at all. There is no third answer in
-//! which a figure gathered before the gap is handed back as though it were
-//! current — so state events are never retransmitted, however recent. What is
-//! current comes from a gather made after the client returned, and nothing else.
 
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lemonfiber_core::ports::Clock;
 
-use super::wire::{Event, Nature, Rendered};
+use super::wire::{Event, Item, Rendered, Replayed};
 
-/// How many records a client may have missed and still be told what they were.
-///
-/// Bounded because a stream nobody is listening to must not grow: past this the
-/// record is no longer whole, and the stream restarts rather than handing back a
-/// part of it.
-///
-/// Records, because records are what can be handed back. A state event is
-/// gathered every tick and never retransmitted, so keeping one costs a whole
-/// snapshot to hold something nobody can ever be given — and, because the bound
-/// counts what is kept, it pushes out the records that could have been.
+/// How many records a run keeps to hand back.
 pub const HELD: usize = 256;
+
+/// How many items a run keeps the newest line of to hand back.
+pub const ITEMS: usize = 256;
 
 /// Everything one run of the stream has said, as far back as it still keeps it.
 pub struct Backlog {
-    /// What this run calls itself.
-    ///
-    /// Ids are a run's own counting, so the same number names a different event
-    /// in the next run. Carrying the run in the id is what lets a client that
-    /// returns to a restarted server be recognised as such, rather than told it
-    /// is up to date because its number happens to be one this run has reached.
+    /// What this run calls itself, the first half of every id it gives.
     run: String,
     /// The records said, oldest first, and where each was said.
     held: VecDeque<(u64, Event)>,
+    /// The newest line of each item, and where it was said.
+    lines: Vec<Line>,
+    /// The latest place said of anything no longer kept.
+    dropped: u64,
     /// The place the next thing said will take.
     next: u64,
+}
+
+/// The newest line said about one item.
+struct Line {
+    /// What it is about.
+    item: Option<Item>,
+    /// Where it was said.
+    at: u64,
+    /// What was said.
+    event: Event,
 }
 
 impl Backlog {
@@ -47,52 +44,87 @@ impl Backlog {
         Self {
             run: mark(clock.now()),
             held: VecDeque::new(),
+            lines: Vec::new(),
+            dropped: 0,
             next: 1,
         }
     }
 
     /// Record one thing said, and give it its place in the run.
-    ///
-    /// Everything said takes a place, because the place is what a client names
-    /// when it comes back. Only a record is kept: a state event is the one thing
-    /// [`since`](Self::since) will never hand back, so keeping one holds a whole
-    /// snapshot for nothing and spends a slot a record could have had.
     pub fn say(&mut self, said: Rendered) -> Event {
         let place = self.next;
-        let event = Event::placed(format!("{}-{place}", self.run), said);
         self.next = self.next.saturating_add(1);
-        if event.nature() == Nature::Record {
-            self.held.push_back((place, event.clone()));
-            while self.held.len() > HELD {
-                self.held.pop_front();
-            }
+        let replayed = said.replayed();
+        let (item, said) = said.parted();
+        let event = Event::placed(format!("{}-{place}", self.run), said);
+        match replayed {
+            Replayed::Every => self.record(place, &event),
+            Replayed::NewestOfEach => self.line(item, place, &event),
+            Replayed::Never => {}
         }
         event
     }
 
     /// What a client that last saw `seen` is handed before the stream goes on.
-    ///
-    /// The record it missed, where the whole of that record is still held. An id
-    /// from another run, an id this run has not reached, and a gap reaching
-    /// further back than the backlog all mean the same thing: the record cannot
-    /// be completed, so the stream restarts and hands back nothing.
     #[must_use]
     pub fn since(&self, seen: Option<&str>) -> Vec<Event> {
         let Some(place) = seen.and_then(|seen| self.place_of(seen)) else {
             return Vec::new();
         };
-        let covered = self
-            .held
-            .front()
-            .is_none_or(|(oldest, _)| *oldest <= place.saturating_add(1));
-        if !covered {
+        if !self.whole_after(place) {
             return Vec::new();
         }
-        self.held
+        let mut missed: Vec<(u64, &Event)> = self
+            .held
             .iter()
-            .filter(|(at, event)| *at > place && event.nature() == Nature::Record)
-            .map(|(_, event)| event.clone())
-            .collect()
+            .map(|(at, event)| (*at, event))
+            .chain(self.lines.iter().map(|line| (line.at, &line.event)))
+            .filter(|(at, _)| *at > place)
+            .collect();
+        missed.sort_unstable_by_key(|(at, _)| *at);
+        missed.into_iter().map(|(_, event)| event.clone()).collect()
+    }
+
+    /// Keep a record, letting the oldest go past [`HELD`].
+    fn record(&mut self, place: u64, event: &Event) {
+        self.held.push_back((place, event.clone()));
+        if self.held.len() > HELD {
+            if let Some((gone, _)) = self.held.pop_front() {
+                self.dropped = self.dropped.max(gone);
+            }
+        }
+    }
+
+    /// Keep a line as its item's newest, letting the item whose newest is oldest go
+    /// past [`ITEMS`].
+    fn line(&mut self, item: Option<Item>, place: u64, event: &Event) {
+        if let Some(line) = self.lines.iter_mut().find(|line| line.item == item) {
+            line.at = place;
+            line.event = event.clone();
+            return;
+        }
+        if self.lines.len() >= ITEMS {
+            let oldest = self
+                .lines
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, line)| line.at)
+                .map(|(nth, _)| nth);
+            if let Some(oldest) = oldest {
+                let gone = self.lines.swap_remove(oldest);
+                self.dropped = self.dropped.max(gone.at);
+            }
+        }
+        self.lines.push(Line {
+            item,
+            at: place,
+            event: event.clone(),
+        });
+    }
+
+    /// Whether everything said after `place` that is ever handed back is still kept.
+    const fn whole_after(&self, place: u64) -> bool {
+        self.dropped <= place
     }
 
     /// Where in this run a client's last id puts it, where it is one of this
@@ -106,11 +138,7 @@ impl Backlog {
     }
 }
 
-/// What a run calls itself: the moment it opened.
-///
-/// A clock that reads before the epoch gives a run no moment to be named for,
-/// and it is named zero. Two runs on such a machine are then not told apart,
-/// which costs a returning client one restart rather than anything it is shown.
+/// What a run calls itself: the moment it opened, or zero before the epoch.
 fn mark(now: SystemTime) -> String {
     let opened = now
         .duration_since(UNIX_EPOCH)
