@@ -601,3 +601,26 @@ async fn a_request_service_that_will_not_say_what_it_holds_is_reported() {
         let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
     }
 }
+
+/// What is kept to tell somebody is let go of once they are removed, and a reading of
+/// what removing them costs lets go of nothing.
+#[tokio::test]
+async fn somebody_removed_is_let_go_of_and_only_once_they_are() {
+    let env = recorded_admin("let-go");
+    let heard = Arc::new(lemonfiber_fixtures::heard::Heard::default());
+    let ctx = context(&env, answering()).with_narrator(heard.clone());
+
+    let _ = dispatch(
+        Command::Remove {
+            name: "ana".to_owned(),
+            agreement: None,
+        },
+        &ctx,
+    )
+    .await;
+    assert!(heard.removals().is_empty(), "a reading let somebody go");
+
+    let _ = confirmed(&ctx, "ana").await;
+    assert_eq!(heard.removals(), ["9"]);
+    let _ = std::fs::remove_dir_all(env.parent().unwrap_or(std::path::Path::new("/")));
+}

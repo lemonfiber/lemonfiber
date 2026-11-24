@@ -305,6 +305,14 @@ pub(crate) async fn arrivals(ctx: &Ctx) {
             if let Ok(Some(member)) = store::arrived(&path, ask.named(), held, at) {
                 crate::notify::fanning::ready(ctx, &member);
                 crate::push::telling::ready(ctx, &member);
+                let named = ask.named().to_string();
+                ctx.narrator
+                    .arrived(&crate::ports::Arrival {
+                        member: &member,
+                        ask: &named,
+                        title: &ask.name,
+                    })
+                    .await;
             }
         }
     }

@@ -54,7 +54,7 @@ pub use fingerprint::fingerprint;
 pub use hosting::Host;
 pub use http::Http;
 pub use instant::Instant;
-pub use narration::Narrator;
+pub use narration::{Arrival, Narrator};
 pub use network::Site;
 pub use occupancy::Occupancy;
 pub use process::Runner;

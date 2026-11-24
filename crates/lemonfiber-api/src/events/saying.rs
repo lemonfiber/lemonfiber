@@ -13,7 +13,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::ports::Narrator;
+use lemonfiber_core::alert::Alert;
+use lemonfiber_core::ports::{Arrival, Narrator};
 
 use super::live::Live;
 use super::wire::{EventKind, Rendered};
@@ -56,6 +57,22 @@ impl Narrator for Saying {
     /// Hand one line of a pull to every listener, as the terminal shows it.
     async fn pulled(&self, line: &str) {
         said_to(&self.live, self.job.as_deref(), EventKind::Pull, line).await;
+    }
+
+    /// Tell the member who asked, on their own stream alone, that what they asked for
+    /// is here.
+    async fn arrived(&self, arrival: &Arrival<'_>) {
+        let ready = Alert::ready(arrival.ask, arrival.title);
+        self.live
+            .theirs(arrival.member)
+            .await
+            .say_if_rendered(Rendered::of(EventKind::Alert, &ready))
+            .await;
+    }
+
+    /// Let go of the stream kept for a member who has been removed.
+    async fn removed(&self, member: &str) {
+        self.live.forget(member).await;
     }
 }
 
