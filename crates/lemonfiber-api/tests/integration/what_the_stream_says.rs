@@ -5,8 +5,8 @@
 
 use std::time::Duration;
 
-use lemonfiber_api::events::backlog::{Backlog, HELD};
-use lemonfiber_api::events::wire::{Event, EventKind, Nature, Rendered, BEAT, BEAT_SAID};
+use lemonfiber_api::events::backlog::{Backlog, HELD, ITEMS};
+use lemonfiber_api::events::wire::{Event, EventKind, Nature, Rendered, Replayed, BEAT, BEAT_SAID};
 use lemonfiber_core::ports::Clock;
 use lemonfiber_fixtures::ports::Stopped;
 use serde::{Serialize, Serializer};
@@ -59,6 +59,29 @@ impl Run {
             self.said.push(event);
         }
         self
+    }
+
+    /// The run, having also said this line of a start or a pull, for the work `job` names.
+    fn line(mut self, event: EventKind, job: Option<&str>, line: &str) -> Self {
+        if let Some(said) = Rendered::line(event, line, job) {
+            let event = self.backlog.say(said);
+            self.said.push(event);
+        }
+        self
+    }
+
+    /// What a client that last saw `seen` is handed, each by what it carries.
+    fn handed(&self, seen: Option<&str>) -> Vec<String> {
+        self.since(seen)
+            .iter()
+            .map(|event| {
+                let wire = event.framed();
+                wire.split_once("\"data\":\"")
+                    .and_then(|(_, data)| data.split_once('"'))
+                    .map(|(data, _)| data.to_owned())
+                    .unwrap_or(wire)
+            })
+            .collect()
     }
 
     /// What it called the nth thing it said.
@@ -298,4 +321,152 @@ fn a_client_naming_no_place_at_all_is_handed_nothing() {
 
     assert!(run.since(Some("nonsense")).is_empty(), "no place in it");
     assert!(run.since(Some("0-later")).is_empty(), "not a number");
+}
+
+#[test]
+fn records_are_handed_back_every_one_and_start_and_pull_lines_newest_of_each() {
+    let of = |replayed: Replayed| -> Vec<EventKind> {
+        EventKind::ALL
+            .iter()
+            .copied()
+            .filter(|kind| kind.replayed() == replayed)
+            .collect()
+    };
+
+    assert_eq!(
+        of(Replayed::Every),
+        [EventKind::Alert, EventKind::Log, EventKind::Step]
+    );
+    assert_eq!(
+        of(Replayed::NewestOfEach),
+        [EventKind::Pull, EventKind::Start]
+    );
+    assert_eq!(of(Replayed::Never).len(), EventKind::ALL.len() - 5);
+}
+
+#[test]
+fn a_client_that_resumes_is_handed_the_newest_line_of_each_item_in_the_order_said() {
+    let job = Some("9f2c");
+    let run = Run::opened()
+        .said(Nature::Record, "before the gap")
+        .line(EventKind::Pull, job, "sonarr Pulling")
+        .line(EventKind::Pull, job, " 4f53 Downloading [=>   ] 1MB/9MB")
+        .said(Nature::Record, "a step")
+        .line(EventKind::Pull, job, " 4f53 Downloading [===> ] 5MB/9MB")
+        .said(Nature::State, "a gather")
+        .line(EventKind::Pull, job, " 4f53 Pull complete")
+        .line(EventKind::Start, job, "starting sonarr")
+        .line(EventKind::Start, job, "waiting for sonarr to answer");
+
+    assert_eq!(
+        run.handed(run.id(0)),
+        [
+            "sonarr Pulling",
+            "a step",
+            " 4f53 Pull complete",
+            "waiting for sonarr to answer"
+        ]
+    );
+    let ids: Vec<String> = run
+        .since(run.id(0))
+        .iter()
+        .map(|e| e.id().to_owned())
+        .collect();
+    assert_eq!(
+        ids,
+        ["0-2", "0-4", "0-7", "0-9"],
+        "ids rise as they were said"
+    );
+}
+
+#[test]
+fn a_line_is_about_its_job_and_a_pull_line_about_its_first_word() {
+    let run = Run::opened()
+        .said(Nature::Record, "before the gap")
+        .line(EventKind::Pull, Some("one"), "sonarr Pulling")
+        .line(EventKind::Pull, Some("two"), "sonarr Pulling")
+        .line(EventKind::Pull, Some("one"), "radarr Pulling")
+        .line(EventKind::Start, None, "the server is starting")
+        .line(EventKind::Start, None, "the server has started")
+        .line(EventKind::Start, Some("one"), "starting sonarr")
+        .line(EventKind::Pull, None, "")
+        .line(EventKind::Pull, None, "   ");
+
+    assert_eq!(
+        run.handed(run.id(0)),
+        [
+            "sonarr Pulling",
+            "sonarr Pulling",
+            "radarr Pulling",
+            "the server has started",
+            "starting sonarr",
+            "   "
+        ]
+    );
+}
+
+#[test]
+fn a_line_a_client_already_heard_is_not_handed_back() {
+    let run = Run::opened()
+        .line(EventKind::Pull, None, "sonarr Pulling")
+        .line(EventKind::Pull, None, "radarr Pulling")
+        .said(Nature::Record, "heard up to here")
+        .line(EventKind::Pull, None, "radarr Pulled");
+
+    assert_eq!(run.handed(run.id(2)), ["radarr Pulled"]);
+    assert!(run.since(run.id(3)).is_empty());
+}
+
+#[test]
+fn a_client_with_no_id_is_handed_no_line() {
+    let run = Run::opened().line(EventKind::Start, None, "starting sonarr");
+
+    assert!(run.since(None).is_empty());
+}
+
+#[test]
+fn a_chatty_pull_never_pushes_out_a_record() {
+    let mut run = Run::opened()
+        .said(Nature::Record, "before the gap")
+        .said(Nature::Record, "a step");
+    for _ in 0..=HELD * 4 {
+        run = run.line(EventKind::Pull, None, " 4f53 Downloading [=>   ] 1MB/9MB");
+    }
+    run = run.line(EventKind::Pull, None, " 4f53 Pull complete");
+
+    assert_eq!(run.handed(run.id(0)), ["a step", " 4f53 Pull complete"]);
+}
+
+#[test]
+fn lines_are_kept_for_so_many_items_and_a_gap_past_them_restarts() {
+    let mut run = Run::opened().said(Nature::Record, "before the gap");
+    for layer in 0..=ITEMS {
+        run = run.line(
+            EventKind::Pull,
+            None,
+            &format!("{layer:012x} Pull complete"),
+        );
+    }
+
+    assert!(
+        run.since(run.id(0)).is_empty(),
+        "the first layer's line is gone, so what it missed is no longer whole"
+    );
+    let handed = run.since(run.id(1));
+    assert_eq!(
+        handed.len(),
+        ITEMS,
+        "a client that heard the line now gone misses nothing"
+    );
+    assert!(handed.iter().all(|e| e.id() != "0-2"));
+}
+
+#[test]
+fn a_client_that_heard_only_gathers_is_handed_the_record_said_after() {
+    let run = Run::opened()
+        .said(Nature::State, "a gather")
+        .said(Nature::State, "another gather")
+        .said(Nature::Record, "after the gap");
+
+    assert_eq!(run.handed(run.id(0)), ["after the gap"]);
 }

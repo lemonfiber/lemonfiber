@@ -49,10 +49,6 @@ impl Saying {
 #[async_trait]
 impl Narrator for Saying {
     /// Say one line to every listener.
-    ///
-    /// Carried as state rather than as a record: only the newest line describes
-    /// what the wait is waiting for now, so a client that was away is caught up
-    /// with where the wait got to instead of being replayed every second of it.
     async fn say(&self, said: &str) {
         said_to(&self.live, self.job.as_deref(), EventKind::Start, said).await;
     }
@@ -69,6 +65,5 @@ impl Narrator for Saying {
 /// payload that will not render is a case this cannot stage and that one is already
 /// driven where it lives.
 async fn said_to(live: &Live, job: Option<&str>, event: EventKind, said: &str) {
-    live.say_if_rendered(Rendered::said_by(event, &said, job))
-        .await;
+    live.say_if_rendered(Rendered::line(event, said, job)).await;
 }

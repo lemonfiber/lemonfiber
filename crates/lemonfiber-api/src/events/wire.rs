@@ -44,6 +44,44 @@ pub enum Nature {
     Record,
 }
 
+/// What a client that resumes is handed again of one kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Replayed {
+    /// Every one the run still keeps.
+    Every,
+    /// The newest of each item the run still keeps.
+    NewestOfEach,
+    /// None.
+    Never,
+}
+
+/// What a `start` or `pull` line is about: the work its job names, and for a pull the
+/// image or layer its first word names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Item {
+    /// Whether it is a start or a pull line.
+    event: EventKind,
+    /// The job that said it.
+    job: Option<String>,
+    /// The image or layer a pull line names, empty for a start line.
+    about: String,
+}
+
+impl Item {
+    /// What `line`, said as `event` by the work `job` names, is about.
+    fn of(event: EventKind, line: &str, job: Option<&str>) -> Self {
+        let about = match event {
+            EventKind::Pull => line.split_whitespace().next().unwrap_or_default(),
+            _ => "",
+        };
+        Self {
+            event,
+            job: job.map(str::to_owned),
+            about: about.to_owned(),
+        }
+    }
+}
+
 /// Who on the shared stream may hear an event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -105,6 +143,16 @@ macro_rules! event_kinds {
                 }
             }
 
+            /// What a client that resumes is handed again of this kind.
+            #[must_use]
+            pub const fn replayed(self) -> Replayed {
+                match (self, self.nature()) {
+                    (Self::Start | Self::Pull, _) => Replayed::NewestOfEach,
+                    (_, Nature::Record) => Replayed::Every,
+                    (_, Nature::State) => Replayed::Never,
+                }
+            }
+
             /// Who on the shared stream may hear an event of this kind.
             #[must_use]
             pub const fn audience(self) -> Audience {
@@ -160,6 +208,8 @@ pub struct Rendered {
     event: EventKind,
     /// The envelope, as the command line renders it.
     said: String,
+    /// What it is about, where it is a line kept newest of each.
+    item: Option<Item>,
 }
 
 impl Rendered {
@@ -181,7 +231,27 @@ impl Rendered {
             said: Envelope::new(event.kind(), payload)
                 .said_by(job)
                 .to_json()?,
+            item: None,
         })
+    }
+
+    /// Render one line for the stream as an event of one kind, said by the work a job names.
+    #[must_use]
+    pub fn line(event: EventKind, line: &str, job: Option<&str>) -> Option<Self> {
+        Some(Self {
+            item: Some(Item::of(event, line, job)),
+            ..Self::said_by(event, &line, job)?
+        })
+    }
+
+    /// What a client that resumes is handed again of its kind.
+    pub(crate) const fn replayed(&self) -> Replayed {
+        self.event.replayed()
+    }
+
+    /// What it is about, apart from the rest of it.
+    pub(crate) fn parted(mut self) -> (Option<Item>, Self) {
+        (self.item.take(), self)
     }
 
     /// What the envelope calls itself.
