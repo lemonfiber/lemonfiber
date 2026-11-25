@@ -237,6 +237,23 @@ pub fn owned(_meta: &Metadata) -> Option<Owned> {
     None
 }
 
+/// Whether a file is a plain file this process's user owns that nobody else may read or write.
+#[cfg(unix)]
+#[must_use]
+pub fn owner_kept(meta: &Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+    meta.is_file()
+        && meta.uid() == rustix::process::geteuid().as_raw()
+        && meta.mode() & PERMISSION_BITS & !OWNER_FILE == 0
+}
+
+/// Whether a file is a plain file this process's user owns that nobody else may read or write.
+#[cfg(not(unix))]
+#[must_use]
+pub fn owner_kept(meta: &Metadata) -> bool {
+    meta.is_file()
+}
+
 /// Give `at` to the user `uid` and the group `gid`, without following a link at it.
 ///
 /// # Errors

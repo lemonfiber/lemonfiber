@@ -15,13 +15,14 @@
 //! quiescing wraps a capture, so this stays the decide-and-replace core they drive.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::Serialize;
 
 use crate::archive::{Archiving, Reader};
 use crate::backup::{self, Compatibility, Manifest, Relocation, Scope, SCHEMA};
-use crate::config::paths::Paths;
 use crate::config::{self, store};
+use crate::copying::{Meter, Starting, What};
 use crate::error::{Diagnose as _, Problem};
 
 use super::{quiesced, Ctx};
@@ -168,7 +169,7 @@ pub async fn run(
     consent.held(&would)?;
 
     quiesced::required(ctx, STILL_RUNNING, "restore").await?;
-    let landed = landed(archives, &path, &current_root, repoint).await;
+    let landed = landed(archives, &path, &current_root, repoint, &Starting::of(ctx)).await;
     let revoked = crate::device_keys::run::restored(ctx, archives.paths.config_dir()).await;
     let report = landed?;
     revoked?;
@@ -186,15 +187,16 @@ async fn landed(
     path: &Path,
     current_root: &Path,
     repoint: bool,
+    starting: &Starting,
 ) -> Result<Report, Box<Problem>> {
     let report = restore(
         path,
-        &archives.paths,
+        archives,
         env!("CARGO_PKG_VERSION"),
         SCHEMA,
         current_root,
         repoint,
-        archives.vault.as_ref(),
+        starting,
     )
     .await?;
 
@@ -352,13 +354,14 @@ fn agreement(manifest: &Manifest, downgrade: bool, relocation: Option<&Relocatio
 /// the operator has not accepted, or where the archive could not be unpacked.
 pub async fn restore(
     archive: &Path,
-    paths: &Paths,
+    archives: &Archiving,
     current_version: &str,
     current_schema: u32,
     current_root: &Path,
     accept_relocation: bool,
-    reader: &dyn Reader,
+    starting: &Starting,
 ) -> Result<Report, Box<Problem>> {
+    let (paths, reader) = (&archives.paths, archives.vault.as_ref());
     let preview = inspect(
         archive,
         current_version,
@@ -375,10 +378,17 @@ pub async fn restore(
     }
 
     let targets = backup::destinations(paths);
-    reader
-        .extract(archive, &targets)
-        .await
-        .map_err(|fault| Box::new(not_restored(&fault)))?;
+    let meter = starting.begin(
+        What::Restore,
+        preview.manifest.scope.clone(),
+        0,
+        preview.manifest.areas(),
+    );
+    let extracted = reader
+        .extract(archive, &targets, Arc::clone(&meter) as Arc<dyn Meter>)
+        .await;
+    drop(meter);
+    extracted.map_err(|fault| Box::new(not_restored(&fault)))?;
 
     let Preview {
         manifest,

@@ -342,7 +342,7 @@ pub fn plan(paths: &Paths, scope: &Scope, declared: &[(String, String)]) -> Plan
         Scope::Service { name } => vec![Item {
             source: paths.service_config().join(name),
             archive_path: format!("{}/{name}", area::SERVICES),
-            label: format!("{name} configuration"),
+            label: configuration_of(name),
             left_out: rebuilt(Some(name), declared),
         }],
         // The only scope that reads nothing from `paths`: an existing setup keeps
@@ -373,6 +373,33 @@ pub fn plan(paths: &Paths, scope: &Scope, declared: &[(String, String)]) -> Plan
 ///
 /// The mirror of what [`plan`] reads from — the same directory for each area — so
 /// a capture and a restore cannot drift onto different places for the same thing.
+/// What one service's configuration is called, as a part of a copy.
+fn configuration_of(service: &str) -> String {
+    format!("{service} configuration")
+}
+
+/// The area the entry at `entry` inside an archive belongs to, named, from the
+/// `(archive path, label)` of each area a plan or manifest lists: a service's own where the
+/// entry is inside the services area. Nothing for an entry no area holds.
+#[must_use]
+pub(crate) fn part(entry: &str, areas: &[(String, String)]) -> Option<String> {
+    let entry: Vec<&str> = entry
+        .split('/')
+        .filter(|step| !step.is_empty() && *step != ".")
+        .collect();
+    let (holding, label) = areas
+        .iter()
+        .filter(|(holding, _)| {
+            let steps: Vec<&str> = holding.split('/').collect();
+            entry.starts_with(&steps)
+        })
+        .max_by_key(|(holding, _)| holding.len())?;
+    match entry.get(1) {
+        Some(service) if holding == area::SERVICES => Some(configuration_of(service)),
+        _ => Some(label.clone()),
+    }
+}
+
 /// The restore hands these to the archive reader, which unpacks each member under
 /// the directory its area names.
 #[must_use]
@@ -384,7 +411,27 @@ pub fn destinations(paths: &Paths) -> Vec<(String, PathBuf)> {
     ]
 }
 
+impl Plan {
+    /// Each area this plan copies, as its path inside the archive and its label.
+    #[must_use]
+    pub fn areas(&self) -> Vec<(String, String)> {
+        self.items
+            .iter()
+            .map(|item| (item.archive_path.clone(), item.label.clone()))
+            .collect()
+    }
+}
+
 impl Manifest {
+    /// Each area this archive holds, as its path inside the archive and its label.
+    #[must_use]
+    pub fn areas(&self) -> Vec<(String, String)> {
+        self.members
+            .iter()
+            .map(|member| (member.archive_path.clone(), member.label.clone()))
+            .collect()
+    }
+
     /// Build the manifest that describes a capture, given the version and time the
     /// surface stamped and the [`Plan`] that decided the contents.
     ///

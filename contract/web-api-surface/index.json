@@ -21,6 +21,7 @@
     "channels": "ref:ChannelsReport",
     "clients": "ref:Guidance",
     "config": "ref:ConfigReport",
+    "copying": "ref:CopyingReport",
     "credentials": "ref:Inventory",
     "dashboard": "ref:Snapshot",
     "device-challenge": "ref:DeviceChallenge",

@@ -219,6 +219,7 @@ fn over_the_household() -> Vec<(&'static str, Command)> {
         ("stuck", Command::Stuck),
         ("boot", Command::Boot),
         ("watcher", Command::Watcher),
+        ("copying", Command::Copying),
         ("queue", Command::Queue(Queueing::Heal)),
         (
             "front-door",

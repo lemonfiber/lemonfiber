@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "data": {
+    "running": {
+      "job": "9f2c1a7e04b3d815",
+      "limit": 52428800,
+      "part": "sonarr configuration",
+      "scope": "whole_stack",
+      "started": 1893456000,
+      "state": "paced",
+      "what": "backup",
+      "whole": 2147483648,
+      "written": 734003200
+    }
+  },
+  "kind": "copying"
+}

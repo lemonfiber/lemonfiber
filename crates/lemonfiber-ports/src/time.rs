@@ -11,3 +11,12 @@ pub trait Clock: Send + Sync {
     /// The current wall-clock time.
     fn now(&self) -> SystemTime;
 }
+
+/// A monotonic clock a long copy measures its pace by and waits on.
+pub trait Stopwatch: Send + Sync {
+    /// The time since this stopwatch started.
+    fn elapsed(&self) -> std::time::Duration;
+
+    /// Wait for `span` to pass.
+    fn wait(&self, span: std::time::Duration);
+}

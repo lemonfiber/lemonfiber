@@ -260,6 +260,9 @@ pub enum Request {
     /// Say what the outside watcher sees beside what each of its monitors covers, and what
     /// no active monitor covers.
     Watcher,
+    /// Say what backup or restore is running on this machine now, how far it has got, and
+    /// whether it is slowed on purpose or stalled.
+    Copying,
     /// Say what the download queue holds that is wedged, why, how many strikes each has,
     /// and what the newest runs did to it.
     Queue {

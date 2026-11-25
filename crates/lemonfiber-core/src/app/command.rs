@@ -268,6 +268,9 @@ pub enum Command {
     /// Say what the outside watcher sees beside what each of its monitors covers, whether
     /// it answers at all, and what no active monitor covers.
     Watcher,
+    /// Say what backup or restore is running on this machine now, how far it has got, and
+    /// whether it is working, held to the operator's limit, or stalled.
+    Copying,
     /// Say what the download queue holds that is wedged, why, and what the newest runs
     /// did to it; or run one pass now.
     Queue(Queueing),

@@ -344,6 +344,14 @@
     "file": false
   },
   {
+    "path": "/api/copying",
+    "parameters": [],
+    "kinds": [
+      "copying"
+    ],
+    "file": false
+  },
+  {
     "path": "/api/queue",
     "parameters": [],
     "kinds": [

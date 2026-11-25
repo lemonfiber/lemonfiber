@@ -44,6 +44,23 @@ pub(crate) const CODE_COUNTS: [(&str, &str, std::ops::RangeInclusive<u32>, u32);
     (CODES_PERIOD, "that period in whole minutes", 1..=1440, 15),
 ];
 
+/// How fast a backup writes at most, in MiB a second, or `off`.
+pub(crate) const BACKUP_LIMIT: &str = "LEMONFIBER_BACKUP_LIMIT";
+
+/// The limits a backup may be held to, in MiB a second.
+pub(crate) const BACKUP_LIMITS: std::ops::RangeInclusive<u32> = 1..=100_000;
+
+/// What `LEMONFIBER_BACKUP_LIMIT` holds where it holds no limit.
+pub(crate) const UNLIMITED: &str = "off";
+
+/// How many minutes a running backup or restore may write nothing before it reads stalled.
+pub(crate) const COPY_STALLED: (&str, &str, std::ops::RangeInclusive<u32>, u32) = (
+    "LEMONFIBER_COPY_STALLED_MINUTES",
+    "how many minutes a running backup or restore may write nothing before it reads stalled",
+    1..=1440,
+    5,
+);
+
 /// The domain the household's names are under where nothing is recorded.
 pub(crate) const DEFAULT_DOMAIN: &str = "home.local";
 
@@ -62,7 +79,7 @@ pub(crate) const PUBLISHED_FROM: [(&str, &str); 2] = [
     (lemonfiber_manifest::container::LOCALE, LOCALE),
 ];
 
-pub(crate) const CORE: [&str; 10] = [
+pub(crate) const CORE: [&str; 12] = [
     DEVICE_KEY_APPS,
     DASHBOARD_SEARCH,
     GUIDE_HOURS,
@@ -70,6 +87,8 @@ pub(crate) const CORE: [&str; 10] = [
     CODES_PER_PERIOD,
     CODES_PERIOD,
     CODES_BY_ADDRESS,
+    BACKUP_LIMIT,
+    COPY_STALLED.0,
     DOMAIN,
     LOCALE,
     crate::plex_link::SETTING,
@@ -116,6 +135,12 @@ pub(crate) fn refusal(name: &str, value: &str) -> Option<String> {
     }
     if name == CODES_BY_ADDRESS {
         return switched(name, value).err();
+    }
+    if name == BACKUP_LIMIT {
+        return backup_limit(value).err();
+    }
+    if name == COPY_STALLED.0 {
+        return code_count(&COPY_STALLED, value).err();
     }
     if name != DEVICE_KEY_APPS {
         return None;
@@ -167,6 +192,26 @@ pub(crate) fn guide_hours(value: &str) -> Result<u32, String> {
 /// # Errors
 ///
 /// Why `value` is not one, naming the setting.
+/// The limit `value` holds for a backup in MiB a second, none for `off`, or why it holds neither.
+pub(crate) fn backup_limit(value: &str) -> Result<Option<u32>, String> {
+    if value == UNLIMITED {
+        return Ok(None);
+    }
+    value
+        .parse::<u32>()
+        .ok()
+        .filter(|held| BACKUP_LIMITS.contains(held))
+        .map(Some)
+        .ok_or_else(|| {
+            format!(
+                "{BACKUP_LIMIT} is how fast a backup writes at most, a whole number of MiB a \
+                 second from {} to {} or {UNLIMITED}, and {value} is neither",
+                BACKUP_LIMITS.start(),
+                BACKUP_LIMITS.end()
+            )
+        })
+}
+
 pub(crate) fn code_count(
     (name, holds, range, _): &(&str, &str, std::ops::RangeInclusive<u32>, u32),
     value: &str,

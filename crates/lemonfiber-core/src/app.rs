@@ -184,6 +184,15 @@ async fn interrupted(ctx: &Ctx, forms: &[String], services: &[String]) -> Outcom
     Outcome::InFlight(in_flight_report(ctx, forms, services).await)
 }
 
+/// The download queue read, or one healing pass run now.
+async fn queued(ctx: &Ctx, queueing: Queueing) -> Result<Outcome, Box<Problem>> {
+    match queueing {
+        Queueing::Read => healing::queue(ctx),
+        Queueing::Heal => healing::heal(ctx).await,
+    }
+    .map(Outcome::Queue)
+}
+
 /// Which app to use on which device, with what the quality in force does to playback.
 ///
 /// Beside the table because it has a step before the answer. One caution above the
@@ -448,8 +457,8 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         Command::Stuck => trace::stuck(ctx).await.map(Outcome::Stuck),
         Command::Boot => boot::booted(ctx).await.map(Outcome::Boot),
         Command::Watcher => watcher::watcher(ctx).await.map(Outcome::Watcher),
-        Command::Queue(Queueing::Read) => healing::queue(ctx).map(Outcome::Queue),
-        Command::Queue(Queueing::Heal) => healing::heal(ctx).await.map(Outcome::Queue),
+        Command::Copying => Ok(Outcome::Copying(crate::copying::run::now(ctx))),
+        Command::Queue(queueing) => queued(ctx, queueing).await,
         Command::Explain { word } => worded(Some(&word)),
         Command::Glossary => worded(None),
         Command::Clients => Ok(guided(ctx)),

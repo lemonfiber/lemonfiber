@@ -20,6 +20,7 @@ mod catalogue;
 mod changelog;
 mod clients;
 mod companion;
+mod copying;
 mod credentials;
 mod doctor;
 pub(crate) mod door;
@@ -314,7 +315,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Backup(report) => archive::backup(report),
         Outcome::Bundle(report) => archive::bundle(report),
         Outcome::Archives(listing) => archive::kept(listing),
-        Outcome::Restore(report) => archive::restoration(report),
+        Outcome::Restore(_) | Outcome::Copying(_) => copying::copied(outcome),
         Outcome::Watch(report) => stack::watch(report),
         Outcome::Walkthrough(report) => walkthrough::ending(report),
     }

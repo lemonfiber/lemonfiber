@@ -12,6 +12,7 @@ use async_trait::async_trait;
 
 use crate::backup::{Existing, Item, Manifest};
 use crate::config::paths::Paths;
+use crate::copying::Meter;
 
 /// The room a capture would take, against what is free where it would be written.
 ///
@@ -88,7 +89,16 @@ pub trait Archive: Send + Sync {
     ///
     /// Returns a [`Fault`] where the archive could not be created or written, or
     /// where one already exists at `dest`.
-    async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault>;
+    ///
+    /// Each entry is told to `meter` as it is written, and each file's bytes as they are
+    /// read into the archive, so the copy's reading follows it and its limit holds it.
+    async fn write(
+        &self,
+        dest: &Path,
+        manifest: &Manifest,
+        items: &[Item],
+        meter: Arc<dyn Meter>,
+    ) -> Result<(), Fault>;
 
     /// Write an archive at `dest` holding these named files, whose contents are in hand
     /// rather than on disk.
@@ -173,7 +183,15 @@ pub trait Reader: Send + Sync {
     /// Returns a [`Fault`] where the archive could not be read, an entry would
     /// escape its target, an area is unrecognised, or a member could not be
     /// written.
-    async fn extract(&self, src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault>;
+    ///
+    /// The bytes the archive holds are told to `meter` before anything is written, then
+    /// each entry as it is written and its bytes as they are read out of the archive.
+    async fn extract(
+        &self,
+        src: &Path,
+        targets: &[(String, PathBuf)],
+        meter: Arc<dyn Meter>,
+    ) -> Result<(), Fault>;
 }
 
 /// Both halves of one adapter: what writes archives and what reads them back.

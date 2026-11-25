@@ -50,6 +50,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Stuck => &[kind::STUCK],
         Command::Boot => &[kind::BOOT],
         Command::Watcher => &[kind::WATCHER],
+        Command::Copying => &[kind::COPYING],
         Command::Queue(Queueing::Read) => &[kind::QUEUE],
         Command::ConfigGet { .. } | Command::ConfigShow => &[kind::CONFIG],
         Command::Explain { .. } => &[kind::WORD],

@@ -9,8 +9,8 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use lemonfiber::cli::{
-    Cli, Mending, RawDoctor, RawDown, RawLogs, RawPass, RawSetup, RawSpace, RawStopSeeding, RawUi,
-    RawUp, Request,
+    Cli, Mending, RawDoctor, RawLogs, RawPass, RawSetup, RawSpace, RawStopSeeding, RawUi, RawUp,
+    Request,
 };
 use lemonfiber_core::app::restore::{Consent, Kept};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Restoring, SetupAction};
@@ -268,12 +268,7 @@ async fn main() -> ExitCode {
         // arrives once.
         Request::Up(RawUp { at_boot: true, .. }) => Command::AtBoot,
         Request::Up(up) => return brought_up(&ctx, up, cli.json).await,
-        Request::Down(RawDown {
-            forms,
-            services,
-            wait,
-            yes,
-        }) => halting(&ctx, forms, services, wait, yes, cli.json).await,
+        Request::Down(down) => halting(&ctx, down, cli.json).await,
         // Not announced beforehand the way starting is. A switch's own report is the
         // announcement — what stopped, what started, and what was left alone — and
         // saying "starts eight services" first would name the wrong set twice over.
@@ -319,6 +314,7 @@ async fn main() -> ExitCode {
         Request::Stuck => Command::Stuck,
         Request::Boot => Command::Boot,
         Request::Watcher => Command::Watcher,
+        Request::Copying => Command::Copying,
         Request::Queue { action } => translate::queue(action),
         Request::FrontDoor => Command::FrontDoor(lemonfiber_core::app::Doorway::default()),
         Request::Stack => Command::Stack,

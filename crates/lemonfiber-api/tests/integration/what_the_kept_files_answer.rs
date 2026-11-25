@@ -77,6 +77,7 @@ impl Archive for Kept {
         _dest: &Path,
         _manifest: &Manifest,
         _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), Fault> {
         Err(unasked())
     }
@@ -96,7 +97,12 @@ impl Reader for Kept {
     async fn read_manifest(&self, _src: &Path) -> Result<Manifest, Fault> {
         Err(unasked())
     }
-    async fn extract(&self, _src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    async fn extract(
+        &self,
+        _src: &Path,
+        _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
+    ) -> Result<(), Fault> {
         Err(unasked())
     }
 }

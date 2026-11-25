@@ -38,6 +38,7 @@ impl Archive for Unasked {
         _dest: &Path,
         _manifest: &Manifest,
         _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("unused"))
     }
@@ -69,6 +70,7 @@ impl Reader for Unasked {
         &self,
         _src: &Path,
         _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("unused"))
     }

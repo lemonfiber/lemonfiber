@@ -258,6 +258,7 @@ impl Jobs {
     /// closed — cannot reach it.
     pub async fn start(&self, job: &Job, action: &str, command: Command, ctx: Arc<Ctx>) {
         let lease = leased(&command);
+        let ctx = Arc::new(Ctx::clone(&ctx).as_job(job.as_str()));
         self.begin(job, action, lease, async move {
             // Nothing is invented for a payload that could not be rendered: an
             // outcome is plain owned values, and the empty arm is reached only by

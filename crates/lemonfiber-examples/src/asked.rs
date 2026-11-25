@@ -1,8 +1,17 @@
 //! Every read, asked of a world that holds something for it to answer.
 
+use std::sync::Arc;
+use std::time::Duration;
+
+use lemonfiber_core::backup::{self, Scope};
+use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::copying::pacing::Stopwatch;
+use lemonfiber_core::copying::{Meter as _, Starting, What};
+use lemonfiber_fixtures::ports::{Stopped, Waited};
+
 use crate::house::{house, HELD, MEMBER};
 use crate::surface::Surface;
-use crate::world::World;
+use crate::world::{World, AT};
 use crate::Seen;
 
 /// The reads a stack answers on its own, each as it is asked.
@@ -71,6 +80,7 @@ fn household() -> Vec<String> {
 
 /// Every read asked, and what each answered kept.
 pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
+    copying(seen).await?;
     reads(
         seen,
         World::named("stack-reads"),
@@ -86,6 +96,32 @@ pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
 }
 
 /// Each of `paths` read in `world`, and what each answered kept.
+/// A backup held to a limit, part-way through the services, asked of while it runs.
+async fn copying(seen: &mut Seen) -> Option<()> {
+    let world = World::named("copying");
+    let paths = Paths::at(world.root(), world.root());
+    let stopwatch = Waited::started();
+    let meter = Starting::on(
+        Stopped::at(AT),
+        Arc::clone(&stopwatch) as Arc<dyn Stopwatch>,
+        Some("9f2c1a7e04b3d815".to_owned()),
+        Some(50 << 20),
+    )
+    .kept_under(&paths)
+    .begin(
+        What::Backup,
+        Scope::WholeStack,
+        2 << 30,
+        backup::plan(&paths, &Scope::WholeStack, &[]).areas(),
+    );
+    meter.writing("services/sonarr");
+    stopwatch.pass(Duration::from_secs(14));
+    meter.wrote(700 << 20);
+    let asked = reads(seen, world, ["/api/copying".to_owned()]).await;
+    drop(meter);
+    asked
+}
+
 async fn reads(
     seen: &mut Seen,
     world: World,

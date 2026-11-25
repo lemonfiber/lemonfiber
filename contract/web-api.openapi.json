@@ -3465,6 +3465,38 @@
         ],
         "type": "object"
       },
+      "CopyWhat": {
+        "description": "Whether a copy is a backup or a restore.",
+        "oneOf": [
+          {
+            "const": "backup",
+            "description": "A backup, writing an archive.",
+            "type": "string"
+          },
+          {
+            "const": "restore",
+            "description": "A restore, writing an archive back.",
+            "type": "string"
+          }
+        ]
+      },
+      "CopyingReport": {
+        "description": "The backup or restore running on this machine now, or none.",
+        "properties": {
+          "running": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunningCopy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The copy running now, or none."
+          }
+        },
+        "type": "object"
+      },
       "Cost": {
         "description": "What changing a decision costs.",
         "oneOf": [
@@ -16634,6 +16666,172 @@
         ],
         "type": "object"
       },
+      "RunningCopy": {
+        "allOf": [
+          {
+            "oneOf": [
+              {
+                "description": "Every service's configuration, plus lemonfiber's own and the stack.",
+                "properties": {
+                  "scope": {
+                    "const": "whole_stack",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "scope"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "One named service's configuration alone.",
+                "properties": {
+                  "name": {
+                    "description": "The service whose configuration it copies.",
+                    "type": "string"
+                  },
+                  "scope": {
+                    "const": "service",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "scope",
+                  "name"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "An existing setup's own configuration.",
+                "properties": {
+                  "project": {
+                    "description": "The Compose project it copies, to the operator alone.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "scope": {
+                    "const": "existing",
+                    "type": "string"
+                  },
+                  "trees": {
+                    "description": "The host trees it copies, to the operator alone.",
+                    "items": {
+                      "$ref": "#/components/schemas/Tree"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "scope"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          {
+            "oneOf": [
+              {
+                "description": "Writing as fast as it can.",
+                "properties": {
+                  "state": {
+                    "const": "working",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Held to the operator's limit.",
+                "properties": {
+                  "limit": {
+                    "description": "The limit, in bytes a second.",
+                    "format": "uint64",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "state": {
+                    "const": "paced",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "limit"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Nothing written for the minutes the operator's setting holds.",
+                "properties": {
+                  "state": {
+                    "const": "stalled",
+                    "type": "string"
+                  },
+                  "wrote": {
+                    "$ref": "#/components/schemas/Instant",
+                    "description": "The instant it last wrote."
+                  }
+                },
+                "required": [
+                  "state",
+                  "wrote"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        ],
+        "description": "A backup or restore running now.",
+        "properties": {
+          "job": {
+            "description": "The name an accepting reply gave the work, where one did.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "part": {
+            "description": "The area being written now, named.",
+            "type": "string"
+          },
+          "started": {
+            "$ref": "#/components/schemas/Instant",
+            "description": "When it started."
+          },
+          "what": {
+            "$ref": "#/components/schemas/CopyWhat",
+            "description": "Whether it is a backup or a restore."
+          },
+          "whole": {
+            "description": "The bytes it will write.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "written": {
+            "description": "The bytes written so far.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "what",
+          "started",
+          "written",
+          "whole",
+          "part"
+        ],
+        "type": "object"
+      },
       "Schedule": {
         "additionalProperties": false,
         "description": "The setting naming when a run-and-exit service runs, and the times where it holds\nnothing.",
@@ -24556,6 +24754,9 @@
             "$ref": "#/components/schemas/kind-config"
           },
           {
+            "$ref": "#/components/schemas/kind-copying"
+          },
+          {
             "$ref": "#/components/schemas/kind-credentials"
           },
           {
@@ -25610,6 +25811,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/ConfigReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-copying": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CopyingReport",
             "description": "The payload."
           },
           "host": {
@@ -33870,6 +34111,33 @@
         }
       }
     },
+    "/api/copying": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-copying"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/credentials": {
       "get": {
         "parameters": [],
@@ -33965,6 +34233,13 @@
               "nature": "record",
               "schema": {
                 "$ref": "#/components/schemas/kind-alert"
+              }
+            },
+            "copying": {
+              "audience": "operator-and-keys",
+              "nature": "state",
+              "schema": {
+                "$ref": "#/components/schemas/kind-copying"
               }
             },
             "dashboard": {

@@ -240,7 +240,13 @@ impl Archive for Vaulting {
         })
     }
 
-    async fn write(&self, dest: &Path, _manifest: &Manifest, _items: &[Item]) -> Result<(), Fault> {
+    async fn write(
+        &self,
+        dest: &Path,
+        _manifest: &Manifest,
+        _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
+    ) -> Result<(), Fault> {
         self.refuse(dest)
     }
 
@@ -266,7 +272,12 @@ impl Reader for Vaulting {
         Err(Fault::new("no archive here holds a manifest"))
     }
 
-    async fn extract(&self, _src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    async fn extract(
+        &self,
+        _src: &Path,
+        _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
+    ) -> Result<(), Fault> {
         Err(Fault::new(
             "a rehearsal asked for an archive to be unpacked",
         ))

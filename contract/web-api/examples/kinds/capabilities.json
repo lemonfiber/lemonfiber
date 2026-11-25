@@ -77,6 +77,7 @@
       "/api/checks": "available",
       "/api/clients": "available",
       "/api/config": "available",
+      "/api/copying": "available",
       "/api/credentials": "available",
       "/api/explain": "available",
       "/api/forms": "available",

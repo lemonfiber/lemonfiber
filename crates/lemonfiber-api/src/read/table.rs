@@ -191,6 +191,9 @@ pub const BOOT: &str = "/api/boot";
 /// What the outside watcher sees, beside what each of its monitors covers.
 pub const WATCHER: &str = "/api/watcher";
 
+/// The backup or restore running on this machine now, or none.
+pub const COPYING: &str = "/api/copying";
+
 /// What the download queue holds that is wedged, and what the newest healing runs did.
 pub const QUEUE: &str = "/api/queue";
 
@@ -364,6 +367,7 @@ pub const OFFERED: &[&str] = &[
     STUCK,
     BOOT,
     WATCHER,
+    COPYING,
     QUEUE,
     CONFIG,
     QUALITY,
@@ -458,6 +462,7 @@ pub fn named(read: &str, given: Wanted) -> Result<Command, Refusal> {
         STUCK => Ok(Command::Stuck),
         BOOT => Ok(Command::Boot),
         WATCHER => Ok(Command::Watcher),
+        COPYING => Ok(Command::Copying),
         QUEUE => Ok(Command::Queue(Queueing::Read)),
         CONFIG => setting(key),
         QUALITY => Ok(Command::Quality(QualityAction::Show)),

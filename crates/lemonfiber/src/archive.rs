@@ -14,7 +14,9 @@
 //! for the bytes beside it.
 
 use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use flate2::read::GzDecoder;
@@ -22,6 +24,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use lemonfiber_core::archive::{Archive, Fault, Reader, Space};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
+use lemonfiber_core::copying::Meter;
 use lemonfiber_core::instant::Instant;
 
 /// Where the manifest rides inside the archive.
@@ -104,7 +107,9 @@ fn walked(
     name: &Path,
     source: &Path,
     left_out: &[PathBuf],
+    meter: &dyn Meter,
 ) -> std::io::Result<()> {
+    meter.writing(&name.to_string_lossy());
     builder.append_dir(name, source)?;
     let mut entries = fs::read_dir(source)?.collect::<std::io::Result<Vec<_>>>()?;
     entries.sort_by_key(fs::DirEntry::file_name);
@@ -115,12 +120,43 @@ fn walked(
         let kind = entry.file_type()?;
         let at = name.join(entry.file_name());
         if kind.is_dir() {
-            walked(builder, &at, &entry.path(), left_out)?;
+            walked(builder, &at, &entry.path(), left_out, meter)?;
         } else if kind.is_file() {
-            builder.append_path_with_name(entry.path(), &at)?;
+            file_metered(builder, &entry.path(), &at, meter)?;
         }
     }
     Ok(())
+}
+
+/// One file at `path`, appended as `at` with its bytes told to `meter` as they are read.
+///
+/// Opened without following a link, so a link put in a file's place after the walk read it
+/// fails the capture rather than carrying what it points at.
+fn file_metered(
+    builder: &mut tar::Builder<GzEncoder<File>>,
+    path: &Path,
+    at: &Path,
+    meter: &dyn Meter,
+) -> std::io::Result<()> {
+    meter.writing(&at.to_string_lossy());
+    let file = lemonfiber_platform::fs::unfollowed(fs::OpenOptions::new().read(true)).open(path)?;
+    let mut header = tar::Header::new_gnu();
+    header.set_metadata_in_mode(&file.metadata()?, tar::HeaderMode::Complete);
+    builder.append_data(&mut header, at, Metered { inner: file, meter })
+}
+
+/// A reader whose bytes are told to a [`Meter`] as they are read.
+struct Metered<'meter, R> {
+    inner: R,
+    meter: &'meter dyn Meter,
+}
+
+impl<R: Read> Read for Metered<'_, R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buf)?;
+        self.meter.wrote(u64::try_from(read).unwrap_or(u64::MAX));
+        Ok(read)
+    }
 }
 
 /// The archive itself, created readable by its owner alone.
@@ -223,6 +259,12 @@ fn removed(path: &Path) -> Result<(), Fault> {
     fs::remove_file(path).map_err(fault)
 }
 
+/// The bytes an archive holds once it is unpacked from its compression.
+fn unpacked(src: &Path) -> Result<u64, Fault> {
+    let file = File::open(src).map_err(fault)?;
+    std::io::copy(&mut GzDecoder::new(file), &mut std::io::sink()).map_err(fault)
+}
+
 /// The manifest riding inside an archive.
 fn manifest_in(src: &Path) -> Result<Manifest, Fault> {
     let file = File::open(src).map_err(fault)?;
@@ -238,7 +280,8 @@ fn manifest_in(src: &Path) -> Result<Manifest, Fault> {
 }
 
 /// Unpack each named area beside its target, and commit only once all of them landed.
-fn extracted(src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+fn extracted(src: &Path, targets: &[(String, PathBuf)], meter: &dyn Meter) -> Result<(), Fault> {
+    meter.whole(unpacked(src)?);
     // Each area is unpacked into a staging sibling of its target first; the
     // targets are not touched until every entry has been read and found safe,
     // so a corrupt or hostile archive is refused with nothing overwritten.
@@ -254,7 +297,7 @@ fn extracted(src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
         let _ = remove_any(staging);
     }
 
-    let staged = stage(src, &plan);
+    let staged = stage(src, &plan, meter);
     if let Err(error) = staged {
         for (_, _, staging) in &plan {
             let _ = remove_any(staging);
@@ -312,7 +355,13 @@ impl Archive for Tar {
         .await
     }
 
-    async fn write(&self, dest: &Path, manifest: &Manifest, items: &[Item]) -> Result<(), Fault> {
+    async fn write(
+        &self,
+        dest: &Path,
+        manifest: &Manifest,
+        items: &[Item],
+        meter: Arc<dyn Meter>,
+    ) -> Result<(), Fault> {
         let dest = dest.to_path_buf();
         let manifest = manifest.clone();
         let items = items.to_vec();
@@ -332,7 +381,7 @@ impl Archive for Tar {
                 for item in &items {
                     if item.source.is_dir() {
                         let at = Path::new(&item.archive_path);
-                        walked(builder, at, &item.source, &skipped(item))?;
+                        walked(builder, at, &item.source, &skipped(item), meter.as_ref())?;
                     }
                 }
                 Ok(())
@@ -373,10 +422,15 @@ impl Reader for Tar {
         away(move || manifest_in(&src)).await
     }
 
-    async fn extract(&self, src: &Path, targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    async fn extract(
+        &self,
+        src: &Path,
+        targets: &[(String, PathBuf)],
+        meter: Arc<dyn Meter>,
+    ) -> Result<(), Fault> {
         let src = src.to_path_buf();
         let targets = targets.to_vec();
-        away(move || extracted(&src, &targets)).await
+        away(move || extracted(&src, &targets, meter.as_ref())).await
     }
 }
 

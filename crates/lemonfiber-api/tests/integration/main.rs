@@ -32,6 +32,7 @@ mod what_a_read_refuses;
 mod what_a_rehearsal_answers;
 mod what_a_repair_action_means;
 mod what_a_request_meets;
+mod what_a_running_copy_answers;
 mod what_a_searching_trace_means;
 mod what_a_service_tells_the_core;
 mod what_an_action_means;

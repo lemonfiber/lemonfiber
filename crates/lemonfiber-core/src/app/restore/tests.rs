@@ -7,7 +7,7 @@ use lemonfiber_fixtures::support::Reporting;
 
 use super::{inspect, restore, run, Consent, Kept, STILL_RUNNING};
 use crate::admission::Credential;
-use crate::app::fixtures::{keeping, paths, scratch, FakeArchive, CURRENT};
+use crate::app::fixtures::{archiving, keeping, scratch, unkept, FakeArchive, CURRENT};
 use crate::app::Ctx;
 use crate::archive::{Archiving, Fault};
 use crate::backup::{Member, Scope, SCHEMA};
@@ -33,29 +33,36 @@ fn archive() -> PathBuf {
 
 /// Restore against a machine at version 0.3.0 and data root `/srv/media`,
 /// accepting no re-point.
-async fn restoring(reader: &FakeArchive) -> Result<super::Report, Box<super::super::Problem>> {
+async fn restoring(reader: &Arc<FakeArchive>) -> Result<super::Report, Box<super::super::Problem>> {
     restore(
         &archive(),
-        &paths(),
+        &archiving(reader),
         "0.3.0",
         SCHEMA,
         Path::new("/srv/media"),
         false,
-        reader,
+        &unkept(),
     )
     .await
 }
 
 async fn inspecting(
-    reader: &FakeArchive,
+    reader: &Arc<FakeArchive>,
     current_root: &str,
 ) -> Result<super::Preview, Box<super::super::Problem>> {
-    inspect(&archive(), "0.3.0", SCHEMA, Path::new(current_root), reader).await
+    inspect(
+        &archive(),
+        "0.3.0",
+        SCHEMA,
+        Path::new(current_root),
+        reader.as_ref(),
+    )
+    .await
 }
 
 #[tokio::test]
 async fn a_compatible_archive_is_previewed_with_its_contents() {
-    let reader = FakeArchive::holding(CURRENT, SCHEMA);
+    let reader = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
     let preview = inspecting(&reader, "/srv/media").await;
     assert_eq!(
         preview.map(|preview| (
@@ -69,7 +76,7 @@ async fn a_compatible_archive_is_previewed_with_its_contents() {
 
 #[tokio::test]
 async fn a_restore_unpacks_the_archive_and_reports_what_it_restored() {
-    let reader = FakeArchive::holding("0.2.0", SCHEMA);
+    let reader = Arc::new(FakeArchive::holding("0.2.0", SCHEMA));
     let report = restoring(&reader).await;
     assert_eq!(
         report.map(|report| (report.scope, report.from_version, report.relocated)),
@@ -84,10 +91,10 @@ async fn a_restore_unpacks_the_archive_and_reports_what_it_restored() {
 
 #[tokio::test]
 async fn a_corrupt_archive_is_refused_before_anything_is_overwritten() {
-    let reader = FakeArchive {
+    let reader = Arc::new(FakeArchive {
         manifest: Err(Fault::new("unexpected end of archive")),
         ..FakeArchive::holding(CURRENT, SCHEMA)
-    };
+    });
     let refusal = restoring(&reader).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(CORRUPT));
     assert!(reader.extractions().is_empty(), "nothing was unpacked");
@@ -95,14 +102,14 @@ async fn a_corrupt_archive_is_refused_before_anything_is_overwritten() {
 
 #[tokio::test]
 async fn a_newer_archive_is_refused_with_the_version_gap() {
-    let reader = FakeArchive::holding("0.4.0", SCHEMA);
+    let reader = Arc::new(FakeArchive::holding("0.4.0", SCHEMA));
     let refusal = restoring(&reader).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(TOO_NEW));
 }
 
 #[tokio::test]
 async fn an_archive_in_an_unreadable_format_is_refused() {
-    let reader = FakeArchive::holding(CURRENT, SCHEMA + 1);
+    let reader = Arc::new(FakeArchive::holding(CURRENT, SCHEMA + 1));
     let refusal = restoring(&reader).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(INCOMPATIBLE));
 }
@@ -120,6 +127,7 @@ async fn an_archive_of_a_setup_we_do_not_manage_is_refused_and_nothing_is_unpack
         manifest.scope = Scope::existing("media", &["/srv/their-media".to_owned()]);
     }
 
+    let reader = Arc::new(reader);
     let refusal = restoring(&reader).await.err();
     assert_eq!(refusal.as_ref().map(|problem| problem.code), Some(NOT_OURS));
     assert!(
@@ -140,6 +148,7 @@ async fn an_archive_whose_member_would_escape_is_refused() {
             label: "hostile".to_owned(),
         });
     }
+    let reader = Arc::new(reader);
     let refusal = restoring(&reader).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(UNSAFE));
     assert!(reader.extractions().is_empty());
@@ -149,13 +158,13 @@ async fn an_archive_whose_member_would_escape_is_refused() {
 async fn a_much_older_archive_is_previewed_as_a_downgrade_and_still_restores() {
     // A whole major version behind is allowed with a warning; the preview
     // carries the warning and the restore proceeds.
-    let reader = FakeArchive::holding("1.4.0", SCHEMA);
+    let reader = Arc::new(FakeArchive::holding("1.4.0", SCHEMA));
     let preview = inspect(
         &archive(),
         "2.0.0",
         SCHEMA,
         Path::new("/srv/media"),
-        &reader,
+        reader.as_ref(),
     )
     .await
     .map_err(|problem| *problem);
@@ -163,12 +172,12 @@ async fn a_much_older_archive_is_previewed_as_a_downgrade_and_still_restores() {
 
     let report = restore(
         &archive(),
-        &paths(),
+        &archiving(&reader),
         "2.0.0",
         SCHEMA,
         Path::new("/srv/media"),
         false,
-        &reader,
+        &unkept(),
     )
     .await;
     assert!(report.is_ok(), "a warned downgrade still restores");
@@ -176,7 +185,7 @@ async fn a_much_older_archive_is_previewed_as_a_downgrade_and_still_restores() {
 
 #[tokio::test]
 async fn a_different_data_root_is_reported_by_inspect_rather_than_refused() {
-    let reader = FakeArchive::holding(CURRENT, SCHEMA);
+    let reader = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
     let preview = inspecting(&reader, "/mnt/library").await;
     assert_eq!(
         preview.map(|preview| preview.relocation.map(|move_| (move_.was, move_.now))),
@@ -186,15 +195,15 @@ async fn a_different_data_root_is_reported_by_inspect_rather_than_refused() {
 
 #[tokio::test]
 async fn a_restore_onto_a_different_data_root_waits_for_the_re_point_to_be_accepted() {
-    let reader = FakeArchive::holding(CURRENT, SCHEMA);
+    let reader = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
     let refusal = restore(
         &archive(),
-        &paths(),
+        &archiving(&reader),
         "0.3.0",
         SCHEMA,
         Path::new("/mnt/library"),
         false,
-        &reader,
+        &unkept(),
     )
     .await
     .err()
@@ -205,15 +214,15 @@ async fn a_restore_onto_a_different_data_root_waits_for_the_re_point_to_be_accep
 
 #[tokio::test]
 async fn a_restore_onto_a_different_data_root_proceeds_once_re_pointing_is_accepted() {
-    let reader = FakeArchive::holding(CURRENT, SCHEMA);
+    let reader = Arc::new(FakeArchive::holding(CURRENT, SCHEMA));
     let report = restore(
         &archive(),
-        &paths(),
+        &archiving(&reader),
         "0.3.0",
         SCHEMA,
         Path::new("/mnt/library"),
         true,
-        &reader,
+        &unkept(),
     )
     .await
     .map_err(|problem| *problem);
@@ -227,10 +236,10 @@ async fn a_restore_onto_a_different_data_root_proceeds_once_re_pointing_is_accep
 
 #[tokio::test]
 async fn a_restore_whose_extraction_fails_is_reported() {
-    let reader = FakeArchive {
+    let reader = Arc::new(FakeArchive {
         extract: Err(Fault::new("read-only filesystem")),
         ..FakeArchive::holding(CURRENT, SCHEMA)
-    };
+    });
     let refusal = restoring(&reader).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(NOT_RESTORED));
 }

@@ -20,7 +20,7 @@ use lemonfiber_ports::network::Site;
 use lemonfiber_ports::process::{Failure as RunFailure, Output, Runner};
 use lemonfiber_ports::random::Random;
 use lemonfiber_ports::resolve::Resolver;
-use lemonfiber_ports::time::Clock;
+use lemonfiber_ports::time::{Clock, Stopwatch};
 use lemonfiber_ports::Instant;
 
 /// A runner that spawns nothing.
@@ -154,6 +154,35 @@ impl Clock for Ticking {
 }
 
 /// How a test scripts the randomness it is given.
+/// A stopwatch that stands still until it is waited on, and then moves on by exactly the wait.
+#[derive(Debug, Default)]
+pub struct Waited(Mutex<Duration>);
+
+impl Waited {
+    /// A stopwatch at nothing elapsed.
+    #[must_use]
+    pub fn started() -> Arc<Self> {
+        Arc::default()
+    }
+
+    /// Move it on by `span`, as time spent writing rather than waiting.
+    pub fn pass(&self, span: Duration) {
+        if let Ok(mut elapsed) = self.0.lock() {
+            *elapsed += span;
+        }
+    }
+}
+
+impl Stopwatch for Waited {
+    fn elapsed(&self) -> Duration {
+        self.0.lock().map(|elapsed| *elapsed).unwrap_or_default()
+    }
+
+    fn wait(&self, span: Duration) {
+        self.pass(span);
+    }
+}
+
 enum Given {
     /// Exactly these bytes, however many were asked for — or nothing at all.
     Exactly(Option<Vec<u8>>),

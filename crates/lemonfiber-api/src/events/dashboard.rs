@@ -39,9 +39,10 @@ use tokio::sync::Mutex;
 use lemonfiber_core::app::{dispatch, Command};
 use tokio::time::Instant;
 
+use super::copying::Heard;
 use super::live::{Early, Gathers};
 use super::theirs::{due, playing_unread, PLAYING_EVERY};
-use super::wire::{EventKind, Rendered};
+use super::wire::{Audience, EventKind, Rendered};
 
 /// The dashboard's gather, as the stream's source.
 pub struct Dashboard {
@@ -58,6 +59,7 @@ pub struct Dashboard {
     alerted: Mutex<Option<BTreeSet<(String, Moment)>>>,
     /// When what is playing was last read, and what was last said of it.
     playing: Mutex<(Option<Instant>, Option<String>)>,
+    copying: Mutex<Heard>,
     /// What is being delivered to the phones that asked to be woken.
     waking: lemonfiber_core::push::run::Waking,
     /// What is being delivered to the back-ends.
@@ -75,6 +77,7 @@ impl Dashboard {
             told: Mutex::new(None),
             alerted: Mutex::new(None),
             playing: Mutex::new((None, None)),
+            copying: Mutex::new(Heard::default()),
             waking: lemonfiber_core::push::run::Waking::default(),
             fanning: lemonfiber_core::notify::fanning::Fanning::default(),
         }
@@ -117,6 +120,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) ->
     dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
     dashboard.fanning.owing(&dashboard.ctx, &snapshot.alerts);
     said.extend(playing(dashboard, joined).await);
+    said.extend(copying(dashboard, joined).await);
     *last = Some(gathered);
     said
 }
@@ -180,6 +184,24 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
         .filter(|_| outcome.kind() == EventKind::Playing.kind())?;
     let previous = heard.1.replace(rendered.said().to_owned());
     (joined || previous.as_deref() != Some(rendered.said())).then_some(rendered)
+}
+
+/// The copy running now, where it is owed: in full to the operator, and to a `read` or an
+/// `act` key as the read answers a key.
+async fn copying(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
+    let now = lemonfiber_core::copying::run::now(&dashboard.ctx);
+    let said = dashboard
+        .copying
+        .lock()
+        .await
+        .due(now, joined, Instant::now());
+    said.into_iter()
+        .flat_map(|said| {
+            let keys = said.clone().for_a_key();
+            [(said, Audience::Operator), (keys, Audience::Key)]
+        })
+        .filter_map(|(said, to)| Rendered::of(EventKind::Copying, &said).map(|said| said.to(to)))
+        .collect()
 }
 
 /// The newest of each kind, where it is owed: to a listener that has just arrived,

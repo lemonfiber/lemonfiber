@@ -102,6 +102,7 @@ impl lemonfiber_core::archive::Archive for Captured {
         _dest: &Path,
         _manifest: &lemonfiber_core::backup::Manifest,
         items: &[lemonfiber_core::backup::Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), lemonfiber_core::archive::Fault> {
         if let Ok(mut seen) = self.0.lock() {
             seen.extend(items.iter().map(|item| item.source.clone()));
@@ -146,6 +147,7 @@ impl lemonfiber_core::archive::Reader for Captured {
         &self,
         _src: &Path,
         _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), lemonfiber_core::archive::Fault> {
         Err(lemonfiber_core::archive::Fault::new(
             "an adoption never reads an archive back",

@@ -50,13 +50,12 @@ pub(crate) fn exit_code(problem: &Problem) -> u8 {
     leaves(problem.code).exit()
 }
 
-/// A restore that put something back succeeded; one that only listed what it would put
-/// back is waiting on an agreement.
-fn restored(report: &lemonfiber_core::app::restore::Restoration) -> ExitCode {
-    if report.done.is_some() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(VALIDATION)
+/// A restore that only listed what it would put back is waiting on an agreement; one that
+/// put something back succeeded, and a reading of the copy running arrived.
+fn copied(outcome: &Outcome) -> ExitCode {
+    match outcome {
+        Outcome::Restore(report) if report.done.is_none() => ExitCode::from(VALIDATION),
+        _ => ExitCode::SUCCESS,
     }
 }
 
@@ -183,7 +182,7 @@ pub(crate) fn settled(outcome: &Outcome) -> ExitCode {
         // A restore that overwrote nothing listed what it would overwrite and
         // stopped — like an unconfirmed reset, it is waiting on the operator's
         // say-so, so a script sees a non-zero result rather than a false success.
-        Outcome::Restore(report) => restored(report),
+        Outcome::Restore(_) | Outcome::Copying(_) => copied(outcome),
         Outcome::Update(report) => moving(report),
         Outcome::Lifecycle(report) => lifecycle(report),
         Outcome::Wizard(report) => setting_up(report),
