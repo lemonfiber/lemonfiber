@@ -51,6 +51,45 @@ pub(crate) fn minted(ctx: &Ctx, service: &str) -> Result<String, String> {
     Ok(key)
 }
 
+/// An event a service posted, the key it presented, and where it came from.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Telling {
+    /// The key the service presented.
+    pub presented: String,
+    /// What it told of.
+    pub event: Event,
+    /// The address it came from, where it came over a socket.
+    pub from: Option<IpAddr>,
+}
+
+impl std::fmt::Debug for Telling {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("Telling")
+            .field("presented", &"withheld")
+            .field("event", &self.event)
+            .field("from", &self.from)
+            .finish()
+    }
+}
+
+/// Which service told of an event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+pub struct Heard {
+    /// The service whose key it presented.
+    pub service: String,
+}
+
+/// What `telling` came to, as [`intake`] takes it.
+///
+/// # Errors
+///
+/// As [`intake`].
+pub(crate) async fn heard_of(ctx: &Ctx, telling: Telling) -> Result<Heard, Box<Problem>> {
+    intake(ctx, &telling.presented, &telling.event, telling.from)
+        .await
+        .map(|service| Heard { service })
+}
+
 /// Take `event` from whichever service `presented` is the key of, counted as an answer
 /// from `from` like a key presented, and owe every back-end that receives the stack's
 /// alerts the alert it comes to, where the operator wants it.
@@ -59,7 +98,7 @@ pub(crate) fn minted(ctx: &Ctx, service: &str) -> Result<String, String> {
 ///
 /// [`EVENTS_REFUSED`] where no service was handed `presented`, and the wait wrong answers
 /// have earned where they have.
-pub async fn intake(
+pub(crate) async fn intake(
     ctx: &Ctx,
     presented: &str,
     event: &Event,

@@ -2,7 +2,7 @@ use super::answered_under;
 use crate::app::command::{
     Asking, Diagnosing, Keeping, Linking, MigrateAction, Queueing, Settling, Tracing, Whom, Wishing,
 };
-use crate::app::{authoring, plugins, rehearsal, Command};
+use crate::app::{authoring, plugins, rehearsal, Command, Surfacing};
 use crate::model::kind::{self, Kind};
 
 /// Each command that only reads, and the kind it answers with.
@@ -133,7 +133,28 @@ fn dispatched() -> Vec<(Command, Kind)> {
             kind::SERVED,
         ),
         (Command::Serving, kind::SERVED),
-        (Command::Standing, kind::STANDING),
+        (Command::Surface(Surfacing::Standing), kind::STANDING),
+        (
+            Command::Surface(Surfacing::Told(crate::notify::events::Telling {
+                presented: String::new(),
+                event: crate::notify::events::Event {
+                    event: crate::notify::events::Happened::Added,
+                    reference: None,
+                    name: String::new(),
+                    reason: None,
+                    cleared: false,
+                },
+                from: None,
+            })),
+            kind::NOTIFY_HEARD,
+        ),
+        (
+            Command::Surface(Surfacing::Spoke {
+                member: "a7f3".to_owned(),
+            }),
+            kind::RENEWED,
+        ),
+        (Command::Surface(Surfacing::Untune), kind::UNTUNED),
         (
             Command::Admission(crate::app::admitting::Asked::Password(
                 crate::app::admitting::Offered {
@@ -246,4 +267,18 @@ fn a_command_that_reports_answers_as_the_rehearsal_table_says() {
 fn a_command_neither_table_reaches_answers_with_nothing() {
     let walking = Command::Walkthrough { item: None };
     assert!(answered_under(&walking).is_empty());
+}
+
+/// A polled read answers with what the route asking the same read answers with.
+#[test]
+fn a_polled_read_answers_as_its_route_does() {
+    for polled in crate::app::command::polling::tests::every_polled() {
+        let route = polled.clone().twin();
+        assert_eq!(super::polls(&polled), answered_under(&route), "{polled:?}");
+        assert_eq!(
+            answered_under(&Command::Surface(Surfacing::Polled(polled.clone()))),
+            answered_under(&route),
+            "{polled:?}"
+        );
+    }
 }

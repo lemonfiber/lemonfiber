@@ -12,7 +12,10 @@
 
 use crate::model::kind::{self, Kind};
 
-use super::command::{Asking, Keeping, Linking, MigrateAction, Queueing, Settling, Wishing};
+use super::command::{
+    Asking, Keeping, Linking, MigrateAction, Polled, Queueing, Settling, Shelf, Surfacing, Whom,
+    Wishing,
+};
 use super::rehearsal;
 use super::Command;
 use super::{authoring, plugins};
@@ -73,7 +76,6 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Authoring(authoring::Asked::Record { .. }) => &[kind::PLUGIN_RECORDING],
         Command::Password => &[kind::PASSWORD],
         Command::WalkthroughOffer => &[kind::WALKTHROUGH_OFFER],
-        Command::Standing => &[kind::STANDING],
         Command::Admission(super::admitting::Asked::Password(_)) => &[kind::ADMISSION],
         Command::Admission(super::admitting::Asked::Code(_)) => {
             &[kind::SIGN_IN_CODE, kind::ADMISSION]
@@ -87,10 +89,39 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Served(_) | Command::Serving => &[kind::SERVED],
         Command::Wiring(Linking::Read) => &[kind::WIRING],
         Command::Settings(Settling::Read) => &[kind::SETTINGS],
+        Command::Surface(asked) => surfaced(asked),
         Command::Playing { .. } => &[kind::PLAYING],
         Command::Wish(Wishing::Find { .. }) => &[kind::ASKABLE],
         Command::Wish(Wishing::Kinds { .. }) => &[kind::ASKABLE_KINDS],
         _ => &[],
+    }
+}
+
+/// What the web surface asks for itself answers with.
+const fn surfaced(asked: &Surfacing) -> &'static [Kind] {
+    match asked {
+        Surfacing::Standing => &[kind::STANDING],
+        Surfacing::Polled(polled) => polls(polled),
+        Surfacing::Told(_) => &[kind::NOTIFY_HEARD],
+        Surfacing::Spoke { .. } => &[kind::RENEWED],
+        Surfacing::Untune => &[kind::UNTUNED],
+    }
+}
+
+/// What a polled read answers with: what the route asking the same read answers with.
+const fn polls(polled: &Polled) -> &'static [Kind] {
+    match polled {
+        Polled::Settings => answered_under(&Command::Settings(Settling::Read)),
+        Polled::Wiring => answered_under(&Command::Wiring(Linking::Read)),
+        Polled::Installed => answered_under(&Command::Plugins(plugins::Asked::Installed)),
+        Polled::Recorded => answered_under(&Command::Plugins(plugins::Asked::Recorded)),
+        Polled::Copying => answered_under(&Command::Copying),
+        Polled::Playing { .. } => answered_under(&Command::Playing { member: None }),
+        Polled::Household { .. } => answered_under(&Command::Household { member: None }),
+        Polled::Held(_) => answered_under(&Command::Held(Shelf {
+            member: Whom::Defaults,
+            most: 0,
+        })),
     }
 }
 

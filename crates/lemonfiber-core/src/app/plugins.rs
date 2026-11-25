@@ -106,7 +106,6 @@ mod twice;
 mod updating;
 pub(crate) mod writing;
 
-pub use listing::{installed, recorded};
 pub use moving_in::MoveOffered;
 pub use offering::{Consent, Inputs};
 pub use refusals::REFUSALS;

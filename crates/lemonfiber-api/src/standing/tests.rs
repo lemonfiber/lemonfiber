@@ -10,7 +10,12 @@ fn a_standing_read_answers_what_stands_and_nothing_otherwise() {
         told: true,
         ..StackStanding::default()
     };
-    assert_eq!(stood(Ok(Outcome::Standing(standing.clone()))), standing);
+    assert_eq!(
+        stood(Ok(Outcome::Surfaced(
+            lemonfiber_core::app::surfacing::Answer::Standing(standing.clone())
+        ))),
+        standing
+    );
     assert_eq!(
         stood(Ok(Outcome::Admitting(Answer::Caller(Calling::Nobody)))),
         StackStanding::default()

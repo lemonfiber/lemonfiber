@@ -323,7 +323,15 @@ async fn a_stream_whose_pass_lapsed_unrenewed_is_closed_by_the_sweep_and_a_leave
             crate::screening::leaving(&ctx, &manifest, &open.member).await;
         } else {
             tuned::kept(&ctx, Open { lapses: 0, ..open });
-            crate::screening::untuned(&ctx).await;
+            let untuned = crate::app::dispatch(
+                crate::app::Command::Surface(crate::app::Surfacing::Untune),
+                &ctx,
+            )
+            .await;
+            assert!(
+                matches!(untuned, Ok(crate::app::Outcome::Surfaced(crate::app::surfacing::Answer::Untuned(swept))) if swept.closed == 1),
+                "{tag}"
+            );
         }
         assert!(was_asked(&transport, "untune"), "{tag}");
         assert!(kept(&ctx).is_empty(), "{tag}");

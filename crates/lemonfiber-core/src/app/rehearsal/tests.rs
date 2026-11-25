@@ -6,7 +6,7 @@ use super::{
 };
 use crate::app::command::{
     AlertAction, Arranged, Asking, BandwidthAsked, Chosen, Decision, Filling, Keeping, Linking,
-    MigrateAction, QualityAction, Removing, Setting, Settling,
+    MigrateAction, QualityAction, Removing, Setting, Settling, Surfacing,
 };
 use crate::app::engine::Waiting;
 use crate::app::setup::SetupAction;
@@ -248,7 +248,7 @@ fn every_verdict() -> Vec<(Command, Rehearsal)> {
 fn reads() -> Vec<Command> {
     vec![
         Command::WalkthroughOffer,
-        Command::Standing,
+        Command::Surface(Surfacing::Standing),
         Command::Admission(crate::app::admitting::Asked::Caller(
             crate::app::admitting::Carried {
                 offered: None,
@@ -261,6 +261,21 @@ fn reads() -> Vec<Command> {
             tail: 10,
             follow: false,
         }),
+        Command::Surface(Surfacing::Told(crate::notify::events::Telling {
+            presented: String::new(),
+            event: crate::notify::events::Event {
+                event: crate::notify::events::Happened::Added,
+                reference: None,
+                name: String::new(),
+                reason: None,
+                cleared: false,
+            },
+            from: None,
+        })),
+        Command::Surface(Surfacing::Spoke {
+            member: "a7f3".to_owned(),
+        }),
+        Command::Surface(Surfacing::Untune),
         Command::InFlight {
             forms: Vec::new(),
             services: Vec::new(),
@@ -700,7 +715,8 @@ fn an_outcome_is_said_as_a_rehearsal_only_where_one_can_be() {
 mod carrying;
 mod keyed;
 
-/// Only what needs no stack is carried out without what `dispatch` settles about one first.
+/// Only what needs no stack, and what the web surface asks for itself, is carried out
+/// without what `dispatch` settles about a stack first.
 #[test]
 fn only_what_needs_no_stack_skips_the_settling() {
     let skipping: Vec<String> = every_verdict()
@@ -710,9 +726,28 @@ fn only_what_needs_no_stack_skips_the_settling() {
         .collect();
     assert!(
         skipping.iter().all(|named| named.starts_with("Authoring(")
-            || named == "Standing"
-            || named.starts_with("Admission(")),
+            || named.starts_with("Admission(")
+            || named.starts_with("Surface(")),
         "{skipping:?}"
     );
-    assert_eq!(skipping.len(), 8, "{skipping:?}");
+    assert_eq!(skipping.len(), 11, "{skipping:?}");
+}
+
+/// A read a stream polls settles nothing, and is asked as the route asking it is.
+#[test]
+fn a_polled_read_settles_nothing_and_is_asked_as_its_route_is() {
+    for polled in crate::app::command::polling::tests::every_polled() {
+        let route = polled.clone().twin();
+        let polling = Command::Surface(Surfacing::Polled(polled));
+        assert!(unsettled(&polling), "{polling:?}");
+        assert!(!unsettled(&route), "{route:?}");
+        let (poll, read) = (asked(&polling), asked(&route));
+        assert!(
+            poll.named == read.named
+                && poll.rehearsal == read.rehearsal
+                && poll.disturbs == read.disturbs
+                && poll.answers == read.answers,
+            "{polling:?}"
+        );
+    }
 }

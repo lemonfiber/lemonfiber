@@ -25,6 +25,7 @@ mod household;
 mod inviting;
 mod letting_go;
 mod migrate;
+pub(crate) mod polling;
 mod quality;
 mod queueing;
 mod reading_logs;
@@ -33,6 +34,7 @@ mod restarting;
 mod restoring;
 mod setting;
 mod settling;
+mod surfacing;
 mod teardown;
 mod tracing;
 mod uninstall;
@@ -50,6 +52,8 @@ pub use self::{
 pub use filling::{Filling, Linking};
 pub use hosting::{Hostable, Keeping, HOSTABLE};
 pub use household::{Answer, Arranged, Chosen, Decision, Shelf, Whom};
+pub use polling::Polled;
+pub use surfacing::Surfacing;
 pub use viewing::{Live, PlayFrom, Viewing};
 
 /// What a surface is asking for.
@@ -469,8 +473,8 @@ pub enum Command {
     },
     /// Whether a walkthrough is worth offering this stack, and which one.
     WalkthroughOffer,
-    /// What the web API composes its routes and its answers from.
-    Standing,
+    /// What the web surface asks of the core for itself, settling nothing first.
+    Surface(Surfacing),
     /// Who comes in through the web API: a sign-in, or who the session or key a request
     /// carried proves it to be.
     Admission(super::admitting::Asked),

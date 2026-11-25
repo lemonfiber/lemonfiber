@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::ports::Chance;
 
 use super::{standing, StackStanding};
-use crate::app::{dispatch, Command, Ctx, Outcome};
+use crate::app::{dispatch, Command, Ctx, Outcome, Surfacing};
 use crate::config::{Reaching, Settings, MEMBER_KEYS_KEY, REACH_REGISTRY_KEY};
 use crate::test_support::a_context;
 
@@ -62,7 +62,12 @@ fn what_the_operator_switched_on_and_off_is_read_as_it_stands() {
 async fn the_standing_is_dispatched_like_any_other_read() {
     let ctx = a_machine("dispatched", Reaching::default());
 
-    let dispatched = dispatch(Command::Standing, &ctx).await;
+    let dispatched = dispatch(Command::Surface(Surfacing::Standing), &ctx).await;
 
-    assert_eq!(dispatched, Ok(Outcome::Standing(standing(&ctx))));
+    assert_eq!(
+        dispatched,
+        Ok(Outcome::Surfaced(crate::app::surfacing::Answer::Standing(
+            standing(&ctx)
+        )))
+    );
 }

@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "closed": {
+      "type": [
+        "integer/uint"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

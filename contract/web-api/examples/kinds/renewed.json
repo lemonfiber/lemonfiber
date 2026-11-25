@@ -1,0 +1,9 @@
+{
+  "api_version": 1,
+  "data": {
+    "lasts_until": "2030-01-31",
+    "member": "ada",
+    "rehearsed": false
+  },
+  "kind": "renewed"
+}

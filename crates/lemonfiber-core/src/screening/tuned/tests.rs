@@ -74,10 +74,10 @@ async fn a_live_stream_the_server_would_not_close_is_kept_for_the_next_sweep() {
     kept(&ctx, open("b8e4", "ls2", 100));
     let server = Upstream::default();
     let adas = |one: &Open| one.member == "a7f3";
-    closed(&ctx, &server, adas).await;
+    assert_eq!(closed(&ctx, &server, adas).await, 1);
     let left = || -> Vec<String> { read(&ctx).into_iter().map(|one| one.closes_by).collect() };
     assert_eq!(left(), vec![STUCK.to_owned(), "ls2".to_owned()]);
-    closed(&ctx, &server, adas).await;
+    assert_eq!(closed(&ctx, &server, adas).await, 0);
     assert_eq!(
         server.told(),
         ["ls1", STUCK, STUCK].map(|closes_by| format!("untune {closes_by}"))
@@ -94,7 +94,7 @@ async fn the_sweep_closes_nothing_with_no_stack_to_read_or_no_media_server_to_as
     let serverless = ctx("lapsed-serverless");
     kept(&serverless, open("a7f3", "ls1", 0));
     for ctx in [unread, serverless] {
-        lapsed(&ctx).await;
+        assert_eq!(lapsed(&ctx).await, 0);
         assert_eq!(read(&ctx).len(), 1);
     }
 }

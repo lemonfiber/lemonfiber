@@ -323,10 +323,30 @@ async fn watched(
     })
 }
 
+/// The grant to play of a member whose client spoke, and until when it holds.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Renewed {
+    /// The member, by the id their session or key names.
+    pub member: String,
+    /// The last day the grant holds unless their client speaks again, as `YYYY-MM-DD`.
+    pub lasts_until: String,
+    /// Whether this was a rehearsal, which renews nothing.
+    pub rehearsed: bool,
+}
+
 /// Renew the grant of a member whose client just spoke to the core.
-pub fn spoke(ctx: &Ctx, member: &str) {
-    if !ctx.dry_run {
-        grants::renewed(ctx, member);
+pub(crate) fn spoke(ctx: &Ctx, member: &str) -> Renewed {
+    let renewed = if ctx.dry_run {
+        ctx.today()
+    } else {
+        grants::renewed(ctx, member)
+    };
+    Renewed {
+        member: member.to_owned(),
+        lasts_until: grants::until(renewed)
+            .map(grants::written)
+            .unwrap_or_default(),
+        rehearsed: ctx.dry_run,
     }
 }
 
@@ -372,9 +392,18 @@ pub fn browser_origin(ctx: &Ctx) -> Option<String> {
 /// How often a serving process closes the live streams whose passes lapsed unrenewed.
 pub const UNTUNED_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// How many live streams whose passes lapsed unrenewed were closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+pub struct Untuned {
+    /// How many were closed.
+    pub closed: usize,
+}
+
 /// Close every live stream whose pass lapsed unrenewed.
-pub async fn untuned(ctx: &Ctx) {
-    tuned::lapsed(ctx).await;
+pub(crate) async fn untuned(ctx: &Ctx) -> Untuned {
+    Untuned {
+        closed: tuned::lapsed(ctx).await,
+    }
 }
 
 /// Whether `id` is shaped like an item the media server files: thirty-two hex digits,

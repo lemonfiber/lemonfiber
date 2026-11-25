@@ -18,7 +18,7 @@ use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
 use lemonfiber_core::collected::Unit;
 use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::service::Picture;
-use lemonfiber_core::screening::{picture, spoke, Pictured};
+use lemonfiber_core::screening::{picture, Pictured};
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
@@ -60,9 +60,7 @@ async fn found(
         Ok(asked) => asked,
         Err(refused) => return *refused,
     };
-    if let Some(asker) = caller.member() {
-        spoke(&serving.ctx, asker);
-    }
+    caller.spoke(&serving.ctx).await;
     let kind = given.kind.unwrap_or_default();
     let ctx = &serving.ctx;
     answered(match Unit::chosen(Some(&kind), given.unit.as_deref()) {
@@ -84,9 +82,7 @@ async fn kept(
         Ok((member, _)) => member,
         Err(refused) => return *refused,
     };
-    if let Some(asker) = caller.member() {
-        spoke(&serving.ctx, asker);
-    }
+    caller.spoke(&serving.ctx).await;
     let named = Some(member.as_str()).filter(|member| !member.is_empty());
     answered(lemonfiber_core::wishing::kept_cover(&serving.ctx, named, &reference).await)
 }
@@ -135,9 +131,7 @@ async fn pictured(
         Ok(asked) => asked,
         Err(refused) => return *refused,
     };
-    if let Some(asker) = caller.member() {
-        spoke(&serving.ctx, asker);
-    }
+    caller.spoke(&serving.ctx).await;
     answered(picture(&serving.ctx, &member, &id, which).await)
 }
 

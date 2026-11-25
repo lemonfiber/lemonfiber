@@ -260,6 +260,7 @@ mod lifecycle;
 #[cfg(unix)]
 mod linking;
 mod logs;
+mod polling;
 mod routing;
 #[tokio::test]
 async fn a_walkthrough_offer_is_the_walks_own_answer() {

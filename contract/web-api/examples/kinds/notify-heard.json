@@ -1,0 +1,7 @@
+{
+  "api_version": 1,
+  "data": {
+    "service": "sonarr"
+  },
+  "kind": "notify-heard"
+}

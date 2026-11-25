@@ -331,7 +331,7 @@ pub const fn asked(command: &Command) -> Asked {
         // doing anything.
         Command::Walkthrough { .. } => cannot("walkthrough", THE_WALK_IS_THE_OBSERVATION),
         Command::WalkthroughOffer => reads("walkthrough offer"),
-        Command::Standing => reads("standing"),
+        Command::Surface(asked) => surfacing::surfaced(asked),
         Command::Admission(asked) => keyed::admitting(asked),
         Command::Logs(_) => reads("logs"),
         Command::InFlight { .. } => reads("in flight"),
@@ -474,19 +474,21 @@ pub fn permitted(command: &Command, ctx: &Ctx) -> Result<(), Box<Problem>> {
 
 mod keyed;
 mod refusing;
+mod surfacing;
 mod withheld;
 
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
 /// Whether a command is carried out without what `dispatch` settles about a stack first.
 ///
-/// A read of a plugin's own source needs no stack, and a read a surface polls would
-/// settle the stack and say its warnings again on every tick.
+/// A read of a plugin's own source needs no stack. A read a surface polls, and what a
+/// surface does on every request or on a timer, would settle the stack and say its
+/// warnings again each time.
 #[must_use]
 pub const fn unsettled(command: &Command) -> bool {
     matches!(
         command,
-        Command::Authoring(_) | Command::Standing | Command::Admission(_)
+        Command::Authoring(_) | Command::Admission(_) | Command::Surface(_)
     )
 }
 

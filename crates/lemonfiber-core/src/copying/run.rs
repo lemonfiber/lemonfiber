@@ -207,7 +207,7 @@ impl Drop for Recorder {
 
 /// The copy running on this machine now, or none.
 #[must_use]
-pub fn now(ctx: &Ctx) -> Copying {
+pub(crate) fn now(ctx: &Ctx) -> Copying {
     let Some(archives) = ctx.archives.as_ref() else {
         return Copying::default();
     };

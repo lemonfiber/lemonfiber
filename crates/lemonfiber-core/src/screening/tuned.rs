@@ -106,7 +106,7 @@ pub(crate) fn renewed(ctx: &Ctx, closes_by: &str, lapses: u64) {
 ///
 /// One the media server would not close is kept, so the next sweep asks again rather
 /// than forgetting a stream that is still open.
-pub(crate) async fn closed(ctx: &Ctx, server: &dyn Tuning, which: impl Fn(&Open) -> bool) {
+pub(crate) async fn closed(ctx: &Ctx, server: &dyn Tuning, which: impl Fn(&Open) -> bool) -> usize {
     let picked: Vec<Open> = read(ctx).into_iter().filter(|one| which(one)).collect();
     let mut gone = Vec::new();
     for one in picked {
@@ -119,25 +119,24 @@ pub(crate) async fn closed(ctx: &Ctx, server: &dyn Tuning, which: impl Fn(&Open)
             open.retain(|one| !gone.contains(&one.closes_by));
         });
     }
+    gone.len()
 }
 
 /// Close every live stream whose pass lapsed unrenewed.
 ///
 /// Quietly nothing where nothing lapsed or there is no media server to ask: the next
 /// sweep that can reach one does it.
-pub(crate) async fn lapsed(ctx: &Ctx) {
-    if ctx.dry_run {
-        return;
-    }
+pub(crate) async fn lapsed(ctx: &Ctx) -> usize {
     let now = ctx.seconds();
-    if !read(ctx).iter().any(|one| one.lapses <= now) {
-        return;
+    if ctx.dry_run || !read(ctx).iter().any(|one| one.lapses <= now) {
+        return 0;
     }
     let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
-        return;
+        return 0;
     };
-    if let Some(server) = crate::app::targets::serving(ctx, &manifest).await {
-        closed(ctx, server.as_ref(), |one| one.lapses <= now).await;
+    match crate::app::targets::serving(ctx, &manifest).await {
+        Some(server) => closed(ctx, server.as_ref(), |one| one.lapses <= now).await,
+        None => 0,
     }
 }
 

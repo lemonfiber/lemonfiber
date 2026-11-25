@@ -29,6 +29,9 @@ pub trait Narrator: Send + Sync {
     /// Hand on one line a service wrote to its log, as it arrived.
     async fn logged(&self, _line: &crate::docker::LogLine) {}
 
+    /// The logs a read asked for are open, and their lines follow.
+    async fn logs_opened(&self) {}
+
     /// Tell the household member who asked for something that the house now holds it,
     /// on what they alone hear.
     async fn arrived(&self, _arrival: &Arrival<'_>) {}

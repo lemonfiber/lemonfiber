@@ -16,8 +16,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::plugins::Asked;
-use lemonfiber_core::app::{Command, Ctx, Linking};
+use lemonfiber_core::app::{Ctx, Polled};
 use tokio::sync::Mutex;
 
 use super::live::{Early, Gathers};
@@ -63,30 +62,19 @@ impl Extending {
 
     /// What is installed, where it is owed and can be read.
     async fn plugins(&self, joined: bool) -> Option<Rendered> {
-        let recorded = super::read(
-            &self.ctx,
-            Command::Plugins(Asked::Recorded),
-            EventKind::Plugins,
-        )
-        .await?;
+        let recorded = super::read(&self.ctx, Polled::Recorded, EventKind::Plugins).await?;
         let mut told = self.installed.lock().await;
         if !joined && told.as_ref() == Some(&recorded) {
             return None;
         }
-        let listed = super::read(
-            &self.ctx,
-            Command::Plugins(Asked::Installed),
-            EventKind::Plugins,
-        )
-        .await?;
+        let listed = super::read(&self.ctx, Polled::Installed, EventKind::Plugins).await?;
         *told = Some(recorded);
         Some(listed)
     }
 
     /// What the stack wires to what, where it is owed and can be read.
     async fn wiring(&self, joined: bool) -> Option<Rendered> {
-        let rendered =
-            super::read(&self.ctx, Command::Wiring(Linking::Read), EventKind::Wiring).await?;
+        let rendered = super::read(&self.ctx, Polled::Wiring, EventKind::Wiring).await?;
         let mut told = self.wired.lock().await;
         if !joined && told.as_ref() == Some(&rendered) {
             return None;

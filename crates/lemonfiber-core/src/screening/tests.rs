@@ -565,7 +565,7 @@ async fn a_rehearsal_records_no_progress_and_renews_no_grant() {
     assert!(!asked(&transport)
         .iter()
         .any(|(operation, _)| operation == "progressed"));
-    super::spoke(&ctx, "a7f3");
+    assert!(super::spoke(&ctx, "a7f3").rehearsed);
     let kept = crate::app::targets::beside_env(&ctx, "grants.json");
     assert!(kept.is_some_and(|kept| !kept.exists()));
 }
@@ -783,3 +783,4 @@ fn each_raster_opens_only_as_its_own_image_and_never_as_a_drawing() {
 }
 
 mod live;
+mod spoken;

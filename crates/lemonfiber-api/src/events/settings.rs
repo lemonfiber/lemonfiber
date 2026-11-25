@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{Command, Ctx, Settling};
+use lemonfiber_core::app::{Ctx, Polled};
 use tokio::sync::Mutex;
 
 use super::live::Gathers;
@@ -43,12 +43,7 @@ impl Gathers for Settings {
 impl Settings {
     /// The settings, where they are owed and can be read.
     async fn said(&self, joined: bool) -> Option<Rendered> {
-        let rendered = super::read(
-            &self.ctx,
-            Command::Settings(Settling::Read),
-            EventKind::Settings,
-        )
-        .await?;
+        let rendered = super::read(&self.ctx, Polled::Settings, EventKind::Settings).await?;
         let mut told = self.told.lock().await;
         if !joined && told.as_ref() == Some(&rendered) {
             return None;

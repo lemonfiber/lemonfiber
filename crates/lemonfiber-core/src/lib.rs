@@ -139,8 +139,6 @@ pub use settings::legacy::overlaid as stored_over;
 /// The environment file without a line for any name a setting or a secret the core holds
 /// was read into.
 pub use settings::legacy::unstored;
-/// Every setting and secret the services read, as `lemonfiber settings` lists them.
-pub use settings::run::listing as listed_settings;
 /// Every refusal a change to a setting answers with before it is weighed.
 pub use settings::REFUSALS as SETTINGS_REFUSALS;
 pub mod space;

@@ -130,26 +130,30 @@ async fn answering(
         // Ruled on between naming the command and carrying it out, so what is
         // carried out is what this caller may have — narrowed where they may have
         // part of it, and nothing where it is not theirs at all.
-        Ok(command) => match may(caller, Door::Reading, command).granted().inspect(|_| {
-            // A member's client speaking renews their grant to play, so a phone in use
-            // keeps playing and one left unused stops.
-            if let Some(member) = caller.member() {
-                lemonfiber_core::screening::spoke(&serving.ctx, member);
+        Ok(command) => match may(caller, Door::Reading, command).granted() {
+            Ok(command) => {
+                caller.spoke(&serving.ctx).await;
+                granted(serving, caller, command).await
             }
-        }) {
-            // A member's household is the operator's whole reading narrowed to them,
-            // so it is kept a few seconds rather than read again at every asking —
-            // whether the member asked with their session or with a key of theirs.
-            Ok(command @ Command::Household { .. }) => match caller.member() {
-                Some(id) => serving.kept.read(&serving.ctx, id, command).await,
-                None => carried_out(&serving.ctx, command).await,
-            },
-            Ok(command) => rendered(&serving.ctx, command, Audience::of(caller))
-                .await
-                .response(),
             Err(refused) => *refused,
         },
         Err(why) => why.answered(),
+    }
+}
+
+/// What a read the caller may have answers.
+async fn granted(serving: &Serving, caller: &Caller, command: Command) -> Response {
+    match command {
+        // A member's household is the operator's whole reading narrowed to them,
+        // so it is kept a few seconds rather than read again at every asking —
+        // whether the member asked with their session or with a key of theirs.
+        Command::Household { .. } => match caller.member() {
+            Some(id) => serving.kept.read(&serving.ctx, id, command).await,
+            None => carried_out(&serving.ctx, command).await,
+        },
+        command => rendered(&serving.ctx, command, Audience::of(caller))
+            .await
+            .response(),
     }
 }
 

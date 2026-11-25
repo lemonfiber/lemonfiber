@@ -115,11 +115,17 @@ fn what_the_web_api_composes_from_is_said_line_by_line() {
         waiting: false,
         members_mint: true,
     };
-    let said = shaped(&Outcome::Standing(standing)).text();
+    let said = shaped(&Outcome::Surfaced(
+        lemonfiber_core::app::surfacing::Answer::Standing(standing),
+    ))
+    .text();
     assert!(said.contains("Stack f3a1c2d4."), "{said}");
     assert!(said.contains("LEMONFIBER_REACH_REGISTRY is off."), "{said}");
     assert!(said.contains("A way to be told: yes."), "{said}");
     assert!(said.contains("A push waiting: no."), "{said}");
-    let none = shaped(&Outcome::Standing(StackStanding::default())).text();
+    let none = shaped(&Outcome::Surfaced(
+        lemonfiber_core::app::surfacing::Answer::Standing(StackStanding::default()),
+    ))
+    .text();
     assert!(none.contains("No stack identifier is kept here."), "{none}");
 }

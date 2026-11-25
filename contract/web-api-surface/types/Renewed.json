@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "lasts_until": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "member": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "rehearsed": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

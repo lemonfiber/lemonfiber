@@ -173,3 +173,13 @@ async fn a_stack_that_cannot_be_read_is_said_as_each_reading_unread() {
         "a member was told something other than the household's words for a fault: {said:?}"
     );
 }
+
+#[test]
+fn every_reading_a_member_stream_makes_is_a_poll() {
+    for reading in [Reading::Household, Reading::Held, Reading::Playing] {
+        assert!(matches!(
+            reading.theirs("a7f3").polled(),
+            lemonfiber_core::app::Command::Surface(lemonfiber_core::app::Surfacing::Polled(_))
+        ));
+    }
+}

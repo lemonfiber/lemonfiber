@@ -185,9 +185,7 @@ async fn taken(
         Ok(command) => command,
         Err(refused) => return *refused,
     };
-    if let Some(member) = caller.member() {
-        lemonfiber_core::screening::spoke(&serving.ctx, member);
-    }
+    caller.spoke(&serving.ctx).await;
     let job = match answering(&command) {
         Answering::Now => None,
         Answering::Later => match Job::mint(serving.ctx.seams.random.as_ref()) {

@@ -31,7 +31,7 @@ use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
-use lemonfiber_core::app::{dispatch, Command, Ctx};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Polled, Surfacing};
 
 use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
@@ -70,13 +70,15 @@ pub struct Streaming {
     pub reading: Arc<Ctx>,
 }
 
-/// What `command` answers through dispatch, said as `event`, where it answers at all.
+/// What `polled` answers through dispatch, said as `event`, where it answers at all.
 pub(crate) async fn read(
     ctx: &Ctx,
-    command: Command,
+    polled: Polled,
     event: wire::EventKind,
 ) -> Option<wire::Rendered> {
-    let outcome = dispatch(command, ctx).await.ok()?;
+    let outcome = dispatch(Command::Surface(Surfacing::Polled(polled)), ctx)
+        .await
+        .ok()?;
     wire::Rendered::of(event, &outcome)
 }
 
