@@ -482,3 +482,10 @@ async fn a_published_document_is_handed_over_byte_for_byte_as_json() {
         );
     }
 }
+
+#[test]
+fn a_document_this_build_could_not_write_is_refused_as_its_own_fault() {
+    let refused = super::handed(Err(crate::plugin::Ungenerated::Unrenderable)).err();
+
+    assert_eq!(refused.map(|problem| problem.code), Some(UNREADABLE));
+}

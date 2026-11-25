@@ -81,12 +81,15 @@ pub(crate) async fn answered(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Pro
 }
 
 fn published(document: Document) -> Result<Octets, Box<Problem>> {
-    let text = match document {
+    handed(match document {
         Document::Schema => crate::plugin::schema().ok_or(Ungenerated::Unrenderable),
         Document::Points => crate::plugin::points().ok_or(Ungenerated::Unrenderable),
         Document::Vocabulary => crate::plugin::vocabulary(),
-    }
-    .map_err(|why| unreadable(&Unreadable::Stack(why)))?;
+    })
+}
+
+fn handed(text: Result<String, Ungenerated>) -> Result<Octets, Box<Problem>> {
+    let text = text.map_err(|why| unreadable(&Unreadable::Stack(why)))?;
     Ok(Octets {
         media_type: PUBLISHED,
         bytes: text.into_bytes(),

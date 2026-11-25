@@ -248,6 +248,28 @@ fn every_verdict() -> Vec<(Command, Rehearsal)> {
 /// Nothing here reaches for anything it could put back, so there is nothing to
 /// hold off on and no report to give in place of the work.
 fn reads() -> Vec<Command> {
+    let mut every = read_beside();
+    every.extend(read_by_the_surfaces());
+    every
+}
+
+fn read_by_the_surfaces() -> Vec<Command> {
+    vec![
+        Command::Surface(Surfacing::Standing),
+        Command::Surface(Surfacing::Fetch(crate::app::Fetching::Bundle {
+            name: "lemonfiber-support-1.tar.gz".to_owned(),
+        })),
+        Command::Surface(Surfacing::Fetch(crate::app::Fetching::Kept {
+            member: String::new(),
+            reference: "r1".to_owned(),
+        })),
+        Command::Authoring(authoring::Asked::Published(authoring::Document::Schema)),
+        Command::Authoring(authoring::Asked::Published(authoring::Document::Points)),
+        Command::Authoring(authoring::Asked::Published(authoring::Document::Vocabulary)),
+    ]
+}
+
+fn read_beside() -> Vec<Command> {
     vec![
         Command::WalkthroughOffer,
         Command::Surface(Surfacing::Standing),
@@ -391,6 +413,10 @@ fn reports() -> Vec<Command> {
     let mut every = always_reported();
     every.extend(taught_to_report());
     every.extend(answering_twice());
+    every.push(Command::Surface(Surfacing::Export(crate::app::Exporting {
+        text: String::new(),
+        written: 1,
+    })));
     every
 }
 
@@ -732,7 +758,7 @@ fn only_what_needs_no_stack_skips_the_settling() {
             || named.starts_with("Surface(")),
         "{skipping:?}"
     );
-    assert_eq!(skipping.len(), 11, "{skipping:?}");
+    assert_eq!(skipping.len(), 18, "{skipping:?}");
 }
 
 /// A read a stream polls settles nothing, and is asked as the route asking it is.

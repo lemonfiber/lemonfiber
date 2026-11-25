@@ -5,7 +5,7 @@ use crate::app::command::{Fetching, Linking, Polled, Settling, Shelf, Surfacing,
 use crate::app::Command;
 use crate::model::kind;
 
-/// What the web surface asks for itself, every part of which runs as it always does.
+/// What a surface asks for itself, run as it always is but for the log viewer's export.
 pub(super) const fn surfaced(asked: &Surfacing) -> Asked {
     match asked {
         Surfacing::Standing => reads("standing"),

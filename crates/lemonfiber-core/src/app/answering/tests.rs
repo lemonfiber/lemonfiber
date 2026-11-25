@@ -155,6 +155,13 @@ fn dispatched() -> Vec<(Command, Kind)> {
         ),
         (Command::Surface(Surfacing::Untune), kind::UNTUNED),
         (
+            Command::Surface(Surfacing::Export(crate::app::Exporting {
+                text: String::new(),
+                written: 1,
+            })),
+            kind::LOGS_EXPORTED,
+        ),
+        (
             Command::Admission(crate::app::admitting::Asked::Password(
                 crate::app::admitting::Offered {
                     name: None,
@@ -277,4 +284,12 @@ fn a_polled_read_answers_as_its_route_does() {
             "{polled:?}"
         );
     }
+}
+
+#[test]
+fn bytes_handed_over_answer_under_no_published_kind() {
+    let fetched = Command::Surface(Surfacing::Fetch(crate::app::Fetching::Bundle {
+        name: "lemonfiber-support-1.tar.gz".to_owned(),
+    }));
+    assert!(fetched.answered_under().is_empty());
 }
