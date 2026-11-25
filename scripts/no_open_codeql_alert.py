@@ -61,8 +61,8 @@ def expected(workflow: str) -> list[str]:
 
     Two shapes, because the organisation writes both: a `strategy.matrix` where
     there are several languages, and `init`'s own `languages:` where there is
-    one. `brand` and `lemonfiber-media-stack` are the second, and reading only
-    the first would meet them with a bare `KeyError` — a red check with a
+    one. `brand` is the second, and reading only the first would meet it with
+    a bare `KeyError` — a red check with a
     traceback in it, which tells a maintainer nothing about their pull request.
     """
     job = (yaml.safe_load(workflow) or {}).get("jobs", {}).get("analyze") or {}
