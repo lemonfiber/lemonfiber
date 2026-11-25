@@ -31,7 +31,7 @@ use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::{dispatch, Command, Ctx};
 
 use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
@@ -68,6 +68,16 @@ pub struct Streaming {
     /// The context the rest of the surface dispatches through: who a listener is, and
     /// the world a household member's own stream reads in.
     pub reading: Arc<Ctx>,
+}
+
+/// What `command` answers through dispatch, said as `event`, where it answers at all.
+pub(crate) async fn read(
+    ctx: &Ctx,
+    command: Command,
+    event: wire::EventKind,
+) -> Option<wire::Rendered> {
+    let outcome = dispatch(command, ctx).await.ok()?;
+    wire::Rendered::of(event, &outcome)
 }
 
 /// The event stream's route, for the surface to merge with the rest.

@@ -36,7 +36,7 @@ use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::news::{Newest, News};
 use tokio::sync::Mutex;
 
-use lemonfiber_core::app::{dispatch, Command};
+use lemonfiber_core::app::{dispatch, Command, Outcome};
 use tokio::time::Instant;
 
 use super::copying::Heard;
@@ -189,7 +189,9 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
 /// The copy running now, where it is owed: in full to the operator, and to a `read` or an
 /// `act` key as the read answers a key.
 async fn copying(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
-    let now = lemonfiber_core::copying::run::now(&dashboard.ctx);
+    let Ok(Outcome::Copying(now)) = dispatch(Command::Copying, &dashboard.ctx).await else {
+        return Vec::new();
+    };
     let said = dashboard
         .copying
         .lock()

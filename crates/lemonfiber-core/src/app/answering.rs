@@ -65,7 +65,7 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::Migrate(MigrateAction::Survey) => &[kind::MIGRATION],
         Command::History => &[kind::HISTORY],
         Command::SelfUpdate { .. } => &[kind::SELF_UPDATE],
-        Command::Plugins(plugins::Asked::Installed) => &[kind::PLUGINS],
+        Command::Plugins(plugins::Asked::Installed | plugins::Asked::Recorded) => &[kind::PLUGINS],
         Command::PluginCatalogue => &[kind::PLUGIN_CATALOGUE],
         Command::Authoring(authoring::Asked::Claims { .. }) => &[kind::PLUGIN_CLAIMS],
         Command::Authoring(authoring::Asked::Conform { .. }) => &[kind::PLUGIN_CONFORMANCE],

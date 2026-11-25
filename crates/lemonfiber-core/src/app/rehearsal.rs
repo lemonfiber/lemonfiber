@@ -508,7 +508,7 @@ const fn plugin(command: &Command) -> Asked {
         return reads("plugin catalogue");
     };
     match asked {
-        plugins::Asked::Installed => reads("plugin installed"),
+        plugins::Asked::Installed | plugins::Asked::Recorded => reads("plugin installed"),
         // Everything it changes is settled before anything is touched: the manifest
         // is read, what the install decides is settled, and where every one of its
         // writes lands is derived without a disk under it. A rehearsal does all of
