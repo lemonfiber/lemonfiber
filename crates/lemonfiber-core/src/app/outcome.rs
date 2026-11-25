@@ -302,8 +302,8 @@ outcomes! {
     Walkthrough(WalkthroughReport) => WALKTHROUGH,
     /// Whether a walkthrough is worth offering this stack, and which one.
     WalkthroughOffer(crate::walkthrough::Why) => WALKTHROUGH_OFFER,
-    /// What the web API composes its routes and its answers from.
-    Standing(super::standing::StackStanding) => STANDING,
+    /// What the web surface asked of the core for itself.
+    Surfaced(super::surfacing::Answer) => carried,
     /// Who comes in through the web API, each answer under its own kind.
     Admitting(super::admitting::Answer) => carried,
     /// What reading the services' logs came to.

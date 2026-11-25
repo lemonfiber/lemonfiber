@@ -12,7 +12,9 @@ fn a_caller_check_answers_who_it_found_and_nobody_otherwise() {
     }));
     assert_eq!(knocked(Ok(found)), Knocking::Known(Caller::Operator));
     assert_eq!(
-        knocked(Ok(Outcome::Standing(StackStanding::default()))),
+        knocked(Ok(Outcome::Surfaced(
+            lemonfiber_core::app::surfacing::Answer::Standing(StackStanding::default())
+        ))),
         Knocking::Nobody
     );
     let refused = Problem::new(

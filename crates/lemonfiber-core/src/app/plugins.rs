@@ -106,7 +106,6 @@ mod twice;
 mod updating;
 pub(crate) mod writing;
 
-pub use listing::{installed, recorded};
 pub use moving_in::MoveOffered;
 pub use offering::{Consent, Inputs};
 pub use refusals::REFUSALS;
@@ -138,6 +137,8 @@ pub enum Asked {
     },
     /// Say what is installed, and what each install decided.
     Installed,
+    /// Say what is installed as the record holds it, asking no plugin's source.
+    Recorded,
     /// Take a plugin off the machine, putting back everything installing it wrote.
     ///
     /// The id rather than a path, because the plugin's own source may be long gone and
@@ -239,7 +240,7 @@ use crate::error::codes::plugin::{NOWHERE, UNPROVED, UNWRITABLE};
 pub(crate) async fn plugins(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let starts = !matches!(
         action,
-        Asked::Installed | Asked::Prove { .. } | Asked::Run { .. }
+        Asked::Installed | Asked::Recorded | Asked::Prove { .. } | Asked::Run { .. }
     );
     let installs = Box::pin(asked(ctx, action)).await?;
     let guards = Box::pin(guarding::carried(ctx, action, &installs)).await;
@@ -266,6 +267,7 @@ async fn asked(ctx: &Ctx, action: &Asked) -> Result<Installs, Box<Problem>> {
     let held = read(ctx)?;
     match action {
         Asked::Installed => listing::installed(ctx).await,
+        Asked::Recorded => listing::recorded(ctx),
         // Boxed, because each carries a whole install's worth of state across its awaits
         // — the stack's checks read twice, a reversal, a record — and every command the
         // dispatcher runs would otherwise be as large as the one that installs.

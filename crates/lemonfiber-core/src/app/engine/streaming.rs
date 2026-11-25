@@ -97,6 +97,7 @@ pub(crate) async fn read(ctx: &Ctx, asked: &ReadingLogs) -> Result<LogsReport, B
         follow: asked.follow,
     };
     let mut lines = logs(ctx, &asked.forms, &asked.services, query).await?;
+    ctx.narrator.logs_opened().await;
     let mut seen = 0_u64;
     while let Some(line) = lines.recv().await {
         seen += 1;

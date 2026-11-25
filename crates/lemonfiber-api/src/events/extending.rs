@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{plugins, Ctx};
+use lemonfiber_core::app::{Ctx, Polled};
 use tokio::sync::Mutex;
 
 use super::live::{Early, Gathers};
@@ -27,7 +27,7 @@ pub struct Extending {
     /// What the readings reach the machine through.
     ctx: Arc<Ctx>,
     /// The record as last said, so the plugins are said again only on a change.
-    installed: Mutex<Option<String>>,
+    installed: Mutex<Option<Rendered>>,
     /// The wiring as last said, for the same reason.
     wired: Mutex<Option<Rendered>>,
 }
@@ -62,20 +62,19 @@ impl Extending {
 
     /// What is installed, where it is owed and can be read.
     async fn plugins(&self, joined: bool) -> Option<Rendered> {
-        let recorded = serde_json::to_string(&plugins::recorded(&self.ctx).ok()?).ok()?;
+        let recorded = super::read(&self.ctx, Polled::Recorded, EventKind::Plugins).await?;
         let mut told = self.installed.lock().await;
-        if !joined && told.as_deref() == Some(recorded.as_str()) {
+        if !joined && told.as_ref() == Some(&recorded) {
             return None;
         }
-        let listed = plugins::installed(&self.ctx).await.ok()?;
+        let listed = super::read(&self.ctx, Polled::Installed, EventKind::Plugins).await?;
         *told = Some(recorded);
-        Rendered::of(EventKind::Plugins, &listed)
+        Some(listed)
     }
 
     /// What the stack wires to what, where it is owed and can be read.
     async fn wiring(&self, joined: bool) -> Option<Rendered> {
-        let report = lemonfiber_core::wiring::listing(&self.ctx).ok()?;
-        let rendered = Rendered::of(EventKind::Wiring, &report)?;
+        let rendered = super::read(&self.ctx, Polled::Wiring, EventKind::Wiring).await?;
         let mut told = self.wired.lock().await;
         if !joined && told.as_ref() == Some(&rendered) {
             return None;

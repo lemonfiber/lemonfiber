@@ -41,7 +41,7 @@ use lemonfiber_api::frontend as serving;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
-use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Surfacing};
 use lemonfiber_core::companion::served::{Served, ServedReport};
 use lemonfiber_core::error::{Problem, Remedy, State as Standing};
 use lemonfiber_core::frontend::Source;
@@ -467,7 +467,7 @@ fn unrecorded(why: Option<&str>) -> Vec<String> {
 async fn untuning(ctx: Arc<Ctx>) {
     loop {
         tokio::time::sleep(lemonfiber_core::screening::UNTUNED_EVERY).await;
-        lemonfiber_core::screening::untuned(&ctx).await;
+        drop(dispatch(Command::Surface(Surfacing::Untune), &ctx).await);
     }
 }
 

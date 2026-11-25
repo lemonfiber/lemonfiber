@@ -17,6 +17,7 @@ mod disk;
 mod house;
 mod standing;
 mod surface;
+mod surfacing;
 mod terminal;
 mod world;
 
@@ -54,6 +55,7 @@ async fn gather() -> Option<Examples> {
     terminal::every(&mut seen).await?;
     standing::every(&mut seen).await?;
     caller::every(&mut seen).await?;
+    surfacing::every(&mut seen).await?;
     Some(seen.examples)
 }
 

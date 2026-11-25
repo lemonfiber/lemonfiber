@@ -4,6 +4,7 @@ use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::Response;
 use lemonfiber_core::app::admitting::{self, Calling};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Surfacing};
 use lemonfiber_core::keys::Scope;
 
 use crate::refusal::Refusal;
@@ -75,6 +76,17 @@ impl Caller {
             Self::Member(id) => Some(id),
             Self::Key(keyed) => keyed.scope.member(),
             Self::Machine | Self::Operator => None,
+        }
+    }
+
+    /// Renew the grant to play of the member this caller acts as, now their client has
+    /// spoken, so a phone in use keeps playing and one left unused stops.
+    pub(crate) async fn spoke(&self, ctx: &Ctx) {
+        if let Some(member) = self.member() {
+            let renewed = Command::Surface(Surfacing::Spoke {
+                member: member.to_owned(),
+            });
+            drop(dispatch(renewed, ctx).await);
         }
     }
 }

@@ -99,7 +99,9 @@ pub(super) async fn carried(ctx: &Ctx, action: &Asked, installs: &Installs) -> V
         Asked::Install { consent, .. }
         | Asked::Update { consent, .. }
         | Asked::Remove { consent, .. } => consent,
-        Asked::Installed | Asked::Prove { .. } | Asked::Run { .. } => return Vec::new(),
+        Asked::Installed | Asked::Recorded | Asked::Prove { .. } | Asked::Run { .. } => {
+            return Vec::new()
+        }
     };
     let on_a_guard = installs
         .install

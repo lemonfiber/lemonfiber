@@ -10,7 +10,7 @@ async fn spoken(ctx: &Ctx, forms: &[String], query: LogQuery) -> Vec<String> {
     let (closed, silent) = tokio::sync::mpsc::channel(1);
     drop(closed);
 
-    let mut lines = super::super::logs(ctx, forms, &[], query)
+    let mut lines = super::super::engine::logs(ctx, forms, &[], query)
         .await
         .unwrap_or(silent);
 
@@ -27,7 +27,7 @@ async fn heard(ctx: &Ctx, forms: &[String], services: &[String]) -> Vec<String> 
     drop(closed);
 
     let query = LogQuery::recent(10);
-    let mut lines = super::super::logs(ctx, forms, services, query)
+    let mut lines = super::super::engine::logs(ctx, forms, services, query)
         .await
         .unwrap_or(silent);
 
@@ -132,7 +132,7 @@ async fn naming_no_form_reads_everything_that_is_saying_anything() {
 async fn reading_logs_reports_an_engine_it_cannot_see() {
     let ctx = watching(Reporting::absent());
     let query = LogQuery::recent(10);
-    let refusal = super::super::logs(&ctx, &[], &[], query)
+    let refusal = super::super::engine::logs(&ctx, &[], &[], query)
         .await
         .err()
         .map(|problem| problem.code);
@@ -146,7 +146,7 @@ async fn reading_logs_reports_an_engine_it_cannot_see() {
 async fn reading_logs_for_a_form_this_stack_does_not_have_is_refused() {
     let ctx = watching(Reporting::default());
     let query = LogQuery::recent(10);
-    let refusal = super::super::logs(&ctx, &["telly".to_owned()], &[], query)
+    let refusal = super::super::engine::logs(&ctx, &["telly".to_owned()], &[], query)
         .await
         .err()
         .map(|problem| problem.code);
@@ -162,7 +162,7 @@ async fn reading_logs_from_a_stack_that_cannot_be_read_is_refused() {
         .build();
     let query = LogQuery::recent(10);
     assert_eq!(
-        super::super::logs(&ctx, &[], &[], query)
+        super::super::engine::logs(&ctx, &[], &[], query)
             .await
             .err()
             .map(|problem| problem.code),

@@ -1,5 +1,8 @@
+use lemonfiber_core::app::Outcome;
 use lemonfiber_core::companion::{Material, Pairing, Replacement};
 use lemonfiber_core::instant::Instant;
+use lemonfiber_core::notify::events::Heard;
+use lemonfiber_core::screening::{Renewed, Untuned};
 
 use super::{certificate, pairing};
 use crate::render::fixtures::drawn_under;
@@ -122,4 +125,43 @@ fn both_answers_are_shaped_by_their_own_renderer() {
         .text(),
         certificate(&replaced).text()
     );
+}
+
+#[test]
+fn what_the_surface_answers_itself_is_said_in_a_line() {
+    let said = |outcome: &Outcome| crate::render::shaped(outcome).text();
+    let heard = Heard {
+        service: "sonarr".to_owned(),
+    };
+    assert!(said(&Outcome::Surfaced(
+        lemonfiber_core::app::surfacing::Answer::Heard(heard)
+    ))
+    .contains("from sonarr"));
+    let renewed = |rehearsed| Renewed {
+        member: "ada".to_owned(),
+        lasts_until: "2026-12-25".to_owned(),
+        rehearsed,
+    };
+    let holds = said(&Outcome::Surfaced(
+        lemonfiber_core::app::surfacing::Answer::Renewed(renewed(false)),
+    ));
+    assert!(
+        holds.contains("ada's grant to play holds until 2026-12-25"),
+        "{holds}"
+    );
+    assert!(!holds.contains("rehearsal"), "{holds}");
+    let rehearsed = said(&Outcome::Surfaced(
+        lemonfiber_core::app::surfacing::Answer::Renewed(renewed(true)),
+    ));
+    assert!(
+        rehearsed.contains("A rehearsal renews nothing"),
+        "{rehearsed}"
+    );
+    let closed = |closed| {
+        said(&Outcome::Surfaced(
+            lemonfiber_core::app::surfacing::Answer::Untuned(Untuned { closed }),
+        ))
+    };
+    assert!(closed(1).contains("1 live stream closed"));
+    assert!(closed(2).contains("2 live streams closed"));
 }

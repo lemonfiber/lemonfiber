@@ -128,7 +128,7 @@ impl Theirs {
     /// One reading, narrowed to the member and worded for them, as the event it is said
     /// as. Nothing where the answer will not render.
     async fn answered(&self, reading: Reading) -> Option<Rendered> {
-        let outcome = match dispatch(reading.theirs(&self.member), &self.ctx).await {
+        let outcome = match dispatch(reading.theirs(&self.member).polled(), &self.ctx).await {
             Ok(outcome) => outcome,
             Err(problem) => reading.unread(&problem),
         };

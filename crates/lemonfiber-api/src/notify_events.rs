@@ -11,7 +11,8 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Extension, Json, Router};
-use lemonfiber_core::notify::events::{intake, Event};
+use lemonfiber_core::app::{dispatch, Command, Surfacing};
+use lemonfiber_core::notify::events::{Event, Telling};
 
 use crate::guard::Arrived;
 use crate::read::went_wrong;
@@ -53,7 +54,12 @@ async fn told(
     let Ok(Json(event)) = given else {
         return Refusal::NotAKeyRequest.answered();
     };
-    match intake(&serving.ctx, presented, &event, Some(arrived.from)).await {
+    let telling = Telling {
+        presented: presented.to_owned(),
+        event,
+        from: Some(arrived.from),
+    };
+    match dispatch(Command::Surface(Surfacing::Told(telling)), &serving.ctx).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(problem) => went_wrong(&problem),
     }

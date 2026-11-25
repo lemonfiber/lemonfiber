@@ -22,7 +22,7 @@ use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::{Jobs, Standing};
 use lemonfiber_api::router::Serving;
-use lemonfiber_core::app::Ctx;
+use lemonfiber_core::app::{Ctx, Surfacing};
 use lemonfiber_core::config::Settings;
 use lemonfiber_fixtures::ports::{Chance, Stopped};
 use lemonfiber_fixtures::pulled::Pulled;
@@ -152,7 +152,7 @@ fn the_reads_every_request_makes_rehearse_as_the_reads_they_are() {
         offered: None,
         arrived: None,
     }));
-    for command in [Command::Standing, caller] {
+    for command in [Command::Surface(Surfacing::Standing), caller] {
         assert!(
             matches!(asked(&command).rehearsal, Rehearsal::Reads),
             "{command:?}"

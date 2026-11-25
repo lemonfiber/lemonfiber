@@ -30,13 +30,10 @@
 use std::sync::Arc;
 
 use axum::response::Response;
-use lemonfiber_core::app::{logs, Ctx};
-use lemonfiber_core::logs::Line;
-use lemonfiber_core::ports::docker::LogQuery;
+use lemonfiber_core::app::{Ctx, ReadingLogs};
 
 use crate::actions::unnameable;
 use crate::events::live::Live;
-use crate::events::wire::{EventKind, Rendered};
 use crate::jobs::ended::Ending;
 use crate::jobs::{accepted, Job, Lease, Standing};
 use crate::router::Serving;
@@ -66,7 +63,7 @@ pub(crate) async fn followed(
     serving
         .jobs
         .begin(&job, ASKED_FOR, Lease::WhileAsked, async move {
-            following(&ctx, &live, &forms, &services, tail).await
+            following(&ctx, live, forms, services, tail).await
         })
         .await;
     accepted(&job, ASKED_FOR)
@@ -81,22 +78,19 @@ pub(crate) async fn followed(
 /// rather than an answer it never had.
 async fn following(
     ctx: &Ctx,
-    live: &Live,
-    forms: &[String],
-    services: &[String],
+    live: Arc<Live>,
+    forms: Vec<String>,
+    services: Vec<String>,
     tail: u32,
 ) -> Standing {
-    let query = LogQuery { tail, follow: true };
-    let mut lines = match logs(ctx, forms, services, query).await {
-        Ok(opened) => opened,
-        Err(problem) => return Standing::failed(&problem),
+    let asked = ReadingLogs {
+        forms,
+        services,
+        tail,
+        follow: true,
     };
-    while let Some(line) = lines.recv().await {
-        // A record rather than state: a line skipped is a hole in what a service
-        // said, not a figure that has been overtaken, so a client that was away is
-        // given the ones it missed rather than only the newest.
-        let said = Rendered::of(EventKind::Log, &Line::from(line));
-        live.say_if_rendered(said).await;
+    match crate::tailing::followed(ctx, live, asked).await {
+        Ok(()) => Standing::Ended(Ending::Quiet),
+        Err(problem) => Standing::failed(&problem),
     }
-    Standing::Ended(Ending::Quiet)
 }

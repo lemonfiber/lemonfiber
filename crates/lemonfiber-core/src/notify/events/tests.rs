@@ -185,3 +185,24 @@ fn no_key_is_handed_out_that_could_not_be_minted_or_kept() {
     assert!(!record.exists());
     assert!(std::fs::remove_dir_all(blocked).is_ok());
 }
+
+#[tokio::test]
+async fn an_event_handed_on_through_dispatch_names_the_service_it_came_from() {
+    let ctx = machine("notify-events-dispatched");
+    let key = minted(&ctx, "sonarr").unwrap_or_default();
+    let telling = |presented: &str| {
+        crate::app::Command::Surface(crate::app::Surfacing::Told(super::Telling {
+            presented: presented.to_owned(),
+            event: event(Happened::Added, "Dune", None),
+            from: None,
+        }))
+    };
+
+    let heard = crate::app::dispatch(telling(&key), &ctx).await;
+    assert!(
+        matches!(heard, Ok(crate::app::Outcome::Surfaced(crate::app::surfacing::Answer::Heard(heard))) if heard.service == "sonarr")
+    );
+    let refused = crate::app::dispatch(telling("not-the-key"), &ctx).await;
+    assert!(refused.is_err_and(|problem| problem.code == EVENTS_REFUSED));
+    assert!(!format!("{:?}", telling(&key)).contains(&key));
+}

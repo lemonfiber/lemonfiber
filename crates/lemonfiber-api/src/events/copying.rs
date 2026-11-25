@@ -2,7 +2,9 @@
 
 use std::time::Duration;
 
+use lemonfiber_core::app::Outcome;
 use lemonfiber_core::copying::{Copying, Running};
+use lemonfiber_core::error::Problem;
 use tokio::time::Instant;
 
 use super::theirs::due;
@@ -18,9 +20,22 @@ pub struct Heard {
 }
 
 impl Heard {
+    /// What a read of the copy running now answered, where it is owed.
+    pub fn heard(
+        &mut self,
+        answered: Result<Outcome, Box<Problem>>,
+        joined: bool,
+        at: Instant,
+    ) -> Option<Copying> {
+        let Ok(Outcome::Copying(now)) = answered else {
+            return None;
+        };
+        self.due(now, joined, at)
+    }
+
     /// The reading to say at `at`, where a listener `joined`, the copy started, ended or
     /// changed its state or part, or it runs and was last said [`COPYING_EVERY`] ago.
-    pub fn due(&mut self, now: Copying, joined: bool, at: Instant) -> Option<Copying> {
+    fn due(&mut self, now: Copying, joined: bool, at: Instant) -> Option<Copying> {
         let changed = self.was.as_ref().is_none_or(|was| moved(was, &now));
         let every = now.running.is_some() && due(self.said, COPYING_EVERY, at);
         if !(joined || changed || every) {

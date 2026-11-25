@@ -6692,6 +6692,19 @@
         ],
         "type": "object"
       },
+      "Heard": {
+        "description": "Which service told of an event.",
+        "properties": {
+          "service": {
+            "description": "The service whose key it presented.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service"
+        ],
+        "type": "object"
+      },
       "Heartbeat": {
         "description": "A heartbeat's interval and grace, and its last check-in.",
         "properties": {
@@ -15880,6 +15893,29 @@
         ],
         "type": "object"
       },
+      "Renewed": {
+        "description": "The grant to play of a member whose client spoke, and until when it holds.",
+        "properties": {
+          "lasts_until": {
+            "description": "The last day the grant holds unless their client speaks again, as `YYYY-MM-DD`.",
+            "type": "string"
+          },
+          "member": {
+            "description": "The member, by the id their session or key names.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether this was a rehearsal, which renews nothing.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "member",
+          "lasts_until",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
       "Repair": {
         "description": "One repair lemonfiber could carry out.",
         "properties": {
@@ -22220,6 +22256,21 @@
         ],
         "type": "object"
       },
+      "Untuned": {
+        "description": "How many live streams whose passes lapsed unrenewed were closed.",
+        "properties": {
+          "closed": {
+            "description": "How many were closed.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closed"
+        ],
+        "type": "object"
+      },
       "Unvetted": {
         "description": "The operator's own overlay, named because nothing in it was held to the model.",
         "properties": {
@@ -24865,6 +24916,9 @@
             "$ref": "#/components/schemas/kind-notify"
           },
           {
+            "$ref": "#/components/schemas/kind-notify-heard"
+          },
+          {
             "$ref": "#/components/schemas/kind-notify-mine"
           },
           {
@@ -24932,6 +24986,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-removal"
+          },
+          {
+            "$ref": "#/components/schemas/kind-renewed"
           },
           {
             "$ref": "#/components/schemas/kind-repair"
@@ -25013,6 +25070,9 @@
           },
           {
             "$ref": "#/components/schemas/kind-uninstall"
+          },
+          {
+            "$ref": "#/components/schemas/kind-untuned"
           },
           {
             "$ref": "#/components/schemas/kind-update"
@@ -27209,6 +27269,46 @@
         "title": "Envelope",
         "type": "object"
       },
+      "kind-notify-heard": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Heard",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
       "kind-notify-mine": {
         "description": "The wrapper every machine-readable payload arrives in.",
         "properties": {
@@ -28100,6 +28200,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/HouseholdRemoval",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-renewed": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Renewed",
             "description": "The payload."
           },
           "host": {
@@ -29180,6 +29320,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/Uninstall",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-untuned": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Untuned",
             "description": "The payload."
           },
           "host": {

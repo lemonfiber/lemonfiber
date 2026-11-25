@@ -11,6 +11,7 @@
 //! nothing consults is the failure mode these exist against, and it is one a unit
 //! test cannot see.
 
+use lemonfiber_core::config::paths::GRANTS;
 use lemonfiber_core::error::codes::admit::NOT_YOURS;
 use lemonfiber_core::error::household::Words;
 
@@ -698,4 +699,34 @@ fn a_members_choice_of_how_to_be_told_is_answered_at_once() {
     });
     assert_eq!(answering(&choose), Answering::Now);
     assert_eq!(answering(&woken), Answering::Now);
+}
+
+/// A member's grant to play is renewed by a request of theirs that was let through, and
+/// left as it was by one that was refused.
+#[tokio::test]
+async fn only_a_request_let_through_renews_a_members_grant() {
+    let kept = keeping("member-renews");
+    let ctx = keeping_at(
+        world(Some(kept.path().to_path_buf()), not_the_token()),
+        kept.path(),
+    );
+    let (router, _) = surface(ctx, &housed(Recognising::knowing(MEMBER)));
+    let mut carried = from_here();
+    carried.push((TOKEN_HEADER, signed_in(router.clone()).await));
+    let grants = kept.path().with_file_name(GRANTS);
+    let long_ago = serde_json::json!({ MEMBER: "2000-01-01" }).to_string();
+    assert!(std::fs::write(&grants, &long_ago).is_ok());
+    let held = || std::fs::read_to_string(&grants).unwrap_or_default();
+
+    let refused = asked(router.clone(), "GET", "/api/version", &carried, "").await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(held(), long_ago, "a refused request renewed the grant");
+
+    let answer = asked(router, "GET", "/api/requests", &carried, "").await;
+    assert_ne!(answer.status, StatusCode::FORBIDDEN, "{}", answer.body);
+    assert!(
+        held().contains(MEMBER) && !held().contains("2000-01-01"),
+        "a request let through left the grant unrenewed: {}",
+        held()
+    );
 }

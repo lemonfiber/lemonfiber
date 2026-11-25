@@ -35,9 +35,8 @@ mod carrying;
 mod chosen;
 mod fillers;
 mod handing;
-pub(crate) mod run;
-pub use run::listing;
 mod replacing;
+pub(crate) mod run;
 mod settling;
 
 pub use carrying::LeftBehind;

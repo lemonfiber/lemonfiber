@@ -3,6 +3,7 @@
 use lemonfiber_core::app::admitting::{Admitted, Answer, Caller, Calling, SignInCode};
 use lemonfiber_core::app::password::PasswordReport;
 use lemonfiber_core::app::standing::StackStanding;
+use lemonfiber_core::app::surfacing::Answer as Surfaced;
 use lemonfiber_core::app::{InFlightReport, LogsReport, Outcome, Unfinished};
 use lemonfiber_core::certificate::described::Described;
 use lemonfiber_core::companion::served::ServedReport;
@@ -10,6 +11,8 @@ use lemonfiber_core::dashboard::Protocol;
 use lemonfiber_core::device_keys::Challenged;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::keys::Scope;
+use lemonfiber_core::notify::events::Heard;
+use lemonfiber_core::screening::{Renewed, Untuned};
 use lemonfiber_core::walkthrough::{Shape, Why};
 
 /// What each command a surface dispatches for itself answers with.
@@ -47,13 +50,22 @@ pub(crate) fn samples() -> Vec<Outcome> {
             }),
             presented: None,
         }),
-        Outcome::Standing(StackStanding {
+        Outcome::Surfaced(Surfaced::Standing(StackStanding {
             stack: Some("f3a1c2d4".to_owned()),
             switched_off: vec![lemonfiber_core::config::REACH_REGISTRY_KEY.to_owned()],
             told: true,
             waiting: false,
             members_mint: false,
-        }),
+        })),
+        Outcome::Surfaced(Surfaced::Heard(Heard {
+            service: "sonarr".to_owned(),
+        })),
+        Outcome::Surfaced(Surfaced::Renewed(Renewed {
+            member: "a7f3".to_owned(),
+            lasts_until: "2026-12-25".to_owned(),
+            rehearsed: false,
+        })),
+        Outcome::Surfaced(Surfaced::Untuned(Untuned { closed: 2 })),
         Outcome::Admitting(Answer::Admission(Admitted {
             token: "5e55".repeat(16),
             until: Instant::from_seconds(1_791_223_200),

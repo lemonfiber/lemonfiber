@@ -224,10 +224,16 @@ kinds! {
     STACK = "stack",
     /// What the web API composes its routes and its answers from.
     STANDING = "standing",
+    /// The grant to play of a member whose client spoke, and until when it holds.
+    RENEWED = "renewed",
+    /// How many live streams whose passes lapsed unrenewed were closed.
+    UNTUNED = "untuned",
     /// Where a message goes: every back-end alerts are delivered to.
     NOTIFY = "notify",
     /// The ways a member may be told that something they asked for is ready.
     NOTIFY_MINE = "notify-mine",
+    /// Which service told of an event it posted, handed on.
+    NOTIFY_HEARD = "notify-heard",
     /// What each service is doing.
     STATUS = "status",
     /// One step of a walkthrough, said the moment it is true.

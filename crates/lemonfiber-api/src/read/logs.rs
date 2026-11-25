@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::{logs, Ctx};
+use lemonfiber_core::app::{Ctx, ReadingLogs};
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::Envelope;
@@ -76,7 +76,7 @@ async fn log_lines(
     if follow {
         return crate::following::followed(&serving, forms, services, tail).await;
     }
-    read_logs(&serving.ctx, &forms, &services, tail).await
+    read_logs(&serving.ctx, forms, services, tail).await
 }
 
 /// The scrollback, one envelope per line.
@@ -87,19 +87,15 @@ async fn log_lines(
 /// The scrollback only. A read ends, and what a service says after it ended is
 /// what live state is for; drawing the lines on a screen that scrolls back is a
 /// thing a terminal does with them rather than a thing they are.
-async fn read_logs(ctx: &Ctx, forms: &[String], services: &[String], tail: u32) -> Response {
-    let query = LogQuery {
+async fn read_logs(ctx: &Ctx, forms: Vec<String>, services: Vec<String>, tail: u32) -> Response {
+    let asked = ReadingLogs {
+        forms,
+        services,
         tail,
         follow: false,
     };
-    match logs(ctx, forms, services, query).await {
-        Ok(mut opened) => {
-            let mut said = Vec::new();
-            while let Some(line) = opened.recv().await {
-                said.push(Line::from(line));
-            }
-            enveloped(StatusCode::OK, one_per_line(&said))
-        }
+    match crate::tailing::read(ctx, asked).await {
+        Ok(said) => enveloped(StatusCode::OK, one_per_line(&said)),
         Err(problem) => went_wrong(&problem),
     }
 }

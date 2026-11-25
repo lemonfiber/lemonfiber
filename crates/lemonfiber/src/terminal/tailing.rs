@@ -9,10 +9,13 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
-use lemonfiber_core::app::{logs, Ctx};
+use async_trait::async_trait;
+use lemonfiber_core::app::{dispatch, Command, Ctx, ReadingLogs};
 use lemonfiber_core::bundle::Marks;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine, LogQuery};
-use tokio::sync::mpsc::Receiver;
+use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
+use lemonfiber_core::ports::{Arrival, Narrator};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{oneshot, Mutex};
 use tokio::task::{JoinHandle, JoinSet};
 
 use super::screen::{drawing, read_keyboard, Screen};
@@ -36,10 +39,27 @@ pub(crate) async fn watching(
 ) -> ExitCode {
     // Opened before the terminal is taken, so a stack that cannot be read says why
     // on an ordinary terminal rather than flashing an alternate screen and leaving.
-    let lines = match logs(ctx, forms, services, LogQuery { tail, follow: true }).await {
-        Ok(opened) => opened,
-        Err(problem) => return complain(&problem),
+    let (sender, lines) = tokio::sync::mpsc::channel(LINES);
+    let (opening, opened) = oneshot::channel();
+    let sending = Sending {
+        beside: Arc::clone(&ctx.narrator),
+        opening: Mutex::new(Some(opening)),
+        lines: sender,
     };
+    let reading = ctx.clone().with_narrator(Arc::new(sending));
+    let asked = Command::Logs(ReadingLogs {
+        forms: forms.to_vec(),
+        services: services.to_vec(),
+        tail,
+        follow: true,
+    });
+    let read = tokio::spawn(async move { dispatch(asked, &reading).await });
+    if opened.await.is_err() {
+        return match read.await {
+            Ok(Err(problem)) => complain(&problem),
+            _ => ExitCode::FAILURE,
+        };
+    }
     let mut screen = match Screen::open() {
         Ok(screen) => screen,
         Err(err) => {
@@ -48,8 +68,54 @@ pub(crate) async fn watching(
         }
     };
     let outcome = following(&mut screen, ctx, lines).await;
+    read.abort();
     drop(screen);
     outcome
+}
+
+/// Say once that the read opened, to whoever is waiting to hear it.
+async fn opened(opening: &Mutex<Option<oneshot::Sender<()>>>) {
+    if let Some(opening) = opening.lock().await.take() {
+        let _ = opening.send(());
+    }
+}
+
+/// How many lines wait for the viewer before the read waits for it.
+const LINES: usize = 1024;
+
+/// A narrator handing the viewer each line a read of the logs says, and saying when the
+/// read opened, passing everything else on.
+struct Sending {
+    beside: Arc<dyn Narrator>,
+    opening: Mutex<Option<oneshot::Sender<()>>>,
+    lines: Sender<LogLine>,
+}
+
+#[async_trait]
+impl Narrator for Sending {
+    async fn say(&self, said: &str) {
+        self.beside.say(said).await;
+    }
+
+    async fn pulled(&self, line: &str) {
+        self.beside.pulled(line).await;
+    }
+
+    async fn logged(&self, line: &LogLine) {
+        drop(self.lines.send(line.clone()).await);
+    }
+
+    async fn logs_opened(&self) {
+        opened(&self.opening).await;
+    }
+
+    async fn arrived(&self, arrival: &Arrival<'_>) {
+        self.beside.arrived(arrival).await;
+    }
+
+    async fn removed(&self, member: &str) {
+        self.beside.removed(member).await;
+    }
 }
 
 /// The loop itself, with the terminal already in hand.

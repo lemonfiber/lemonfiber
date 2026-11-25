@@ -36,7 +36,7 @@ use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::news::{Newest, News};
 use tokio::sync::Mutex;
 
-use lemonfiber_core::app::{dispatch, Command};
+use lemonfiber_core::app::{dispatch, Command, Polled, Surfacing};
 use tokio::time::Instant;
 
 use super::copying::Heard;
@@ -177,9 +177,12 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
         return None;
     }
     heard.0 = Some(now);
-    let outcome = dispatch(Command::Playing { member: None }, &dashboard.ctx)
-        .await
-        .unwrap_or_else(|problem| playing_unread(&problem));
+    let outcome = dispatch(
+        Command::Surface(Surfacing::Polled(Polled::Playing { member: None })),
+        &dashboard.ctx,
+    )
+    .await
+    .unwrap_or_else(|problem| playing_unread(&problem));
     let rendered = Rendered::of(EventKind::Playing, &outcome)
         .filter(|_| outcome.kind() == EventKind::Playing.kind())?;
     let previous = heard.1.replace(rendered.said().to_owned());
@@ -189,12 +192,16 @@ async fn playing(dashboard: &Dashboard, joined: bool) -> Option<Rendered> {
 /// The copy running now, where it is owed: in full to the operator, and to a `read` or an
 /// `act` key as the read answers a key.
 async fn copying(dashboard: &Dashboard, joined: bool) -> Vec<Rendered> {
-    let now = lemonfiber_core::copying::run::now(&dashboard.ctx);
+    let answered = dispatch(
+        Command::Surface(Surfacing::Polled(Polled::Copying)),
+        &dashboard.ctx,
+    )
+    .await;
     let said = dashboard
         .copying
         .lock()
         .await
-        .due(now, joined, Instant::now());
+        .heard(answered, joined, Instant::now());
     said.into_iter()
         .flat_map(|said| {
             let keys = said.clone().for_a_key();

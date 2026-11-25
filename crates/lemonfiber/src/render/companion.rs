@@ -4,8 +4,12 @@
 //! is what to check and what to know, and none of it has to be read to pair.
 
 use lemonfiber_core::app::standing::StackStanding;
+use lemonfiber_core::app::surfacing::Answer;
 use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::companion::{Pairing, Replacement, LASTS};
+use lemonfiber_core::notify::events::Heard;
+use lemonfiber_core::plural::s;
+use lemonfiber_core::screening::{Renewed, Untuned};
 use lemonfiber_core::PRODUCT;
 
 use super::{qr, Lines};
@@ -138,9 +142,19 @@ fn left_out(more: usize) -> String {
     }
 }
 
+/// What the web surface asked of the core for itself.
+pub(super) fn surfaced(answer: &Answer) -> Lines {
+    match answer {
+        Answer::Standing(report) => standing(report),
+        Answer::Heard(report) => heard(report),
+        Answer::Renewed(report) => renewed(report),
+        Answer::Untuned(report) => untuned(*report),
+    }
+}
+
 /// The stack's identifier, the settings that are off, and whether a way to be told,
 /// a waiting push and members' own keys stand.
-pub(super) fn standing(report: &StackStanding) -> Lines {
+fn standing(report: &StackStanding) -> Lines {
     let mut lines = Lines::default();
     lines.put(report.stack.as_ref().map_or_else(
         || "No stack identifier is kept here.".to_owned(),
@@ -154,6 +168,39 @@ pub(super) fn standing(report: &StackStanding) -> Lines {
     lines.put(format!(
         "Members mint their own keys: {}.",
         said(report.members_mint)
+    ));
+    lines
+}
+
+/// Which service an event was handed on from.
+fn heard(report: &Heard) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!("An event from {} was handed on.", report.service));
+    lines
+}
+
+/// Until when a member's grant to play holds.
+fn renewed(report: &Renewed) -> Lines {
+    let mut lines = Lines::default();
+    let holds = format!(
+        "{}'s grant to play holds until {}.",
+        report.member, report.lasts_until
+    );
+    lines.put(if report.rehearsed {
+        format!("A rehearsal renews nothing: {holds}")
+    } else {
+        holds
+    });
+    lines
+}
+
+/// How many live streams were closed because their passes lapsed.
+fn untuned(report: Untuned) -> Lines {
+    let mut lines = Lines::default();
+    lines.put(format!(
+        "{} live stream{} closed, the pass of each lapsed unrenewed.",
+        report.closed,
+        s(report.closed)
     ));
     lines
 }

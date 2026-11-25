@@ -316,7 +316,7 @@ pub(super) async fn answered(
             recipe,
             consent,
         },
-        Asked::Installed => Asked::Installed,
+        listing @ (Asked::Installed | Asked::Recorded) => listing,
     };
     plugins(ctx, &yes).await
 }

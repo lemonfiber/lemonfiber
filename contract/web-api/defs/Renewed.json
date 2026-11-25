@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The grant to play of a member whose client spoke, and until when it holds.",
+  "type": "object",
+  "properties": {
+    "lasts_until": {
+      "description": "The last day the grant holds unless their client speaks again, as `YYYY-MM-DD`.",
+      "type": "string"
+    },
+    "member": {
+      "description": "The member, by the id their session or key names.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether this was a rehearsal, which renews nothing.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "member",
+    "lasts_until",
+    "rehearsed"
+  ]
+}

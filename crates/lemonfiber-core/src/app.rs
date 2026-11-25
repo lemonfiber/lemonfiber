@@ -95,6 +95,7 @@ pub mod setup;
 pub(crate) mod showing;
 pub mod standing;
 pub mod support;
+pub mod surfacing;
 pub mod switched;
 pub(crate) mod targets;
 pub(crate) mod trace;
@@ -107,9 +108,9 @@ pub(crate) mod watcher;
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
     Diagnosing, Doorway, Downloading, Filling, Gathering, Halting, Hostable, Inviting, Keeping,
-    LettingGo, Linking, Live, MigrateAction, PlayFrom, QualityAction, Queueing, ReadingLogs,
-    Reclaiming, Removing, Restarting, Restoring, Setting, Settling, Shelf, Teardown, Tracing,
-    Viewing, Whom, Wishing, HOSTABLE,
+    LettingGo, Linking, Live, MigrateAction, PlayFrom, Polled, QualityAction, Queueing,
+    ReadingLogs, Reclaiming, Removing, Restarting, Restoring, Setting, Settling, Shelf, Surfacing,
+    Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use answering::answered_under;
@@ -118,12 +119,10 @@ pub use outcome::Outcome;
 pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;
 
-// The log-following reads a surface streams from live outside dispatch, so they are the
-// engine module's functions re-exported for the binary and the log commands to reach.
 pub use engine::{
-    claimed, diagnose, in_flight_report, logs, offline, pull_progress, released, start_progress,
-    started, unstarted, Claim, Containers, InFlightReport, InstallOffered, LogsReport, Offline,
-    Unfinished, Waiting, INSTALL_REFUSALS,
+    claimed, diagnose, in_flight_report, offline, pull_progress, released, start_progress, started,
+    unstarted, Claim, Containers, InFlightReport, InstallOffered, LogsReport, Offline, Unfinished,
+    Waiting, INSTALL_REFUSALS,
 };
 pub use notify::{notify, Notified, CHANNEL_CHECK};
 pub use walkthrough::{walkthrough, worth_offering};
@@ -514,7 +513,7 @@ async fn routed(command: Command, ctx: &Ctx) -> Result<Outcome, Box<Problem>> {
         // watched rather than read afterwards.
         Command::Walkthrough { item } => walked(ctx, item).await,
         Command::WalkthroughOffer => worth_offering(ctx).await.map(Outcome::WalkthroughOffer),
-        Command::Standing => Ok(Outcome::Standing(standing::standing(ctx))),
+        Command::Surface(asked) => Box::pin(surfacing::surfaced(ctx, asked)).await,
         Command::Admission(asked) => admitting::admitted(ctx, asked).await,
         Command::Logs(asked) => engine::read_logs(ctx, &asked).await.map(Outcome::Logs),
         Command::Served(asked) => served::serving(ctx, asked).await.map(Outcome::Served),

@@ -110,7 +110,7 @@ pub(crate) const NOTIFY_BACKENDS: &str = "notify-backends.json";
 /// The secret each notification back-end is reached with.
 pub(crate) const NOTIFY_SECRETS: &str = "notify-secrets.json";
 /// The digest of the key each filler tells the core what happened with.
-pub(crate) const NOTIFY_EVENTS: &str = "notify-events.json";
+pub const NOTIFY_EVENTS: &str = "notify-events.json";
 /// The keys other programs reach the web surface with, as digests.
 pub const KEYS: &str = "keys.json";
 /// When each of those keys was last used.
@@ -120,7 +120,7 @@ pub(crate) const HELD_BACK: &str = "held-back.json";
 /// Every repair lemonfiber carried out.
 pub(crate) const REPAIRS: &str = "repairs.json";
 /// The last day each member's client spoke to the media server.
-pub(crate) const GRANTS: &str = "grants.json";
+pub const GRANTS: &str = "grants.json";
 /// Each live stream the core opened for a member, until it is closed.
 pub(crate) const TUNED: &str = "tuned.json";
 /// What is wrong, and since when.

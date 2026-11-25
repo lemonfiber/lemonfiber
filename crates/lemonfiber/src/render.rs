@@ -283,7 +283,7 @@ pub(crate) fn shaped(outcome: &Outcome) -> Lines {
         Outcome::Logs(read) => logs::read(read.lines),
         Outcome::InFlight(report) => downloads::in_flight(report),
         Outcome::Served(report) => companion::served(report),
-        Outcome::Standing(report) => companion::standing(report),
+        Outcome::Surfaced(answer) => companion::surfaced(answer),
         Outcome::Admitting(answer) => admitting::answered(answer),
         Outcome::PluginCatalogue(report) => plugin::offered::listed(report),
         Outcome::PluginClaims(read) => plugin::claims(read),

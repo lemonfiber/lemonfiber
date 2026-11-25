@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Which service told of an event.",
+  "type": "object",
+  "properties": {
+    "service": {
+      "description": "The service whose key it presented.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service"
+  ]
+}
