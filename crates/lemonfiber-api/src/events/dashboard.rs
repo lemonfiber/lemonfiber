@@ -33,6 +33,7 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
 use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::news::{Newest, News};
+use lemonfiber_error::Problem;
 use tokio::sync::Mutex;
 
 use lemonfiber_core::app::dashboarding::Early as FirstWave;
@@ -107,12 +108,7 @@ async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) ->
         },
     );
     let asked = Command::Surface(Surfacing::Gather { now: false });
-    let mut said: Vec<Rendered> = Vec::new();
-    if let Ok(Outcome::Surfaced(Answer::Dashboard(snapshot))) = dispatch(asked, &ctx).await {
-        said.extend(shared(&snapshot));
-        said.extend(newly(dashboard, &snapshot, joined).await);
-        said.extend(alerted(dashboard, &snapshot.alerts).await);
-    }
+    let mut said = said_of(dashboard, dispatch(asked, &ctx).await, joined).await;
     said.extend(playing(dashboard, joined).await);
     said.extend(copying(dashboard, joined).await);
     said
@@ -124,6 +120,22 @@ impl FirstWave for Handing {
     fn first(&self, snapshot: Snapshot) {
         self.0.say(shared(&snapshot));
     }
+}
+
+/// What a gather says of the dashboard it answered: the dashboard, what is newly here and each
+/// alert that came or went; nothing where it answered anything else.
+async fn said_of(
+    dashboard: &Dashboard,
+    gathered: Result<Outcome, Box<Problem>>,
+    joined: bool,
+) -> Vec<Rendered> {
+    let Ok(Outcome::Surfaced(Answer::Dashboard(snapshot))) = gathered else {
+        return Vec::new();
+    };
+    let mut said: Vec<Rendered> = shared(&snapshot).into_iter().collect();
+    said.extend(newly(dashboard, &snapshot, joined).await);
+    said.extend(alerted(dashboard, &snapshot.alerts).await);
+    said
 }
 
 /// The dashboard as the shared stream says it: every run-and-exit service without the

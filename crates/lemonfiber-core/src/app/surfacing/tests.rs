@@ -58,3 +58,12 @@ fn each_answer_is_written_and_described_under_its_own_kind() {
         ]
     );
 }
+
+#[tokio::test]
+async fn a_gathered_dashboard_is_written_and_described_under_its_own_kind() {
+    let ctx = crate::test_support::a_context().build();
+    let gathered = crate::dashboard::run::gather(&ctx, None).await;
+    let outcome = Outcome::Surfaced(Answer::Dashboard(Box::new(gathered)));
+    assert_eq!(outcome.kind(), kind::DASHBOARD);
+    assert!(serde_json::to_value(&outcome).is_ok_and(|written| written.is_object()));
+}
