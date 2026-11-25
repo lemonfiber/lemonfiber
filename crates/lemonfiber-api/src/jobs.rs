@@ -56,7 +56,8 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::{ENDED, ERROR, JOB};
+use lemonfiber_core::model::Envelope;
 use lemonfiber_error::Problem;
 
 use ended::{Ended, Ending};
@@ -167,9 +168,7 @@ impl Standing {
     #[must_use]
     pub fn failed(problem: &Problem) -> Self {
         Self::Failed(
-            Envelope::new(kind::ERROR, problem)
-                .to_json()
-                .unwrap_or_default(),
+            Envelope::new(ERROR, problem).to_json().unwrap_or_default(),
             // Read here, where the problem is still in hand, and by the same
             // function the reads answer with — so a form nothing declares is a
             // `404` whether it was named to a read or to an action that took a
@@ -465,7 +464,7 @@ fn stands(job: &str, work: &Work) -> Response {
                 action: work.action.clone(),
                 ended: *why,
             };
-            enveloped(StatusCode::OK, Envelope::new(kind::ENDED, ended).to_json())
+            enveloped(StatusCode::OK, Envelope::new(ENDED, ended).to_json())
         }
     }
 }
@@ -487,10 +486,7 @@ fn still(job: &str, action: &str) -> Response {
         job: job.to_owned(),
         action: action.to_owned(),
     };
-    enveloped(
-        StatusCode::ACCEPTED,
-        Envelope::new(kind::JOB, started).to_json(),
-    )
+    enveloped(StatusCode::ACCEPTED, Envelope::new(JOB, started).to_json())
 }
 
 /// A name this run never handed out.

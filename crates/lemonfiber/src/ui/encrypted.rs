@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use lemonfiber_api::guard::Binding;
-use lemonfiber_core::companion::served::{uncertified, ServedReport};
+use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::PRODUCT;
 use lemonfiber_error::codes::serve::UNSETTLED_PORT;
 use lemonfiber_error::{Problem, Remedy};
@@ -66,7 +66,11 @@ pub(crate) fn encrypting(served: &ServedReport) -> Result<Option<Encrypting>, Bo
             )
             .ok()
     })
-    .ok_or_else(|| Box::new(uncertified("the certificate kept would not serve")))?;
+    .ok_or_else(|| {
+        Box::new(ServedReport::uncertified(
+            "the certificate kept would not serve",
+        ))
+    })?;
     Ok(Some(Encrypting {
         acceptor: TlsAcceptor::from(Arc::new(config)),
         fingerprint: kept.fingerprint.clone(),

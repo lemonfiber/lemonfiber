@@ -55,7 +55,6 @@ use schemars::{schema_for, Schema};
 use serde::Serialize;
 use serde_json::Value;
 
-use lemonfiber_core::agreement;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
@@ -63,7 +62,6 @@ use lemonfiber_core::model::{
     kind::{self, Kind},
     Envelope, SetupReport, API_VERSION,
 };
-use lemonfiber_core::wiring;
 use lemonfiber_error::codes::declared;
 use lemonfiber_error::{Code, Problem};
 
@@ -296,9 +294,9 @@ fn beside(kinds: &mut BTreeMap<String, Schema>) {
 /// again rather than by reporting a failure. The rest are each family's refusals of what
 /// a request named or how it asked, which a client branches on by code.
 pub(crate) const CORE_REFUSALS: [&[Code]; 26] = [
-    &agreement::MOVED,
+    &lemonfiber_core::agreement::MOVED,
     &lemonfiber_core::app::admitting::REFUSALS,
-    &wiring::REFUSED,
+    &lemonfiber_core::wiring::REFUSED,
     &lemonfiber_core::app::REFUSALS,
     &lemonfiber_core::app::SCHEDULED_REFUSALS,
     &lemonfiber_core::app::authoring::REFUSALS,
@@ -337,7 +335,7 @@ fn refusals() -> BTreeMap<String, Listed> {
         .iter()
         .map(|refusal| refusal.code())
         .chain(
-            wiring::UNREAD
+            lemonfiber_core::wiring::UNREAD
                 .iter()
                 .flat_map(|codes| codes.iter().copied()),
         )

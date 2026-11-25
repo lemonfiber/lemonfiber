@@ -12,7 +12,7 @@
 //! instead. They are gathered here so that the shape of a refusal is settled in one
 //! place and the mapping beside them stays a mapping.
 
-use lemonfiber_core::app::restore;
+use lemonfiber_core::app::restore::Consent as Restoring;
 use lemonfiber_core::app::{Command, Diagnosing, QualityAction, Tracing};
 use lemonfiber_core::audio::Format;
 use lemonfiber_core::doctor::Narrowing;
@@ -96,11 +96,11 @@ pub(super) fn consent(
 /// Apart from [`consent`] because they are not the same decision. A repair's yes
 /// also says *which* repairs, out of an offer of several; a restore has one archive
 /// and nothing to choose out of it, so there is no `agreed` here to be missing.
-pub(super) fn listing(confirm: bool, offer: Option<String>) -> Result<restore::Consent, Refused> {
+pub(super) fn listing(confirm: bool, offer: Option<String>) -> Result<Restoring, Refused> {
     match (confirm, offer) {
-        (false, None) => Ok(restore::Consent::List),
-        (true, None) => Ok(restore::Consent::Standing),
-        (true, Some(listing)) => Ok(restore::Consent::Given { listing }),
+        (false, None) => Ok(Restoring::List),
+        (true, None) => Ok(Restoring::Standing),
+        (true, Some(listing)) => Ok(Restoring::Given { listing }),
         (false, Some(_)) => Err(Refused::Missing {
             action: "restore".to_owned(),
             argument: "confirm".to_owned(),

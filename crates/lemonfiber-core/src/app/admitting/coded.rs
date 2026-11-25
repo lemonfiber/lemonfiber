@@ -5,10 +5,11 @@ use std::net::IpAddr;
 use serde::Serialize;
 
 use super::household::{named, opened, vouched};
-use super::refused::{no_session, not_waiting, signs_in_by_password, too_many_codes, unconfirmed};
+use super::refused::{no_session, not_waiting, signs_in_by_password, too_many_codes};
 use super::sessions::Opened;
 use super::signing_in::device;
 use super::Answer;
+use super::Caller;
 use crate::app::{Ctx, Outcome};
 use crate::error::Problem;
 use crate::instant::Instant;
@@ -68,13 +69,13 @@ async fn asked(ctx: &Ctx, asker: Asker) -> Result<SignInCode, Box<Problem>> {
     codes
         .asking(&asker, &limits, ctx.seams.clock.now())
         .map_err(too_many_codes)?;
-    let household = opened(ctx).await.ok_or_else(unconfirmed)?;
+    let household = opened(ctx).await.ok_or_else(Caller::unconfirmed)?;
     let random = ctx.seams.random.as_ref();
-    let device = device(random).ok_or_else(unconfirmed)?;
+    let device = device(random).ok_or_else(Caller::unconfirmed)?;
     let issued = match household.sign_in_by_code(&device).await {
         Ok(issued) => issued,
         Err(Failure::Unsupported { .. }) => return Err(signs_in_by_password()),
-        Err(_) => return Err(unconfirmed()),
+        Err(_) => return Err(Caller::unconfirmed()),
     };
     let waiting = codes
         .kept(
@@ -96,7 +97,7 @@ async fn asked(ctx: &Ctx, asker: Asker) -> Result<SignInCode, Box<Problem>> {
 fn unkept(not_kept: NotKept) -> Box<Problem> {
     match not_kept {
         NotKept::Waiting(left) => too_many_codes(left),
-        NotKept::Undrawn => unconfirmed(),
+        NotKept::Undrawn => Caller::unconfirmed(),
     }
 }
 
@@ -108,7 +109,7 @@ async fn finished(ctx: &Ctx, asker: &Asker, handle: String) -> Result<Outcome, B
         .codes
         .claimed(&handle, asker, &limits, ctx.seams.clock.now())
         .ok_or_else(not_waiting)?;
-    let household = opened(ctx).await.ok_or_else(unconfirmed)?;
+    let household = opened(ctx).await.ok_or_else(Caller::unconfirmed)?;
     let signed = match household.signed_by_code(&finishing.id).await {
         Ok(Some(signed)) => signed,
         Ok(None) => {
@@ -119,13 +120,15 @@ async fn finished(ctx: &Ctx, asker: &Asker, handle: String) -> Result<Outcome, B
                 waiting: handle,
             })))
         }
-        Err(_) => return Err(unconfirmed()),
+        Err(_) => return Err(Caller::unconfirmed()),
     };
     finishing.spent();
     if !vouched(ctx, &signed.id).await {
         return Err(not_waiting());
     }
-    let name = named(ctx, &signed.id).await.ok_or_else(unconfirmed)?;
+    let name = named(ctx, &signed.id)
+        .await
+        .ok_or_else(Caller::unconfirmed)?;
     admitting
         .sessions
         .opened(

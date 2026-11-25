@@ -32,6 +32,7 @@ fn a_household(named: &str) -> (Ctx, Arc<Fake>) {
 async fn read(kept: &Kept, ctx: &Ctx, member: &str) -> String {
     let answer = kept
         .read(
+            ctx.seams.clock.now(),
             ctx,
             member,
             Command::Household {

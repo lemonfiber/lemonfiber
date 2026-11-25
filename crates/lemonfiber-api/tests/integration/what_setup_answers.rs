@@ -58,35 +58,43 @@ fn world(paths: &Paths) -> Ctx {
 
 /// What this run serves, over the world a test chose.
 fn serving(paths: &Paths) -> Option<Serving> {
-    Some(Serving {
-        ctx: Arc::new(world(paths)),
-        token: Arc::new(Token::mint(&Chance::cycling())?),
-        bound: bound(),
-        jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0))),
-        kept: Arc::default(),
-        answered: Arc::default(),
+    Some({
+        let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(world(paths));
+        Serving {
+            own: crate::own(&ctx),
+            ctx,
+            token: Arc::new(Token::mint(&Chance::cycling())?),
+            bound: bound(),
+            jobs: Jobs::default(),
+            live: Arc::new(Live::opening(Stopped::at(0))),
+            kept: Arc::default(),
+            answered: Arc::default(),
+        }
     })
 }
 
 /// A run with nowhere to keep configuration at all, which is not the caller's
 /// mistake and is not answered as one.
 fn homeless() -> Option<axum::Router> {
-    let serving = Serving {
-        ctx: Arc::new(
+    let serving = {
+        let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(
             lemonfiber_testing::a_context()
                 .runner(Arc::new(Idle))
                 .clock(Arc::new(lemonfiber_adapters::System))
                 .over(lemonfiber_testing::nowhere())
                 .build()
                 .with_http(Fake::silent()),
-        ),
-        token: Arc::new(Token::mint(&Chance::cycling())?),
-        bound: bound(),
-        jobs: Jobs::default(),
-        live: Arc::new(Live::opening(Stopped::at(0))),
-        kept: Arc::default(),
-        answered: Arc::default(),
+        );
+        Serving {
+            own: crate::own(&ctx),
+            ctx,
+            token: Arc::new(Token::mint(&Chance::cycling())?),
+            bound: bound(),
+            jobs: Jobs::default(),
+            live: Arc::new(Live::opening(Stopped::at(0))),
+            kept: Arc::default(),
+            answered: Arc::default(),
+        }
     };
     Some(
         lemonfiber_api::setup::routes()

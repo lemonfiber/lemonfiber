@@ -51,3 +51,12 @@ mod what_the_machine_reads_answer;
 mod what_the_settings_answer;
 mod what_the_stream_says;
 mod who_the_stack_admits;
+
+/// The clock and the randomness a test's web surface holds of its own: the ones its
+/// context was given, so a test that fixes either for the context fixes it for both.
+pub(crate) fn own(ctx: &lemonfiber_core::app::Ctx) -> lemonfiber_api::router::Own {
+    lemonfiber_api::router::Own {
+        clock: std::sync::Arc::clone(&ctx.seams.clock),
+        random: std::sync::Arc::clone(&ctx.seams.random),
+    }
+}

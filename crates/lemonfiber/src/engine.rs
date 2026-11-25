@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, ReadingLogs, Waiting};
 use lemonfiber_core::logs::Line;
-use lemonfiber_core::model::kind::{self, Kind};
+use lemonfiber_core::model::kind::{Kind, LOG, PULL, START};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_core::ports::Narrator;
@@ -135,18 +135,18 @@ pub(crate) struct Narrating;
 #[async_trait::async_trait]
 impl Narrator for Narrating {
     async fn say(&self, said: &str) {
-        emit_line(kind::START, said, crate::say::for_a_parser());
+        emit_line(START, said, crate::say::for_a_parser());
     }
 
     async fn pulled(&self, line: &str) {
-        emit_line(kind::PULL, line, crate::say::for_a_parser());
+        emit_line(PULL, line, crate::say::for_a_parser());
     }
 
     async fn logged(&self, line: &LogLine) {
         if crate::say::for_a_parser() {
             emit!(
                 "{}",
-                Envelope::new(kind::LOG, &Line::from(line.clone()))
+                Envelope::new(LOG, &Line::from(line.clone()))
                     .to_json()
                     .unwrap_or(UNRENDERABLE.to_owned())
             );

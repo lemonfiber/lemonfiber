@@ -407,14 +407,14 @@ impl Refusal {
 /// A caller who proved who they are, refused what is not theirs, saying `why` where there
 /// is more to say than that.
 pub(crate) fn not_yours(why: Option<&str>) -> Response<Body> {
-    let refused = *lemonfiber_core::app::admitting::not_yours();
+    let refused = *lemonfiber_core::app::admitting::Caller::not_yours();
     let summary = why.map_or(refused.summary.clone(), str::to_owned);
     crate::read::went_wrong(&Problem { summary, ..refused })
 }
 
 /// A caller whose standing the media server could not be asked about.
 pub(crate) fn unconfirmed() -> Response<Body> {
-    crate::read::went_wrong(&lemonfiber_core::app::admitting::unconfirmed())
+    crate::read::went_wrong(&lemonfiber_core::app::admitting::Caller::unconfirmed())
 }
 
 mod meaning;

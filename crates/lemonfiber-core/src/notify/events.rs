@@ -109,7 +109,7 @@ pub(crate) async fn intake(
     let ticket = attempts
         .taken_at_a_key(from, now)
         .await
-        .map_err(crate::app::admitting::held)?;
+        .map_err(crate::app::admitting::Caller::held)?;
     let service = heard(ctx, presented, event)?;
     attempts
         .right(&ticket, crate::app::admitting::Door::Key, now)

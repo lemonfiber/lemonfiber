@@ -26,7 +26,8 @@ use axum::Router;
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::{Command, Ctx};
 use lemonfiber_core::keys::Scope as KeyScope;
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::CAPABILITIES as ANSWERED_UNDER;
+use lemonfiber_core::model::Envelope;
 use serde::Serialize;
 
 use crate::actions::{reached, Arguments, ACTION};
@@ -120,7 +121,7 @@ pub fn routes() -> Router<Serving> {
 /// The capabilities, in the envelope every read answers with.
 async fn answered(ctx: &Ctx, caller: &Caller) -> Response {
     let standing = crate::standing::standing(ctx).await;
-    let said = Envelope::new(kind::CAPABILITIES, &declared(&standing, caller)).to_json();
+    let said = Envelope::new(ANSWERED_UNDER, &declared(&standing, caller)).to_json();
     enveloped(StatusCode::OK, said)
 }
 

@@ -188,7 +188,7 @@ async fn taken(
     caller.spoke(&serving.ctx).await;
     let job = match answering(&command) {
         Answering::Now => None,
-        Answering::Later => match Job::mint(serving.ctx.seams.random.as_ref()) {
+        Answering::Later => match Job::mint(serving.own.random.as_ref()) {
             Some(job) => Some(job),
             None => return unnameable(),
         },
@@ -203,7 +203,7 @@ async fn taken(
     let Some(key) = key else {
         return carrying.out(&serving).await.reply();
     };
-    let at = (serving.ctx.seams.clock.now(), again::bounds(&serving.ctx));
+    let at = (serving.own.clock.now(), again::bounds(&serving.ctx));
     let slot = match serving.answered.claim(&caller, key, asked, at).await {
         // Handed to the runtime rather than awaited here, so the attempt is carried out
         // and its answer kept even when the client that sent it has stopped listening —

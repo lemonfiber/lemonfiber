@@ -20,7 +20,7 @@ pub(crate) use attempts::Door;
 pub use caller::{Arrived, Caller, Calling, Carried};
 pub use coded::{Coded, SignInCode};
 pub use household::{AtHand, Remembered, Stacked, KEPT_FOR};
-pub use refused::{held, not_the_password, not_yours, unconfirmed, REFUSALS};
+pub use refused::{not_the_password, REFUSALS};
 pub use sessions::{Admitted, Opened, Sessions};
 pub(crate) use signing_in::{proves_the_member, proves_the_operator};
 pub use signing_in::{Offered, PASSWORD};

@@ -191,14 +191,18 @@ pub(crate) fn surface(ctx: Ctx, admitting: &Arc<Admitting>) -> (axum::Router, Ar
         unreachable!("a cycling source always mints one")
     };
     let live = Arc::new(Live::opening(Stopped::at(NOW)));
-    let serving = Serving {
-        ctx: Arc::new(admitted_by(ctx, admitting)),
-        token: Arc::clone(&token),
-        bound: bound(),
-        jobs: Jobs::default(),
-        live: Arc::clone(&live),
-        kept: Arc::default(),
-        answered: Arc::default(),
+    let serving = {
+        let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(admitted_by(ctx, admitting));
+        Serving {
+            own: crate::own(&ctx),
+            ctx,
+            token: Arc::clone(&token),
+            bound: bound(),
+            jobs: Jobs::default(),
+            live: Arc::clone(&live),
+            kept: Arc::default(),
+            answered: Arc::default(),
+        }
     };
     let streaming = Arc::new(Streaming {
         token: Arc::clone(&token),

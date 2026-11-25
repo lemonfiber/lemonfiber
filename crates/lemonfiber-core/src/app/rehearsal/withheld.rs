@@ -31,7 +31,7 @@ pub fn carried(command: Command, ctx: &Ctx) -> Command {
 /// the one that stops being true.
 ///
 /// Not exhaustive, and that is deliberate: this is the mechanism, not the decision.
-/// What a rehearsal of a command *means* is decided in [`super::asked`], which the compiler
+/// What a rehearsal of a command *means* is decided in [`Command::asked`], which the compiler
 /// checks, and a command that claims to report while its go-ahead is not taken back
 /// here fails `a_rehearsal_changes_nothing` against a real disk.
 #[must_use]

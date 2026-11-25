@@ -10,7 +10,8 @@ use std::process::ExitCode;
 use crate::render::Lines;
 use crate::say::complain;
 use lemonfiber_core::config::HOUSEHOLD_HOST_SETTING;
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::ERROR;
+use lemonfiber_core::model::Envelope;
 use lemonfiber_core::PRODUCT;
 use lemonfiber_error::codes::{handoff, life, pair};
 use lemonfiber_error::Problem;
@@ -119,7 +120,7 @@ fn on_the_command_line(problem: &Problem) -> Option<String> {
 fn as_a_document(problem: &Problem) -> Lines {
     let mut lines = Lines::for_a_parser();
     lines.put(
-        Envelope::new(kind::ERROR, problem)
+        Envelope::new(ERROR, problem)
             .to_json()
             // Eagerly, for the reason `machine_readable` states beside it: a
             // lazily-built fallback is a line no test could ever run, since these

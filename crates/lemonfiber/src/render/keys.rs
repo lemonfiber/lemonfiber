@@ -4,9 +4,7 @@
 //! The secret comes first and once, because it is the one thing on the screen that is
 //! never shown again: everything under it is how to use it and what to know.
 
-use lemonfiber_core::device_keys;
 use lemonfiber_core::keys::{Claimed, Listed, Listing, Minted, State};
-use lemonfiber_core::push;
 
 use super::{qr, Lines};
 
@@ -126,7 +124,7 @@ const fn state(state: State) -> &'static str {
 }
 
 /// A device key registered.
-pub(super) fn registered(report: &device_keys::Registered) -> Lines {
+pub(super) fn registered(report: &lemonfiber_core::device_keys::Registered) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
         "Registered the device key {}, held in {}, made by {}.",
@@ -139,7 +137,7 @@ pub(super) fn registered(report: &device_keys::Registered) -> Lines {
 }
 
 /// Every device key, and what became of a revoke.
-pub(super) fn devices(report: &device_keys::Listing) -> Lines {
+pub(super) fn devices(report: &lemonfiber_core::device_keys::Listing) -> Lines {
     let mut lines = Lines::default();
     if let Some(name) = report.revoked.as_deref() {
         lines.put(if report.rehearsed {
@@ -176,7 +174,7 @@ pub(super) fn devices(report: &device_keys::Listing) -> Lines {
 }
 
 /// A push endpoint registered.
-pub(super) fn pushed(report: &push::Registered) -> Lines {
+pub(super) fn pushed(report: &lemonfiber_core::push::Registered) -> Lines {
     let mut lines = Lines::default();
     lines.put(if report.rehearsed {
         format!("Registering would wake the push endpoint {}.", report.name)
@@ -190,7 +188,7 @@ pub(super) fn pushed(report: &push::Registered) -> Lines {
 }
 
 /// Every push endpoint, and what became of a removal.
-pub(super) fn pushes(report: &push::Listing) -> Lines {
+pub(super) fn pushes(report: &lemonfiber_core::push::Listing) -> Lines {
     let mut lines = Lines::default();
     if let Some(name) = report.removed.as_deref() {
         lines.put(if report.rehearsed {

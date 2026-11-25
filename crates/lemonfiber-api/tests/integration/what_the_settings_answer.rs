@@ -51,14 +51,18 @@ async fn answered(
     };
     let router = actions::routes()
         .merge(read::routes())
-        .with_state(Serving {
-            ctx: Arc::new(ctx),
-            token: Arc::new(token),
-            bound: lemonfiber_api::guard::Binding::here(8475),
-            jobs: Jobs::default(),
-            live: Arc::new(Live::opening(Stopped::at(0))),
-            kept: Arc::default(),
-            answered: Arc::default(),
+        .with_state({
+            let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx);
+            Serving {
+                own: crate::own(&ctx),
+                ctx,
+                token: Arc::new(token),
+                bound: lemonfiber_api::guard::Binding::here(8475),
+                jobs: Jobs::default(),
+                live: Arc::new(Live::opening(Stopped::at(0))),
+                kept: Arc::default(),
+                answered: Arc::default(),
+            }
         })
         .layer(Extension(caller));
     let request = axum::http::Request::builder()

@@ -139,7 +139,7 @@ async fn collected(ctx: &Ctx, claim: &str, from: Option<IpAddr>) -> Result<Outco
     let ticket = attempts
         .taken_at_a_key(from, now)
         .await
-        .map_err(crate::app::admitting::held)?;
+        .map_err(crate::app::admitting::Caller::held)?;
     let from = from.map(|from| from.to_canonical().to_string());
     let minted = claimed::collect(ctx, claim, from).await?;
     attempts

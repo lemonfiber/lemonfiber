@@ -12,7 +12,8 @@
 use axum::http::StatusCode;
 use axum::response::Response;
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::ERROR;
+use lemonfiber_core::model::Envelope;
 use lemonfiber_error::household;
 use lemonfiber_error::Problem;
 
@@ -70,7 +71,7 @@ pub(crate) struct Refused(pub(crate) Problem);
 /// A refusal at `status`, in the envelope every refusal arrives in, carrying its problem
 /// and, where it says how long to wait before trying again, `Retry-After`.
 pub(crate) fn refused(status: StatusCode, problem: Problem) -> Response {
-    let mut response = enveloped(status, Envelope::new(kind::ERROR, &problem).to_json());
+    let mut response = enveloped(status, Envelope::new(ERROR, &problem).to_json());
     if let Some(seconds) = problem.retry_after {
         response
             .headers_mut()
@@ -90,10 +91,7 @@ pub(crate) fn for_audience(audience: Audience, mut response: Response) -> Respon
         return response;
     };
     let spoken = household::spoken(&problem);
-    let rebuilt = enveloped(
-        response.status(),
-        Envelope::new(kind::ERROR, &spoken).to_json(),
-    );
+    let rebuilt = enveloped(response.status(), Envelope::new(ERROR, &spoken).to_json());
     *response.body_mut() = rebuilt.into_body();
     response.extensions_mut().insert(Refused(spoken));
     response

@@ -52,14 +52,18 @@ fn routed(jobs: Jobs) -> axum::Router {
         unreachable!("cycling letters always supply bytes");
     };
     actions::routes()
-        .with_state(Serving {
-            ctx: Arc::new(world()),
-            token: Arc::new(token),
-            bound: lemonfiber_api::guard::Binding::here(8473),
-            jobs,
-            live: Arc::new(Live::opening(Stopped::at(0))),
-            kept: Arc::default(),
-            answered: Arc::default(),
+        .with_state({
+            let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(world());
+            Serving {
+                own: crate::own(&ctx),
+                ctx,
+                token: Arc::new(token),
+                bound: lemonfiber_api::guard::Binding::here(8473),
+                jobs,
+                live: Arc::new(Live::opening(Stopped::at(0))),
+                kept: Arc::default(),
+                answered: Arc::default(),
+            }
         })
         // The subject the guard puts on every request it admits, for the reason
         // `what_a_disturbing_diagnosis_means` gives.

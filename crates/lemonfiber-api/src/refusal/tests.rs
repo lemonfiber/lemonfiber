@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 
 use axum::body::to_bytes;
 use axum::http::StatusCode;
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::ERROR;
+use lemonfiber_core::model::Envelope;
 use lemonfiber_error::codes::declared;
 use serde_json::Value;
 
@@ -144,7 +145,7 @@ async fn a_refusal_saying_its_particulars_keeps_its_code() {
 #[test]
 fn the_refusal_written_out_ahead_is_the_one_rendering_would_write() {
     let problem = Refusal::Unrenderable.problem(Refusal::Unrenderable.said());
-    let rendered = Envelope::new(kind::ERROR, problem).to_json();
+    let rendered = Envelope::new(ERROR, problem).to_json();
     assert_eq!(rendered.as_deref(), Some(UNRENDERED));
 }
 

@@ -40,12 +40,14 @@ fn serving(ctx: Ctx) -> Serving {
     let Some(token) = Token::mint(&Chance::cycling()) else {
         unreachable!("cycling letters always supply bytes");
     };
+    let own = crate::own(&ctx);
     Serving::for_run(
         Arc::new(ctx),
         Arc::new(token),
         lemonfiber_api::guard::Binding::here(8471),
         Jobs::default(),
         Arc::new(Live::opening(Stopped::at(0))),
+        own,
     )
 }
 

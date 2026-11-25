@@ -3,7 +3,7 @@
 
 use std::net::IpAddr;
 
-use crate::app::admitting::{held, proves_the_member, proves_the_operator, Door, PASSWORD};
+use crate::app::admitting::{proves_the_member, proves_the_operator, Door, PASSWORD};
 use crate::app::Ctx;
 use crate::device_keys::proof::Mint;
 use crate::device_keys::run::{challenge_not_standing, misproved, signature_wrong, standing, used};
@@ -74,7 +74,7 @@ pub(super) async fn proved(
             let ticket = attempts
                 .taken(proving.from, None, now)
                 .await
-                .map_err(held)?;
+                .map_err(crate::app::admitting::Caller::held)?;
             let stood = ctx
                 .admitting
                 .challenges
@@ -111,12 +111,12 @@ fn answered(proved: Result<bool, std::time::Duration>) -> Result<Option<String>,
     match proved {
         Ok(true) => Ok(None),
         Ok(false) => Err(crate::app::admitting::not_the_password()),
-        Err(left) => Err(held(left)),
+        Err(left) => Err(crate::app::admitting::Caller::held(left)),
     }
 }
 
 fn not_yours() -> Box<Problem> {
-    let refused = crate::app::admitting::not_yours();
+    let refused = crate::app::admitting::Caller::not_yours();
     Box::new(Problem {
         summary: "Device keys are the operator's, and only theirs.".to_owned(),
         ..*refused

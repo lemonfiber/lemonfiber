@@ -48,10 +48,15 @@ pub struct Kept {
 }
 
 impl Kept {
-    /// What `command` answers for `member`, read again only where the last answer
-    /// has run out.
-    pub async fn read(&self, ctx: &Ctx, member: &str, command: Command) -> Response {
-        let now = ctx.seams.clock.now();
+    /// What `command` answers for `member` at `now`, read again only where the last
+    /// answer has run out.
+    pub async fn read(
+        &self,
+        now: SystemTime,
+        ctx: &Ctx,
+        member: &str,
+        command: Command,
+    ) -> Response {
         let mut held = self.held.lock().await;
         held.retain(|_, answer| answer.until > now);
         if let Some(answer) = held.get(member) {

@@ -11,7 +11,9 @@ use lemonfiber_fixtures::support::{Question, Reporting, Scripted};
 use lemonfiber_core::app::{claimed, released};
 use lemonfiber_core::stack::compose::Action;
 
-use super::{emit_line, kind, pull, pull_showing, stream, Ctx};
+use lemonfiber_core::model::kind;
+
+use super::{emit_line, pull, pull_showing, stream, Ctx};
 
 /// An engine that answers nothing, which is all these paths ask of it.
 fn absent() -> Reporting {

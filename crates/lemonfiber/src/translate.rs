@@ -24,7 +24,7 @@ use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::push::run::Asked as Pushing;
 use lemonfiber_core::quality::Preset;
 use lemonfiber_core::uninstall::Tier;
-use lemonfiber_core::update::run as update;
+use lemonfiber_core::update::run::Asked as Updating;
 use lemonfiber_ports::media::offered;
 
 use crate::authoring::Document;
@@ -387,7 +387,7 @@ pub(crate) fn moving(object: UpdateCommand) -> Command {
             confirm,
             wait,
             offer,
-        } => Command::Update(update::Asked {
+        } => Command::Update(Updating {
             service,
             confirm,
             wait: wait.into(),

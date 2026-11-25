@@ -12,7 +12,8 @@ use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, service_user_from_env, store, Protocols, Settings,
 };
-use lemonfiber_core::model::{kind, Envelope, SetupOutcome, SetupReport};
+use lemonfiber_core::model::kind::SETUP;
+use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::wizard::Step;
 use lemonfiber_error::Problem;
 
@@ -61,7 +62,7 @@ pub fn answering(
 #[must_use]
 pub fn report(outcome: SetupOutcome, settings: &Settings) -> Envelope<SetupReport> {
     Envelope::new(
-        kind::SETUP,
+        SETUP,
         SetupReport {
             outcome,
             protocols: settings.protocols,

@@ -35,7 +35,8 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::{Extension, Router};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Doorway};
-use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_core::model::kind::ERROR;
+use lemonfiber_core::model::Envelope;
 use lemonfiber_error::{Code, Problem};
 
 use crate::admission::{Caller, RETRY_AFTER};
@@ -148,7 +149,12 @@ async fn granted(serving: &Serving, caller: &Caller, command: Command) -> Respon
         // so it is kept a few seconds rather than read again at every asking —
         // whether the member asked with their session or with a key of theirs.
         Command::Household { .. } => match caller.member() {
-            Some(id) => serving.kept.read(&serving.ctx, id, command).await,
+            Some(id) => {
+                serving
+                    .kept
+                    .read(serving.own.clock.now(), &serving.ctx, id, command)
+                    .await
+            }
             None => carried_out(&serving.ctx, command).await,
         },
         command => rendered(&serving.ctx, command, Audience::of(caller))
@@ -225,10 +231,7 @@ impl Reply {
 fn failed(problem: &Problem) -> Reply {
     Reply {
         retry_after: problem.retry_after,
-        ..Reply::of(
-            refusing(problem),
-            Envelope::new(kind::ERROR, problem).to_json(),
-        )
+        ..Reply::of(refusing(problem), Envelope::new(ERROR, problem).to_json())
     }
 }
 

@@ -112,7 +112,7 @@ pub async fn asked(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Problem>> {
                     .await
                     .map(Outcome::DeviceKey),
                 Ok(false) => Err(crate::app::admitting::not_the_password()),
-                Err(left) => Err(crate::app::admitting::held(left)),
+                Err(left) => Err(crate::app::admitting::Caller::held(left)),
             }
         }
         Asked::List => list(ctx).await.map(Outcome::DeviceKeys),

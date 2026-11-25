@@ -16,6 +16,8 @@ use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
+use lemonfiber_ports::random::Random;
+use lemonfiber_ports::time::Clock;
 
 use crate::actions::again::Answered;
 use crate::admission::Knocking;
@@ -56,6 +58,19 @@ pub struct Serving {
     /// What each attempt at an action sent under a key was answered with, so the same
     /// attempt sent again is answered the same and not carried out twice.
     pub answered: Arc<Answered>,
+    /// The clock and the randomness this surface holds of its own.
+    pub own: Own,
+}
+
+/// What the web surface holds of its own rather than reaching into the core for: the
+/// clock it dates what it keeps by, and the randomness it draws job ids from.
+#[derive(Clone)]
+pub struct Own {
+    /// What time it is, as this surface reads it.
+    pub clock: Arc<dyn Clock>,
+    /// Where a job id is drawn from. The operating system's CSPRNG in a run: whoever
+    /// guesses a job id reads that job's answer, so an id must not be guessable.
+    pub random: Arc<dyn Random>,
 }
 
 impl Serving {
@@ -70,6 +85,7 @@ impl Serving {
         bound: Binding,
         jobs: Jobs,
         live: Arc<Live>,
+        own: Own,
     ) -> Self {
         Self {
             ctx,
@@ -79,6 +95,7 @@ impl Serving {
             live,
             kept: Arc::default(),
             answered: Arc::default(),
+            own,
         }
     }
 }
@@ -221,7 +238,9 @@ pub(crate) fn refused(knocking: &Knocking) -> Option<Response> {
             crate::refusal::unconfirmed(),
         )),
         Knocking::Held(seconds) => Some(crate::read::went_wrong(
-            &lemonfiber_core::app::admitting::held(std::time::Duration::from_secs(*seconds)),
+            &lemonfiber_core::app::admitting::Caller::held(std::time::Duration::from_secs(
+                *seconds,
+            )),
         )),
         Knocking::Exposed => Some(Refusal::KeyInTheClear.answered()),
         Knocking::Known(_) | Knocking::Nobody => None,

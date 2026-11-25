@@ -11,7 +11,7 @@ use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::Binding;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::Jobs;
-use lemonfiber_api::router::Serving;
+use lemonfiber_api::router::{Own, Serving};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::Settings;
 use lemonfiber_core::platform::HostOs;
@@ -249,8 +249,10 @@ fn written() -> String {
 /// Start the surface, stop it at once, and say what it exited with.
 async fn started(ctx: Ctx, asked: Asked) -> String {
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let own = given(&ctx);
     let running = tokio::spawn(serving(
         ctx,
+        own,
         asked,
         None,
         Box::pin(async move {
@@ -314,8 +316,11 @@ async fn a_port_already_held_stops_the_run_rather_than_serving_on_another() {
             .map(|(_, bound)| bound.port()),
         ..Asked::default()
     };
+    let ctx = ctx(Some(enough()));
+    let own = given(&ctx);
     let code = serving(
-        ctx(Some(enough())),
+        ctx,
+        own,
         asked,
         None,
         Box::pin(std::future::ready(())),
@@ -333,8 +338,11 @@ async fn a_port_already_held_stops_the_run_rather_than_serving_on_another() {
 async fn a_machine_that_will_not_supply_randomness_serves_nothing() {
     // A surface whose token could not be minted would be one every request
     // reached, so there is nothing here to fall back to.
+    let ctx = ctx(None);
+    let own = given(&ctx);
     let code = serving(
-        ctx(None),
+        ctx,
+        own,
         Asked::default(),
         None,
         Box::pin(std::future::ready(())),
@@ -356,14 +364,18 @@ async fn a_machine_that_will_not_supply_randomness_serves_nothing() {
 fn as_served(random: &Chance) -> Option<Router> {
     let token = Arc::new(Token::mint(random)?);
     let live = Arc::new(Live::opening(lemonfiber_fixtures::ports::Stopped::at(0)));
-    let serving = Serving {
-        ctx: Arc::new(ctx(Some(enough()))),
-        token: Arc::clone(&token),
-        bound: Binding::here(bound().port()),
-        jobs: Jobs::default(),
-        live: Arc::clone(&live),
-        kept: Arc::default(),
-        answered: Arc::default(),
+    let serving = {
+        let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx(Some(enough())));
+        Serving {
+            own: given(&ctx),
+            ctx,
+            token: Arc::clone(&token),
+            bound: Binding::here(bound().port()),
+            jobs: Jobs::default(),
+            live: Arc::clone(&live),
+            kept: Arc::default(),
+            answered: Arc::default(),
+        }
     };
     let streaming = Arc::new(Streaming {
         token,
@@ -628,8 +640,11 @@ async fn over_tcp(port: u16, host: &str, token: &str) -> Option<u16> {
 #[tokio::test]
 async fn the_network_without_a_password_is_refused_rather_than_served_narrower() {
     let dir = a_directory("unpassworded");
+    let ctx = keeping(Some(dir.join("admission.json")));
+    let own = given(&ctx);
     let code = serving(
-        keeping(Some(dir.join("admission.json"))),
+        ctx,
+        own,
         Asked {
             reach: Reach::Network,
             ..Asked::default()
@@ -666,8 +681,11 @@ async fn a_password_taken_away_gives_up_the_network_and_keeps_this_machine() {
     drop(free);
 
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let ctx = keeping(Some(path.clone()));
+    let own = given(&ctx);
     let running = tokio::spawn(serving(
-        keeping(Some(path.clone())),
+        ctx,
+        own,
         Asked {
             port: Some(port),
             reach: Reach::Network,
@@ -713,4 +731,12 @@ async fn the_lapsed_live_stream_sweep_runs_every_period_while_the_surface_serves
     }
     assert!(!sweeping.is_finished());
     sweeping.abort();
+}
+
+/// The clock and the randomness the web surface holds in a test: the context's own.
+fn given(ctx: &Ctx) -> Own {
+    Own {
+        clock: Arc::clone(&ctx.seams.clock),
+        random: Arc::clone(&ctx.seams.random),
+    }
 }

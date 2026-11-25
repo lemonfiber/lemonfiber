@@ -71,14 +71,18 @@ impl Run {
         // ask for everything since `0-0` without guessing what the run calls itself.
         let live = Arc::new(Live::opening(Stopped::at(0)));
         Some(Self {
-            serving: Serving {
-                ctx: Arc::new(ctx),
-                token: Arc::new(Token::mint(&given())?),
-                bound: lemonfiber_api::guard::Binding::here(8471),
-                jobs: Jobs::default(),
-                live: Arc::clone(&live),
-                kept: Arc::default(),
-                answered: Arc::default(),
+            serving: {
+                let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx);
+                Serving {
+                    own: crate::own(&ctx),
+                    ctx,
+                    token: Arc::new(Token::mint(&given())?),
+                    bound: lemonfiber_api::guard::Binding::here(8471),
+                    jobs: Jobs::default(),
+                    live: Arc::clone(&live),
+                    kept: Arc::default(),
+                    answered: Arc::default(),
+                }
             },
             live,
         })

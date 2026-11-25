@@ -8,7 +8,7 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{Ctx, ReadingLogs};
 use lemonfiber_core::logs::Line;
-use lemonfiber_core::model::kind::{self, Kind};
+use lemonfiber_core::model::kind::{Kind, JOB, LOG};
 use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogQuery;
 
@@ -40,7 +40,7 @@ fn not_a_count() -> String {
 /// The read of what the services are saying.
 /// What this read answers with: a `log` envelope a line, or, where it was asked to keep
 /// reading, the `job` the lines go on arriving under.
-pub(super) const ANSWERED_UNDER: &[Kind] = &[kind::LOG, kind::JOB];
+pub(super) const ANSWERED_UNDER: &[Kind] = &[LOG, JOB];
 
 pub(super) fn routes() -> Router<Serving> {
     Router::new().route(LOGS, get(log_lines))
@@ -103,11 +103,7 @@ async fn read_logs(ctx: &Ctx, forms: Vec<String>, services: Vec<String>, tail: u
 /// Every line as its own envelope, or nothing where one could not be rendered.
 fn one_per_line(said: &[Line]) -> Option<String> {
     said.iter()
-        .map(|line| {
-            Envelope::new(kind::LOG, line)
-                .to_json()
-                .map(|json| json + "\n")
-        })
+        .map(|line| Envelope::new(LOG, line).to_json().map(|json| json + "\n"))
         .collect()
 }
 
