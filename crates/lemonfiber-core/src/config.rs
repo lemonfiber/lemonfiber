@@ -22,6 +22,7 @@ pub mod reaching;
 mod reading;
 pub(crate) mod renamed;
 pub mod resending;
+mod starting;
 pub mod storage;
 pub mod store;
 
@@ -57,6 +58,7 @@ pub use healing::{
 };
 pub use polling::{events_poll_from_env, EVENTS_POLL_KEY};
 pub use resending::{Resending, IDEMPOTENCY_KEYS_KEY, IDEMPOTENCY_MINUTES_KEY};
+pub use starting::Surroundings;
 
 pub use reaching::{
     offline, Reaching, OFFLINE_KEY, REACH_APPRISE_KEY, REACH_CATALOGUE_KEY, REACH_GOTIFY_KEY,

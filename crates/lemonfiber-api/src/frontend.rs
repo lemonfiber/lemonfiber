@@ -27,6 +27,7 @@ use axum::routing::any;
 use axum::Router;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::frontend::{Asset, Source};
+use lemonfiber_core::screening::Origin;
 
 use crate::refusal::Refusal;
 use crate::serve::{carrying, SENTENCE};
@@ -42,9 +43,10 @@ const POLICY: &str = "default-src 'self'; img-src 'self' data: blob:; \
                       connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 /// What this page may load, and what may load it, where it plays a title from the
-/// front door at `front_door`: media from it, and from memory, and its playlists fetched.
+/// front door's `origin`: media from it, and from memory, and its playlists fetched.
 #[must_use]
-pub fn playing_from(front_door: &str) -> String {
+pub fn playing_from(origin: &Origin) -> String {
+    let front_door = origin.as_str();
     format!(
         "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: {front_door}; \
          style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' {front_door}; \
@@ -149,7 +151,11 @@ pub fn page(app: Option<Source>, asked: &str) -> Response<Body> {
 /// What a path is answered with, a page of the app saying it may play a title from the
 /// front door at `front_door`, where the core knows one.
 #[must_use]
-pub fn page_playing(app: Option<Source>, asked: &str, front_door: Option<&str>) -> Response<Body> {
+pub fn page_playing(
+    app: Option<Source>,
+    asked: &str,
+    front_door: Option<&Origin>,
+) -> Response<Body> {
     let mut response = page(app, asked);
     if response
         .headers()
@@ -175,9 +181,9 @@ pub fn routes(app: Option<Source>, ctx: Arc<Ctx>) -> Router {
                 let front_door = if asked.starts_with(ENDPOINTS) {
                     None
                 } else {
-                    lemonfiber_core::screening::browser_origin(&ctx)
+                    crate::standing::standing(&ctx).await.plays_from
                 };
-                page_playing(app, asked, front_door.as_deref())
+                page_playing(app, asked, front_door.as_ref())
             },
         ))
         .with_state((app, ctx))
@@ -199,7 +205,7 @@ fn plainly(status: StatusCode, said: &str) -> Response<Body> {
 /// Only the app's own answers carry it. The endpoints beside them are fetched by
 /// a page rather than drawn as one, and a policy on a document nothing renders
 /// says nothing about what anything may do.
-fn allowed(response: &mut Response<Body>, front_door: Option<&str>) {
+fn allowed(response: &mut Response<Body>, front_door: Option<&Origin>) {
     let policy = front_door
         .and_then(|origin| HeaderValue::from_str(&playing_from(origin)).ok())
         .unwrap_or_else(|| HeaderValue::from_static(POLICY));

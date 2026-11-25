@@ -1,4 +1,5 @@
 use super::said;
+use lemonfiber_core::config::Settings;
 use lemonfiber_core::ports::docker::{Origin, Target};
 
 /// A run against this machine has nothing to say, and nothing is what it says.
@@ -11,7 +12,10 @@ use lemonfiber_core::ports::docker::{Origin, Target};
 #[test]
 fn a_run_against_this_machine_has_nothing_to_say() {
     assert_eq!(Target::local().host(), None, "there is nothing to mistake");
-    super::settle(&Target::local());
+    super::settle(&Settings {
+        docker: Target::local(),
+        ..Settings::default()
+    });
 }
 
 /// A run aimed elsewhere says so, once.
@@ -23,7 +27,10 @@ fn a_run_against_this_machine_has_nothing_to_say() {
 /// process's own stream would be a harness rather than a test.
 #[test]
 fn settling_the_same_target_twice_in_one_process_is_one_run() {
-    let there = Target::at("ssh://media@nas.local", Origin::Variable);
+    let there = Settings {
+        docker: Target::at("ssh://media@nas.local", Origin::Variable),
+        ..Settings::default()
+    };
 
     super::settle(&there);
     super::settle(&there);

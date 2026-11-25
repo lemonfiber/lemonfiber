@@ -46,6 +46,16 @@ macro_rules! schemas_of {
     };
 }
 
+#[cfg(test)]
+macro_rules! listed {
+    (carried) => {
+        None
+    };
+    ($kind:ident) => {
+        Some(kind::$kind)
+    };
+}
+
 macro_rules! outcomes {
     ($($(#[doc = $doc:literal])* $variant:ident($payload:ty) => $kind:ident $([$said:ident])?,)*) => {
         /// What dispatching produced.
@@ -91,6 +101,9 @@ macro_rules! outcomes {
 
         /// Every kind an outcome is written under that says, when it was asked for as
         /// a rehearsal, that it was one: the entries marked `[rehearsed]` below.
+        #[cfg(test)]
+        pub(crate) const LISTED: &[Option<Kind>] = &[$(listed!($kind),)*];
+
         #[cfg(test)]
         pub(crate) const SAID_AS_A_REHEARSAL: &[Kind] = &[$($({
             let _ = stringify!($said);
@@ -302,7 +315,8 @@ outcomes! {
     Walkthrough(WalkthroughReport) => WALKTHROUGH,
     /// Whether a walkthrough is worth offering this stack, and which one.
     WalkthroughOffer(crate::walkthrough::Why) => WALKTHROUGH_OFFER,
-    /// What the web surface asked of the core for itself.
+    /// What a surface asked of the core for itself, and the bytes it hands over as
+    /// they are.
     Surfaced(super::surfacing::Answer) => carried,
     /// Who comes in through the web API, each answer under its own kind.
     Admitting(super::admitting::Answer) => carried,
@@ -315,9 +329,36 @@ outcomes! {
 }
 
 impl Outcome {
+    /// The bytes this outcome carries, for a surface handing them over as they are.
+    ///
+    /// # Errors
+    ///
+    /// Where it carries a report rather than bytes, which no read handing bytes over
+    /// is answered with.
+    pub fn octets(self) -> Result<crate::model::Octets, Box<crate::error::Problem>> {
+        match self {
+            Self::Surfaced(super::surfacing::Answer::Octets(octets)) => Ok(octets),
+            other => Err(Box::new(not_octets(other.kind()))),
+        }
+    }
+
     /// This outcome in the envelope every surface writes it in.
     #[must_use]
     pub fn envelope(self) -> Envelope<Self> {
         Envelope::new(self.kind(), self)
     }
 }
+
+fn not_octets(answered: Kind) -> crate::error::Problem {
+    crate::error::Problem::new(
+        crate::error::codes::read::NO_SUCH_READ,
+        "This read does not answer with bytes",
+        "It answered with a report, which is read under its own kind rather than handed over \
+         as a file.",
+        crate::error::Remedy::new("Ask the read that answers with this report instead"),
+    )
+    .with_detail(format!("it answered under {answered}"))
+}
+
+#[cfg(test)]
+mod tests;

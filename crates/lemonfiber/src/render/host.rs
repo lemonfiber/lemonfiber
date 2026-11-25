@@ -17,7 +17,7 @@
 
 use std::sync::OnceLock;
 
-use lemonfiber_core::ports::docker::Target;
+use lemonfiber_core::config::Settings;
 
 use crate::say::say;
 
@@ -35,14 +35,14 @@ static ANNOUNCED: OnceLock<()> = OnceLock::new();
 /// answer carries the host in its envelope and a consumer reads it there. The
 /// sentence is for a person only: a run whose whole output is one document must not
 /// have prose folded into it.
-pub(crate) fn settle(target: &Target) {
-    let Some(host) = lemonfiber_core::model::settle_host(target.host()) else {
+pub(crate) fn settle(settings: &Settings) {
+    let Some(host) = settings.settle_host() else {
         return;
     };
     if crate::say::for_a_parser() || ANNOUNCED.set(()).is_err() {
         return;
     }
-    for line in said(&host, target.context()) {
+    for line in said(&host, settings.docker.context()) {
         say!("{line}");
     }
 }

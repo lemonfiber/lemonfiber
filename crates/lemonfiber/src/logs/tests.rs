@@ -1,11 +1,10 @@
 /// A title with more room than anything here is testing the edge of.
 const WIDE: usize = 200;
 
-use super::{cleared, colours, sampled, wanted, Asked, Press, Shown, Viewer, BATCH};
-use lemonfiber_core::bundle::Marks;
+use super::{colours, sampled, wanted, Asked, Press, Shown, Viewer, BATCH};
+use lemonfiber_core::docker::State;
 use lemonfiber_core::logs::Level;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
-use lemonfiber_fixtures::ports::Chance;
+use lemonfiber_core::ports::docker::{LogLine, Stream};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// One keypress as this view reads it.
@@ -111,12 +110,9 @@ fn press(viewer: &mut Viewer, presses: &[Press]) {
     }
 }
 
-/// The view, redacted — empty where the chosen randomness somehow refused, which
-/// every caller rules out by asserting on what it got back.
+/// The view as the core is handed it to export.
 fn exported(viewer: &Viewer) -> String {
-    Marks::new(&Chance::repeating(vec![7]))
-        .and_then(|marks| viewer.exported(&marks).ok())
-        .unwrap_or_default()
+    viewer.exported()
 }
 
 /// Type a search and apply it.
@@ -502,9 +498,9 @@ fn a_press_says_what_it_is() {
     assert!(format!("{:?}", Press::Rubout).contains("Rubout"));
 }
 
-/// What the engine reports for one service.
-fn engine(service: &str, lifecycle: Lifecycle) -> Vec<(String, Lifecycle)> {
-    vec![(service.to_owned(), lifecycle)]
+/// What the core reports for one service.
+fn engine(service: &str, state: State) -> Vec<(String, State)> {
+    vec![(service.to_owned(), state)]
 }
 
 /// Opening a viewer onto a running stack would otherwise print a notice for
@@ -513,7 +509,7 @@ fn engine(service: &str, lifecycle: Lifecycle) -> Vec<(String, Lifecycle)> {
 fn the_first_look_at_the_engine_is_not_news() {
     let mut viewer = a_viewer();
 
-    viewer.doing(&engine("sonarr", Lifecycle::Running));
+    viewer.doing(&engine("sonarr", State::Running));
 
     assert_eq!(shown(&viewer, 10).len(), 3, "nothing was added");
 }
@@ -523,14 +519,14 @@ fn the_first_look_at_the_engine_is_not_news() {
 #[test]
 fn a_service_that_restarts_is_noted_without_ending_the_view() {
     let mut viewer = a_viewer();
-    viewer.doing(&engine("sonarr", Lifecycle::Running));
+    viewer.doing(&engine("sonarr", State::Running));
 
-    viewer.doing(&engine("sonarr", Lifecycle::Restarting));
+    viewer.doing(&engine("sonarr", State::CrashLooping));
 
     let said = shown(&viewer, 10);
     assert!(
         said.iter()
-            .any(|line| line.contains("sonarr is restarting")),
+            .any(|line| line.contains("sonarr keeps restarting")),
         "{said:?}"
     );
     assert_eq!(
@@ -546,7 +542,7 @@ fn a_service_that_restarts_is_noted_without_ending_the_view() {
 fn a_service_that_has_not_changed_is_not_mentioned_again() {
     let mut viewer = a_viewer();
     for _ in 0..4 {
-        viewer.doing(&engine("sonarr", Lifecycle::Running));
+        viewer.doing(&engine("sonarr", State::Running));
     }
 
     assert_eq!(shown(&viewer, 10).len(), 3);
@@ -557,8 +553,8 @@ fn a_service_that_has_not_changed_is_not_mentioned_again() {
 #[test]
 fn a_notice_belongs_to_the_service_it_is_about() {
     let mut viewer = a_viewer();
-    viewer.doing(&engine("sonarr", Lifecycle::Running));
-    viewer.doing(&engine("sonarr", Lifecycle::Restarting));
+    viewer.doing(&engine("sonarr", State::Running));
+    viewer.doing(&engine("sonarr", State::CrashLooping));
 
     viewer.pressed(Press::Typed('s'));
 
@@ -566,35 +562,36 @@ fn a_notice_belongs_to_the_service_it_is_about() {
     assert!(
         shown(&viewer, 10)
             .iter()
-            .any(|line| line.contains("is restarting")),
+            .any(|line| line.contains("keeps restarting")),
         "a notice narrowed away with its own service"
     );
 }
 
-/// Every state the engine can report says what happened rather than naming
-/// itself: `Exited` is a state, "has stopped" is news.
+/// Every state the core can report says what happened rather than naming itself:
+/// `Stopped` is a state, "has stopped" is news.
 #[test]
-fn every_state_the_engine_reports_reads_as_news() {
-    for (lifecycle, expected) in [
-        (Lifecycle::Created, "was created"),
-        (Lifecycle::Running, "is running again"),
-        (Lifecycle::Paused, "was paused"),
-        (Lifecycle::Restarting, "is restarting"),
-        (Lifecycle::Exited, "has stopped"),
-        (Lifecycle::Removing, "is being removed"),
-        (Lifecycle::Dead, "died"),
+fn every_state_the_core_reports_reads_as_news() {
+    for (state, expected) in [
+        (State::Failed, "failed"),
+        (State::CrashLooping, "keeps restarting"),
+        (State::Unhealthy, "is unhealthy"),
+        (State::Absent, "is gone"),
+        (State::Stopped, "has stopped"),
+        (State::Starting, "is starting"),
+        (State::Running, "is running again"),
+        (State::Healthy, "is healthy again"),
+        (State::HostManaged, "is kept by the operating system"),
     ] {
-        // Seeded with something this case is not, so every one is a change.
-        let seed = match lifecycle {
-            Lifecycle::Running => Lifecycle::Exited,
-            _ => Lifecycle::Running,
+        let seed = match state {
+            State::Running => State::Stopped,
+            _ => State::Running,
         };
         let mut viewer = a_viewer();
         viewer.doing(&engine("sonarr", seed));
-        viewer.doing(&engine("sonarr", lifecycle));
+        viewer.doing(&engine("sonarr", state));
 
         let said = shown(&viewer, 10).concat();
-        assert!(said.contains(expected), "{lifecycle:?}: {said}");
+        assert!(said.contains(expected), "{state:?}: {said}");
     }
 }
 
@@ -657,32 +654,6 @@ fn an_export_carries_no_instruction_a_terminal_would_obey() {
     assert!(text.contains("gone"), "{text:?}");
 }
 
-/// The requirement: an export is redacted by the support bundle's own rules, not
-/// by a second set that could disagree with them about what a credential is.
-///
-/// Anchored on the rule that a query string goes wholesale — that is where the key
-/// nobody spotted actually lives, riding inside something that looks like an
-/// address — so this fails if the redaction is skipped or swapped for another.
-#[test]
-fn an_export_is_redacted_the_way_the_support_bundle_is() {
-    let viewer = fed(&[("sonarr", "GET /api/v3/series?apikey=letmein done")]);
-
-    let text = exported(&viewer);
-
-    assert!(
-        !text.contains("letmein"),
-        "the key in the query survived into the export"
-    );
-    assert!(
-        text.contains("/api/v3/series?"),
-        "the address the key rode in on went with it"
-    );
-    assert!(
-        text.contains("done"),
-        "the rest of the line went with the key"
-    );
-}
-
 /// What the viewer did belongs where the operator was reading, at the point it
 /// happened — a row that the next thing overwrites cannot say when.
 #[test]
@@ -728,19 +699,4 @@ fn any_value_at_all_refuses_colour() {
 fn a_viewer_may_be_asked_to_add_no_colour() {
     assert!(Viewer::opened().colours(), "colour by default");
     assert!(!Viewer::opened().without_colour().colours());
-}
-
-/// An export whose text still reads as a credential after redaction is refused, naming
-/// the line, and one that does not is handed over as it is.
-#[test]
-fn an_export_that_still_reads_as_a_credential_is_refused() {
-    let terms = lemonfiber_core::bundle::Terms::default();
-    let key: String = ('a'..='f').chain('0'..='9').cycle().take(32).collect();
-    let still = format!("sonarr | fine\nsonarr | the key {key}\n");
-    assert_eq!(
-        cleared(still, &terms).err().map(|found| found.line),
-        Some(2)
-    );
-    let clean = "sonarr | fine\n".to_owned();
-    assert_eq!(cleared(clean.clone(), &terms).ok(), Some(clean));
 }

@@ -7,6 +7,17 @@
       "description": "Whether household members may mint keys for themselves.",
       "type": "boolean"
     },
+    "plays_from": {
+      "description": "The origin a browser plays a title from, which the page's policy allows, where\nthe core knows one: built from the stack's front door, never from a request.",
+      "anyOf": [
+        {
+          "$ref": "PlayOrigin.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "stack": {
       "description": "The stack's own identifier, the one pairing material carries; absent where this\nmachine has nowhere to keep one.",
       "type": [

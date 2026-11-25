@@ -24,8 +24,7 @@ use std::time::SystemTime;
 
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use lemonfiber_core::app::Ctx;
-use lemonfiber_core::config::{store, Resending};
+use lemonfiber_core::config::Resending;
 use lemonfiber_error::Problem;
 use tokio::sync::{Mutex, SetOnce};
 use tokio::task::JoinHandle;
@@ -230,20 +229,6 @@ impl Answered {
         }
         let _ = slot.set(finished.unwrap_or_else(Answer::unanswered));
     }
-}
-
-/// How long and how many, as the operator's settings say now.
-///
-/// Read from the file at each send rather than once when serving began, so a change
-/// to either setting holds from the next send. A machine with no settings file, or
-/// one that will not read, is held to the defaults.
-#[must_use]
-pub fn bounds(ctx: &Ctx) -> Resending {
-    ctx.settings
-        .env_file
-        .as_deref()
-        .and_then(|path| store::read(path).ok())
-        .map_or_else(Resending::default, |file| Resending::from_env(&file))
 }
 
 /// Let go of `who`'s oldest answered attempts until there is room for one more

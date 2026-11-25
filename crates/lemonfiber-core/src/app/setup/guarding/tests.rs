@@ -158,7 +158,7 @@ fn each_choice_is_asked_after_what_its_values_need_then_what_the_guard_needs_to_
 #[test]
 fn a_walk_offers_only_what_the_answers_before_it_open_and_asks_only_what_they_need() {
     let mut asked = Vec::new();
-    let given = super::asked(&guard().questions(), &mut |asking| {
+    let given = super::Guarded::asked(&guard().questions(), &mut |asking| {
         asked.push(asking.clone().into_owned_name());
         match asking {
             Asking::Choice { setting, .. } if *setting == "guard:vpn-type" => {

@@ -29,6 +29,11 @@ pub enum Polled {
     },
     /// One member's shelf.
     Held(Shelf),
+    /// What each service of these forms is doing, as the log viewer watches it.
+    Status {
+        /// The forms watched, or every one where none is named.
+        forms: Vec<String>,
+    },
 }
 
 impl Polled {
@@ -44,6 +49,7 @@ impl Polled {
             Self::Playing { member } => Command::Playing { member },
             Self::Household { member } => Command::Household { member },
             Self::Held(asked) => Command::Held(asked),
+            Self::Status { forms } => Command::Status { forms },
         }
     }
 }
@@ -62,6 +68,7 @@ impl Command {
             Self::Playing { member } => Polled::Playing { member },
             Self::Household { member } => Polled::Household { member },
             Self::Held(asked) => Polled::Held(asked),
+            Self::Status { forms } => Polled::Status { forms },
             other => return other,
         }))
     }

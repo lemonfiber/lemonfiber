@@ -61,6 +61,7 @@ tar = { workspace = true }
 sysinfo = { workspace = true }
 # Reading and writing the manifest that rides inside a backup archive. The type and
 # its derives live in the core; this only turns it to and from the bytes tar stores.
+serde = { workspace = true }
 serde_json = { workspace = true }
 ratatui = { workspace = true }
 

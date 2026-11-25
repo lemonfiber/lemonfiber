@@ -5,12 +5,11 @@
 //! operator is asked what to do about a finding, and whatever they choose is another
 //! step.
 
-use lemonfiber_core::app::setup::asked;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
 use lemonfiber_core::model::{SetupOutcome, StorageFinding, WizardReport};
 use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
-use lemonfiber_core::wizard::{Answer, Indexer, Provider, Step, Vpn};
+use lemonfiber_core::wizard::{Answer, Guarded, Indexer, Provider, Step, Vpn};
 use lemonfiber_error::Problem;
 
 use super::{CredentialChoice, Prompt};
@@ -149,7 +148,9 @@ async fn answer(ctx: &Ctx, given: Answer) -> Result<WizardReport, Ended> {
 fn vpn(prompt: &dyn Prompt, report: &WizardReport) -> Vpn {
     loop {
         if prompt.vpn() {
-            return Vpn::Carrying(asked(&report.guard, &mut |asking| prompt.guard(asking)));
+            return Vpn::Carrying(Guarded::asked(&report.guard, &mut |asking| {
+                prompt.guard(asking)
+            }));
         }
         if prompt.unprotected() {
             return Vpn::Absent;

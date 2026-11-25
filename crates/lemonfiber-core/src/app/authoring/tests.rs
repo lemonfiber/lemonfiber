@@ -456,3 +456,29 @@ fn each_question_names_the_kind_it_is_answered_under() {
         assert_eq!(Command::Authoring(asked).answered_under(), &[kind]);
     }
 }
+
+#[tokio::test]
+async fn a_published_document_is_handed_over_byte_for_byte_as_json() {
+    let ctx = crate::test_support::a_context().build();
+    for (read, published) in [
+        (super::Document::Schema, crate::plugin::schema()),
+        (super::Document::Points, crate::plugin::points()),
+        (
+            super::Document::Vocabulary,
+            crate::plugin::vocabulary().ok(),
+        ),
+    ] {
+        let asked = Command::Authoring(super::Asked::Published(read));
+        let handed = dispatch(asked, &ctx).await.and_then(Outcome::octets);
+        assert_eq!(
+            handed.as_ref().map(|octets| octets.media_type).ok(),
+            Some(super::PUBLISHED),
+            "{read:?}"
+        );
+        assert_eq!(
+            handed.ok().map(|octets| octets.bytes),
+            published.map(String::into_bytes),
+            "{read:?}"
+        );
+    }
+}

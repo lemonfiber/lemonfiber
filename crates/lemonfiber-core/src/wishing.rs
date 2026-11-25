@@ -45,8 +45,8 @@ use crate::rating::Limits;
 use find::searched;
 
 pub(crate) use beside::settled as settled_beside;
-pub use cover::{cover, kept_cover};
-pub use poster::poster;
+pub(crate) use cover::{cover, kept_cover};
+pub(crate) use poster::poster;
 
 /// Every refusal a member's search, ask or poster answers with, which a client names by
 /// its code.

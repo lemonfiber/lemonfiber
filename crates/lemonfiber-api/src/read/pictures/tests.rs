@@ -3,7 +3,7 @@ use axum::http::{header, StatusCode};
 use axum::response::Response;
 use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
 use lemonfiber_core::keys::Scope;
-use lemonfiber_core::screening::Pictured;
+use lemonfiber_core::model::Octets;
 
 use super::{searcher, shown, titled};
 use crate::admission::{Caller, Keyed};
@@ -51,7 +51,7 @@ async fn said(response: Response) -> (StatusCode, Vec<u8>) {
 
 #[test]
 fn a_picture_is_shown_as_its_raster_type_and_kept_by_its_asker_alone() {
-    let response = shown(Pictured {
+    let response = shown(Octets {
         media_type: "image/webp",
         bytes: b"webp".to_vec(),
     });

@@ -725,7 +725,7 @@ async fn a_stream_whose_session_is_voided_ends_once_its_last_yes_runs_out() {
     reading.settings.admission = Some(kept.to_path_buf());
     let clock = Stopped::at(0);
     reading.seams.clock = clock.clone();
-    let Some(credential) = lemonfiber_core::admission::at(&kept) else {
+    let Some(credential) = lemonfiber_core::admission::Credential::at(&kept) else {
         unreachable!("the password was just kept");
     };
     let Some(admitted) = reading

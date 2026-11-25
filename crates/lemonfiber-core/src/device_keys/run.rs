@@ -336,7 +336,7 @@ fn password(ctx: &Ctx) -> Option<String> {
     ctx.settings
         .admission
         .as_deref()
-        .and_then(crate::admission::at)
+        .and_then(crate::admission::Credential::at)
         .map(|credential| credential.fingerprint())
 }
 

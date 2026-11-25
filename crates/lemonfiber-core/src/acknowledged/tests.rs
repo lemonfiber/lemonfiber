@@ -70,7 +70,7 @@ fn a_record_that_is_not_there_is_an_empty_one() {
     let nowhere = lemonfiber_fixtures::scratch::Scratch::named("known-absent-.json");
     let _ = std::fs::remove_file(&nowhere);
 
-    assert!(super::at(&nowhere).is_empty());
+    assert!(super::Acknowledged::at(&nowhere).is_empty());
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn what_was_stored_is_read_back_from_where_it_was_put() {
     held.take("indexer");
     let _ = std::fs::write(&path, held.to_json().unwrap_or_default());
 
-    let read = super::at(&path);
+    let read = super::Acknowledged::at(&path);
     let _ = std::fs::remove_file(&path);
 
     assert!(read.holds("indexer"), "{read:?}");

@@ -12,8 +12,8 @@ use crate::collected::Unit;
 use crate::config::{Reaching, REACH_POSTERS_KEY};
 use crate::error::codes::wish::{CANNOT_FETCH, NOT_ASKABLE, NOT_WORKING, NO_PICTURE};
 use crate::error::Code;
+use crate::model::Octets;
 use crate::ports::service::{BookUnit, Candidate, CandidateState};
-use crate::screening::Pictured;
 use crate::test_support::adapted::answered;
 use crate::test_support::collecting::at;
 use crate::wishing::{cover, kept_cover};
@@ -44,7 +44,7 @@ fn outward(transport: &Arc<Transport>, tag: &str) -> Ctx {
     ctx(transport, tag).with_resolver(Resolving::anywhere())
 }
 
-fn code(outcome: &Result<Pictured, Box<crate::error::Problem>>) -> Option<Code> {
+fn code(outcome: &Result<Octets, Box<crate::error::Problem>>) -> Option<Code> {
     outcome.as_ref().err().map(|problem| problem.code)
 }
 

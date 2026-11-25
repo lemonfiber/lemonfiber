@@ -1,7 +1,7 @@
 use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::support::a_password;
 
-use super::{at, forget, keep, written, Credential, Weak, LEAST, SALT_BYTES};
+use super::{forget, keep, written, Credential, Weak, LEAST, SALT_BYTES};
 use crate::error::Diagnose as _;
 
 /// The randomness a real machine supplies: as many bytes as were asked for.
@@ -167,12 +167,12 @@ fn a_credential_is_kept_read_back_and_forgotten() {
     let path = dir.join("admission.json");
     let _ = std::fs::remove_dir_all(&dir);
 
-    assert_eq!(at(&path), None);
+    assert_eq!(Credential::at(&path), None);
     let held = a_record();
     assert!(held.as_ref().is_some_and(|held| keep(&path, held).is_ok()));
-    assert!(at(&path).is_some_and(|held| held.verifies(&chosen())));
+    assert!(Credential::at(&path).is_some_and(|held| held.verifies(&chosen())));
     assert!(forget(&path).is_ok());
-    assert_eq!(at(&path), None);
+    assert_eq!(Credential::at(&path), None);
     // Forgetting what is already forgotten is what was asked for.
     assert!(forget(&path).is_ok());
     let _ = std::fs::remove_dir_all(&dir);

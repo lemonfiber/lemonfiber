@@ -14,6 +14,7 @@ publish = false
 [dependencies]
 lemonfiber-error = { workspace = true }
 lemonfiber-manifest = { workspace = true }
+lemonfiber-platform = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 thiserror = { workspace = true }

@@ -296,7 +296,7 @@ fn password_kept(ctx: &Ctx) -> bool {
     ctx.settings
         .admission
         .as_deref()
-        .and_then(lemonfiber_core::admission::at)
+        .and_then(lemonfiber_core::admission::Credential::at)
         .is_some()
 }
 

@@ -1,8 +1,9 @@
 //! What a rehearsal of what the web surface asks for itself comes to.
 
-use super::{plugins, reads, Asked};
-use crate::app::command::{Linking, Polled, Settling, Shelf, Surfacing, Whom};
+use super::{plugins, reads, reports, Asked};
+use crate::app::command::{Fetching, Linking, Polled, Settling, Shelf, Surfacing, Whom};
 use crate::app::Command;
+use crate::model::kind;
 
 /// What the web surface asks for itself, every part of which runs as it always does.
 pub(super) const fn surfaced(asked: &Surfacing) -> Asked {
@@ -12,6 +13,9 @@ pub(super) const fn surfaced(asked: &Surfacing) -> Asked {
         Surfacing::Told(_) => reads("notify heard"),
         Surfacing::Spoke { .. } => reads("spoke"),
         Surfacing::Untune => reads("untune"),
+        Surfacing::Fetch(Fetching::Bundle { .. }) => reads("bundle"),
+        Surfacing::Fetch(_) => reads("picture"),
+        Surfacing::Export(_) => reports("logs export", &[kind::LOGS_EXPORTED]),
     }
 }
 
@@ -30,5 +34,6 @@ const fn polls(polled: &Polled) -> Asked {
             most: 0,
         })
         .asked(),
+        Polled::Status { .. } => reads("ps"),
     }
 }

@@ -17,6 +17,8 @@ mod credentials;
 mod diagnosing;
 mod doorway;
 mod downloading;
+mod exporting;
+mod fetching;
 mod filling;
 mod gathering;
 mod halting;
@@ -43,11 +45,12 @@ mod wishing;
 
 pub use self::{
     alerts::AlertAction, allowance::Allowance, bandwidth::BandwidthAsked, credentials::Asking,
-    diagnosing::Diagnosing, doorway::Doorway, downloading::Downloading, gathering::Gathering,
-    halting::Halting, inviting::Inviting, letting_go::LettingGo, migrate::MigrateAction,
-    quality::QualityAction, queueing::Queueing, reading_logs::ReadingLogs, reclaiming::Reclaiming,
-    restarting::Restarting, restoring::Restoring, setting::Setting, settling::Settling,
-    teardown::Teardown, tracing::Tracing, uninstall::Removing, wishing::Wishing,
+    diagnosing::Diagnosing, doorway::Doorway, downloading::Downloading, exporting::Exporting,
+    fetching::Fetching, gathering::Gathering, halting::Halting, inviting::Inviting,
+    letting_go::LettingGo, migrate::MigrateAction, quality::QualityAction, queueing::Queueing,
+    reading_logs::ReadingLogs, reclaiming::Reclaiming, restarting::Restarting,
+    restoring::Restoring, setting::Setting, settling::Settling, teardown::Teardown,
+    tracing::Tracing, uninstall::Removing, wishing::Wishing,
 };
 pub use filling::{Filling, Linking};
 pub use hosting::{Hostable, Keeping, HOSTABLE};

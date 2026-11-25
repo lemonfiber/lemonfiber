@@ -14,11 +14,12 @@ use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
+use lemonfiber_core::app::{
+    dispatch, Command, Ctx, Fetching, Outcome, Surfacing, Viewing, Whom, Wishing,
+};
 use lemonfiber_core::collected::Unit;
+use lemonfiber_core::model::Octets;
 use lemonfiber_core::ports::service::Picture;
-use lemonfiber_core::screening::{picture, Pictured};
-use lemonfiber_error::Problem;
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};
@@ -62,12 +63,12 @@ async fn found(
     };
     caller.spoke(&serving.ctx).await;
     let kind = given.kind.unwrap_or_default();
-    let ctx = &serving.ctx;
-    answered(match Unit::chosen(Some(&kind), given.unit.as_deref()) {
-        Ok(Some(unit)) => lemonfiber_core::wishing::cover(ctx, &member, unit, &id).await,
-        Ok(None) => lemonfiber_core::wishing::poster(ctx, &member, &kind, &id).await,
+    let asked = match Unit::chosen(Some(&kind), given.unit.as_deref()) {
+        Ok(Some(unit)) => Fetching::Cover { member, unit, id },
+        Ok(None) => Fetching::Found { member, kind, id },
         Err(_) => return Refusal::UnrecognisedArgument.answered(),
-    })
+    };
+    answered(&serving.ctx, asked).await
 }
 
 /// The cover of an ask the core keeps, fetched by the core for the member who made it or
@@ -83,8 +84,7 @@ async fn kept(
         Err(refused) => return *refused,
     };
     caller.spoke(&serving.ctx).await;
-    let named = Some(member.as_str()).filter(|member| !member.is_empty());
-    answered(lemonfiber_core::wishing::kept_cover(&serving.ctx, named, &reference).await)
+    answered(&serving.ctx, Fetching::Kept { member, reference }).await
 }
 
 /// Whose search a picture read at `read` is for and what else it was asked with, ruled on
@@ -132,7 +132,7 @@ async fn pictured(
         Err(refused) => return *refused,
     };
     caller.spoke(&serving.ctx).await;
-    answered(picture(&serving.ctx, &member, &id, which).await)
+    answered(&serving.ctx, Fetching::Title { member, id, which }).await
 }
 
 /// Whose shelf and which title a picture read asks for, ruled on as the title read is,
@@ -162,16 +162,19 @@ fn titled(granted: Result<Command, Box<Response>>) -> Result<(Whom, String), Box
     }
 }
 
-/// The picture a read fetched, or what went wrong fetching it.
-fn answered(outcome: Result<Pictured, Box<Problem>>) -> Response {
-    match outcome {
+/// The picture `asked` fetches through the dispatcher, or what went wrong fetching it.
+async fn answered(ctx: &Ctx, asked: Fetching) -> Response {
+    match dispatch(Command::Surface(Surfacing::Fetch(asked)), ctx)
+        .await
+        .and_then(Outcome::octets)
+    {
         Ok(pictured) => shown(pictured),
         Err(problem) => went_wrong(&problem),
     }
 }
 
 /// A picture as a browser draws it, kept by that browser alone.
-fn shown(pictured: Pictured) -> Response {
+fn shown(pictured: Octets) -> Response {
     let mut response = carrying(
         StatusCode::OK,
         pictured.media_type,

@@ -78,7 +78,7 @@ pub enum Asked {
 /// The operator's credential as it is kept now, read on a thread made for blocking.
 pub(crate) async fn credential_now(ctx: &Ctx) -> Option<Credential> {
     let kept = ctx.settings.admission.clone()?;
-    tokio::task::spawn_blocking(move || crate::admission::at(&kept))
+    tokio::task::spawn_blocking(move || Credential::at(&kept))
         .await
         .ok()
         .flatten()

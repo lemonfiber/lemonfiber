@@ -3,7 +3,7 @@
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::Response;
-use lemonfiber_core::app::admitting::{self, Calling};
+use lemonfiber_core::app::admitting::{Caller as Admitted, Calling};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Surfacing};
 use lemonfiber_core::keys::Scope;
 
@@ -58,12 +58,12 @@ pub enum Caller {
     Key(Keyed),
 }
 
-impl From<admitting::Caller> for Caller {
-    fn from(caller: admitting::Caller) -> Self {
+impl From<Admitted> for Caller {
+    fn from(caller: Admitted) -> Self {
         match caller {
-            admitting::Caller::Operator => Self::Operator,
-            admitting::Caller::Member { id } => Self::Member(id),
-            admitting::Caller::Key { name, scope } => Self::Key(Keyed { name, scope }),
+            Admitted::Operator => Self::Operator,
+            Admitted::Member { id } => Self::Member(id),
+            Admitted::Key { name, scope } => Self::Key(Keyed { name, scope }),
         }
     }
 }

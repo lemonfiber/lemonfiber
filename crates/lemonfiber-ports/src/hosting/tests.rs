@@ -79,3 +79,12 @@ fn a_manager_that_refused_is_quoted_and_says_the_definition_went_too() {
     );
     assert!(failure.to_string().contains("launchd"));
 }
+
+#[test]
+fn each_platform_names_the_service_manager_it_actually_has() {
+    use lemonfiber_platform::host::HostOs;
+    assert_eq!(Manager::on(HostOs::MacOs), Manager::Launchd);
+    assert_eq!(Manager::on(HostOs::Linux), Manager::Systemd);
+    assert_eq!(Manager::on(HostOs::Windows), Manager::TaskScheduler);
+    assert!(!Manager::on(HostOs::Other).configurable());
+}

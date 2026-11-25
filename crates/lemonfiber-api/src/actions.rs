@@ -203,7 +203,7 @@ async fn taken(
     let Some(key) = key else {
         return carrying.out(&serving).await.reply();
     };
-    let at = (serving.own.clock.now(), again::bounds(&serving.ctx));
+    let at = (serving.own.clock.now(), serving.ctx.settings.resending());
     let slot = match serving.answered.claim(&caller, key, asked, at).await {
         // Handed to the runtime rather than awaited here, so the attempt is carried out
         // and its answer kept even when the client that sent it has stopped listening —

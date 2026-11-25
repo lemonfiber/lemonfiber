@@ -153,7 +153,7 @@ impl Register {
             .settings
             .admission
             .as_deref()
-            .and_then(credential::at)
+            .and_then(credential::Credential::at)
     }
 }
 

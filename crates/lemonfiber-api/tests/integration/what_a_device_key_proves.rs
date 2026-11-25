@@ -80,7 +80,7 @@ fn built(
     ctx.settings.env_file = Some(env.to_path_buf());
     ctx.settings.stack_dir = env.parent().map(|dir| dir.join("stack"));
     if let Some(phone) = phone {
-        let under = credential::at(&admission)
+        let under = credential::Credential::at(&admission)
             .map(|held| held.fingerprint())
             .unwrap_or_default();
         let app = format!("android:app.lemonfiber.companion@{}", "5a".repeat(32));

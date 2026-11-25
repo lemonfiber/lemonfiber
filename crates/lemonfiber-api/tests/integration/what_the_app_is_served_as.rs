@@ -19,6 +19,7 @@ use lemonfiber_api::frontend::{
     absent, content_type, missing, page, page_playing, playing_from, routes, served, unanswered,
 };
 use lemonfiber_core::frontend::{Asset, Source};
+use lemonfiber_core::screening::Origin;
 
 /// The app a build would embed, read from disk instead.
 fn app() -> Source {
@@ -209,12 +210,13 @@ fn the_page_says_what_it_may_load_and_refuses_to_be_framed() {
 
 #[test]
 fn a_page_that_plays_from_the_front_door_may_load_from_it() {
-    let door = "https://watch.home.lan";
+    let door = Origin::of("https://watch.home.lan");
+    assert!(door.is_some(), "a plain origin");
     let policy = said(
-        &page_playing(Some(app()), "/", Some(door)),
+        &page_playing(Some(app()), "/", door.as_ref()),
         header::CONTENT_SECURITY_POLICY,
     );
-    assert_eq!(policy, playing_from(door));
+    assert_eq!(Some(policy), door.as_ref().map(playing_from));
     let alone = said(
         &page_playing(Some(app()), "/", None),
         header::CONTENT_SECURITY_POLICY,

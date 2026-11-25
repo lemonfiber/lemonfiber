@@ -25,7 +25,7 @@ use crate::error::codes::play::{
     SERVER_SILENT, SIGNS_NO_DEVICE_IN,
 };
 use crate::error::{Code, Diagnose as _, Problem, Remedy, State};
-use crate::model::{GrantReport, PartWayReport, TitleReport, WatchedReport};
+use crate::model::{GrantReport, Octets, PartWayReport, TitleReport, WatchedReport};
 use crate::ports::service::{Household, HowFar, Image, Member, Picture, PICTURE_MOST};
 
 use door::{placed, progressed};
@@ -84,18 +84,9 @@ pub struct Raster {
     pub opens: fn(&[u8]) -> bool,
 }
 
-/// A picture as the core passes it on.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Pictured {
-    /// Its media type, one of [`RASTER`]'s.
-    pub media_type: &'static str,
-    /// Its bytes, at most [`PICTURE_MOST`] of them.
-    pub bytes: Vec<u8>,
-}
-
 /// The picture as the core passes it on, where it is answered as a raster image, its
 /// bytes open as that image does, and it is at most [`PICTURE_MOST`] bytes.
-pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
+pub(crate) fn passed_on(image: Image) -> Option<Octets> {
     let declared = image
         .media_type
         .split(';')
@@ -105,7 +96,7 @@ pub(crate) fn passed_on(image: Image) -> Option<Pictured> {
     let raster = RASTER
         .into_iter()
         .find(|raster| raster.media_type.eq_ignore_ascii_case(declared))?;
-    (image.bytes.len() <= PICTURE_MOST && (raster.opens)(&image.bytes)).then_some(Pictured {
+    (image.bytes.len() <= PICTURE_MOST && (raster.opens)(&image.bytes)).then_some(Octets {
         media_type: raster.media_type,
         bytes: image.bytes,
     })
@@ -182,12 +173,12 @@ async fn title(ctx: &Ctx, whose: &Whom, id: &str) -> Result<TitleReport, Box<Pro
 /// not on the member's shelf or has no such picture, where what the server answered is
 /// not a raster image of at most [`PICTURE_MOST`] bytes, and where there is no server or
 /// it does not answer.
-pub async fn picture(
+pub(crate) async fn picture(
     ctx: &Ctx,
     whose: &Whom,
     id: &str,
     which: Picture,
-) -> Result<Pictured, Box<Problem>> {
+) -> Result<Octets, Box<Problem>> {
     if !an_item(id) {
         return Err(not_an_item());
     }
@@ -380,13 +371,45 @@ pub(crate) async fn leaving(ctx: &Ctx, manifest: &lemonfiber_manifest::Manifest,
     crate::app::project::passing::unrenewed(ctx, member);
 }
 
-/// The origin of the stack's front door a browser plays a title from, as a content
-/// security policy names it, where the core knows one.
-#[must_use]
-pub fn browser_origin(ctx: &Ctx) -> Option<String> {
-    let base = door::for_a_browser(ctx).ok()?;
-    let origin = url::Url::parse(&base).ok()?.origin();
-    origin.is_tuple().then(|| origin.ascii_serialization())
+/// The origin a browser plays a title from, as a content security policy names it:
+/// its scheme, host and port alone.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(transparent)]
+#[schemars(rename = "PlayOrigin")]
+pub struct Origin(String);
+
+impl Origin {
+    /// The origin `address` is served from, where it is an `http` or `https` address
+    /// whose host is an IP address or a name of letters, digits, hyphens and dots alone.
+    #[must_use]
+    pub fn of(address: &str) -> Option<Self> {
+        let url = url::Url::parse(address).ok()?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return None;
+        }
+        let plain = match url.host()? {
+            url::Host::Domain(name) => name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'.'),
+            url::Host::Ipv4(_) | url::Host::Ipv6(_) => true,
+        };
+        plain.then(|| Self(url.origin().ascii_serialization()))
+    }
+
+    /// The origin as a policy names it.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The origin of the stack's front door a browser plays a title from, where the core
+/// knows one.
+pub(crate) fn plays_from(ctx: &Ctx) -> Option<Origin> {
+    door::for_a_browser(ctx)
+        .ok()
+        .as_deref()
+        .and_then(Origin::of)
 }
 
 /// How often a serving process closes the live streams whose passes lapsed unrenewed.

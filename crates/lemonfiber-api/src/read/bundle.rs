@@ -25,7 +25,8 @@ use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use lemonfiber_core::app::support::{held, Held};
+use lemonfiber_core::app::{dispatch, Command, Fetching, Outcome, Surfacing};
+use lemonfiber_core::model::Octets;
 
 use crate::admission::Caller;
 use crate::read::table::{wanted, BUNDLE};
@@ -33,12 +34,6 @@ use crate::router::Serving;
 use crate::serve::{carrying, operator_only};
 
 use super::went_wrong;
-
-/// What a bundle is served as.
-///
-/// Its true type, not a decoy: labelled with `nosniff` beside it, as everything
-/// this surface answers with is.
-const ARCHIVE: &str = "application/gzip";
 
 /// That the answer is a file to keep rather than a page to show.
 ///
@@ -76,15 +71,21 @@ async fn bundle(
     if let Err(problem) = wanted(BUNDLE, query.as_deref()) {
         return went_wrong(&problem);
     }
-    match held(&serving.ctx, &name) {
-        Ok(bundle) => handed_over(&bundle),
+    match dispatch(
+        Command::Surface(Surfacing::Fetch(Fetching::Bundle { name })),
+        &serving.ctx,
+    )
+    .await
+    .and_then(Outcome::octets)
+    {
+        Ok(bundle) => handed_over(bundle),
         Err(problem) => went_wrong(&problem),
     }
 }
 
 /// A bundle as a file a browser keeps, rather than as a page it shows.
-fn handed_over(bundle: &Held) -> Response {
-    let mut response = carrying(StatusCode::OK, ARCHIVE, Body::from(bundle.bytes.clone()));
+fn handed_over(bundle: Octets) -> Response {
+    let mut response = carrying(StatusCode::OK, bundle.media_type, Body::from(bundle.bytes));
     response.headers_mut().insert(
         header::CONTENT_DISPOSITION,
         HeaderValue::from_static(KEEP_IT),

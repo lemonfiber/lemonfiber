@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Where an export went, or would have gone.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "description": "The file, named relative to the directory the viewer was run in.",
+      "type": "string"
+    },
+    "rehearsed": {
+      "description": "Whether it only said where it would have written.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "path",
+    "rehearsed"
+  ]
+}

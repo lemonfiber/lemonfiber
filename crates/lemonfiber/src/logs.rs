@@ -19,21 +19,10 @@
 //! then be able to say "detached" while scrolled to the tail. So the offset is the
 //! only truth and the scrollback is told, in one place, every time it changes.
 
-use lemonfiber_core::bundle::{prose, residual, Marks, Residual, Terms};
-
-/// What an export is called when the scan behind the redactor names where it stopped.
-const EXPORT: &str = "the export";
-
-/// Redacted text as it may be written out, or where it still reads as a credential.
-fn cleared(said: String, terms: &Terms) -> Result<String, Residual> {
-    match residual(&[(EXPORT.to_owned(), said.clone())], terms) {
-        Some(found) => Err(found),
-        None => Ok(said),
-    }
-}
+use lemonfiber_core::docker::State;
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
 use lemonfiber_core::logs::Level;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
+use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_error::plural::s;
 use lemonfiber_words::text::plain;
 
@@ -124,7 +113,7 @@ pub(crate) struct Viewer {
     ///
     /// Empty until the first look, which is what stops a viewer opening onto a
     /// notice for every service in the stack: there is nothing to have changed from.
-    was: Vec<(String, Lifecycle)>,
+    was: Vec<(String, State)>,
     /// How far back from the newest admitted line the view sits.
     back: usize,
     /// Whether the operator is still here.
@@ -223,15 +212,15 @@ impl Viewer {
     /// The view is not disturbed. A restart is something to notice while reading,
     /// not a reason to be thrown back to the tail, so the notice arrives the way any
     /// other line does and the operator stays where they were.
-    pub(crate) fn doing(&mut self, now: &[(String, Lifecycle)]) {
-        for (service, lifecycle) in now {
+    pub(crate) fn doing(&mut self, now: &[(String, State)]) {
+        for (service, state) in now {
             let before = self
                 .was
                 .iter()
                 .find(|(named, _)| named == service)
                 .map(|(_, was)| *was);
-            if before.is_some_and(|before| before != *lifecycle) {
-                self.take(noticed(service, *lifecycle));
+            if before.is_some_and(|before| before != *state) {
+                self.take(noticed(service, *state));
             }
         }
         self.was = now.to_vec();
@@ -293,34 +282,7 @@ impl Viewer {
             .collect()
     }
 
-    /// The view as text, redacted, ready to be written out.
-    ///
-    /// Through the support bundle's own redaction rather than a second set of rules.
-    /// An exported log is the same kind of thing a bundle carries — somebody else's
-    /// copy of what this stack said — and two redactors would be two chances to
-    /// disagree about what a credential looks like.
-    ///
-    /// Redacted here rather than by whatever writes the file, so that what this
-    /// returns is the thing that lands on disk and a test can say so. A redaction
-    /// applied on the way out of the module would be a rule nothing could check.
-    ///
-    /// On the bundle's default terms, which are its most careful ones: the viewer has
-    /// no record of what the operator agreed to reveal, and an export is read by
-    /// whoever it was sent to.
-    ///
-    /// And read back by the bundle's own scan before it is handed over, which is the
-    /// check behind the redactor: a line that still reads as a credential refuses the
-    /// export, naming the line, rather than writing it for somebody to send on.
-    pub(crate) fn exported(&self, marks: &Marks) -> Result<String, Residual> {
-        let terms = Terms::default();
-        // `prose` rejoins the lines it split, which leaves the last one bare. A file
-        // that does not end in a newline is one that reads as truncated.
-        let mut said = prose(&self.as_text(), marks, &terms);
-        said.push('\n');
-        cleared(said, &terms)
-    }
-
-    /// The view as text, before redaction.
+    /// The view as text, before the core redacts it into an export.
     ///
     /// What the filter admits rather than everything held: an export is a copy of
     /// what the operator is looking at, and one that quietly carried the lines they
@@ -329,7 +291,7 @@ impl Viewer {
     /// Tagged `service | line`, which is the shape the support bundle's own log
     /// extract takes — the redaction that runs over this was written against that
     /// shape, and a different one would be redacted differently.
-    fn as_text(&self) -> String {
+    pub(crate) fn exported(&self) -> String {
         self.held
             .showing(&self.filter())
             .into_iter()

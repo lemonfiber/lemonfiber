@@ -14,21 +14,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lemonfiber_adapters::{Launchd, Systemd, TaskScheduler, Unhosted};
-use lemonfiber_core::acknowledged::{self, Acknowledged};
+use lemonfiber_core::acknowledged::Acknowledged;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::archive::Archiving;
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{
-    data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
-    indexer_from_env, ip_echo_from_env, port_forward_from_env, provider_host_from_env,
-    service_user_from_env, store, Protocols, Reaching, Settings, AUTOSTART_ON_BATTERY_KEY,
-    EXPLANATIONS_KEY,
-};
-use lemonfiber_core::platform::{self, engine_is_desktop, Environment, HOST_OS};
+use lemonfiber_core::config::{Settings, Surroundings};
+use lemonfiber_core::contained::MOUNT_TABLE;
+use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::ports::hosting::Manager;
 use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
-use lemonfiber_words::setting::{reads_as_off, reads_as_on};
 
 use lemonfiber::carried::STACK;
 
@@ -49,24 +44,24 @@ pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bo
     // And what this operator has already gone and found out about, so a report names
     // those words rather than teaching them again.
     crate::render::glossary::settle_known(here().map_or_else(Acknowledged::default, |paths| {
-        acknowledged::at(&paths.acknowledged())
+        Acknowledged::at(&paths.acknowledged())
     }));
     // And which machine this run is about, before it does anything. Settled here
     // because this is where the one answer for the run already lives: everything
     // below reads it off the settings rather than asking the environment again.
-    crate::render::host::settle(&settings.docker);
+    crate::render::host::settle(&settings);
 
     // Docker Engine and Docker Desktop are told apart by where the engine was found,
     // which the settings already carry.
-    let environment = Environment::resolve(HOST_OS, engine_is_desktop(&settings.docker));
+    let environment = settings.environment();
 
     // Every engine seam is built from the one resolved target the settings carry,
     // which is the same field the Compose invocation is built from. That is the whole
     // of what stops the reads and the writes reaching different machines: there is no
     // second place to resolve one.
-    let seams = lemonfiber_adapters::live_reaching(&settings.docker);
-    let runner: Arc<dyn Runner> = Arc::clone(&seams.runner);
-    let ctx = Ctx::new(seams, stack, settings, environment)
+    let reaching = lemonfiber_adapters::live_reaching(&settings.docker);
+    let runner: Arc<dyn Runner> = Arc::clone(&reaching.runner);
+    let ctx = Ctx::new(reaching, stack, settings, environment)
         // Which service manager this machine has is decided from the target it was
         // built for and handed in, so the core asks a port rather than the operating
         // system — and a machine whose home directory cannot be found hosts nothing
@@ -107,7 +102,7 @@ pub(crate) async fn context(stack_dir: Option<PathBuf>, dry_run: bool, force: bo
     } else {
         ctx
     };
-    lemonfiber_core::filed(&ctx).await;
+    ctx.filed().await;
     ctx.settings = read_settings(Some(&ctx));
     ctx
 }
@@ -139,7 +134,7 @@ fn manager(runner: &Arc<dyn Runner>) -> Arc<dyn Host> {
     let Ok(strategy) = etcetera::choose_base_strategy() else {
         return Arc::new(Unhosted);
     };
-    match platform::manager(HOST_OS) {
+    match Manager::on(HOST_OS) {
         Manager::Launchd => Arc::new(Launchd::over(
             strategy.home_dir().join("Library/LaunchAgents"),
             Arc::clone(runner),
@@ -170,73 +165,17 @@ pub(crate) fn read_settings(run: Option<&Ctx>) -> Settings {
 /// The settings kept beneath `paths`, the run's own records laid over the file's where
 /// `run` is given: what a run that has just written its settings there reads them back from.
 pub(crate) fn settings_at(run: Option<&Ctx>, paths: Option<&Paths>) -> Settings {
-    let env_file = paths.map(Paths::env_file);
-    let recorded = env_file
-        .as_deref()
-        .and_then(|path| store::read(path).ok())
-        .map(|file| match run {
-            Some(ctx) => lemonfiber_core::stored_over(ctx, file),
-            None => lemonfiber_core::unstored(file),
-        })
-        .unwrap_or_default();
-
-    Settings {
-        project: lemonfiber_core::config::project_from_env(&recorded),
-        quiet: lemonfiber_core::config::quiet_from_env(&recorded),
-        overlays: lemonfiber_core::overlay::layered(env_file.as_deref()),
-        protocols: Protocols::from_env(&recorded),
-        vpn_declined: lemonfiber_core::config::vpn_declined_from_env(&recorded),
-        ip_echo: ip_echo_from_env(&recorded),
-        data_root: data_root_from_env(&recorded),
-        nfs: lemonfiber_core::config::nfs_from_env(&recorded),
-        storage_state: paths.map(Paths::storage_state),
-        service_user: service_user_from_env(&recorded),
-        port_forward: port_forward_from_env(&recorded),
-        indexer: indexer_from_env(&recorded),
-        admission: paths.map(Paths::admission),
-        companion: paths.map(Paths::companion),
-        host_locale: std::env::var(lemonfiber_core::locale::HOST).ok(),
-        host_zone: lemonfiber_core::zone::Zone::host(),
-        household_host: household_host_from_env(&recorded),
-        events_address: lemonfiber_core::config::events_address_from_env(&recorded),
-        household_domain: lemonfiber_core::config::household_domain_from_env(&recorded),
-        exposed: exposed_from_env(&recorded),
-        unmanaged: lemonfiber_core::config::unmanaged_from_env(&recorded),
-        front_door: front_door_from_env(&recorded),
-        reaching: Reaching::from_env(&recorded),
-        provider_host: provider_host_from_env(&recorded),
-        // What a hosted service names as the program to run, which only this process
-        // can say. Absent where the platform will not, which hosting refuses on rather
-        // than installing a service against a guessed path.
-        program: std::env::current_exe().ok(),
-        hosted: paths.map(Paths::hosted),
-        // Where the tools that install programs leave a record of having done so,
-        // which is the only thing this is read for.
-        home: home_directory(),
-        // Which container this process runs in, read off its own mount table. The
-        // file exists only on Linux, and names a container only inside one.
-        container: std::fs::read_to_string(lemonfiber_core::contained::MOUNT_TABLE)
-            .ok()
-            .as_deref()
-            .and_then(lemonfiber_core::contained::container),
-        // Which engine this run operates, resolved once from the environment and
-        // from Docker's own records. Read here rather than by whoever needs it, so
-        // the Engine API client, the image listing, the Compose invocation and the
-        // diagnosis all obey one answer.
-        docker: lemonfiber_adapters::docker_target(),
-        // On unless it is explicitly turned off: somebody meeting this vocabulary
-        // does not know there is a setting to look for, and somebody who wants the
-        // explanations gone knows exactly what they want to stop.
-        explanations: !recorded.get(EXPLANATIONS_KEY).is_some_and(reads_as_off),
-        // Off unless it is explicitly turned on, which is the other way round from the
-        // explanations above and deliberately so: a stack started on a battery costs an
-        // afternoon of it, and that is a thing to have asked for.
-        autostart_on_battery: recorded
-            .get(AUTOSTART_ON_BATTERY_KEY)
-            .is_some_and(reads_as_on),
-        env_file,
-        stack_dir: paths.map(Paths::stack),
-    }
+    Settings::read(
+        run,
+        &Surroundings {
+            paths: paths.cloned(),
+            program: std::env::current_exe().ok(),
+            home: home_directory(),
+            docker: lemonfiber_adapters::docker_target(),
+            host_locale: std::env::var(lemonfiber_core::locale::HOST).ok(),
+            mounts: std::fs::read_to_string(MOUNT_TABLE).ok(),
+        },
+    )
 }
 
 /// Record that a word has been gone and found out about.
@@ -258,7 +197,7 @@ pub(crate) fn remember(words: &[&str], rehearsing: bool) {
         return;
     };
     let path = paths.acknowledged();
-    let mut known = acknowledged::at(&path);
+    let mut known = Acknowledged::at(&path);
     // Read and written once however many words were opened at a time, which is what
     // a pane does — the file is small, but a screenful of separate rewrites is a
     // screenful of chances for two of them to lose each other's.

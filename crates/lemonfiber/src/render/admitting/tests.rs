@@ -114,6 +114,7 @@ fn what_the_web_api_composes_from_is_said_line_by_line() {
         told: true,
         waiting: false,
         members_mint: true,
+        plays_from: lemonfiber_core::screening::Origin::of("https://watch.home.lan"),
     };
     let said = shaped(&Outcome::Surfaced(
         lemonfiber_core::app::surfacing::Answer::Standing(standing),

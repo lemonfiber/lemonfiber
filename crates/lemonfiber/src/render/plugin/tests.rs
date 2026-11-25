@@ -1,4 +1,5 @@
 use super::{capabilities, claims, document, points};
+use crate::authoring::published::{Probe, Vocabulary};
 
 use lemonfiber_core::filling::{Filling, Shown};
 use lemonfiber_core::plugin::{
@@ -463,16 +464,27 @@ fn a_capability_of_the_plugins_own_says_what_inert_means() {
     );
 }
 
-/// The capability listing this build produces.
-///
-/// Taken through the result rather than out of it, because an arm for a build whose
-/// own vocabulary does not publish is a line no run can enter. Such a build renders
-/// nothing at all here, which every assertion below notices rather than passes over.
+/// The vocabulary this build publishes, read back as the listing reads it.
+fn vocabulary() -> Option<Vocabulary> {
+    lemonfiber_core::plugin::vocabulary()
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+}
+
+/// The capability listing this build produces, or nothing where it publishes none,
+/// which every assertion below notices rather than passes over.
 fn listed() -> String {
-    lemonfiber_core::plugin::capabilities()
-        .iter()
-        .map(|published| capabilities(published).text())
-        .collect()
+    vocabulary()
+        .map(|published| capabilities(&published).text())
+        .unwrap_or_default()
+}
+
+/// The extension points listing this build produces.
+fn pointed() -> String {
+    lemonfiber_core::plugin::points()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .map(|published| points(&published).text())
+        .unwrap_or_default()
 }
 
 #[test]
@@ -509,24 +521,19 @@ fn a_probe_says_whether_it_is_a_request_or_a_run_and_what_ends_it() {
         text.contains("put as   a request of the running service"),
         "{text}"
     );
-    let run = lemonfiber_core::plugin::Probe {
-        id: "runs",
-        title: "Its own program runs",
-        asks: "a run of the image's own program",
-        why: "Nothing reaches it over the network.",
-        credential: lemonfiber_core::plugin::Credential::None,
-        requires: lemonfiber_core::plugin::Requirement::Run {
-            exit: &[0],
-            body: &[lemonfiber_core::plugin::Constraint::StdoutStartsWith],
-        },
-    };
+    let run: Option<Probe> = serde_json::from_str(
+        r#"{"id": "runs", "kind": "run", "title": "Its own program runs",
+            "asks": "a run of the image's own program", "credential": "none",
+            "requires": {"exit": [0], "body": ["stdout_starts_with"]}}"#,
+    )
+    .ok();
     assert_eq!(
-        super::answers(&run),
-        "exit 0, and one of stdout_starts_with"
+        run.as_ref().map(super::answers).as_deref(),
+        Some("exit 0, and one of stdout_starts_with")
     );
     assert_eq!(
-        super::put_as(run.kind()),
-        "a run of the image's own program"
+        run.map(|probe| super::put_as(probe.kind)),
+        Some("a run of the image's own program")
     );
 }
 
@@ -534,11 +541,11 @@ fn a_probe_says_whether_it_is_a_request_or_a_run_and_what_ends_it() {
 #[test]
 fn nothing_the_vocabulary_carries_is_left_out() {
     let text = listed();
-    let missing: Vec<&str> = lemonfiber_core::plugin::capabilities()
+    let missing: Vec<String> = lemonfiber_core::plugin::capabilities()
         .iter()
         .flat_map(|published| published.capabilities.iter())
-        .map(|capability| capability.name)
-        .filter(|name| !text.contains(name))
+        .map(|capability| capability.name.to_owned())
+        .filter(|name| !text.contains(name.as_str()))
         .collect();
     assert!(
         !text.is_empty(),
@@ -549,7 +556,7 @@ fn nothing_the_vocabulary_carries_is_left_out() {
 
 #[test]
 fn a_point_carries_its_row_its_bounds_and_what_is_already_in_it() {
-    let text = points(&lemonfiber_core::plugin::extension_points()).text();
+    let text = pointed();
     assert!(text.contains("generation 1"), "{text}");
     assert!(text.contains("doctor.check"), "{text}");
     assert!(text.contains("asks for  doctor.contribute"), "{text}");
@@ -564,7 +571,7 @@ fn a_point_carries_its_row_its_bounds_and_what_is_already_in_it() {
 /// A register nothing is standing in says so rather than showing an empty list.
 #[test]
 fn a_register_with_nothing_in_it_says_nothing_yet() {
-    let text = points(&lemonfiber_core::plugin::extension_points()).text();
+    let text = pointed();
     assert!(text.contains("taken     nothing yet"), "{text}");
 }
 

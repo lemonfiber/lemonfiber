@@ -1934,6 +1934,7 @@ dependencies = [
  "base64 0.23.1",
  "lemonfiber-error",
  "lemonfiber-manifest",
+ "lemonfiber-platform",
  "regex",
  "regex-syntax",
  "ring",

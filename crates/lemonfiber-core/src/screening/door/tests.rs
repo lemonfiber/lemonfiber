@@ -401,7 +401,8 @@ fn a_browser_reaches_the_guard_under_the_households_domain_or_is_told_why_not() 
         "{reached:?}"
     );
     assert_eq!(
-        crate::screening::browser_origin(&bundled("origin", Some("home.lan"))),
+        crate::screening::plays_from(&bundled("origin", Some("home.lan")))
+            .map(|origin| origin.as_str().to_owned()),
         reached
             .ok()
             .and_then(|base| url::Url::parse(&base).ok())

@@ -27,7 +27,6 @@ use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run::Asked as Updating;
 use lemonfiber_ports::media::offered;
 
-use crate::authoring::Document;
 use crate::exit::USAGE;
 use crate::say::complain;
 use lemonfiber::cli::{
@@ -36,6 +35,7 @@ use lemonfiber::cli::{
     RawCompanion, RawDownloads, RawKey, RawPushEndpoint, RawRemoval, RawRemoving, RawRestart,
     UpdateCommand, WiringCommand,
 };
+use lemonfiber_core::app::authoring::Document;
 use lemonfiber_core::app::Restarting;
 
 mod credentials;

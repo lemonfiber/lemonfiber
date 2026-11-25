@@ -283,34 +283,36 @@ fn unanswered(missing: &[String], unasked: &[String]) -> Problem {
     .in_state(State::Guided)
 }
 
-/// Ask each of `questions` as the answers before it leave it to be asked, through
-/// `answering`, and take what it gives: nothing leaves a question unanswered.
-///
-/// The walk a surface holding the conversation takes over the questions a setup report
-/// lists, and the one the core holds an answer to, so what is asked and what is checked
-/// cannot come apart.
-#[must_use]
-pub fn asked(
-    questions: &[GuardQuestion],
-    answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>,
-) -> Guarded {
-    let defaults: BTreeMap<&str, &str> = questions
-        .iter()
-        .filter_map(|question| match question {
-            GuardQuestion::Choice {
-                setting,
-                default: Some(default),
-                ..
-            } => Some((setting.as_str(), default.as_str())),
-            _ => None,
-        })
-        .collect();
-    walk(
-        questions,
-        &|name: &str| defaults.get(name).map(|value| (*value).to_owned()),
-        answering,
-    )
-    .given
+impl Guarded {
+    /// Ask each of `questions` as the answers before it leave it to be asked, through
+    /// `answering`, and take what it gives: nothing leaves a question unanswered.
+    ///
+    /// The walk a surface holding the conversation takes over the questions a setup report
+    /// lists, and the one the core holds an answer to, so what is asked and what is checked
+    /// cannot come apart.
+    #[must_use]
+    pub fn asked(
+        questions: &[GuardQuestion],
+        answering: &mut dyn FnMut(&Asking<'_>) -> Option<String>,
+    ) -> Self {
+        let defaults: BTreeMap<&str, &str> = questions
+            .iter()
+            .filter_map(|question| match question {
+                GuardQuestion::Choice {
+                    setting,
+                    default: Some(default),
+                    ..
+                } => Some((setting.as_str(), default.as_str())),
+                _ => None,
+            })
+            .collect();
+        walk(
+            questions,
+            &|name: &str| defaults.get(name).map(|value| (*value).to_owned()),
+            answering,
+        )
+        .given
+    }
 }
 
 /// One walk through `questions`, `answering` each as it is asked, with `defaulted`

@@ -19,6 +19,7 @@ use serde::Serialize;
 
 use crate::bundle::Contents;
 use crate::error::{Code, Problem, Remedy, State};
+use crate::model::Octets;
 
 use super::bundle::{collect, measure, unconfirmed, without_marks, write, Wanted};
 use super::Ctx;
@@ -27,6 +28,9 @@ use crate::error::codes::bundle::{BUNDLE_NOT_HELD, NOWHERE_HELD, NOWHERE_TO_KEEP
 /// Every refusal asking for a kept bundle by name answers with, which a client names by
 /// its code.
 pub const REFUSALS: [Code; 1] = [BUNDLE_NOT_HELD];
+
+/// What a kept bundle is handed over as.
+pub const ARCHIVE: &str = "application/gzip";
 
 /// Where a bundle is written.
 ///
@@ -192,19 +196,6 @@ fn nowhere_to_keep() -> Problem {
     .in_state(State::Guided)
 }
 
-/// One bundle this run kept, whole.
-///
-/// The name travels with the bytes because it is what the file is called wherever
-/// it lands next, and a caller handed bytes alone would have to be told separately.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Held {
-    /// What the file is called, derived from the name that was asked for rather
-    /// than echoed back from it.
-    pub name: String,
-    /// The archive itself.
-    pub bytes: Vec<u8>,
-}
-
 /// One of the bundles this run kept, read back for a caller with no filesystem.
 ///
 /// The answer to `--out` for a surface that has no path to name: a bundle is
@@ -224,7 +215,7 @@ pub struct Held {
 ///
 /// Returns a [`Problem`] where this run has nowhere it keeps its own files, or
 /// where the name names none of the bundles kept there.
-pub fn held(ctx: &Ctx, name: &str) -> Result<Held, Box<Problem>> {
+pub(crate) fn held(ctx: &Ctx, name: &str) -> Result<Octets, Box<Problem>> {
     let archives = ctx
         .archives
         .as_ref()
@@ -232,8 +223,8 @@ pub fn held(ctx: &Ctx, name: &str) -> Result<Held, Box<Problem>> {
     let file = crate::within::one_file(name).ok_or_else(|| Box::new(not_held(name)))?;
     let bytes = std::fs::read(archives.paths.bundles().join(&file))
         .map_err(|_| Box::new(not_held(name)))?;
-    Ok(Held {
-        name: file.to_string_lossy().into_owned(),
+    Ok(Octets {
+        media_type: ARCHIVE,
         bytes,
     })
 }

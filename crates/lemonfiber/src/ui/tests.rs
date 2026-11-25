@@ -529,7 +529,7 @@ async fn a_run_asked_for_a_password_sets_one_and_then_serves() {
         crate::exit::shown(code),
         crate::exit::shown(ExitCode::SUCCESS)
     );
-    assert!(credential::at(&path).is_some_and(|held| held.verifies(&chosen)));
+    assert!(credential::Credential::at(&path).is_some_and(|held| held.verifies(&chosen)));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -597,7 +597,7 @@ async fn a_password_that_could_not_be_set_stops_the_run_rather_than_serving() {
             "{kept:?}"
         );
     }
-    assert_eq!(credential::at(&path), None);
+    assert_eq!(credential::Credential::at(&path), None);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

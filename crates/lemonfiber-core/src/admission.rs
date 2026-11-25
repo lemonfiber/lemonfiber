@@ -202,20 +202,22 @@ fn written(password: &str, random: &dyn Random) -> Option<String> {
     Some(hashed.to_string())
 }
 
-/// The credential this machine holds, or nothing where it holds none.
-///
-/// Absent, unreadable and unreadable-as-a-credential are one answer, and
-/// deliberately: every one of them means nothing here can prove who is knocking,
-/// and the binding policy reads that as no authentication rather than as a fault to
-/// be worked around. Getting it wrong in this direction costs an operator a
-/// password to set again; getting it wrong in the other would leave a surface on the
-/// network with nothing in front of it.
-#[must_use]
-pub fn at(path: &Path) -> Option<Credential> {
-    std::fs::read_to_string(path)
-        .ok()
-        .as_deref()
-        .and_then(Credential::parse)
+impl Credential {
+    /// The credential this machine holds, or nothing where it holds none.
+    ///
+    /// Absent, unreadable and unreadable-as-a-credential are one answer, and
+    /// deliberately: every one of them means nothing here can prove who is knocking,
+    /// and the binding policy reads that as no authentication rather than as a fault to
+    /// be worked around. Getting it wrong in this direction costs an operator a
+    /// password to set again; getting it wrong in the other would leave a surface on the
+    /// network with nothing in front of it.
+    #[must_use]
+    pub fn at(path: &Path) -> Option<Self> {
+        std::fs::read_to_string(path)
+            .ok()
+            .as_deref()
+            .and_then(Self::parse)
+    }
 }
 
 /// Write it down, owner-only, where the rest of this machine's configuration lives.

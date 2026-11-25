@@ -49,6 +49,7 @@
     "lifecycle": "ref:LifecycleReport",
     "log": "ref:LogLine",
     "logs": "ref:LogsReport",
+    "logs-exported": "ref:LogsExported",
     "migration": "ref:MigrationReport",
     "minted-key": "ref:MintedKey",
     "music": "ref:MusicReport",

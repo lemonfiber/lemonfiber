@@ -59,7 +59,10 @@ use lemonfiber_core::alert::Alert;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::model::{
-    kind::{self, Kind},
+    kind::{
+        Kind, ALERT, CAPABILITIES, DASHBOARD, ENDED, ERROR, JOB, LOG, NEWS, PULL, REPLAY, SETUP,
+        START, STEP,
+    },
     Envelope, SetupReport, API_VERSION,
 };
 use lemonfiber_error::codes::declared;
@@ -267,23 +270,19 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 /// which is what a count could not tell anybody: the doc said one thing, the code did
 /// another, and the guard compared two integers that agreed.
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
-    describing(kinds, kind::ALERT, schema_for!(Envelope<Alert>));
-    describing(
-        kinds,
-        kind::CAPABILITIES,
-        schema_for!(Envelope<Capabilities>),
-    );
-    describing(kinds, kind::DASHBOARD, schema_for!(Envelope<Snapshot>));
-    describing(kinds, kind::ENDED, schema_for!(Envelope<Ended>));
-    describing(kinds, kind::ERROR, schema_for!(Envelope<Problem>));
-    describing(kinds, kind::JOB, schema_for!(Envelope<Started>));
-    describing(kinds, kind::LOG, schema_for!(Envelope<LogLine>));
-    describing(kinds, kind::NEWS, schema_for!(Envelope<Newest>));
-    describing(kinds, kind::PULL, schema_for!(Envelope<String>));
-    describing(kinds, kind::REPLAY, schema_for!(Envelope<Replay>));
-    describing(kinds, kind::SETUP, schema_for!(Envelope<SetupReport>));
-    describing(kinds, kind::START, schema_for!(Envelope<String>));
-    describing(kinds, kind::STEP, schema_for!(Envelope<Line>));
+    describing(kinds, ALERT, schema_for!(Envelope<Alert>));
+    describing(kinds, CAPABILITIES, schema_for!(Envelope<Capabilities>));
+    describing(kinds, DASHBOARD, schema_for!(Envelope<Snapshot>));
+    describing(kinds, ENDED, schema_for!(Envelope<Ended>));
+    describing(kinds, ERROR, schema_for!(Envelope<Problem>));
+    describing(kinds, JOB, schema_for!(Envelope<Started>));
+    describing(kinds, LOG, schema_for!(Envelope<LogLine>));
+    describing(kinds, NEWS, schema_for!(Envelope<Newest>));
+    describing(kinds, PULL, schema_for!(Envelope<String>));
+    describing(kinds, REPLAY, schema_for!(Envelope<Replay>));
+    describing(kinds, SETUP, schema_for!(Envelope<SetupReport>));
+    describing(kinds, START, schema_for!(Envelope<String>));
+    describing(kinds, STEP, schema_for!(Envelope<Line>));
 }
 
 /// Every refusal of the core's that a request on this surface may be answered with, family

@@ -502,6 +502,12 @@ impl Ctx {
         self
     }
 
+    /// File what the operator's environment file and the stack's hold into the stores,
+    /// as a run starting does before it reads its settings again.
+    pub async fn filed(&self) {
+        crate::settings::filing::everything(self).await;
+    }
+
     /// The same context, in rehearsal.
     #[must_use]
     pub fn rehearsing(mut self) -> Self {

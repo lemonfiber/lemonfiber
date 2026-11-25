@@ -1,11 +1,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::{held, landing, Destination, Held, BUNDLE_NOT_HELD, NOWHERE_HELD};
+use super::{held, landing, Destination, ARCHIVE, BUNDLE_NOT_HELD, NOWHERE_HELD};
 use crate::app::fixtures::{scratch, FakeArchive};
 use crate::app::Ctx;
 use crate::archive::Archiving;
 use crate::config::paths::Paths;
+use crate::model::Octets;
 use crate::test_support::a_context;
 use crate::test_support::Holds as _;
 
@@ -35,8 +36,8 @@ fn a_bundle_this_run_kept_is_handed_back_whole() {
     let ctx = holding("held-whole", "lemonfiber-support-1.tar.gz", "an archive");
     assert_eq!(
         held(&ctx, "lemonfiber-support-1.tar.gz").ok(),
-        Some(Held {
-            name: "lemonfiber-support-1.tar.gz".to_owned(),
+        Some(Octets {
+            media_type: ARCHIVE,
             bytes: b"an archive".to_vec(),
         })
     );

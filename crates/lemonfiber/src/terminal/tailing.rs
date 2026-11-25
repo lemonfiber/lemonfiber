@@ -4,15 +4,17 @@
 //! here is the wire: the stream from the engine, the file an export lands in, and
 //! the periodic ask about what each service is doing.
 
-use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use lemonfiber_core::app::{dispatch, Command, Ctx, ReadingLogs};
-use lemonfiber_core::bundle::Marks;
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
+use lemonfiber_core::app::surfacing::Answer;
+use lemonfiber_core::app::{
+    dispatch, Command, Ctx, Exporting, Outcome, Polled, ReadingLogs, Surfacing,
+};
+use lemonfiber_core::docker::State;
+use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_core::ports::{Arrival, Narrator};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Mutex};
@@ -67,7 +69,7 @@ pub(crate) async fn watching(
             return ExitCode::FAILURE;
         }
     };
-    let outcome = following(&mut screen, ctx, lines).await;
+    let outcome = following(&mut screen, ctx, forms, lines).await;
     read.abort();
     drop(screen);
     outcome
@@ -119,7 +121,12 @@ impl Narrator for Sending {
 }
 
 /// The loop itself, with the terminal already in hand.
-async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>) -> ExitCode {
+async fn following(
+    screen: &mut Screen,
+    ctx: &Ctx,
+    forms: &[String],
+    mut lines: Receiver<LogLine>,
+) -> ExitCode {
     let (presses, mut arriving) = tokio::sync::mpsc::channel::<Press>(16);
     let reader = std::thread::spawn(move || read_keyboard(&presses, wanted));
 
@@ -150,9 +157,8 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
                 Some(press) => match viewer.pressed(press) {
                     Asked::Export => {
                         written += 1;
-                        if let Some((path, text)) = export(&mut viewer, ctx, written) {
-                            written_apart(&mut exports, Arc::clone(&shared), path, text);
-                        }
+                        let asked = Exporting { text: viewer.exported(), written };
+                        written_apart(&mut exports, Arc::clone(&shared), asked);
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Asked::Learned => {
@@ -175,7 +181,7 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
             },
             _ = looking.tick() => {
                 if asking.is_none() {
-                    asking = Some(asked(Arc::clone(&shared)));
+                    asking = Some(asked(Arc::clone(&shared), forms.to_vec()));
                 }
             },
             now = super::finished(&mut asking) => {
@@ -201,89 +207,43 @@ async fn following(screen: &mut Screen, ctx: &Ctx, mut lines: Receiver<LogLine>)
 }
 
 /// What each service is doing, where the engine says.
-type Doing = Option<Vec<(String, Lifecycle)>>;
+type Doing = Option<Vec<(String, State)>>;
 
-/// The view as an export writes it, and the file it goes into.
-///
-/// The redacting is [`Viewer::exported`]'s, where it can be tested; what is here is
-/// only the randomness the stand-ins need and the name of the file.
-///
-/// A stand-in an operator can predict is a way back to the value it stands for, so an
-/// export cannot proceed without real randomness. Saying so beats writing a file whose
-/// redaction is only as good as a fixed salt.
-fn export(viewer: &mut Viewer, ctx: &Ctx, written: usize) -> Option<(PathBuf, String)> {
-    let Some(marks) = Marks::new(ctx.seams.random.as_ref()) else {
-        viewer.remarked("this machine would not provide the randomness an export needs");
+async fn kept(ctx: &Ctx, asked: Exporting) -> String {
+    let answered = dispatch(Command::Surface(Surfacing::Export(asked)), ctx).await;
+    match answered {
+        Ok(Outcome::Surfaced(Answer::Exported(exported))) => {
+            crate::render::logs::exported(&exported).text()
+        }
+        _ => answered
+            .err()
+            .map(|problem| problem.summary)
+            .unwrap_or_default(),
+    }
+}
+
+fn written_apart(exports: &mut JoinSet<String>, ctx: Arc<Ctx>, asked: Exporting) {
+    exports.spawn(async move { kept(&ctx, asked).await });
+}
+
+fn asked(ctx: Arc<Ctx>, forms: Vec<String>) -> JoinHandle<Doing> {
+    tokio::spawn(async move { states(&ctx, forms).await })
+}
+
+async fn states(ctx: &Ctx, forms: Vec<String>) -> Doing {
+    let polled = Command::Surface(Surfacing::Polled(Polled::Status { forms }));
+    let Ok(Outcome::Status(report)) = dispatch(polled, ctx).await else {
         return None;
     };
-    // Stamped from the clock port rather than a date, so two runs on the same day
-    // cannot write over each other's export.
-    let stamp = ctx
-        .seams
-        .clock
-        .now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|since| since.as_secs())
-        .unwrap_or_default();
-    let path = PathBuf::from(format!("lemonfiber-logs-{stamp}-{written}.txt"));
-    match viewer.exported(&marks) {
-        Ok(text) => Some((path, text)),
-        Err(found) => {
-            viewer.remarked(&format!(
-                "not written: line {} still reads like a credential after redaction",
-                found.line
-            ));
-            None
-        }
-    }
-}
-
-/// Write an export, and say where it went.
-async fn kept(ctx: &Ctx, path: &Path, text: &str) -> String {
-    ctx.seams.filesystem.write(path, text).await;
-
-    // Writing is best effort and says nothing about whether it worked, so the file is
-    // read back before the screen claims it is there. An operator told their export
-    // landed, on a directory they cannot write to, would find out when they went
-    // looking for it — which is the moment they were relying on it.
-    if ctx.seams.filesystem.read(path).await.is_some() {
-        format!("written to {}", path.display())
-    } else {
-        format!("could not write {}", path.display())
-    }
-}
-
-/// An export, written apart from the loop that draws the screen.
-fn written_apart(exports: &mut JoinSet<String>, ctx: Arc<Ctx>, path: PathBuf, text: String) {
-    exports.spawn(async move { kept(&ctx, &path, &text).await });
-}
-
-/// What each service is doing, asked apart from the loop that draws the screen.
-fn asked(ctx: Arc<Ctx>) -> JoinHandle<Doing> {
-    tokio::spawn(async move { states(&ctx).await })
-}
-
-/// What each service is doing, or nothing where the engine will not say.
-///
-/// Nothing rather than an empty list where the engine will not say. Silence is not
-/// "everything stopped", and handing the viewer an empty list would both invent that
-/// and throw away what it knew — so a hiccup leaves its account of the stack intact
-/// and the next answer is compared against the last real one.
-async fn states(ctx: &Ctx) -> Doing {
-    let containers = ctx.seams.engine.list(&ctx.settings.project).await.ok()?;
     Some(
-        containers
+        report
+            .services
             .into_iter()
-            .map(|container| (container.service, container.lifecycle))
+            .map(|service| (service.id, service.state))
             .collect(),
     )
 }
 
-/// Take what is already waiting, up to what one pass allows.
-///
-/// The oldest of a backlog go, not the newest. On a live tail what matters is what
-/// is happening now, and keeping the front of the queue would show the operator a
-/// view that falls further behind the longer the flood lasts.
 fn absorb(viewer: &mut Viewer, lines: &mut Receiver<LogLine>) {
     let (taking, letting_go) = sampled(lines.len());
     for _ in 0..letting_go {
