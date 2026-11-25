@@ -494,6 +494,15 @@ pub const EVERY: &[Entry] = &[
         at: Paths::backups,
     },
     Entry {
+        accessor: "copying",
+        what: "the reading of the backup or restore running now",
+        why: "How far the copy running on this machine has got, and the lock it holds while it \
+              runs, so any process can say so whoever started it. It names what is copied and \
+              never what the files hold, and the reading goes when the copy ends.",
+        secret: false,
+        at: Paths::copying,
+    },
+    Entry {
         accessor: "bundles",
         what: "the support bundles kept for a browser",
         why: "A bundle asked for from the web surface is written here so it can be handed back \

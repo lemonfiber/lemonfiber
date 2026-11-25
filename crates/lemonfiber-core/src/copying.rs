@@ -14,7 +14,7 @@ pub use run::Starting;
 
 /// Whether a copy is a backup or a restore.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "CopyWhat")]
 pub enum What {
     /// A backup, writing an archive.
@@ -64,7 +64,7 @@ impl From<Scope> for Copied {
 
 /// How a running copy is moving.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(tag = "state", rename_all = "snake_case")]
+#[serde(tag = "state", rename_all = "kebab-case")]
 pub enum State {
     /// Writing as fast as it can.
     Working,
