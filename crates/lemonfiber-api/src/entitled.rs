@@ -92,6 +92,9 @@ impl Permitted {
 #[must_use]
 pub fn may(caller: &Caller, door: Door, command: Command) -> Permitted {
     match caller {
+        Caller::Member(_) | Caller::Key(_) if matches!(command, Command::Surface(_)) => {
+            Permitted::Nothing
+        }
         Caller::Key(_) if matches!(command, Command::Notify(_) | Command::PushEndpoints(_)) => {
             Permitted::Nothing
         }

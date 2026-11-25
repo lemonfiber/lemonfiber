@@ -31,12 +31,14 @@ use async_trait::async_trait;
 use lemonfiber_core::alert::{Alert, Moment};
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::changelog::Record;
-use lemonfiber_core::dashboard::run::{waves, Gathered};
 use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::news::{Newest, News};
 use tokio::sync::Mutex;
 
-use lemonfiber_core::app::{dispatch, Command, Polled, Surfacing};
+use lemonfiber_core::app::dashboarding::Early as FirstWave;
+use lemonfiber_core::app::surfacing::Answer;
+use lemonfiber_core::app::{dispatch, Command, Outcome, Polled, Surfacing};
+use lemonfiber_core::model::ScheduledService;
 use tokio::time::Instant;
 
 use super::copying::Heard;
@@ -48,8 +50,6 @@ use super::wire::{Audience, EventKind, Rendered};
 pub struct Dashboard {
     /// What the gather reaches the outside world through.
     ctx: Arc<Ctx>,
-    /// The gather the next one replaces, where there has been one.
-    last: Mutex<Option<Gathered>>,
     /// The record of releases this build carries, read once because it is compiled in.
     record: Option<Record>,
     /// What the stream last said was newest, so it says so again only on a change.
@@ -60,10 +60,6 @@ pub struct Dashboard {
     /// When what is playing was last read, and what was last said of it.
     playing: Mutex<(Option<Instant>, Option<String>)>,
     copying: Mutex<Heard>,
-    /// What is being delivered to the phones that asked to be woken.
-    waking: lemonfiber_core::push::run::Waking,
-    /// What is being delivered to the back-ends.
-    fanning: lemonfiber_core::notify::fanning::Fanning,
 }
 
 impl Dashboard {
@@ -72,14 +68,11 @@ impl Dashboard {
     pub fn against(ctx: Arc<Ctx>) -> Self {
         Self {
             ctx,
-            last: Mutex::new(None),
             record: Record::carried(),
             told: Mutex::new(None),
             alerted: Mutex::new(None),
             playing: Mutex::new((None, None)),
             copying: Mutex::new(Heard::default()),
-            waking: lemonfiber_core::push::run::Waking::default(),
-            fanning: lemonfiber_core::notify::fanning::Fanning::default(),
         }
     }
 }
@@ -106,30 +99,42 @@ impl Gathers for Dashboard {
 /// What the fast sources answered goes to `early` as a dashboard of its own where
 /// some source is slower, so the panels beside a slow one are not held up by it.
 async fn gathered(dashboard: &Dashboard, joined: bool, early: Option<&Early>) -> Vec<Rendered> {
-    let mut last = dashboard.last.lock().await;
-    let gathered = waves(&dashboard.ctx, last.as_ref(), |first| {
-        if let Some(early) = early {
-            early.say(shared(&first));
-        }
-    })
-    .await;
-    let snapshot = &gathered.snapshot;
-    let mut said: Vec<Rendered> = shared(snapshot).into_iter().collect();
-    said.extend(newly(dashboard, snapshot, joined).await);
-    said.extend(alerted(dashboard, &snapshot.alerts).await);
-    dashboard.waking.owing(&dashboard.ctx, &snapshot.alerts);
-    dashboard.fanning.owing(&dashboard.ctx, &snapshot.alerts);
+    let ctx = early.map_or_else(
+        || dashboard.ctx.as_ref().clone(),
+        |early| {
+            let handing: Arc<dyn FirstWave> = Arc::new(Handing(early.clone()));
+            dashboard.ctx.as_ref().clone().with_early(handing)
+        },
+    );
+    let asked = Command::Surface(Surfacing::Gather { now: false });
+    let mut said: Vec<Rendered> = Vec::new();
+    if let Ok(Outcome::Surfaced(Answer::Dashboard(snapshot))) = dispatch(asked, &ctx).await {
+        said.extend(shared(&snapshot));
+        said.extend(newly(dashboard, &snapshot, joined).await);
+        said.extend(alerted(dashboard, &snapshot.alerts).await);
+    }
     said.extend(playing(dashboard, joined).await);
     said.extend(copying(dashboard, joined).await);
-    *last = Some(gathered);
     said
+}
+
+struct Handing(Early);
+
+impl FirstWave for Handing {
+    fn first(&self, snapshot: Snapshot) {
+        self.0.say(shared(&snapshot));
+    }
 }
 
 /// The dashboard as the shared stream says it: every run-and-exit service without the
 /// lines its last run wrote, since a key and a member hear the stream too.
 fn shared(snapshot: &Snapshot) -> Option<Rendered> {
     let mut said = snapshot.clone();
-    said.scheduled = lemonfiber_core::scheduled::unlogged(said.scheduled);
+    said.scheduled = said
+        .scheduled
+        .into_iter()
+        .map(ScheduledService::unlogged)
+        .collect();
     Rendered::of(EventKind::Dashboard, &said)
 }
 

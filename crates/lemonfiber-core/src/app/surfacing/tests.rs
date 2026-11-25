@@ -53,7 +53,8 @@ fn each_answer_is_written_and_described_under_its_own_kind() {
             kind::NOTIFY_HEARD,
             kind::RENEWED,
             kind::UNTUNED,
-            kind::LOGS_EXPORTED
+            kind::LOGS_EXPORTED,
+            kind::DASHBOARD
         ]
     );
 }

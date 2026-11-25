@@ -9,8 +9,10 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
+use lemonfiber_core::app::dashboarding::Early as FirstWave;
+use lemonfiber_core::app::surfacing::Answer as Surfaced;
+use lemonfiber_core::app::Surfacing;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::dashboard::run::{waves, Gathered};
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::walkthrough::{Line as Step, Narrator};
@@ -127,9 +129,9 @@ async fn serving(again: Rebuilding, asked: crate::ui::Asked) -> ExitCode {
 /// What the screen shows: the first wave where one is in, or else the last gather.
 fn showing<'a>(
     early: Option<&'a Snapshot>,
-    gathered: Option<&'a Gathered>,
+    gathered: Option<&'a Snapshot>,
 ) -> Option<&'a Snapshot> {
-    early.or(gathered.map(|gathered| &gathered.snapshot))
+    early.or(gathered)
 }
 
 /// The loop itself, with the terminal already in hand.
@@ -153,7 +155,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     let (keys, mut typed) = tokio::sync::mpsc::channel(16);
     let reader = std::thread::spawn(move || read_keyboard(&keys, meaning));
 
-    let mut gathered: Option<Gathered> = None;
+    let mut gathered: Option<Snapshot> = None;
     let (firsts, mut first) = tokio::sync::mpsc::unbounded_channel();
     let mut early: Option<Snapshot> = None;
     // Read here rather than deeper in, because this is the edge: what a run explains
@@ -163,7 +165,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
     if !crate::render::glossary::wanted() {
         acting = acting.without_explanations();
     }
-    let mut refreshing = gathering(&ctx, None, Duration::ZERO, &firsts);
+    let mut refreshing = gathering(&ctx, false, Duration::ZERO, &firsts);
     // The one thing this screen is waiting on the core for — an action or a read —
     // held rather than sent down a channel for two reasons. One at a time is the
     // screen's own rule, so a second replaces the first and the answer nobody is
@@ -199,8 +201,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                         refreshing.abort();
                         // Asked for by hand, so every panel is read afresh rather
                         // than only the ones whose pace has come round.
-                        let due = gathered.as_ref().map(Gathered::due_now);
-                        refreshing = gathering(&ctx, due.as_ref(), Duration::ZERO, &firsts);
+                        refreshing = gathering(&ctx, true, Duration::ZERO, &firsts);
                     }
                     // Opening them is the asking, so what was opened is recorded.
                     Wanted::Words => {
@@ -228,16 +229,16 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
                 }
             },
             read = &mut refreshing => {
-                if let Ok(fresh) = read {
+                if let Ok(Some(fresh)) = read {
                     // The services go to the screen's own state as well as to the
                     // panels, because the lists that name one are built from what the
                     // panels are already showing rather than from a read of their own.
-                    acting.gathered(&fresh.snapshot.services);
+                    acting.gathered(&fresh.services);
                     gathered = Some(fresh);
                     while first.try_recv().is_ok() {}
                     early = None;
                 }
-                refreshing = gathering(&ctx, gathered.as_ref(), TICK, &firsts);
+                refreshing = gathering(&ctx, false, TICK, &firsts);
             }
             shown = first.recv() => {
                 if let Some(snapshot) = shown {
@@ -341,29 +342,34 @@ fn carry(command: Command, ctx: Arc<Ctx>) -> tokio::task::JoinHandle<Answer> {
     tokio::spawn(async move { dispatch(command, &ctx).await })
 }
 
-/// Gather afresh after `delay`, carrying forward what the last gather read, and
-/// sending what the fast sources answered to `firsts` where some source is slower.
+/// Gather afresh after `delay`, sending what the fast sources answered to `firsts`
+/// where some source is slower.
 ///
-/// One way to begin a gather, and it takes the last gather rather than being told
-/// whether to. A source that answered a moment ago and did not this time has told
-/// the screen something, and a gather begun without the last reading blanks a figure
-/// the operator can still use — permanently, since the next tick carries the blanked
-/// snapshot forward. That is what a screen asked to refresh *because* a panel looked
-/// stale would have done to the very figure it was asked about.
+/// The core carries forward what the last gather read, so a source that answered a
+/// moment ago and did not this time leaves its figure standing; `now`, asked for by
+/// hand, reads every panel afresh. The look owes nobody anything: the run serving the
+/// web surface is the one that wakes phones and tells back-ends of a new alert.
 fn gathering(
     ctx: &Arc<Ctx>,
-    previous: Option<&Gathered>,
+    now: bool,
     delay: Duration,
     firsts: &tokio::sync::mpsc::UnboundedSender<Snapshot>,
-) -> tokio::task::JoinHandle<Gathered> {
-    let ctx = Arc::clone(ctx);
-    let previous = previous.cloned();
-    let firsts = firsts.clone();
+) -> tokio::task::JoinHandle<Option<Snapshot>> {
+    let handing: Arc<dyn FirstWave> = Arc::new(Firsts(firsts.clone()));
+    let ctx = ctx.as_ref().clone().with_early(handing);
     tokio::spawn(async move {
         tokio::time::sleep(delay).await;
-        waves(&ctx, previous.as_ref(), |first| {
-            let _ = firsts.send(first);
-        })
-        .await
+        match dispatch(Command::Surface(Surfacing::Glance { now }), &ctx).await {
+            Ok(Outcome::Surfaced(Surfaced::Dashboard(snapshot))) => Some(*snapshot),
+            _ => None,
+        }
     })
+}
+
+struct Firsts(tokio::sync::mpsc::UnboundedSender<Snapshot>);
+
+impl FirstWave for Firsts {
+    fn first(&self, snapshot: Snapshot) {
+        let _ = self.0.send(snapshot);
+    }
 }

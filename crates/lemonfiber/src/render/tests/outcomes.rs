@@ -356,3 +356,14 @@ fn bytes_are_shown_as_they_are_and_an_export_says_where_it_went() {
         "written to lemonfiber-logs-1-1.txt"
     );
 }
+
+#[test]
+fn a_gathered_dashboard_prints_each_panel_under_its_title() {
+    use lemonfiber_core::app::surfacing::Answer;
+    let snapshot = crate::dashboard::tests::a_snapshot();
+    let gathered = Outcome::Surfaced(Answer::Dashboard(Box::new(snapshot)));
+
+    let printed = super::super::shaped(&gathered).text();
+
+    assert!(printed.contains("VPN"), "{printed}");
+}

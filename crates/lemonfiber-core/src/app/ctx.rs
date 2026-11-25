@@ -146,6 +146,10 @@ pub struct Ctx {
     pub held: Arc<dyn std::any::Any + Send + Sync>,
     /// Who this run lets in through the web API, shared by every clone.
     pub admitting: Arc<super::admitting::Admitting>,
+    /// What this run holds of its dashboard, shared by every clone.
+    pub dashboarding: Arc<super::dashboarding::Dashboarding>,
+    /// Where the fast panels of a gather are handed before its slow ones are in.
+    pub early: Arc<dyn super::dashboarding::Early>,
     /// How this run serves the web surface, as it settled when it began, shared by every
     /// clone.
     pub served: Arc<crate::companion::served::Settled>,
@@ -226,6 +230,8 @@ impl Ctx {
             built_from: crate::stack::BUILT_FROM,
             held: Arc::new(()),
             admitting: Arc::default(),
+            dashboarding: Arc::default(),
+            early: Arc::new(super::dashboarding::Unheard),
             served: Arc::default(),
             job: None,
         }
@@ -502,10 +508,11 @@ impl Ctx {
         self
     }
 
-    /// File what the operator's environment file and the stack's hold into the stores,
-    /// as a run starting does before it reads its settings again.
-    pub async fn filed(&self) {
-        crate::settings::filing::everything(self).await;
+    /// The same context, handing the first wave of a gather to `early`.
+    #[must_use]
+    pub fn with_early(mut self, early: Arc<dyn super::dashboarding::Early>) -> Self {
+        self.early = early;
+        self
     }
 
     /// The same context, in rehearsal.

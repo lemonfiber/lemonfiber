@@ -73,6 +73,7 @@ pub trait Gathers: Send + Sync {
 }
 
 /// What a source hands over before its gather is done, said as soon as it is.
+#[derive(Clone)]
 pub struct Early(mpsc::UnboundedSender<Rendered>);
 
 impl Early {

@@ -722,3 +722,27 @@ fn what_a_stop_would_interrupt_and_how_the_surface_is_served_are_read_by_the_ope
         assert!(!callable_by_a_key(&command));
     }
 }
+
+/// What a surface asks of the core for itself is never a caller's to ask: a member or a
+/// key naming the operator's gather, or any other of them, is given nothing.
+#[test]
+fn a_surface_command_is_nobodys_to_ask_but_the_surfaces() {
+    let gather = || Command::Surface(lemonfiber_core::app::Surfacing::Gather { now: true });
+    for caller in [
+        member(),
+        key(lemonfiber_core::keys::Scope::Read),
+        key(lemonfiber_core::keys::Scope::Act),
+    ] {
+        for door in [Door::Reading, Door::Acting] {
+            assert_eq!(
+                may(&caller, door, gather()),
+                Permitted::Nothing,
+                "{caller:?}"
+            );
+        }
+    }
+    assert_eq!(
+        may(&Caller::Operator, Door::Reading, gather()),
+        Permitted::This(gather())
+    );
+}

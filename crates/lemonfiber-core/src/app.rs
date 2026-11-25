@@ -52,6 +52,7 @@ pub mod conditions;
 pub(crate) mod configuring;
 pub(crate) mod credentials;
 pub(crate) mod ctx;
+pub mod dashboarding;
 pub mod disturbance;
 pub(crate) mod engine;
 pub(crate) mod expiring;

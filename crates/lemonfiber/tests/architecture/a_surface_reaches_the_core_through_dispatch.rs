@@ -7,11 +7,13 @@
 //! names the context's `seams`: what it needs of the world beyond the core, a clock or
 //! randomness, it holds itself.
 //!
-//! A plain check of names, read off the lexed source the compiler reads. The code a
-//! surface builds only for its tests is not the surface, and is not read. Excused,
-//! each by its file and its name, are the dashboard's own calls alone: its gather
-//! drives the push wake-ups and the alert fan-out, and moves behind `dispatch` with
-//! them.
+//! A plain check of names, read off the lexed source the compiler reads, with nothing
+//! excused. The code a surface builds only for its tests is not the surface, and is
+//! not read.
+//!
+//! The one command that wakes phones and tells back-ends of a new alert is the
+//! operator's dashboard gather, and it is sent from one place: the dashboard source
+//! the run serving the web surface gathers, built by that run alone.
 
 use std::path::Path;
 
@@ -26,21 +28,11 @@ const CORE: &str = "lemonfiber_core";
 /// The one function a surface may call in the core, by its path there.
 const ENTRY: [&str; 2] = ["app", "dispatch"];
 
-/// The dashboard's calls into the core, by file and name.
-const DASHBOARD: [(&str, &str); 3] = [
-    (
-        "crates/lemonfiber-api/src/events/dashboard.rs",
-        "dashboard::run::waves",
-    ),
-    (
-        "crates/lemonfiber-api/src/events/dashboard.rs",
-        "scheduled::unlogged",
-    ),
-    (
-        "crates/lemonfiber/src/terminal/dashboard.rs",
-        "dashboard::run::waves",
-    ),
-];
+/// The one file that sends the operator's gather.
+const GATHERS: &str = "crates/lemonfiber-api/src/events/dashboard.rs";
+
+/// The one file that builds the source sending it: the run's own.
+const BUILDS: &str = "crates/lemonfiber-api/src/events/extending.rs";
 
 /// The context's field holding the core's ports, which no surface names.
 const SEAMS: &str = "seams";
@@ -272,7 +264,6 @@ fn a_surface_names_nothing_in_the_core_but_dispatch_its_types_and_its_constants(
         .flat_map(|(path, text)| {
             unreachable_names(text)
                 .into_iter()
-                .filter(move |(_, named)| !DASHBOARD.contains(&(path.as_str(), named.as_str())))
                 .map(move |(line, named)| format!("{path}:{line} names {CORE}::{named}"))
         })
         .collect();
@@ -283,25 +274,25 @@ fn a_surface_names_nothing_in_the_core_but_dispatch_its_types_and_its_constants(
     );
 }
 
-#[test]
-fn every_call_excused_is_one_a_surface_still_makes() {
-    let named: Vec<(String, String)> = surfaces()
+/// Every file of the surfaces naming `first` then `second`, joined by `::`.
+fn naming(first: &str, second: &str) -> Vec<String> {
+    surfaces()
         .into_iter()
-        .flat_map(|(path, text)| {
-            unreachable_names(&text)
-                .into_iter()
-                .map(move |(_, named)| (path.clone(), named))
+        .filter(|(_, text)| {
+            tokens(text).windows(3).any(|three| {
+                three.first().map(|(_, token)| *token) == Some(Token::Name(first))
+                    && three.get(1).map(|(_, token)| *token) == Some(Token::Joint)
+                    && three.get(2).map(|(_, token)| *token) == Some(Token::Name(second))
+            })
         })
-        .collect();
-    let stale: Vec<&(&str, &str)> = DASHBOARD
-        .iter()
-        .filter(|(path, call)| {
-            !named
-                .iter()
-                .any(|(file, named)| file == path && named == call)
-        })
-        .collect();
-    assert!(stale.is_empty(), "excused but no longer named: {stale:?}");
+        .map(|(path, _)| path)
+        .collect()
+}
+
+#[test]
+fn only_the_runs_own_dashboard_sends_the_gather_that_wakes_phones() {
+    assert_eq!(naming("Surfacing", "Gather"), [GATHERS]);
+    assert_eq!(naming("Dashboard", "against"), [BUILDS]);
 }
 
 #[test]

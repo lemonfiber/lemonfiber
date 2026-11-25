@@ -133,6 +133,16 @@ pub(crate) fn showing(snapshot: &Snapshot) -> String {
     words_of(&sections(snapshot, &[]))
 }
 
+/// A snapshot as lines a terminal prints: each panel's title, then what it shows.
+pub(crate) fn listed(snapshot: &Snapshot) -> crate::render::Lines {
+    let mut said = crate::render::Lines::default();
+    for (title, lines) in sections(snapshot, &[]) {
+        said.put(title.to_owned());
+        said.put(format!("  {}", crate::pane::showing(&lines)));
+    }
+    said
+}
+
 /// The room each panel's own lines have, inside its border.
 fn rooms(places: &[Rect]) -> Vec<usize> {
     places

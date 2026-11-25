@@ -16,6 +16,7 @@ pub(super) const fn surfaced(asked: &Surfacing) -> Asked {
         Surfacing::Fetch(Fetching::Bundle { .. }) => reads("bundle"),
         Surfacing::Fetch(_) => reads("picture"),
         Surfacing::Export(_) => reports("logs export", &[kind::LOGS_EXPORTED]),
+        Surfacing::Gather { .. } | Surfacing::Glance { .. } => reads("dashboard"),
     }
 }
 

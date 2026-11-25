@@ -3,9 +3,11 @@
 
 use serde::Serialize;
 
+use super::dashboarding::{self, Owes};
 use super::exporting::Exported;
 use super::standing::StackStanding;
 use super::{routed, standing, Ctx, Outcome, Surfacing};
+use crate::dashboard::Snapshot;
 use crate::error::Problem;
 use crate::model::kind::{self, Kind};
 use crate::model::{Envelope, Octets};
@@ -25,6 +27,8 @@ pub enum Answer {
     Untuned(Untuned),
     /// Where what the log viewer showed was written.
     Exported(Exported),
+    /// The dashboard as it was gathered.
+    Dashboard(Box<Snapshot>),
     /// Bytes handed over as they are, which no envelope holds.
     Octets(Octets),
 }
@@ -39,6 +43,7 @@ impl Answer {
             Self::Renewed(_) => kind::RENEWED,
             Self::Untuned(_) => kind::UNTUNED,
             Self::Exported(_) => kind::LOGS_EXPORTED,
+            Self::Dashboard(_) => kind::DASHBOARD,
             Self::Octets(octets) => octets.kind(),
         }
     }
@@ -56,6 +61,7 @@ impl Answer {
             kind::LOGS_EXPORTED,
             schemars::schema_for!(Envelope<Exported>),
         );
+        each(kind::DASHBOARD, schemars::schema_for!(Envelope<Snapshot>));
         Octets::schemas(each);
     }
 }
@@ -68,6 +74,7 @@ impl Serialize for Answer {
             Self::Renewed(renewed) => renewed.serialize(serializer),
             Self::Untuned(untuned) => untuned.serialize(serializer),
             Self::Exported(exported) => exported.serialize(serializer),
+            Self::Dashboard(snapshot) => snapshot.serialize(serializer),
             Self::Octets(octets) => octets.serialize(serializer),
         }
     }
@@ -84,6 +91,12 @@ pub(super) async fn surfaced(ctx: &Ctx, asked: Surfacing) -> Result<Outcome, Box
         Surfacing::Polled(polled) => return Box::pin(routed(polled.twin(), ctx)).await,
         Surfacing::Fetch(asked) => Answer::Octets(super::fetching::fetched(ctx, asked).await?),
         Surfacing::Export(asked) => Answer::Exported(super::exporting::exported(ctx, asked).await?),
+        Surfacing::Gather { now } => Answer::Dashboard(Box::new(
+            dashboarding::gathered(ctx, now, Owes::Alerts).await,
+        )),
+        Surfacing::Glance { now } => Answer::Dashboard(Box::new(
+            dashboarding::gathered(ctx, now, Owes::Nothing).await,
+        )),
         Surfacing::Standing => Answer::Standing(standing::standing(ctx)),
         Surfacing::Told(telling) => {
             Answer::Heard(crate::notify::events::heard_of(ctx, telling).await?)
