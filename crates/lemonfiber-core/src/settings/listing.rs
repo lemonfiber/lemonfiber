@@ -35,7 +35,7 @@ pub(super) fn report(
 
 fn settings(recorded: &Recorded, readers: &Readers) -> Vec<SettingRead> {
     let mut names: BTreeSet<&str> = readers.settings.keys().map(String::as_str).collect();
-    names.extend(own::CORE);
+    names.extend(own::CORE.map(|(name, _)| name));
     names
         .into_iter()
         .map(|name| SettingRead {
@@ -43,6 +43,7 @@ fn settings(recorded: &Recorded, readers: &Readers) -> Vec<SettingRead> {
             whose: readers::whose(name),
             readers: readers.settings.get(name).cloned().unwrap_or_default(),
             value: recorded.value(name).map(str::to_owned),
+            default: own::unset(name).and_then(own::Unset::written),
             environment: legacy::setting_key(name).map(str::to_owned),
             choices: readers.choices.get(name).cloned(),
         })

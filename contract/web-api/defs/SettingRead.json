@@ -13,6 +13,13 @@
         "$ref": "Choosable.json"
       }
     },
+    "default": {
+      "description": "What the core reads while no value is recorded, for one of the core's own settings\nthat holds anything then; a service's setting has its manifest's on each reader.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "environment": {
       "description": "The environment file's key it is held under, where it is held there.",
       "type": [

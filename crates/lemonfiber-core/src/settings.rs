@@ -125,11 +125,10 @@ pub(crate) fn sign_in_codes(ctx: &Ctx) -> crate::sign_in_codes::Limits {
         by_address: recorded
             .value(own::CODES_BY_ADDRESS)
             .and_then(|value| own::switched(own::CODES_BY_ADDRESS, value).ok())
-            .unwrap_or(false),
+            .unwrap_or(own::DEFAULT_BY_ADDRESS),
     }
 }
 
-/// What the setting `name` holds, where it holds anything.
 /// How fast a backup writes at most, in bytes a second: none where none is recorded, `off`
 /// is, or what is recorded is not a limit.
 pub(crate) fn backup_limit(ctx: &Ctx) -> Option<u64> {

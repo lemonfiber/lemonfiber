@@ -1,7 +1,7 @@
 use crate::settings::own::{
-    is_configs, is_core, refusal, BACKUP_LIMIT, CODES_BY_ADDRESS, CODES_PERIOD, CODES_PER_PERIOD,
-    CODES_WAITING, COPY_STALLED, DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH, DEVICE_KEY_APPS,
-    DOMAIN, GUIDE_HOURS,
+    is_configs, is_core, refusal, Unset, BACKUP_LIMIT, CODES_BY_ADDRESS, CODES_PERIOD,
+    CODES_PER_PERIOD, CODES_WAITING, COPY_STALLED, DASHBOARD_SEARCH, DEFAULT_DOMAIN,
+    DEFAULT_SEARCH, DEVICE_KEY_APPS, DOMAIN, GUIDE_HOURS,
 };
 
 fn fingerprint() -> String {
@@ -16,6 +16,15 @@ fn the_core_settings_are_a_closed_list_and_every_other_own_key_is_configs() {
     assert!(!is_core("LEMONFIBER_IDEMPOTENCY_MINUTES"));
     assert!(!is_configs("VPN_COUNTRIES"));
     assert!(!is_core("gluetun:countries"));
+}
+
+#[test]
+fn what_a_core_setting_holds_unset_is_written_as_its_value_would_be() {
+    assert_eq!(Unset::Text("off").written().as_deref(), Some("off"));
+    assert_eq!(Unset::Number(12).written().as_deref(), Some("12"));
+    assert_eq!(Unset::Switch(true).written().as_deref(), Some("on"));
+    assert_eq!(Unset::Switch(false).written().as_deref(), Some("off"));
+    assert_eq!(Unset::Nothing.written(), None);
 }
 
 #[test]

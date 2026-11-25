@@ -38,6 +38,9 @@ pub struct SettingRead {
     pub readers: Vec<Reader>,
     /// The operator's value, where one is recorded.
     pub value: Option<String>,
+    /// What the core reads while no value is recorded, for one of the core's own settings
+    /// that holds anything then; a service's setting has its manifest's on each reader.
+    pub default: Option<String>,
     /// The environment file's key it is held under, where it is held there.
     pub environment: Option<String>,
     /// Every value it accepts, where its manifest declares them.

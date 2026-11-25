@@ -79,25 +79,66 @@ pub(crate) const PUBLISHED_FROM: [(&str, &str); 2] = [
     (lemonfiber_manifest::container::LOCALE, LOCALE),
 ];
 
-pub(crate) const CORE: [&str; 12] = [
-    DEVICE_KEY_APPS,
-    DASHBOARD_SEARCH,
-    GUIDE_HOURS,
-    CODES_WAITING,
-    CODES_PER_PERIOD,
-    CODES_PERIOD,
-    CODES_BY_ADDRESS,
-    BACKUP_LIMIT,
-    COPY_STALLED.0,
-    DOMAIN,
-    LOCALE,
-    crate::plex_link::SETTING,
+/// Whether finishing a sign-in by a code must come from the address that asked, where
+/// nothing is recorded.
+pub(crate) const DEFAULT_BY_ADDRESS: bool = false;
+
+/// What one of the core's own settings holds where nothing is recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Unset {
+    /// This text.
+    Text(&'static str),
+    /// This whole number.
+    Number(u32),
+    /// This switch.
+    Switch(bool),
+    /// None of the entries a list of them holds.
+    Nothing,
+}
+
+impl Unset {
+    /// The value it is written as, where it is one.
+    pub(crate) fn written(self) -> Option<String> {
+        match self {
+            Self::Text(text) => Some(text.to_owned()),
+            Self::Number(number) => Some(number.to_string()),
+            Self::Switch(true) => Some(crate::config::reaching::SWITCHED_ON.to_owned()),
+            Self::Switch(false) => Some(crate::config::reaching::SWITCHED_OFF.to_owned()),
+            Self::Nothing => None,
+        }
+    }
+}
+
+/// The core's own settings, each with what it holds where nothing is recorded.
+pub(crate) const CORE: [(&str, Unset); 12] = [
+    (DEVICE_KEY_APPS, Unset::Nothing),
+    (DASHBOARD_SEARCH, Unset::Text(DEFAULT_SEARCH)),
+    (GUIDE_HOURS, Unset::Number(DEFAULT_GUIDE_HOURS)),
+    (CODE_COUNTS[0].0, Unset::Number(CODE_COUNTS[0].3)),
+    (CODE_COUNTS[1].0, Unset::Number(CODE_COUNTS[1].3)),
+    (CODE_COUNTS[2].0, Unset::Number(CODE_COUNTS[2].3)),
+    (CODES_BY_ADDRESS, Unset::Switch(DEFAULT_BY_ADDRESS)),
+    (BACKUP_LIMIT, Unset::Text(UNLIMITED)),
+    (COPY_STALLED.0, Unset::Number(COPY_STALLED.3)),
+    (DOMAIN, Unset::Text(DEFAULT_DOMAIN)),
+    (LOCALE, Unset::Text(crate::locale::DEFAULT)),
+    (
+        crate::plex_link::SETTING,
+        Unset::Text(crate::plex_link::Mode::UNSET.word()),
+    ),
 ];
 
 const OWN_PREFIX: &str = "LEMONFIBER_";
 
 pub(crate) fn is_core(name: &str) -> bool {
-    CORE.contains(&name)
+    unset(name).is_some()
+}
+
+/// What the core's own setting `name` holds where nothing is recorded, where it is one.
+pub(crate) fn unset(name: &str) -> Option<Unset> {
+    CORE.iter()
+        .find(|(core, _)| *core == name)
+        .map(|(_, unset)| *unset)
 }
 
 pub(crate) fn is_configs(name: &str) -> bool {

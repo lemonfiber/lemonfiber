@@ -23,6 +23,7 @@ fn listing() -> SettingsReport {
                 },
                 readers: vec![reader("gluetun", "SERVER_COUNTRIES", Some("Netherlands"))],
                 value: Some("Belgium".to_owned()),
+                default: None,
                 environment: Some("VPN_COUNTRIES".to_owned()),
                 choices: None,
             },
@@ -33,6 +34,7 @@ fn listing() -> SettingsReport {
                 },
                 readers: vec![reader("gluetun", "VPN_SERVICE_PROVIDER", Some(""))],
                 value: None,
+                default: None,
                 environment: None,
                 choices: None,
             },
@@ -41,6 +43,16 @@ fn listing() -> SettingsReport {
                 whose: Owner::Core,
                 readers: Vec::new(),
                 value: None,
+                default: None,
+                environment: None,
+                choices: None,
+            },
+            SettingRead {
+                name: "LEMONFIBER_GUIDE_HOURS".to_owned(),
+                whose: Owner::Core,
+                readers: Vec::new(),
+                value: None,
+                default: Some("12".to_owned()),
                 environment: None,
                 choices: None,
             },
@@ -92,6 +104,8 @@ fn the_listing_reads_each_setting_with_its_readers_and_each_secret_without_its_v
          \n  gluetun:provider  at its default  (gluetun's)\n\
          \x20   reads     gluetun as VPN_SERVICE_PROVIDER, empty by default\n\
          \n  LEMONFIBER_DEVICE_KEY_APPS  at its default  (the core's)\n\
+         \x20   reads     nothing in the stack; the core reads it\n\
+         \n  LEMONFIBER_GUIDE_HOURS  at its default, 12  (the core's)\n\
          \x20   reads     nothing in the stack; the core reads it\n\
          \n\
          Secrets the services read, never shown:\n\
@@ -321,6 +335,7 @@ fn a_setting_with_choices_lists_each_and_a_reference_says_what_it_is_written_bes
         },
         readers: vec![first, two],
         value: None,
+        default: None,
         environment: None,
         choices: Some(vec![
             Choosable {
