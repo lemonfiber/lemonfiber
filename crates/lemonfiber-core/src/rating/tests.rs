@@ -1,4 +1,4 @@
-use super::{rated, reading, said, Certificate, FALLBACK, NAMED_AT_MOST};
+use super::{rated, reading, Certificate, FALLBACK, NAMED_AT_MOST};
 
 /// The media server's own table for the United States, as the pinned image
 /// answers it — trimmed to the certificates the assertions turn on.
@@ -100,7 +100,7 @@ fn a_server_naming_nothing_falls_back_to_the_documented_mapping() {
 /// a bare number on a server whose own table said nothing.
 #[test]
 fn the_mapping_names_every_step_the_surfaces_offer() {
-    for step in crate::age_limit::steps() {
+    for step in crate::age_limit::OFFERED {
         assert!(
             FALLBACK.iter().any(|(age, _)| *age == step.age),
             "the mapping names nothing at {}",
@@ -190,7 +190,7 @@ fn a_limit_past_the_top_of_the_table_names_only_what_it_allows() {
 fn a_reading_already_taken_says_what_taking_it_again_would_say() {
     let table = british();
 
-    assert_eq!(reading(&table, Some(12)), said(12, &rated(&table, 12)));
+    assert_eq!(reading(&table, Some(12)), rated(&table, 12).said(12));
 }
 
 #[test]

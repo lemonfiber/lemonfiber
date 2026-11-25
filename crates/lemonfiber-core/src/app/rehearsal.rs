@@ -264,6 +264,14 @@ const fn paired(pairing: Pairing) -> Asked {
     }
 }
 
+impl Command {
+    /// What this command is, as the one table describing every command says.
+    #[must_use]
+    pub const fn asked(&self) -> Asked {
+        described(self)
+    }
+}
+
 /// What each command is: the name an operator knows it by, what a rehearsal of it
 /// comes to, and what it takes away while it runs.
 ///
@@ -275,8 +283,7 @@ const fn paired(pairing: Pairing) -> Asked {
 /// The sub-actions that are split are split because the split is real — reading a
 /// credential and rotating one arrive as the same command, and refusing the flag on
 /// the read would be refusing it on something that changes nothing.
-#[must_use]
-pub const fn asked(command: &Command) -> Asked {
+const fn described(command: &Command) -> Asked {
     match command {
         // Reads. Nothing here reaches for anything it could put back.
         Command::Version => reads("version"),
@@ -440,20 +447,6 @@ pub const fn asked(command: &Command) -> Asked {
     }
 }
 
-/// The record a rehearsal of `command` keeps of its own, by its file name beside the
-/// configuration; nothing for every command but one.
-///
-/// A rehearsed `queue heal` keeps the run it would have taken, every act `would`, so the
-/// queue's read shows it. It advances no strike, journals nothing, and tells no curator
-/// or download client anything.
-#[must_use]
-pub const fn keeps_its_own_record(command: &Command) -> Option<&'static str> {
-    match command {
-        Command::Queue(Queueing::Heal) => Some(crate::config::paths::HEALING),
-        _ => None,
-    }
-}
-
 /// Whether this run may go ahead, or the refusal to give instead of running it.
 ///
 /// Consulted by [`super::dispatch`] before the handler is reached, which is the whole
@@ -469,14 +462,16 @@ pub fn permitted(command: &Command, ctx: &Ctx) -> Result<(), Box<Problem>> {
     if !ctx.dry_run {
         return Ok(());
     }
-    verdict(&asked(command))
+    verdict(&command.asked())
 }
 
+mod kept;
 mod keyed;
 mod refusing;
 mod surfacing;
 mod withheld;
 
+pub use kept::keeps_its_own_record;
 pub use refusing::{not_taught_yet, verdict, REFUSALS};
 pub use withheld::carried;
 /// Whether a command is carried out without what `dispatch` settles about a stack first.

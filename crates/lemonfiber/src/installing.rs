@@ -7,7 +7,7 @@
 //! cannot be taken.
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 /// What is put to the operator when a start would install a part from this build.
 pub(crate) const ASK_TO_INSTALL: &str = "Install from this build, offline, and start? [y/N]";

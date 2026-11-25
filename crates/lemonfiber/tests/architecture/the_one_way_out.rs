@@ -204,7 +204,7 @@ fn nothing_leaves_this_binary_without_passing_through_a_treatment() {
 
     // And the treatments themselves, since a door naming one that does nothing
     // would satisfy the check above without disarming anything.
-    let text = file("crates/lemonfiber-core/src/text.rs");
+    let text = file("crates/lemonfiber-words/src/text.rs");
     assert!(
         function(&text, "plain").is_some() && function(&text, "escaped").is_some(),
         "the two treatments are where the doors reach for them"

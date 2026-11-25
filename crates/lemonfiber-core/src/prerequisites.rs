@@ -79,30 +79,32 @@ pub struct PrerequisiteMap {
     pub library_only: Option<&'static str>,
 }
 
-/// The prerequisites the given protocol choices imply.
-///
-/// Nothing chosen needs nothing bought: a folder of existing media reaches a
-/// working media server with no accounts, and that path is stated rather than left
-/// for the operator to infer. Each chosen protocol adds exactly its own
-/// prerequisites and no others, in the order they have to be obtained — a
-/// provider before the indexer that searches it produces a confusing partial
-/// state otherwise.
-#[must_use]
-pub fn prerequisites(protocols: Protocols) -> PrerequisiteMap {
-    let mut items = Vec::new();
-    if protocols.usenet {
-        items.push(usenet_provider());
-        items.push(usenet_indexer());
-    }
-    if protocols.torrent {
-        items.push(torrent_indexer());
-        items.push(vpn());
-    }
+impl PrerequisiteMap {
+    /// The prerequisites the given protocol choices imply.
+    ///
+    /// Nothing chosen needs nothing bought: a folder of existing media reaches a
+    /// working media server with no accounts, and that path is stated rather than left
+    /// for the operator to infer. Each chosen protocol adds exactly its own
+    /// prerequisites and no others, in the order they have to be obtained — a
+    /// provider before the indexer that searches it produces a confusing partial
+    /// state otherwise.
+    #[must_use]
+    pub fn of(protocols: Protocols) -> Self {
+        let mut items = Vec::new();
+        if protocols.usenet {
+            items.push(usenet_provider());
+            items.push(usenet_indexer());
+        }
+        if protocols.torrent {
+            items.push(torrent_indexer());
+            items.push(vpn());
+        }
 
-    PrerequisiteMap {
-        protocols,
-        library_only: items.is_empty().then_some(LIBRARY_ONLY),
-        items,
+        Self {
+            protocols,
+            library_only: items.is_empty().then_some(LIBRARY_ONLY),
+            items,
+        }
     }
 }
 

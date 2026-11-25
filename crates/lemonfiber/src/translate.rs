@@ -19,12 +19,13 @@ use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::keys::run::Asked as Keyed;
 use lemonfiber_core::keys::Minter;
 use lemonfiber_core::migration::mode::Mode;
-use lemonfiber_core::ports::media::offered;
+use lemonfiber_core::model::QualityOffered;
 use lemonfiber_core::ports::media::Kind;
 use lemonfiber_core::push::run::Asked as Pushing;
-use lemonfiber_core::quality::{self, Preset};
+use lemonfiber_core::quality::Preset;
 use lemonfiber_core::uninstall::Tier;
 use lemonfiber_core::update::run as update;
+use lemonfiber_ports::media::offered;
 
 use crate::authoring::Document;
 use crate::exit::USAGE;
@@ -201,7 +202,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
                 let Some(format) = Format::from_label(&preset) else {
                     complain!(
                         "error: no music format named `{preset}` (try {})",
-                        offered(&quality::offered().formats)
+                        offered(&QualityOffered::all().formats)
                     );
                     return Err(USAGE);
                 };
@@ -210,7 +211,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
             let Some(preset) = Preset::from_label(&preset) else {
                 complain!(
                     "error: no quality preset named `{preset}` (try {})",
-                    offered(&quality::offered().presets)
+                    offered(&QualityOffered::all().presets)
                 );
                 return Err(USAGE);
             };
@@ -218,7 +219,7 @@ pub(crate) fn quality(action: QualityCommand) -> Result<Command, u8> {
                 if !Kind::ALL.iter().any(|kind| kind.media_type() == media_type) {
                     complain!(
                         "error: no media type named `{media_type}` (try {})",
-                        offered(&quality::offered().media_types)
+                        offered(&QualityOffered::all().media_types)
                     );
                     return Err(USAGE);
                 }

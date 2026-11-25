@@ -111,7 +111,7 @@ const DOCKER_HUB: &str = "docker.io";
 
 /// Where a request goes, said once for the case where nothing is configured to
 /// reach.
-const NOTHING_CONFIGURED: &str = "nothing configured";
+pub const NOTHING_CONFIGURED: &str = "nothing configured";
 
 /// One request, filled in against this machine.
 pub(super) fn outbound(
@@ -436,12 +436,6 @@ pub fn cost(reach: Reach) -> &'static str {
              installing from a git source or a directory you name is unaffected."
         }
     }
-}
-
-/// What is said where a request has nowhere configured to go.
-#[must_use]
-pub const fn nothing_configured() -> &'static str {
-    NOTHING_CONFIGURED
 }
 
 #[cfg(test)]

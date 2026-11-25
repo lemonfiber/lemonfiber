@@ -12,9 +12,9 @@ use std::time::Duration;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::dashboard::run::{waves, Gathered};
 use lemonfiber_core::dashboard::Snapshot;
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::stack::Source;
 use lemonfiber_core::walkthrough::{Line as Step, Narrator};
+use lemonfiber_error::Problem;
 
 use super::screen::{drawing, read_keyboard, Screen};
 use crate::acting::{meaning, Acting, Wanted};

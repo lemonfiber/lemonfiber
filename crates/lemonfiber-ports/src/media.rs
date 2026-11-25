@@ -160,6 +160,17 @@ impl TitleKind {
         }
     }
 
+    /// What a household calls a title of this kind, one of them, as a search names what
+    /// it looked among.
+    #[must_use]
+    pub const fn asked_noun(self) -> &'static str {
+        match self {
+            Self::Music => "album and artist",
+            Self::Books => "book, author and series",
+            Self::Tv | Self::Movies => self.noun(),
+        }
+    }
+
     /// The kind of video it is, or `None` for music and books.
     #[must_use]
     pub const fn video(self) -> Option<Kind> {

@@ -43,11 +43,11 @@ use lemonfiber_api::jobs::{Jobs, LEASE};
 use lemonfiber_api::router::{self, Serving};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Surfacing};
 use lemonfiber_core::companion::served::{Served, ServedReport};
-use lemonfiber_core::error::{Problem, Remedy, State as Standing};
 use lemonfiber_core::frontend::Source;
 use lemonfiber_core::platform::HOST_OS;
 use lemonfiber_core::ports::asking::Asking;
 use lemonfiber_core::PRODUCT;
+use lemonfiber_error::{Problem, Remedy, State as Standing};
 
 use crate::exit::complain;
 use crate::say::say;
@@ -55,7 +55,7 @@ use crate::ui::reach::{address, held, permitted, unauthenticated, Offered, Reach
 use crate::ui::said::{announcement, opening, reverted, Browser};
 use holding::{holding, Held};
 
-use lemonfiber_core::error::codes::serve::NO_TOKEN;
+use lemonfiber_error::codes::serve::NO_TOKEN;
 
 /// What `ui` was asked for.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

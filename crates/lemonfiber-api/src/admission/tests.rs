@@ -1,7 +1,7 @@
 use lemonfiber_core::app::admitting::{Answer, Caller as Calling_, Calling};
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::error::{Problem, Remedy};
+use lemonfiber_error::{Problem, Remedy};
 
 use super::{knocked, typed, Caller, Knocking};
 
@@ -18,7 +18,7 @@ fn a_caller_check_answers_who_it_found_and_nobody_otherwise() {
         Knocking::Nobody
     );
     let refused = Problem::new(
-        lemonfiber_core::error::codes::admit::UNCONFIRMED,
+        lemonfiber_error::codes::admit::UNCONFIRMED,
         "x",
         "y",
         Remedy::new("z"),

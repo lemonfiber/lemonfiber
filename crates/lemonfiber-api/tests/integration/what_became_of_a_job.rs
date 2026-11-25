@@ -637,8 +637,8 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
 /// the defect, so a test that stopped there would be testing the wrong half.
 #[test]
 fn the_code_a_refusal_carries_decides_the_status_a_job_is_answered_with() {
-    use lemonfiber_core::error::codes::{docker, form, life, word};
-    use lemonfiber_core::error::{Code, Problem, Remedy};
+    use lemonfiber_error::codes::{docker, form, life, word};
+    use lemonfiber_error::{Code, Problem, Remedy};
 
     let refusing = |code: Code| {
         let problem = Problem::new(

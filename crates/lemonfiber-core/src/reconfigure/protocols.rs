@@ -23,7 +23,7 @@ use lemonfiber_manifest::Manifest;
 use super::Opening;
 use crate::config::{reads_as_on, Protocols, Supported, TORRENT_KEY, USENET_KEY};
 use crate::plugin::Profiled;
-use crate::prerequisites::prerequisites;
+use crate::prerequisites::PrerequisiteMap;
 use crate::stack::closure::everything;
 use crate::wizard::opened_by;
 
@@ -48,8 +48,8 @@ pub fn changed(now: Protocols, key: &str, value: &str) -> Option<Protocols> {
 /// can be pasted anywhere. Empty for a reduction, which asks for nothing.
 #[must_use]
 pub fn opened(before: Protocols, after: Protocols) -> Vec<Opening> {
-    let had = prerequisites(before).items;
-    let mut opens: Vec<Opening> = prerequisites(after)
+    let had = PrerequisiteMap::of(before).items;
+    let mut opens: Vec<Opening> = PrerequisiteMap::of(after)
         .items
         .into_iter()
         .filter(|item| !had.iter().any(|held| held.id == item.id))

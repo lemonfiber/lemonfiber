@@ -4,9 +4,9 @@
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
 use lemonfiber_core::doctor::{Overall, Verdict};
-use lemonfiber_core::error::{Problem, State};
 use lemonfiber_core::model::DoctorReport;
-use lemonfiber_core::repair::{mendable, ASK_FOR_REPAIRS};
+use lemonfiber_core::repair::ASK_FOR_REPAIRS;
+use lemonfiber_error::{Problem, State};
 
 use super::Lines;
 
@@ -122,7 +122,7 @@ pub(super) fn remedies(problem: &Problem) -> Lines {
     // Which of the three kinds this is, said where it changes what the operator can do.
     // The other two already say so in their own remedies — one names where to go and the
     // other offers the bundle — and only this one has an answer they would not guess at.
-    if mendable(problem.state) {
+    if problem.state.mendable() {
         lines.put("      lemonfiber can put this one right for you".to_owned());
         lines.put(format!("        {ASK_FOR_REPAIRS}"));
     }

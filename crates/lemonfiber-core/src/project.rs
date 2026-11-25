@@ -250,27 +250,29 @@ fn unrendered(units: &[Unit<'_>], reading: &Reading<'_>) -> Vec<String> {
         .collect()
 }
 
-/// The entries the project writes for `installed`'s services beside the stack this build
-/// carries, with every value read as `reading` answers it: what installing it adds to the
-/// project.
-#[must_use]
-pub fn entries(installed: &Installed, reading: &Reading<'_>) -> String {
-    let ours: Vec<&str> = installed
-        .services
-        .iter()
-        .map(|placed| placed.service.as_str())
-        .collect();
-    Manifest::from_toml(lemonfiber_bundled::STACK)
-        .map(|manifest| {
-            let project = generated(
-                &manifest,
-                std::slice::from_ref(installed),
-                &Chosen::read(None),
-                reading,
-            );
-            document::sliced(&project.text, &ours)
-        })
-        .unwrap_or_default()
+impl Installed {
+    /// The entries the project writes for this plugin's services beside the stack this build
+    /// carries, with every value read as `reading` answers it: what installing it adds to the
+    /// project.
+    #[must_use]
+    pub fn project_entries(&self, reading: &Reading<'_>) -> String {
+        let ours: Vec<&str> = self
+            .services
+            .iter()
+            .map(|placed| placed.service.as_str())
+            .collect();
+        Manifest::from_toml(lemonfiber_bundled::STACK)
+            .map(|manifest| {
+                let project = generated(
+                    &manifest,
+                    std::slice::from_ref(self),
+                    &Chosen::read(None),
+                    reading,
+                );
+                document::sliced(&project.text, &ours)
+            })
+            .unwrap_or_default()
+    }
 }
 
 /// The networks `manifest`'s services and `installed`'s are placed on, wired as `chosen`

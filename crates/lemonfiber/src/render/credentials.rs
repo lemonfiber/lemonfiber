@@ -12,7 +12,7 @@
 
 use lemonfiber_core::credential::{Inventory, Reach, Revealed, Revoked, Rotation, Settled};
 use lemonfiber_core::instant::Instant;
-use lemonfiber_core::text::plain;
+use lemonfiber_words::text::plain;
 
 use super::Lines;
 

@@ -121,7 +121,7 @@ fn an_approval_of_a_pair_inside_the_stack_is_refused_as_one_nothing_asks_for() {
         steps: Vec::new(),
         pairs: vec![pair("komga", false), pair("meta.example.org", true)],
     }];
-    let asked = crate::plugin::approvals(&recipes);
+    let asked = crate::plugin::Recipe::approvals(&recipes);
     assert_eq!(asked, ["token@meta.example.org"]);
 
     let ctx = crate::test_support::a_context().build();

@@ -26,7 +26,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::{store, Resending};
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 use tokio::sync::{Mutex, SetOnce};
 use tokio::task::JoinHandle;
 

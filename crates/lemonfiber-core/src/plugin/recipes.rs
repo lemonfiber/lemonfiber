@@ -233,20 +233,22 @@ fn declared_native(installed: &[super::Installed], service: &str) -> Option<Stri
         .clone()
 }
 
-/// Every approval these recipes ask for, once each, in the order they declare them.
-#[must_use]
-pub fn approvals(recipes: &[Recipe]) -> Vec<&str> {
-    let mut asked: Vec<&str> = Vec::new();
-    for approval in recipes
-        .iter()
-        .flat_map(|recipe| recipe.pairs.iter())
-        .filter_map(|pair| pair.approval.as_deref())
-    {
-        if !asked.contains(&approval) {
-            asked.push(approval);
+impl Recipe {
+    /// Every approval these recipes ask for, once each, in the order they declare them.
+    #[must_use]
+    pub fn approvals(recipes: &[Self]) -> Vec<&str> {
+        let mut asked: Vec<&str> = Vec::new();
+        for approval in recipes
+            .iter()
+            .flat_map(|recipe| recipe.pairs.iter())
+            .filter_map(|pair| pair.approval.as_deref())
+        {
+            if !asked.contains(&approval) {
+                asked.push(approval);
+            }
         }
+        asked
     }
-    asked
 }
 
 #[cfg(test)]

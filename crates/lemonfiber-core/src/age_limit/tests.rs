@@ -1,4 +1,6 @@
-use super::{reading, steps, A_FILTER_NOT_A_LOCK};
+use lemonfiber_words::age::reading;
+
+use super::{A_FILTER_NOT_A_LOCK, OFFERED};
 
 /// No limit, the youngest step and an ordinary age each read as their own words.
 #[test]
@@ -15,7 +17,7 @@ fn each_limit_reads_as_the_words_for_it() {
 #[test]
 fn a_limit_that_is_not_a_step_offered_still_reads() {
     assert!(
-        !steps().iter().any(|step| step.age == 13),
+        !OFFERED.iter().any(|step| step.age == 13),
         "13 is a step offered, so this asserts nothing"
     );
     assert_eq!(reading(Some(13)), "nothing above about 13");
@@ -25,7 +27,7 @@ fn a_limit_that_is_not_a_step_offered_still_reads() {
 /// unrelated numbers.
 #[test]
 fn the_steps_rise_from_the_youngest_audience() {
-    let ages: Vec<u32> = steps().iter().map(|step| step.age).collect();
+    let ages: Vec<u32> = OFFERED.iter().map(|step| step.age).collect();
 
     assert!(ages.len() > 2, "there is no ladder to read: {ages:?}");
     assert_eq!(
@@ -52,7 +54,7 @@ fn what_a_limit_is_says_what_it_is_not() {
 /// blank beside each.
 #[test]
 fn every_step_says_who_it_suits() {
-    for step in steps() {
+    for step in OFFERED {
         // Bound rather than called in the message, which only runs on failure.
         let said = reading(Some(step.age));
         assert!(!step.suits.is_empty(), "{said} has nothing beside it");

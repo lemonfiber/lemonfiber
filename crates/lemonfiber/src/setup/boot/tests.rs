@@ -1,11 +1,11 @@
-use super::{afterwards, condition, found, gating, overall, preflight, start, wire, Wired};
+use super::{afterwards, condition, found, gating, preflight, start, wire, Wired};
 use crate::exit::{shown, success};
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::config::Protocols;
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::{autostart, Category, Finding, Overall, Verdict};
-use lemonfiber_core::error::Remedy;
 use lemonfiber_core::stack::Source;
+use lemonfiber_error::Remedy;
 
 use crate::setup::tests::{ctx, engine_quiet, working_ctx, Scripted};
 
@@ -59,7 +59,7 @@ fn a_prerequisite_nobody_could_confirm_does_not_stop_setup() {
     let kept = gating(vec![engine, unverified]);
 
     assert_eq!(kept.len(), 1, "the autostart finding is the one dropped");
-    assert_eq!(overall(&kept), Overall::Healthy, "so setup goes on");
+    assert_eq!(Overall::of(&kept), Overall::Healthy, "so setup goes on");
 }
 
 #[tokio::test(start_paused = true)]
@@ -88,7 +88,7 @@ static QUIET_FILES: include_dir::Dir<'_> =
 #[test]
 fn an_answer_that_is_no_diagnosis_leaves_the_environment_undetermined() {
     let read = Outcome::Logs(lemonfiber_core::app::LogsReport { lines: 0 });
-    assert_eq!(overall(&gating(found(read))), Overall::Unknown);
+    assert_eq!(Overall::of(&gating(found(read))), Overall::Unknown);
 }
 
 #[test]

@@ -23,8 +23,8 @@
 //! offered and an explanation imposed.
 
 use lemonfiber_core::acknowledged::Acknowledged;
-use lemonfiber_core::glossary::{mentioned, Term, Vocabulary};
-use lemonfiber_core::text::Overrun;
+use lemonfiber_words::glossary::{mentioned, Term, Vocabulary};
+use lemonfiber_words::text::Overrun;
 
 use super::{Lines, PRODUCT};
 
@@ -209,7 +209,7 @@ fn remainder(words: &[&'static str]) -> Option<String> {
 /// overrun is re-wrapped by the terminal the report is read at; a screen has no such
 /// reader and asks for the other edge.
 fn wrapped(text: &str, width: usize) -> Vec<String> {
-    lemonfiber_core::text::wrapped(text, width, Overrun::Allowed)
+    lemonfiber_words::text::wrapped(text, width, Overrun::Allowed)
 }
 
 #[cfg(test)]

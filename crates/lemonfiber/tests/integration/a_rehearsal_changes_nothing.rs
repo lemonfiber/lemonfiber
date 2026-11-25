@@ -48,7 +48,7 @@ use clap::CommandFactory as _;
 
 use lemonfiber::carried::STACK;
 use lemonfiber::cli::Cli;
-use lemonfiber_core::app::rehearsal::{asked, keeps_its_own_record, Rehearsal};
+use lemonfiber_core::app::rehearsal::{keeps_its_own_record, Rehearsal};
 use lemonfiber_core::app::{dispatch, Command, Ctx};
 use lemonfiber_core::archive::{Archive, Archiving, Fault, Reader, Space, Vault};
 use lemonfiber_core::backup::{Existing, Item, Manifest};
@@ -529,7 +529,7 @@ fn every_name_a_refusal_publishes_can_be_typed() {
     let refusing: BTreeSet<String> = samples()
         .into_iter()
         .chain(beyond_the_command_line())
-        .map(|(_, command)| asked(&command))
+        .map(|(_, command)| command.asked())
         .filter(|asked| !matches!(asked.rehearsal, Rehearsal::Reads | Rehearsal::Reports))
         .map(|asked| asked.named.to_owned())
         .collect();

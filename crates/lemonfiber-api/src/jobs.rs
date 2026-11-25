@@ -56,8 +56,8 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_error::Problem;
 
 use ended::{Ended, Ending};
 use lemonfiber_core::ports::random::Random;

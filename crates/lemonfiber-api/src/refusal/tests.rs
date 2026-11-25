@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use axum::body::to_bytes;
 use axum::http::StatusCode;
-use lemonfiber_core::error::codes::declared;
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_error::codes::declared;
 use serde_json::Value;
 
 use super::{Refusal, UNRENDERED};
@@ -91,7 +91,7 @@ fn only_the_refusals_that_are_not_faults_are_warnings() {
         let warns = matches!(refusal, Refusal::NotForAKey);
         let severity = refusal.problem("").severity;
         assert_eq!(
-            severity == lemonfiber_core::error::Severity::Warning,
+            severity == lemonfiber_error::Severity::Warning,
             warns,
             "{refusal:?}"
         );

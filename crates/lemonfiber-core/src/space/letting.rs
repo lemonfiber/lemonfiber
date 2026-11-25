@@ -19,8 +19,9 @@
 
 use serde::Serialize;
 
-use super::waste::{ratio_reads, Candidate, Standing};
+use super::waste::{Candidate, Standing};
 use crate::ports::service::Seeded;
+use lemonfiber_words::ratio;
 
 /// What goes with a download when the client lets it go, said before it is asked for.
 ///
@@ -114,7 +115,7 @@ pub fn agreement(download: &Candidate) -> String {
 fn stands(standing: Standing) -> String {
     match standing {
         Standing::NeverImported => "never imported".to_owned(),
-        Standing::Seeding { ratio } => ratio_reads(ratio).map_or_else(
+        Standing::Seeding { ratio } => ratio::reads(ratio).map_or_else(
             || "seeding, having taken nothing".to_owned(),
             |reads| format!("seeding at {reads}"),
         ),

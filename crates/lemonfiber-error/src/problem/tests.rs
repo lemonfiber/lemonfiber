@@ -224,3 +224,14 @@ fn a_problem_says_the_wait_its_code_declares_until_it_knows_the_time_left() {
     let silent = serde_json::to_value(a_problem()).ok();
     assert!(silent.is_some_and(|said| said.get("retry_after").is_none()));
 }
+
+/// The classification the operator sees is the one the problem already carried. A
+/// second vocabulary invented here would be a second thing to keep in step.
+#[test]
+fn what_lemonfiber_can_mend_is_what_the_problem_already_said() {
+    assert!(State::Remediable.mendable());
+    assert!(!State::Actionable.mendable());
+    assert!(!State::Guided.mendable());
+    assert!(!State::Unknown.mendable());
+    assert!(!State::Suppressed.mendable());
+}

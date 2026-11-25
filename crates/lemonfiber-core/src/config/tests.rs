@@ -112,20 +112,6 @@ fn nothing_recorded_means_nothing_configured() {
 }
 
 #[test]
-fn a_setting_may_be_spelled_the_ways_people_spell_it() {
-    // Including quoted, which a hand-edited .env commonly is.
-    for on in ["on", "ON", "true", "yes", "1", " on ", "\"on\"", "'yes'"] {
-        assert!(super::reads_as_on(on), "{on:?} should read as on");
-    }
-    for off in ["off", "false", "no", "0", "", "maybe", "\"off\"", "\"\""] {
-        assert!(!super::reads_as_on(off), "{off:?} should not read as on");
-        if off != "maybe" {
-            assert!(super::reads_as_off(off), "{off:?} should read as off");
-        }
-    }
-}
-
-#[test]
 fn the_project_name_defaults_to_the_product() {
     let settings = Settings::default();
     assert_eq!(settings.project, "lemonfiber");

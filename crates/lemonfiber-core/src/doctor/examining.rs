@@ -48,7 +48,7 @@ pub async fn examine(checks: &[Box<dyn Check>], narrowing: &Narrowing) -> Doctor
     .collect();
     DoctorReport {
         rehearsed: false,
-        overall: overall(&findings),
+        overall: Overall::of(&findings),
         findings,
     }
 }
@@ -165,40 +165,42 @@ fn timed_out(check: &dyn Check) -> Finding {
     }
 }
 
-/// Reduce findings to one word.
-///
-/// Public as well as used here, because a caller that keeps only some of a run's
-/// findings has to be able to sum what it kept. Re-summing is the whole point: a
-/// verdict carried over from the run a finding was dropped from would be a word about
-/// findings that are no longer there.
-///
-/// Highest consequence wins, and it is never an average — one leaking VPN among
-/// eighteen passes is not eighteen-nineteenths healthy. An unverified finding
-/// keeps the answer out of `healthy`: a thing that could not be checked is not a
-/// thing that passed, and a run that established nothing is `unknown` rather than
-/// a comfortable green.
-#[must_use]
-pub fn overall(findings: &[Finding]) -> Overall {
-    let mut passed = false;
-    let mut warned = false;
-    let mut unverified = false;
-    for finding in findings {
-        match finding.verdict {
-            Verdict::Fail(_) => return Overall::Broken,
-            Verdict::Warn(_) => warned = true,
-            Verdict::Unverified { .. } => unverified = true,
-            Verdict::Pass { .. } => passed = true,
-            Verdict::Skipped { .. } => {}
+impl Overall {
+    /// Reduce findings to one word.
+    ///
+    /// Public as well as used here, because a caller that keeps only some of a run's
+    /// findings has to be able to sum what it kept. Re-summing is the whole point: a
+    /// verdict carried over from the run a finding was dropped from would be a word about
+    /// findings that are no longer there.
+    ///
+    /// Highest consequence wins, and it is never an average — one leaking VPN among
+    /// eighteen passes is not eighteen-nineteenths healthy. An unverified finding
+    /// keeps the answer out of `healthy`: a thing that could not be checked is not a
+    /// thing that passed, and a run that established nothing is `unknown` rather than
+    /// a comfortable green.
+    #[must_use]
+    pub fn of(findings: &[Finding]) -> Self {
+        let mut passed = false;
+        let mut warned = false;
+        let mut unverified = false;
+        for finding in findings {
+            match finding.verdict {
+                Verdict::Fail(_) => return Self::Broken,
+                Verdict::Warn(_) => warned = true,
+                Verdict::Unverified { .. } => unverified = true,
+                Verdict::Pass { .. } => passed = true,
+                Verdict::Skipped { .. } => {}
+            }
         }
-    }
-    if warned {
-        Overall::Degraded
-    } else if unverified {
-        Overall::Unknown
-    } else if passed {
-        Overall::Healthy
-    } else {
-        Overall::Unknown
+        if warned {
+            Self::Degraded
+        } else if unverified {
+            Self::Unknown
+        } else if passed {
+            Self::Healthy
+        } else {
+            Self::Unknown
+        }
     }
 }
 

@@ -52,11 +52,11 @@ fn an_invitation_is_asked_which_libraries_and_how_far_up_the_ratings() {
 
     let listed = showing(&acting);
     assert!(listed.contains("> anything"), "{listed}");
-    let step = lemonfiber_core::age_limit::steps()
+    let step = lemonfiber_core::age_limit::OFFERED
         .iter()
         .find(|step| step.age == 12)
         .map_or_else(String::new, |step| {
-            lemonfiber_core::age_limit::reading(Some(step.age))
+            lemonfiber_words::age::reading(Some(step.age))
         });
     assert!(
         !step.is_empty(),

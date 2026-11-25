@@ -12,9 +12,9 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::asking::Asking;
 use lemonfiber_core::repair::run::Consent;
+use lemonfiber_error::Problem;
 
 use crate::exit::USAGE;
 use crate::say::complain;

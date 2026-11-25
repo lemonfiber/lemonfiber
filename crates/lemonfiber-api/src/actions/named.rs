@@ -28,10 +28,10 @@ use lemonfiber_core::app::{
 use lemonfiber_core::bundle::run::{Wanted, LINES};
 use lemonfiber_core::companion::Asked as Paired;
 use lemonfiber_core::doctor::Narrowing;
-use lemonfiber_core::error::codes::{life, rate, update};
-use lemonfiber_core::error::Code;
 use lemonfiber_core::uninstall::{Tier, TIERS};
 use lemonfiber_core::update::run::Asked;
+use lemonfiber_error::codes::{life, rate, update};
+use lemonfiber_error::Code;
 
 mod choosing;
 mod extending;

@@ -81,7 +81,8 @@ jobs:
             case "${path}" in
             crates/lemonfiber/* | crates/lemonfiber-adapters/* | crates/lemonfiber-api/* \
               | crates/lemonfiber-core/* | crates/lemonfiber-error/* | crates/lemonfiber-manifest/* \
-              | crates/lemonfiber-plugin/* | crates/lemonfiber-ports/* | fuzz/* \
+              | crates/lemonfiber-plugin/* | crates/lemonfiber-ports/* | crates/lemonfiber-words/* \
+              | fuzz/* \
               | .github/workflows/fuzz.yml | rust-toolchain.toml | Cargo.lock)
               fuzzed=true
               ;;

@@ -5,7 +5,7 @@ use lemonfiber_plugin::{Manifest, Shape};
 use lemonfiber_plugin::seeding::Form;
 
 use super::{
-    asked, changes, overrides, placeholding, proofs, reshipped, taking, Changing, Overriding,
+    changes, overrides, placeholding, proofs, reshipped, taking, Changing, Overriding,
     Placeholding, Proving, Puts, Taking,
 };
 use crate::plugin::installed::Installed;
@@ -283,7 +283,7 @@ fn a_shape_is_asked_to_be_approved_after_every_value_the_recipes_send_elsewhere(
     }];
     let taken = taking(&shaped);
     assert_eq!(
-        asked(&shaped, &taken),
+        shaped.asked(&taken),
         ["token@meta.example.org", "egress-guard@gluetun"]
     );
 }

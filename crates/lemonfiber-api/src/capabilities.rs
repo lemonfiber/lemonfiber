@@ -24,7 +24,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::standing::StackStanding;
-use lemonfiber_core::app::{switched, Command, Ctx};
+use lemonfiber_core::app::{Command, Ctx};
 use lemonfiber_core::keys::Scope as KeyScope;
 use lemonfiber_core::model::{kind, Envelope};
 use serde::Serialize;
@@ -176,7 +176,8 @@ fn served_at(action: &str) -> String {
 fn offered(standing: &StackStanding, caller: &Caller, door: Door, command: Command) -> Standing {
     match may(caller, door, command) {
         Permitted::Nothing | Permitted::NotForAKey(_) => Standing::Unpermitted,
-        Permitted::This(command) => match switched::needed(&command)
+        Permitted::This(command) => match command
+            .needed_setting()
             .filter(|setting| standing.switched_off.iter().any(|off| off == setting))
         {
             Some(_) => Standing::Unconfigured,

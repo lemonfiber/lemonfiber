@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lemonfiber_core::app::{dispatch, Command, Ctx, ReadingLogs};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_core::ports::{Arrival, Narrator};
+use lemonfiber_error::Problem;
 
 use crate::events::live::Live;
 use crate::events::wire::{EventKind, Rendered};

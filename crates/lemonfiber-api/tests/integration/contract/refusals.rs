@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use axum::http::StatusCode;
 use lemonfiber_api::contract::Contract;
 use lemonfiber_core::agreement::MOVED;
-use lemonfiber_core::error::codes::{self, plugin, quota, setting};
-use lemonfiber_core::error::Code;
+use lemonfiber_error::codes::{self, plugin, quota, setting};
+use lemonfiber_error::Code;
 
 /// A generator names a value per refusal after the name it is declared under, so two
 /// codes declared under one name would be one value standing for two refusals — and

@@ -88,7 +88,7 @@ impl Terminal {
         if !self.explaining {
             return;
         }
-        let Some(term) = lemonfiber_core::glossary::explain(word) else {
+        let Some(term) = lemonfiber_words::glossary::explain(word) else {
             return;
         };
         if !self.first_meeting(term.word) {

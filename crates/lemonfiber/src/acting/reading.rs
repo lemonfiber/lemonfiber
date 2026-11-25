@@ -14,7 +14,7 @@
 //! becomes: rendered by the renderer the command line reaches for the same answer,
 //! so the two surfaces cannot come to say different things about one stack.
 
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 use super::{Press, Stage, Wanted};
 

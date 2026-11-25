@@ -20,7 +20,7 @@
 //! what it is unsure of teaches an operator that absence means nothing happened.
 
 use lemonfiber_core::changelog::{Notes, Release, State, Summary};
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 
 use super::Lines;
 

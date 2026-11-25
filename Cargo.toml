@@ -38,6 +38,7 @@ lemonfiber-pinned = { path = "crates/lemonfiber-pinned" }
 lemonfiber-random = { path = "crates/lemonfiber-random" }
 lemonfiber-sidecar = { path = "crates/lemonfiber-sidecar" }
 lemonfiber-testing = { path = "crates/lemonfiber-testing" }
+lemonfiber-words = { path = "crates/lemonfiber-words" }
 schemars = "1.2"
 # Validating the contract's examples against its schemas, in tests alone.
 boon = "0.6"

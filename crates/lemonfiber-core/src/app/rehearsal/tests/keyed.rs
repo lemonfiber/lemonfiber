@@ -1,6 +1,6 @@
 //! What a rehearsal of asking the keys and the back-ends for something comes to.
 
-use super::super::{asked, Rehearsal};
+use super::super::Rehearsal;
 use crate::app::Command;
 
 /// Asking the keys rehearses as each request is: a listing reads, a revoke says which
@@ -9,28 +9,32 @@ use crate::app::Command;
 fn asking_the_keys_rehearses_as_each_request_is() {
     use crate::keys::run::Asked as Keyed;
     use crate::keys::Minter;
-    let list = asked(&Command::Keys(Keyed::List {
+    let list = Command::Keys(Keyed::List {
         by: Minter::Operator,
-    }));
+    })
+    .asked();
     assert!(matches!(list.rehearsal, Rehearsal::Reads));
-    let revoke = asked(&Command::Keys(Keyed::Revoke {
+    let revoke = Command::Keys(Keyed::Revoke {
         name: "ha".to_owned(),
         by: Minter::Operator,
-    }));
+    })
+    .asked();
     assert!(matches!(revoke.rehearsal, Rehearsal::Reports));
-    let mint = asked(&Command::Keys(Keyed::Mint {
+    let mint = Command::Keys(Keyed::Mint {
         name: "ha".to_owned(),
         scope: "read".to_owned(),
         purpose: "other".to_owned(),
         by: Minter::Operator,
         claim: false,
         proving: None,
-    }));
+    })
+    .asked();
     assert!(matches!(mint.rehearsal, Rehearsal::Cannot(_)));
-    let collect = asked(&Command::Keys(Keyed::Collect {
+    let collect = Command::Keys(Keyed::Collect {
         claim: "lfc_".to_owned(),
         from: None,
-    }));
+    })
+    .asked();
     assert!(matches!(collect.rehearsal, Rehearsal::Cannot(_)));
 }
 
@@ -50,7 +54,7 @@ fn asking_the_back_ends_rehearses_as_each_request_is() {
             "notify mine",
         ),
     ] {
-        let rehearsed = asked(&Command::Notify(command));
+        let rehearsed = Command::Notify(command).asked();
         assert_eq!(rehearsed.named, named);
         assert!(matches!(rehearsed.rehearsal, Rehearsal::Reads));
     }
@@ -86,7 +90,7 @@ fn asking_the_back_ends_rehearses_as_each_request_is() {
             "notify choose",
         ),
     ] {
-        let rehearsed = asked(&Command::Notify(command));
+        let rehearsed = Command::Notify(command).asked();
         assert_eq!(rehearsed.named, named);
         assert!(matches!(rehearsed.rehearsal, Rehearsal::Reports));
     }
@@ -97,9 +101,10 @@ fn asking_the_back_ends_rehearses_as_each_request_is() {
 #[test]
 fn a_challenge_for_a_device_key_cannot_be_rehearsed() {
     use crate::device_keys::run::Asked as Devices;
-    let challenge = asked(&Command::DeviceKeys(Devices::Challenge {
+    let challenge = Command::DeviceKeys(Devices::Challenge {
         name: "pixel".to_owned(),
         session: "a-session".to_owned(),
-    }));
+    })
+    .asked();
     assert!(matches!(challenge.rehearsal, Rehearsal::Cannot(_)));
 }

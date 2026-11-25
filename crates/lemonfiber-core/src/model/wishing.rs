@@ -12,17 +12,6 @@ use crate::ports::service::{BookUnit, MusicUnit};
 
 pub use crate::ports::media::TitleKind;
 
-/// What a household calls a title of `kind`, one of them, as a search names what it
-/// looked among.
-#[must_use]
-pub const fn asked_noun(kind: TitleKind) -> &'static str {
-    match kind {
-        TitleKind::Music => "album and artist",
-        TitleKind::Books => "book, author and series",
-        TitleKind::Tv | TitleKind::Movies => kind.noun(),
-    }
-}
-
 impl From<Medium> for TitleKind {
     fn from(medium: Medium) -> Self {
         match medium {

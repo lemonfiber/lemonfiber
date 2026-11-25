@@ -34,7 +34,7 @@ use super::reading::Reading;
 use super::surface::{self, Open};
 use super::Stage;
 use crate::ui::Asked;
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 use shapes::{
     agreed, choosing, dimmed, elsewhere, named, read, setting, shortened, typing, AGREEING,
 };

@@ -12,8 +12,8 @@
 //! test cannot see.
 
 use lemonfiber_core::config::paths::GRANTS;
-use lemonfiber_core::error::codes::admit::NOT_YOURS;
-use lemonfiber_core::error::household::Words;
+use lemonfiber_error::codes::admit::NOT_YOURS;
+use lemonfiber_error::household::Words;
 
 use crate::door;
 use door::*;

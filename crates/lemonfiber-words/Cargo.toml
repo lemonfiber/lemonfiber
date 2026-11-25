@@ -1,0 +1,21 @@
+[package]
+name = "lemonfiber-words"
+description = "How lemonfiber words what it shows: text made safe for a terminal, byte counts as a person reads them, and the glossary."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license-file = "../../LICENSE"
+publish = false
+
+[dependencies]
+lemonfiber-error = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

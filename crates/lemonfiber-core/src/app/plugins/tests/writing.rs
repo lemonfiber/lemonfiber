@@ -33,7 +33,7 @@ async fn the_document_on_disk_is_the_container_the_record_derives() {
     };
     let recorded = shown
         .and_then(|one| one.install)
-        .map(|one| crate::project::entries(&one.would, &reading))
+        .map(|one| one.would.project_entries(&reading))
         .unwrap_or_default();
 
     let written = document(&ctx);

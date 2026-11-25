@@ -10,10 +10,10 @@
 //! would free, and never in a paragraph afterwards. A figure with its cost a screen
 //! away is a figure somebody decides on without the cost.
 
-use lemonfiber_core::bytes::humanize;
 use lemonfiber_core::space::{
-    ratio_reads, Candidate, Consumption, Freshness, Letting, Reckoning, Reclaimed, Standing, Volume,
+    Candidate, Consumption, Freshness, Letting, Reckoning, Reclaimed, Standing, Volume,
 };
+use lemonfiber_words::bytes::humanize;
 
 use super::Lines;
 
@@ -197,7 +197,7 @@ fn stands(candidate: &Candidate) -> String {
         // A torrent added from files already on disk downloaded nothing, so there is
         // no ratio to divide — the fact is said rather than the number that stands
         // for it, which would read as forty-two million.
-        Standing::Seeding { ratio } => ratio_reads(ratio).map_or_else(
+        Standing::Seeding { ratio } => lemonfiber_words::ratio::reads(ratio).map_or_else(
             || "imported, and still seeding, having given back more than it ever took".to_owned(),
             |reads| format!("imported, and still seeding at a ratio of {reads}"),
         ),

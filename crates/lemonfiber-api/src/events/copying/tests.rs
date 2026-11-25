@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::copying::{Copied, Copying, Running, State, What};
-use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_core::instant::Instant;
+use lemonfiber_error::{Problem, Remedy};
 use tokio::time::Instant as Now;
 
 use super::{Heard, COPYING_EVERY};
@@ -99,7 +99,7 @@ fn nothing_running_is_said_only_to_whoever_joins() {
 fn a_read_that_answered_no_copy_says_nothing() {
     let (at, mut heard) = (Now::now(), Heard::default());
     let refused = Problem::new(
-        lemonfiber_core::error::codes::wish::NOT_ASKABLE,
+        lemonfiber_error::codes::wish::NOT_ASKABLE,
         "Refused.",
         "Refused.",
         Remedy::new("Try again."),

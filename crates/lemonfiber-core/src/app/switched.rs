@@ -14,7 +14,9 @@ use super::{Command, Ctx};
 /// The setting `command` is refused without, where it is off on this machine.
 #[must_use]
 pub fn off(ctx: &Ctx, command: &Command) -> Option<&'static str> {
-    needed(command).filter(|setting| !ctx.settings.reaching.allows(setting))
+    command
+        .needed_setting()
+        .filter(|setting| !ctx.settings.reaching.allows(setting))
 }
 
 /// Each setting some command cannot do its work without that is off on this machine.
@@ -29,15 +31,17 @@ pub(crate) fn switched_off(ctx: &Ctx) -> Vec<String> {
 /// Every setting some command cannot do its work without.
 const NEEDED: [&str; 1] = [REACH_REGISTRY_KEY];
 
-/// The setting `command` cannot do its work without, whether or not it is on.
-///
-/// A fetch asks a registry for images and for nothing else, so with
-/// [`REACH_REGISTRY_KEY`] off it is refused.
-#[must_use]
-pub const fn needed(command: &Command) -> Option<&'static str> {
-    match command {
-        Command::Pull { .. } => Some(REACH_REGISTRY_KEY),
-        _ => None,
+impl Command {
+    /// The setting this command cannot do its work without, whether or not it is on.
+    ///
+    /// A fetch asks a registry for images and for nothing else, so with
+    /// [`REACH_REGISTRY_KEY`] off it is refused.
+    #[must_use]
+    pub const fn needed_setting(&self) -> Option<&'static str> {
+        match self {
+            Command::Pull { .. } => Some(REACH_REGISTRY_KEY),
+            _ => None,
+        }
     }
 }
 

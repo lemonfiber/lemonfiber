@@ -1,7 +1,6 @@
 //! The larger reports the samples are built from, one function each.
 
 use lemonfiber_core::credential::Inventory;
-use lemonfiber_core::glossary::Term;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::model::{
     FrontDoorReport, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove,
@@ -10,6 +9,7 @@ use lemonfiber_core::model::{
 };
 use lemonfiber_core::stack::closure::Plan;
 use lemonfiber_core::wiring::{Reaches, Settled, Substitution, Unfilled, Wired};
+use lemonfiber_words::glossary::Term;
 
 /// A run of an update carrying one of everything it can report.
 ///

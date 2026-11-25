@@ -8,8 +8,8 @@
 
 use std::fmt::Write as _;
 
-use lemonfiber_core::error::codes::{every_declared, families, RETIRED};
-use lemonfiber_core::error::household::Words;
+use lemonfiber_error::codes::{every_declared, families, RETIRED};
+use lemonfiber_error::household::Words;
 use serde_json::{json, Value};
 
 /// Where the published registry is kept, relative to the workspace root.

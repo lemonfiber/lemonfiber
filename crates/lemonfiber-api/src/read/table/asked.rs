@@ -19,7 +19,7 @@
 //! drops the rest, and a request that named two things to follow and was answered
 //! about one of them has been answered about something it did not ask.
 
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 use crate::refusal::Refusal;
 

@@ -3,7 +3,7 @@
 
 use base64::Engine as _;
 use lemonfiber_core::companion::served::Served;
-use lemonfiber_core::error::codes::serve::NOT_SERVING;
+use lemonfiber_error::codes::serve::NOT_SERVING;
 
 use crate::door::{
     chosen, housed, keeping, keeping_at, offered_from, offering, session, surface, Chance,

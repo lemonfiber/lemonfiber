@@ -32,10 +32,10 @@ fn cleared(said: String, terms: &Terms) -> Result<String, Residual> {
     }
 }
 use lemonfiber_core::logs::viewer::{Filter, Scrollback};
-use lemonfiber_core::logs::{declared, Level};
-use lemonfiber_core::plural::s;
+use lemonfiber_core::logs::Level;
 use lemonfiber_core::ports::docker::{Lifecycle, LogLine};
-use lemonfiber_core::text::plain;
+use lemonfiber_error::plural::s;
+use lemonfiber_words::text::plain;
 
 use notices::{noticed, remark, SELF};
 
@@ -287,7 +287,7 @@ impl Viewer {
             .iter()
             .map(|line| Shown {
                 service: plain(&line.service),
-                level: declared(&line.line),
+                level: Level::declared(&line.line),
                 said: plain(&line.line),
             })
             .collect()
@@ -388,7 +388,7 @@ impl Viewer {
             unseen => format!(" — {unseen} unseen"),
         };
         let room = across.saturating_sub(unseen.chars().count());
-        lemonfiber_core::text::plain(&format!("{}{unseen}", self.sources(room)))
+        lemonfiber_words::text::plain(&format!("{}{unseen}", self.sources(room)))
     }
 
     /// Which services are being shown, named while there is room to name them.

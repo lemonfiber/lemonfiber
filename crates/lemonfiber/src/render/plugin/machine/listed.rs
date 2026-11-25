@@ -77,7 +77,7 @@ pub(super) fn provenance(one: &Installed, report: &Installs) -> Lines {
         lines.put(format!(
             "    adds       {} row{} to registers lemonfiber runs",
             one.contributions.len(),
-            lemonfiber_core::plural::s(one.contributions.len())
+            lemonfiber_error::plural::s(one.contributions.len())
         ));
     }
     for stands in substituted

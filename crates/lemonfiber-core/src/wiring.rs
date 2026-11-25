@@ -214,24 +214,26 @@ pub struct Unfilled {
     pub media_types: Vec<String>,
 }
 
-/// The words naming the media an ask is narrowed to, following what it asks for; none
-/// where it is narrowed to none.
-#[must_use]
-pub fn filing(files: Option<&str>, media_types: &[String]) -> String {
-    let media: Vec<&str> = files
-        .into_iter()
-        .chain(media_types.iter().map(String::as_str))
-        .collect();
-    if media.is_empty() {
-        String::new()
-    } else {
-        format!(" filing {}", media.join(" or "))
+impl Unfilled {
+    /// The words naming the media an ask is narrowed to, following what it asks for; none
+    /// where it is narrowed to none.
+    #[must_use]
+    pub fn filing(files: Option<&str>, media_types: &[String]) -> String {
+        let media: Vec<&str> = files
+            .into_iter()
+            .chain(media_types.iter().map(String::as_str))
+            .collect();
+        if media.is_empty() {
+            String::new()
+        } else {
+            format!(" filing {}", media.join(" or "))
+        }
     }
 }
 
 impl std::fmt::Display for Unfilled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let filing = filing(self.files.as_deref(), &self.media_types);
+        let filing = Self::filing(self.files.as_deref(), &self.media_types);
         match &self.native {
             Some(apis) => write!(
                 f,

@@ -25,18 +25,20 @@ pub(crate) const COST: &str =
                         itself — but peers reach you only when they can, so seeding is slower and \
                         some torrents will barely seed at all.";
 
-/// The consequence to state when a stack is set up this way, or nothing where it
-/// costs this stack nothing.
-///
-/// Nothing where no VPN carries torrents: a port the VPN forwards buys a Usenet-only
-/// stack, and one torrenting without a VPN, exactly nothing, and saying it anyway is a
-/// sentence about a problem the operator cannot have.
-#[must_use]
-pub const fn at_setup(supported: Supported, port_forward: &PortForward) -> Option<&'static str> {
-    if supported.tunnelled() && !port_forward.enabled {
-        Some(COST)
-    } else {
-        None
+impl PortForward {
+    /// The consequence to state when a stack is set up this way, or nothing where it
+    /// costs this stack nothing.
+    ///
+    /// Nothing where no VPN carries torrents: a port the VPN forwards buys a Usenet-only
+    /// stack, and one torrenting without a VPN, exactly nothing, and saying it anyway is a
+    /// sentence about a problem the operator cannot have.
+    #[must_use]
+    pub const fn unforwarded_at_setup(&self, supported: Supported) -> Option<&'static str> {
+        if supported.tunnelled() && !self.enabled {
+            Some(COST)
+        } else {
+            None
+        }
     }
 }
 

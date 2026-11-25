@@ -1,7 +1,5 @@
-use std::time::Duration;
-
 use super::Step;
-use super::{size, spell_out, Line, Speed};
+use super::{Line, Speed};
 
 #[test]
 fn a_line_says_what_its_step_says() {
@@ -60,18 +58,4 @@ fn a_large_download_is_known_to_be_large() {
     }
     .is_large());
     assert_eq!(Speed::default().line().step, Step::Downloading);
-}
-
-#[test]
-fn sizes_read_in_the_units_the_rest_of_the_product_quotes() {
-    assert_eq!(size(2_100_000_000), "2.1 GB");
-    assert_eq!(size(999_000_000), "999 MB");
-    assert_eq!(size(0), "0 MB");
-}
-
-#[test]
-fn a_wait_is_told_in_the_coarsest_unit_that_still_says_something() {
-    assert_eq!(spell_out(Duration::from_secs(45)), "45s");
-    assert_eq!(spell_out(Duration::from_secs(120)), "2m");
-    assert_eq!(spell_out(Duration::from_secs(7200)), "2h");
 }

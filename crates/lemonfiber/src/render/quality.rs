@@ -3,12 +3,12 @@
 //! One of the renderers, its own file so each answer's shape is read on its own.
 //! Every one of them builds lines and hands them back; the printer is at the edge.
 
-use lemonfiber_core::bytes::humanize;
 use lemonfiber_core::model::{
     Disposition, MusicChoice, MusicReport, PresetChoice, QualityReport, Total, Triggered,
     UpgradeReport,
 };
 use lemonfiber_core::PRODUCT;
+use lemonfiber_words::bytes::humanize;
 
 use super::Lines;
 

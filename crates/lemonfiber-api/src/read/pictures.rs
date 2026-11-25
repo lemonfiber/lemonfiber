@@ -16,9 +16,9 @@ use axum::routing::get;
 use axum::Router;
 use lemonfiber_core::app::{Command, Viewing, Whom, Wishing};
 use lemonfiber_core::collected::Unit;
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::ports::service::Picture;
 use lemonfiber_core::screening::{picture, Pictured};
+use lemonfiber_error::Problem;
 
 use crate::admission::Caller;
 use crate::entitled::{may, Door};

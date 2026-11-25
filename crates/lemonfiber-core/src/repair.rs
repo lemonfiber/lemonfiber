@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::baseline::Record;
 use crate::condition::Condition;
-use crate::error::{Remedy, State};
+use crate::error::Remedy;
 use crate::journal::{Change, Undo};
 
 pub use crate::ports::service::ASK_FOR_REPAIRS;
@@ -232,16 +232,6 @@ impl Outcome {
     pub const fn settled(&self) -> bool {
         matches!(self, Self::Fixed)
     }
-}
-
-/// Whether a finding in this state is something lemonfiber could put right itself.
-///
-/// The classification the operator sees is the one the problem already carries: a check
-/// says what kind of trouble it found when it raises it, and a second vocabulary invented
-/// here would be a second thing to keep in step with the first.
-#[must_use]
-pub const fn mendable(state: State) -> bool {
-    matches!(state, State::Remediable)
 }
 
 /// Whether this condition should still be offered a repair.

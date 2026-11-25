@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
 
-use crate::app::{answered_under, dispatch, rehearsal, Command, Ctx, Outcome, Rehearsal};
+use crate::app::{dispatch, Command, Ctx, Outcome, Rehearsal};
 use crate::error::codes::plugin::{KEY_UNREADABLE, UNREADABLE};
 use crate::error::Problem;
 use crate::model::kind;
@@ -417,7 +417,7 @@ fn only_a_recording_that_writes_is_refused_a_rehearsal() {
         },
     ];
     for asked in reads {
-        let rehearsal = rehearsal::asked(&Command::Authoring(asked.clone())).rehearsal;
+        let rehearsal = Command::Authoring(asked.clone()).asked().rehearsal;
         assert!(matches!(rehearsal, Rehearsal::Reads), "{asked:?}");
     }
 
@@ -425,10 +425,7 @@ fn only_a_recording_that_writes_is_refused_a_rehearsal() {
         path,
         taking: Retaking::default(),
     });
-    assert!(matches!(
-        rehearsal::asked(&writing).rehearsal,
-        Rehearsal::Cannot(_)
-    ));
+    assert!(matches!(writing.asked().rehearsal, Rehearsal::Cannot(_)));
 }
 
 #[test]
@@ -456,6 +453,6 @@ fn each_question_names_the_kind_it_is_answered_under() {
         ),
     ];
     for (asked, kind) in asked {
-        assert_eq!(answered_under(&Command::Authoring(asked)), &[kind]);
+        assert_eq!(Command::Authoring(asked).answered_under(), &[kind]);
     }
 }

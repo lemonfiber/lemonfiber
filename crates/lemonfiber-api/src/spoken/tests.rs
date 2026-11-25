@@ -1,9 +1,9 @@
 use axum::body::to_bytes;
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
-use lemonfiber_core::error::codes::play::SERVER_SILENT;
-use lemonfiber_core::error::household::Words;
-use lemonfiber_core::error::{Problem, Remedy};
+use lemonfiber_error::codes::play::SERVER_SILENT;
+use lemonfiber_error::household::Words;
+use lemonfiber_error::{Problem, Remedy};
 use lemonfiber_fixtures::unhoused::unhoused;
 
 use lemonfiber_core::app::Outcome;
@@ -188,7 +188,7 @@ fn a_refusal_carries_retry_after_only_where_its_code_declares_a_wait() {
     let waits = refused(
         StatusCode::SERVICE_UNAVAILABLE,
         Problem::new(
-            lemonfiber_core::error::codes::wish::NOT_CHECKED,
+            lemonfiber_error::codes::wish::NOT_CHECKED,
             "Not checked.",
             "Not checked.",
             Remedy::new("Try again."),

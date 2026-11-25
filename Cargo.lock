@@ -1623,8 +1623,10 @@ dependencies = [
  "lemonfiber-fixtures",
  "lemonfiber-manifest",
  "lemonfiber-platform",
+ "lemonfiber-ports",
  "lemonfiber-sdk",
  "lemonfiber-testing",
+ "lemonfiber-words",
  "qrcodegen",
  "ra-ap-rustc_lexer",
  "ratatui",
@@ -1709,7 +1711,9 @@ dependencies = [
  "lemonfiber-error",
  "lemonfiber-examples",
  "lemonfiber-fixtures",
+ "lemonfiber-ports",
  "lemonfiber-testing",
+ "lemonfiber-words",
  "ring",
  "schemars",
  "serde",
@@ -1800,6 +1804,7 @@ dependencies = [
  "lemonfiber-ports",
  "lemonfiber-sidecar",
  "lemonfiber-testing",
+ "lemonfiber-words",
  "p12-keystore",
  "rcgen",
  "regex",
@@ -1992,6 +1997,16 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "lemonfiber-words"
+version = "0.17.0"
+dependencies = [
+ "lemonfiber-error",
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

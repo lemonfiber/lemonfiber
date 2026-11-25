@@ -10,7 +10,7 @@
 //! second wall, not the first.
 
 use lemonfiber_core::plugin::{Installed, Recipe, Sharing, Taking};
-use lemonfiber_core::text::plain;
+use lemonfiber_words::text::plain;
 
 use super::super::super::Lines;
 

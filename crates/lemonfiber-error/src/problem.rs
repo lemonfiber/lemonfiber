@@ -98,6 +98,18 @@ pub enum State {
     Suppressed,
 }
 
+impl State {
+    /// Whether a finding in this state is something lemonfiber could put right itself.
+    ///
+    /// The classification the operator sees is the one the problem already carries: a check
+    /// says what kind of trouble it found when it raises it, and a second vocabulary invented
+    /// here would be a second thing to keep in step with the first.
+    #[must_use]
+    pub const fn mendable(self) -> bool {
+        matches!(self, Self::Remediable)
+    }
+}
+
 /// One thing the operator can do about a problem.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Remedy {

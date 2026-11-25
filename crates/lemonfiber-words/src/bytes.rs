@@ -82,5 +82,26 @@ pub fn humanize(bytes: u64) -> String {
     format!("{bytes} B")
 }
 
+/// A size in the decimal gigabytes the rest of the product quotes — the same units the
+/// quality presets and the free-space checks use, so two numbers an operator sees on one
+/// screen mean the same thing.
+#[must_use]
+pub fn decimal(bytes: u64) -> String {
+    /// One decimal gigabyte.
+    const GB: u64 = 1_000_000_000;
+    /// One decimal megabyte.
+    const MB: u64 = 1_000_000;
+
+    if bytes >= GB {
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "a size shown to one decimal place; the lost precision is far below \
+                      what is printed"
+        )]
+        return format!("{:.1} GB", bytes as f64 / GB as f64);
+    }
+    format!("{} MB", bytes / MB)
+}
+
 #[cfg(test)]
 mod tests;

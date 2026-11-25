@@ -1,6 +1,6 @@
 use super::{colour, draw, widest};
 use crate::logs::{Press, Viewer};
-use lemonfiber_core::logs::{declared, Level};
+use lemonfiber_core::logs::Level;
 use lemonfiber_core::ports::docker::{LogLine, Stream};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier, Style};
@@ -480,7 +480,7 @@ fn no_line_is_given_a_severity_its_own_words_do_not_say() {
     for shown in lines {
         assert_eq!(
             shown.level,
-            declared(&shown.said),
+            Level::declared(&shown.said),
             "a severity nothing on the line said: {}",
             shown.said
         );
@@ -520,7 +520,7 @@ fn the_words_this_screen_explains_are_explained_whole() {
     viewer.take(line("qbittorrent", "INFO the hardlink failed"));
     viewer.pressed(Press::Typed('?'));
 
-    let explained: Vec<&str> = lemonfiber_core::glossary::TERMS
+    let explained: Vec<&str> = lemonfiber_words::glossary::TERMS
         .iter()
         .filter(|term| term.word == "hardlink")
         .flat_map(|term| term.short.split_whitespace())

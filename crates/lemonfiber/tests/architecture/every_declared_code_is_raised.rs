@@ -12,7 +12,7 @@
 
 use std::collections::BTreeSet;
 
-use lemonfiber_core::error::codes::{declared, every, Declared};
+use lemonfiber_error::codes::{declared, every, Declared};
 
 use crate::source_tree::{crates_that_ship, in_a_crate_that_ships, shipped};
 

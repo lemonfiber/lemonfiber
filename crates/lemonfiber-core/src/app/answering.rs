@@ -16,21 +16,22 @@ use super::command::{
     Asking, Keeping, Linking, MigrateAction, Polled, Queueing, Settling, Shelf, Surfacing, Whom,
     Wishing,
 };
-use super::rehearsal;
 use super::Command;
 use super::{authoring, plugins};
 
-/// The kinds `command`'s answer is written under.
-///
-/// Every command that reports a rehearsal, as the rehearsal table names it, and every
-/// command a read reaches. Empty for a command neither reaches.
-#[must_use]
-pub const fn answered_under(command: &Command) -> &'static [Kind] {
-    let reported = rehearsal::asked(command).answers;
-    if reported.is_empty() {
-        read(command)
-    } else {
-        reported
+impl Command {
+    /// The kinds `command`'s answer is written under.
+    ///
+    /// Every command that reports a rehearsal, as the rehearsal table names it, and every
+    /// command a read reaches. Empty for a command neither reaches.
+    #[must_use]
+    pub const fn answered_under(&self) -> &'static [Kind] {
+        let reported = self.asked().answers;
+        if reported.is_empty() {
+            read(self)
+        } else {
+            reported
+        }
     }
 }
 
@@ -111,17 +112,18 @@ const fn surfaced(asked: &Surfacing) -> &'static [Kind] {
 /// What a polled read answers with: what the route asking the same read answers with.
 const fn polls(polled: &Polled) -> &'static [Kind] {
     match polled {
-        Polled::Settings => answered_under(&Command::Settings(Settling::Read)),
-        Polled::Wiring => answered_under(&Command::Wiring(Linking::Read)),
-        Polled::Installed => answered_under(&Command::Plugins(plugins::Asked::Installed)),
-        Polled::Recorded => answered_under(&Command::Plugins(plugins::Asked::Recorded)),
-        Polled::Copying => answered_under(&Command::Copying),
-        Polled::Playing { .. } => answered_under(&Command::Playing { member: None }),
-        Polled::Household { .. } => answered_under(&Command::Household { member: None }),
-        Polled::Held(_) => answered_under(&Command::Held(Shelf {
+        Polled::Settings => Command::Settings(Settling::Read).answered_under(),
+        Polled::Wiring => Command::Wiring(Linking::Read).answered_under(),
+        Polled::Installed => Command::Plugins(plugins::Asked::Installed).answered_under(),
+        Polled::Recorded => Command::Plugins(plugins::Asked::Recorded).answered_under(),
+        Polled::Copying => Command::Copying.answered_under(),
+        Polled::Playing { .. } => (Command::Playing { member: None }).answered_under(),
+        Polled::Household { .. } => (Command::Household { member: None }).answered_under(),
+        Polled::Held(_) => Command::Held(Shelf {
             member: Whom::Defaults,
             most: 0,
-        })),
+        })
+        .answered_under(),
     }
 }
 

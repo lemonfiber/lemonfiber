@@ -32,7 +32,7 @@ use std::collections::VecDeque;
 
 use lemonfiber_ports::docker::LogLine;
 
-use super::{declared, Level};
+use super::Level;
 
 /// The lines a viewer is holding, and the account it owes of the ones it is not.
 #[derive(Debug)]
@@ -231,7 +231,7 @@ impl Filter {
     /// what it is: a search of what lines say about themselves.
     fn by_level(&self, line: &LogLine) -> bool {
         self.least
-            .is_none_or(|least| declared(&line.line).is_some_and(|level| level >= least))
+            .is_none_or(|least| Level::declared(&line.line).is_some_and(|level| level >= least))
     }
 
     /// Whether the line contains the text asked for.

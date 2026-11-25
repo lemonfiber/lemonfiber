@@ -10,10 +10,10 @@ use std::process::ExitCode;
 use crate::render::Lines;
 use crate::say::complain;
 use lemonfiber_core::config::HOUSEHOLD_HOST_SETTING;
-use lemonfiber_core::error::codes::{handoff, life, pair};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
 use lemonfiber_core::PRODUCT;
+use lemonfiber_error::codes::{handoff, life, pair};
+use lemonfiber_error::Problem;
 
 use super::exit_code;
 
@@ -33,7 +33,7 @@ pub(crate) fn complain(problem: &Problem) -> ExitCode {
 /// and this one did not. Three things follow, and only the first was the reason.
 ///
 /// **The text is made safe on the way out.** `Lines::put` passes everything through
-/// [`lemonfiber_core::text::plain`], and a failure carries text this product did not
+/// [`lemonfiber_words::text::plain`], and a failure carries text this product did not
 /// write — a service’s own words, a filesystem’s reason. A terminal is not a text
 /// box: an escape in the middle of one clears the screen or writes over the line
 /// just printed, and a diagnosis that no longer says what this product said has lost

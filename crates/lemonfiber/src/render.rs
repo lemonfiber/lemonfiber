@@ -117,14 +117,14 @@ impl Lines {
             self.said.push(line);
             return;
         }
-        self.said.push(lemonfiber_core::text::plain(&line));
+        self.said.push(lemonfiber_words::text::plain(&line));
     }
 
     /// A remedy: what to do, and where to look when that helps.
     ///
     /// One shape wherever a remedy is shown, so the diagnosis, a repair's escalation and
     /// anything after them cannot drift on how an action and its detail sit together.
-    pub(crate) fn remedy(&mut self, remedy: &lemonfiber_core::error::Remedy, indent: &str) {
+    pub(crate) fn remedy(&mut self, remedy: &lemonfiber_error::Remedy, indent: &str) {
         self.put(format!("{indent}→ {}", remedy.action));
         if let Some(detail) = &remedy.detail {
             self.put(format!("{indent}  {detail}"));
@@ -541,8 +541,8 @@ fn verdict(review: &Review, rehearsed: bool) -> Vec<String> {
 pub(crate) fn logged(service: &str, line: &str) -> String {
     format!(
         "{:<12} {}",
-        lemonfiber_core::text::plain(service),
-        lemonfiber_core::text::plain(line)
+        lemonfiber_words::text::plain(service),
+        lemonfiber_words::text::plain(line)
     )
 }
 

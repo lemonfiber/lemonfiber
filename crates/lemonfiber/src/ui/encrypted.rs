@@ -14,9 +14,9 @@ use std::sync::Arc;
 
 use lemonfiber_api::guard::Binding;
 use lemonfiber_core::companion::served::{uncertified, ServedReport};
-use lemonfiber_core::error::codes::serve::UNSETTLED_PORT;
-use lemonfiber_core::error::{Problem, Remedy};
 use lemonfiber_core::PRODUCT;
+use lemonfiber_error::codes::serve::UNSETTLED_PORT;
+use lemonfiber_error::{Problem, Remedy};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use tokio_rustls::TlsAcceptor;
 

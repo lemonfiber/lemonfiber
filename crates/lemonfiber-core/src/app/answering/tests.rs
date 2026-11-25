@@ -1,8 +1,7 @@
-use super::answered_under;
 use crate::app::command::{
     Asking, Diagnosing, Keeping, Linking, MigrateAction, Queueing, Settling, Tracing, Whom, Wishing,
 };
-use crate::app::{authoring, plugins, rehearsal, Command, Surfacing};
+use crate::app::{authoring, plugins, Command, Surfacing};
 use crate::model::kind::{self, Kind};
 
 /// Each command that only reads, and the kind it answers with.
@@ -195,7 +194,7 @@ fn a_code_answers_with_the_code_or_the_session_it_opens() {
         },
     ));
     assert_eq!(
-        answered_under(&coded),
+        coded.answered_under(),
         &[kind::SIGN_IN_CODE, kind::ADMISSION]
     );
 }
@@ -240,10 +239,10 @@ fn authoring() -> Vec<(Command, Kind)> {
 fn each_reading_answers_with_its_own_kind() {
     for (command, expected) in reading().into_iter().chain(dispatched()).chain(authoring()) {
         assert_eq!(
-            answered_under(&command),
+            command.answered_under(),
             &[expected],
             "{} answered under the wrong kind",
-            rehearsal::asked(&command).named
+            command.asked().named
         );
     }
 }
@@ -255,18 +254,15 @@ fn a_command_that_reports_answers_as_the_rehearsal_table_says() {
     let household = Command::Household {
         member: Some(Whom::Defaults),
     };
-    assert_eq!(
-        answered_under(&household),
-        rehearsal::asked(&household).answers
-    );
-    assert_eq!(answered_under(&household), &[kind::HOUSEHOLD]);
+    assert_eq!(household.answered_under(), household.asked().answers);
+    assert_eq!(household.answered_under(), &[kind::HOUSEHOLD]);
 }
 
 /// A command neither table reaches is said to answer with nothing, never with a guess.
 #[test]
 fn a_command_neither_table_reaches_answers_with_nothing() {
     let walking = Command::Walkthrough { item: None };
-    assert!(answered_under(&walking).is_empty());
+    assert!(walking.answered_under().is_empty());
 }
 
 /// A polled read answers with what the route asking the same read answers with.
@@ -274,10 +270,10 @@ fn a_command_neither_table_reaches_answers_with_nothing() {
 fn a_polled_read_answers_as_its_route_does() {
     for polled in crate::app::command::polling::tests::every_polled() {
         let route = polled.clone().twin();
-        assert_eq!(super::polls(&polled), answered_under(&route), "{polled:?}");
+        assert_eq!(super::polls(&polled), route.answered_under(), "{polled:?}");
         assert_eq!(
-            answered_under(&Command::Surface(Surfacing::Polled(polled.clone()))),
-            answered_under(&route),
+            Command::Surface(Surfacing::Polled(polled.clone())).answered_under(),
+            route.answered_under(),
             "{polled:?}"
         );
     }

@@ -30,7 +30,7 @@ use crate::config::Settings;
 use lemonfiber_manifest::Service;
 
 pub use ours::{
-    nothing_configured, switch, EVERY, GUIDE_SOURCE, POSTERS, PUSHBULLET, PUSHOVER, RELEASE_LIST,
+    switch, EVERY, GUIDE_SOURCE, NOTHING_CONFIGURED, POSTERS, PUSHBULLET, PUSHOVER, RELEASE_LIST,
 };
 
 /// One of the requests lemonfiber makes on its own account.

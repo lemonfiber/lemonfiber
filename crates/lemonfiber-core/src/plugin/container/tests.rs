@@ -108,7 +108,7 @@ fn installed(services: Vec<Placed>) -> Installed {
 
 /// The entries the project writes for `installed`'s services, read as `reading` answers.
 fn written(installed: &Installed, reading: &Reading<'_>) -> String {
-    crate::project::entries(installed, reading)
+    installed.project_entries(reading)
 }
 
 /// The document written for one placed service.

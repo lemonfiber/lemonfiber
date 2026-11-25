@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use lemonfiber_core::alert::{Alert, Moment};
-use lemonfiber_core::error::Severity;
 use lemonfiber_core::model::kind;
+use lemonfiber_error::Severity;
 
 use super::{alerted, playing, Dashboard};
 

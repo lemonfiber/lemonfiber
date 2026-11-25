@@ -26,7 +26,7 @@ segments do.
 Two things have to be got right or the answer is unusable.
 
 **The same function is compiled once per build, and the builds have different names.**
-A crate compiled for `cfg(test)` gets its own stable-crate-id, so `rehearsal::asked`
+A crate compiled for `cfg(test)` gets its own stable-crate-id, so `Command::asked`
 appears as `…CsiMQXB9iHM8p_…5asked` and `…CsaGYycarkOLn_…5asked` — one function to
 `llvm-cov`, two to anything matching on the mangled name. Read that way this workspace
 answered twenty-two thousand lines, nearly all in files the same report calls fully

@@ -311,6 +311,21 @@ pub struct Notes {
 }
 
 impl Notes {
+    /// What a record already in hand says to a build of `running`.
+    #[must_use]
+    pub fn told(record: Option<&Record>, running: &str) -> Self {
+        let Some(record) = record else {
+            return Self::unread();
+        };
+        let release = record.release(running);
+        Self {
+            state: state(record, running),
+            running: release.cloned(),
+            releases: record.releases.iter().map(Summary::from).collect(),
+            requirements: cited(record, release),
+        }
+    }
+
     /// What a surface is told where there is no record to read at all.
     ///
     /// Stale rather than empty and current, because "nothing could be read" and
@@ -330,22 +345,7 @@ impl Notes {
 /// What the record says to a build of this version.
 #[must_use]
 pub fn notes(running: &str) -> Notes {
-    told(Record::carried().as_ref(), running)
-}
-
-/// The same, from a record already in hand.
-#[must_use]
-pub fn told(record: Option<&Record>, running: &str) -> Notes {
-    let Some(record) = record else {
-        return Notes::unread();
-    };
-    let release = record.release(running);
-    Notes {
-        state: state(record, running),
-        running: release.cloned(),
-        releases: record.releases.iter().map(Summary::from).collect(),
-        requirements: cited(record, release),
-    }
+    Notes::told(Record::carried().as_ref(), running)
 }
 
 /// Where the record stands against the version reading it.

@@ -24,13 +24,13 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-use lemonfiber_core::error::{Problem, Remedy, State};
 use lemonfiber_core::PRODUCT;
+use lemonfiber_error::{Problem, Remedy, State};
 use tokio::net::TcpListener;
 
-use lemonfiber_core::error::codes::serve::ADDRESS_TAKEN;
+use lemonfiber_error::codes::serve::ADDRESS_TAKEN;
 
-use lemonfiber_core::error::codes::serve::NO_PASSWORD;
+use lemonfiber_error::codes::serve::NO_PASSWORD;
 
 /// How far this surface was asked to be reachable.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

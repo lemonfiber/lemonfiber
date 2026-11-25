@@ -7,11 +7,11 @@
 
 use lemonfiber_core::app::setup::asked;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, SetupAction};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{SetupOutcome, StorageFinding, WizardReport};
-use lemonfiber_core::prerequisites::prerequisites;
+use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Answer, Indexer, Provider, Step, Vpn};
+use lemonfiber_error::Problem;
 
 use super::{CredentialChoice, Prompt};
 
@@ -118,7 +118,7 @@ async fn walking(
             }
             Step::Protocols if asked => {
                 let protocols = prompt.protocols();
-                prompt.prerequisites(&prerequisites(protocols));
+                prompt.prerequisites(&PrerequisiteMap::of(protocols));
                 answer(ctx, Answer::Protocols(protocols)).await?
             }
             Step::Vpn if asked => answer(ctx, Answer::Vpn(vpn(prompt, &report))).await?,

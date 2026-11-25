@@ -20,8 +20,8 @@
 //! purpose is to say what a word means cannot afford to say most of it.
 
 use lemonfiber_core::acknowledged::Acknowledged;
-use lemonfiber_core::glossary::{mentioned, Term};
-use lemonfiber_core::text::{wrapped, Overrun};
+use lemonfiber_words::glossary::{mentioned, Term};
+use lemonfiber_words::text::{wrapped, Overrun};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Frame, Line, Span, Style};
 use ratatui::style::Modifier;

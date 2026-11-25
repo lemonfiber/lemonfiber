@@ -17,7 +17,7 @@
 //! is why it is the one line here that is made safe for a terminal and never made to
 //! fit a width.
 
-use lemonfiber_core::text::plain;
+use lemonfiber_words::text::plain;
 use ratatui::text::Line;
 
 use super::super::lasting;

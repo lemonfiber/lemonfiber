@@ -17,7 +17,7 @@
 
 use lemonfiber_core::docker::Criticality;
 use lemonfiber_core::model::{CatalogueReport, CataloguedService, RemovedService};
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 
 use super::Lines;
 

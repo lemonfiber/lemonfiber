@@ -204,7 +204,7 @@ fn the_help_names_every_step_the_core_offers() {
         .unwrap_or_default();
 
     assert!(!help.is_empty(), "the invite command has no help to read");
-    for step in lemonfiber_core::age_limit::steps() {
+    for step in lemonfiber_core::age_limit::OFFERED {
         assert!(
             help.contains(&step.age.to_string()),
             "{} is a step the core offers and the help does not name",

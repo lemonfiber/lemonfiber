@@ -255,8 +255,8 @@ fn standing(member: &HouseholdMember) -> String {
     // says nothing about what it actually holds back here.
     if let Some(limit) = member.access.age_limit {
         said.push(member.access.rated.as_ref().map_or_else(
-            || lemonfiber_core::age_limit::reading(Some(limit)),
-            |rated| lemonfiber_core::rating::said(limit, rated),
+            || lemonfiber_words::age::reading(Some(limit)),
+            |rated| rated.said(limit),
         ));
     }
     // Said either way on somebody narrowed, because an unexplained absence is what

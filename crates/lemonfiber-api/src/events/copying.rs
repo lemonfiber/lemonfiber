@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::copying::{Copying, Running};
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 use tokio::time::Instant;
 
 use super::theirs::due;

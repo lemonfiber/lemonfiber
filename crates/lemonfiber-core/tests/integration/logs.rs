@@ -6,7 +6,7 @@
 //! integration one gets two coverage mappings, and merging them invents missed lines
 //! that no annotated report can localise.
 
-use lemonfiber_core::logs::{declared, interleaved, Level, Line};
+use lemonfiber_core::logs::{interleaved, Level, Line};
 use lemonfiber_core::ports::docker::{LogLine, Stream};
 
 /// One line as the engine hands it over.
@@ -48,7 +48,7 @@ fn every_way_this_stacks_services_spell_a_level_reads_the_same() {
         // structured key=value, where the value is the word.
         ("time=2026-08-21 level=error msg=\"no route\"", Level::Error),
     ] {
-        assert_eq!(declared(line), Some(expected), "{line}");
+        assert_eq!(Level::declared(line), Some(expected), "{line}");
     }
 }
 
@@ -63,7 +63,7 @@ fn a_line_that_declares_nothing_is_left_declaring_nothing() {
         "   ",
         "2026-08-21T19:04:11Z starting up",
     ] {
-        assert_eq!(declared(line), None, "{line}");
+        assert_eq!(Level::declared(line), None, "{line}");
     }
 }
 
@@ -72,12 +72,12 @@ fn a_line_that_declares_nothing_is_left_declaring_nothing() {
 #[test]
 fn a_level_named_in_prose_is_something_the_line_is_talking_about() {
     assert_eq!(
-        declared("Downloading Error.404.S01E01.1080p.WEB-DL"),
+        Level::declared("Downloading Error.404.S01E01.1080p.WEB-DL"),
         None,
         "a release somebody named Error is not an error"
     );
     assert_eq!(
-        declared("Import finished, and the second attempt did not error"),
+        Level::declared("Import finished, and the second attempt did not error"),
         None,
         "past the fourth word it is prose"
     );
@@ -108,7 +108,7 @@ fn every_spelling_of_every_level_is_recognised() {
         ("panic", Level::Fatal),
     ] {
         assert_eq!(
-            declared(&format!("[{word}] something happened")),
+            Level::declared(&format!("[{word}] something happened")),
             Some(expected),
             "{word}"
         );
@@ -121,18 +121,18 @@ fn every_spelling_of_every_level_is_recognised() {
 fn a_key_can_name_the_level_and_may_have_nothing_after_it() {
     for key in ["level", "lvl", "severity"] {
         assert_eq!(
-            declared(&format!("t=1 {key}=fatal msg=gone")),
+            Level::declared(&format!("t=1 {key}=fatal msg=gone")),
             Some(Level::Fatal),
             "{key}"
         );
     }
     assert_eq!(
-        declared("level="),
+        Level::declared("level="),
         None,
         "a key with nothing after it names nothing"
     );
     assert_eq!(
-        declared("level=chatty"),
+        Level::declared("level=chatty"),
         None,
         "and a key naming something that is not a level is still not one"
     );
@@ -221,8 +221,8 @@ fn severity_is_ordered_from_least_to_most_serious() {
 /// Two services agreeing about severity should look like they agree.
 #[test]
 fn the_same_level_spelled_two_ways_normalises_to_one_word() {
-    let bracketed = declared("[WARN] queue is backing up").map(Level::word);
-    let bare = declared("2026-08-21 warning: queue is backing up").map(Level::word);
+    let bracketed = Level::declared("[WARN] queue is backing up").map(Level::word);
+    let bare = Level::declared("2026-08-21 warning: queue is backing up").map(Level::word);
     assert_eq!(bracketed, bare);
     assert_eq!(bracketed, Some("warn"));
 }
