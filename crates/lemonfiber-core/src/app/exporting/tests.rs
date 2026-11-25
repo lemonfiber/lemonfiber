@@ -127,3 +127,46 @@ fn an_export_that_still_reads_as_a_credential_is_refused_naming_the_line() {
         Some("sonarr | fine\n")
     );
 }
+
+#[tokio::test]
+async fn nothing_a_caller_sends_reaches_the_path_an_export_is_written_to() {
+    let (ctx, files) = remembering();
+    let asked = Command::Surface(Surfacing::Export(Exporting {
+        text: "../../etc/passwd\n/tmp/elsewhere.txt\nC:\\Windows\\win.ini".to_owned(),
+        written: usize::MAX,
+    }));
+
+    let answered = dispatch(asked, &ctx).await;
+
+    let said = match answered {
+        Ok(Outcome::Surfaced(Answer::Exported(exported))) => exported.path,
+        _ => String::new(),
+    };
+    let path = PathBuf::from(&said);
+    let stamp = named(&ctx)
+        .display()
+        .to_string()
+        .replace("-3.txt", &format!("-{}.txt", usize::MAX));
+    assert_eq!(said, stamp);
+    assert_eq!(path.components().count(), 1, "{path:?}");
+    assert!(files.at(&path).is_some(), "written where it says");
+    assert_eq!(files.at(Path::new("../../etc/passwd")), None);
+}
+
+#[tokio::test]
+async fn an_export_is_read_back_from_the_file_it_wrote_and_no_other() {
+    let ctx = a_context()
+        .build()
+        .with_random(Arc::new(Chance::repeating(vec![7])))
+        .with_filesystem(Files::at(vec![
+            (PathBuf::from("lemonfiber-logs.txt"), "an older export"),
+            (
+                PathBuf::from("../lemonfiber-logs-0-3.txt"),
+                "somebody else's file",
+            ),
+        ]));
+
+    let refused = dispatch(asked("sonarr | fine"), &ctx).await.err();
+
+    assert_eq!(refused.map(|problem| problem.code), Some(BUNDLE_UNWRITTEN));
+}
