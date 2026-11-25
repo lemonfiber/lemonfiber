@@ -47,7 +47,9 @@ pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
         "written_by": "0.0.0",
         "keys": { SERVICE: sha256(PRESENTED) },
     });
-    std::fs::write(world.root().join(NOTIFY_EVENTS), keys.to_string()).ok()?;
+    tokio::fs::write(world.root().join(NOTIFY_EVENTS), keys.to_string())
+        .await
+        .ok()?;
     for command in every_command() {
         let answered = dispatch(command, &world.ctx).await;
         seen.answered(
