@@ -150,6 +150,7 @@ pub(super) fn surfaced(answer: &Answer) -> Lines {
         Answer::Renewed(report) => renewed(report),
         Answer::Untuned(report) => untuned(*report),
         Answer::Exported(report) => super::logs::exported(report),
+        Answer::Dashboard(snapshot) => crate::dashboard::listed(snapshot),
         Answer::Octets(octets) => super::plugin::document(&String::from_utf8_lossy(&octets.bytes)),
     }
 }

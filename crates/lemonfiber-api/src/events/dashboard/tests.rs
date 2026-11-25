@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use lemonfiber_core::alert::{Alert, Moment};
 use lemonfiber_core::model::kind;
-use lemonfiber_error::Severity;
+use lemonfiber_error::codes::play::SERVER_SILENT;
+use lemonfiber_error::{Problem, Remedy, Severity};
 
-use super::{alerted, playing, Dashboard};
+use super::{alerted, playing, said_of, Dashboard};
 
 /// One alert about `check`, at its `recurrence`, going `moment`'s way.
 fn an_alert(check: &str, recurrence: u32, moment: Moment) -> Alert {
@@ -115,6 +116,15 @@ async fn an_alert_with_no_identity_is_never_said_as_happening() {
 
 /// What is playing is said to a listener that has just arrived, and is not read again
 /// before its pace comes round.
+/// A gather that answers no dashboard says nothing of the dashboard, its news or its alerts.
+#[tokio::test]
+async fn a_gather_answering_no_dashboard_says_nothing_of_one() {
+    let refused = Problem::new(SERVER_SILENT, "silent", "silent", Remedy::new("wait"));
+    assert!(said_of(&a_dashboard(), Err(Box::new(refused)), true)
+        .await
+        .is_empty());
+}
+
 #[tokio::test]
 async fn what_is_playing_is_said_on_arrival_and_at_its_pace() {
     let dashboard = a_dashboard();

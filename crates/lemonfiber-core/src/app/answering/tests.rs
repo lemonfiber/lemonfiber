@@ -155,6 +155,10 @@ fn dispatched() -> Vec<(Command, Kind)> {
         ),
         (Command::Surface(Surfacing::Untune), kind::UNTUNED),
         (
+            Command::Surface(Surfacing::Gather { now: false }),
+            kind::DASHBOARD,
+        ),
+        (
             Command::Surface(Surfacing::Export(crate::app::Exporting {
                 text: String::new(),
                 written: 1,

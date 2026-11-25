@@ -57,11 +57,9 @@ use serde_json::Value;
 
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::model::{
     kind::{
-        Kind, ALERT, CAPABILITIES, DASHBOARD, ENDED, ERROR, JOB, LOG, NEWS, PULL, REPLAY, SETUP,
-        START, STEP,
+        Kind, ALERT, CAPABILITIES, ENDED, ERROR, JOB, LOG, NEWS, PULL, REPLAY, SETUP, START, STEP,
     },
     Envelope, SetupReport, API_VERSION,
 };
@@ -272,7 +270,6 @@ fn answered(kinds: &mut BTreeMap<String, Schema>) {
 fn beside(kinds: &mut BTreeMap<String, Schema>) {
     describing(kinds, ALERT, schema_for!(Envelope<Alert>));
     describing(kinds, CAPABILITIES, schema_for!(Envelope<Capabilities>));
-    describing(kinds, DASHBOARD, schema_for!(Envelope<Snapshot>));
     describing(kinds, ENDED, schema_for!(Envelope<Ended>));
     describing(kinds, ERROR, schema_for!(Envelope<Problem>));
     describing(kinds, JOB, schema_for!(Envelope<Started>));

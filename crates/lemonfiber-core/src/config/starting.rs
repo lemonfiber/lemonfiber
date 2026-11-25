@@ -124,6 +124,14 @@ impl Settings {
     }
 }
 
+impl Ctx {
+    /// File what the operator's environment file and the stack's hold into the stores,
+    /// as a run starting does before it reads its settings again.
+    pub async fn filed(&self) {
+        crate::settings::filing::everything(self).await;
+    }
+}
+
 fn recorded(run: Option<&Ctx>, env_file: Option<&Path>) -> super::env::EnvFile {
     env_file
         .and_then(|path| store::read(path).ok())

@@ -256,6 +256,8 @@ fn reads() -> Vec<Command> {
 fn read_by_the_surfaces() -> Vec<Command> {
     vec![
         Command::Surface(Surfacing::Standing),
+        Command::Surface(Surfacing::Gather { now: false }),
+        Command::Surface(Surfacing::Glance { now: true }),
         Command::Surface(Surfacing::Fetch(crate::app::Fetching::Bundle {
             name: "lemonfiber-support-1.tar.gz".to_owned(),
         })),
@@ -758,7 +760,7 @@ fn only_what_needs_no_stack_skips_the_settling() {
             || named.starts_with("Surface(")),
         "{skipping:?}"
     );
-    assert_eq!(skipping.len(), 18, "{skipping:?}");
+    assert_eq!(skipping.len(), 20, "{skipping:?}");
 }
 
 /// A read a stream polls settles nothing, and is asked as the route asking it is.

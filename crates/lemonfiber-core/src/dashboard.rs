@@ -165,7 +165,7 @@ pub enum Protocol {
 }
 
 /// One active download, as the dashboard shows it.
-#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Transfer {
     /// What is being downloaded.
     pub name: String,
@@ -312,7 +312,7 @@ impl Telemetry {
 /// source degrades one region rather than the screen. The surface builds this from
 /// what it gathered; the standing is read from the same facts so it cannot
 /// disagree with the panels.
-#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct Snapshot {
     /// Whether the screen itself can be trusted to be current.
     pub telemetry: Telemetry,

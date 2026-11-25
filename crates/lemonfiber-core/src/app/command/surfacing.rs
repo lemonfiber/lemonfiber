@@ -25,4 +25,15 @@ pub enum Surfacing {
     /// Write what the log viewer shows into a file of its own, redacted as a support
     /// bundle is.
     Export(Exporting),
+    /// The operator's dashboard gathered for the run serving the web surface, owing
+    /// each new alert's wake-ups and deliveries.
+    Gather {
+        /// Whether every reading is taken afresh rather than as it falls due.
+        now: bool,
+    },
+    /// The dashboard gathered for a look at it, owing nobody anything.
+    Glance {
+        /// Whether every reading is taken afresh rather than as it falls due.
+        now: bool,
+    },
 }

@@ -5,7 +5,9 @@ use lemonfiber_core::app::exporting::Exported;
 use lemonfiber_core::app::password::PasswordReport;
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::surfacing::Answer as Surfaced;
-use lemonfiber_core::app::{InFlightReport, LogsReport, Outcome, Unfinished};
+use lemonfiber_core::app::{
+    dispatch, Command, InFlightReport, LogsReport, Outcome, Surfacing, Unfinished,
+};
 use lemonfiber_core::certificate::described::Described;
 use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::dashboard::Protocol;
@@ -18,6 +20,30 @@ use lemonfiber_core::walkthrough::{Shape, Why};
 
 /// What each command a surface dispatches for itself answers with.
 pub(crate) fn samples() -> Vec<Outcome> {
+    let mut every = described();
+    every.extend(gathered());
+    every
+}
+
+/// The dashboard as a gather answers it.
+fn gathered() -> Option<Outcome> {
+    std::thread::spawn(|| {
+        let ctx = lemonfiber_testing::a_context().build();
+        let asked = Command::Surface(Surfacing::Glance { now: false });
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .ok()?
+            .block_on(dispatch(asked, &ctx))
+            .ok()
+    })
+    .join()
+    .ok()
+    .flatten()
+}
+
+/// Every other answer, written out.
+fn described() -> Vec<Outcome> {
     vec![
         Outcome::Password(PasswordReport {
             device_keys_revoked: true,
