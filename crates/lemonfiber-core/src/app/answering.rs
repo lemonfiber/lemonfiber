@@ -106,8 +106,7 @@ const fn surfaced(asked: &Surfacing) -> &'static [Kind] {
         Surfacing::Told(_) => &[kind::NOTIFY_HEARD],
         Surfacing::Spoke { .. } => &[kind::RENEWED],
         Surfacing::Untune => &[kind::UNTUNED],
-        Surfacing::Fetch(_) => &[],
-        Surfacing::Export(_) => &[kind::LOGS_EXPORTED],
+        Surfacing::Fetch(_) | Surfacing::Export(_) => &[],
     }
 }
 
