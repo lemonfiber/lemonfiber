@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The backup or restore running on this machine now, or none.",
+  "type": "object",
+  "properties": {
+    "running": {
+      "description": "The copy running now, or none.",
+      "anyOf": [
+        {
+          "$ref": "RunningCopy.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

@@ -156,7 +156,7 @@ pub(crate) fn fault(problem: &Problem, exit: Option<i32>) -> Fault {
 impl crate::app::Outcome {
     /// The outcome as a key that is no member's is answered with it: every run it carries,
     /// and every doctor finding on one, without the lines the run wrote, which only the
-    /// operator is handed.
+    /// operator is handed; a running copy without what only the operator's reads name.
     #[must_use]
     pub fn for_a_key(self) -> Self {
         match self {
@@ -165,6 +165,7 @@ impl crate::app::Outcome {
                 ..report
             }),
             Self::Ran(report) => Self::Ran(report.unlogged()),
+            Self::Copying(copying) => Self::Copying(copying.for_a_key()),
             Self::Doctor(report) => Self::Doctor(crate::model::DoctorReport {
                 findings: report.findings.into_iter().map(unlogged_finding).collect(),
                 ..report

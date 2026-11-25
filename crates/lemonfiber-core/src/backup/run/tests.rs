@@ -7,39 +7,39 @@ use super::{
     backup, capture, existing as capture_existing, Report, Taking, NOT_MEASURED, NOT_WRITTEN,
     NOWHERE_TO_KEEP, NO_ROOM, STILL_RUNNING,
 };
-use crate::app::fixtures::{keeping, paths, FakeArchive};
+use crate::app::fixtures::{archiving, keeping, paths, unkept, FakeArchive};
 use crate::app::Ctx;
 use crate::archive::{Fault, Space};
 use crate::backup::{Existing, Retention, Scope};
 use crate::instant::Instant;
 use crate::ports::docker::{Health, Lifecycle};
 
-async fn capturing(archive: &FakeArchive) -> Result<Report, Box<crate::error::Problem>> {
+async fn capturing(archive: &Arc<FakeArchive>) -> Result<Report, Box<crate::error::Problem>> {
     capture(
-        &paths(),
+        &archiving(archive),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(2), false),
-        archive,
+        &unkept(),
     )
     .await
 }
 
 /// The same capture, said rather than taken.
 async fn rehearsing(
-    archive: &FakeArchive,
+    archive: &Arc<FakeArchive>,
     retention: Retention,
 ) -> Result<Report, Box<crate::error::Problem>> {
     capture(
-        &paths(),
+        &archiving(archive),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(retention, true),
-        archive,
+        &unkept(),
     )
     .await
 }
@@ -70,7 +70,7 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
     // The whole of the claim: the destination, the size and what retention would
     // drop are all settled before the write, so the report is the real one and the
     // archive directory is untouched.
-    let archive = FakeArchive::keeping_backups(&[
+    let archive = Arc::new(FakeArchive::keeping_backups(&[
         (
             "lemonfiber-full-1782864000.tar.gz",
             Instant::from_seconds(1_782_864_000),
@@ -79,7 +79,7 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
             "lemonfiber-full-1782950400.tar.gz",
             Instant::from_seconds(1_782_950_400),
         ),
-    ]);
+    ]));
     let report = rehearsing(&archive, Retention::keeping(1))
         .await
         .map_err(|problem| *problem);
@@ -102,7 +102,7 @@ async fn a_rehearsed_capture_names_the_archive_and_writes_nothing() {
 
 #[tokio::test]
 async fn a_capture_writes_the_archive_under_the_backups_directory_and_reports_it() {
-    let archive = FakeArchive::roomy();
+    let archive = Arc::new(FakeArchive::roomy());
     let report = capturing(&archive).await;
 
     // The archive lands under the backups directory, named for the scope and
@@ -120,9 +120,9 @@ async fn a_capture_writes_the_archive_under_the_backups_directory_and_reports_it
 
 #[tokio::test]
 async fn a_single_service_capture_is_named_for_its_service() {
-    let archive = FakeArchive::roomy();
+    let archive = Arc::new(FakeArchive::roomy());
     let report = capture(
-        &paths(),
+        &archiving(&archive),
         crate::backup::plan(
             &paths(),
             &Scope::Service {
@@ -134,7 +134,7 @@ async fn a_single_service_capture_is_named_for_its_service() {
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(2), false),
-        &archive,
+        &unkept(),
     )
     .await
     .map_err(|problem| *problem);
@@ -148,14 +148,14 @@ async fn a_single_service_capture_is_named_for_its_service() {
 
 #[tokio::test]
 async fn a_capture_prunes_the_oldest_backups_past_the_keep_count() {
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         existing: Ok(vec![
             full(Instant::from_seconds(1_782_950_400)),
             full(Instant::from_seconds(1_782_864_000)),
             full(Instant::from_seconds(1_783_036_800)),
         ]),
         ..FakeArchive::roomy()
-    };
+    });
     let report = capturing(&archive).await;
     // Keeping two of three prunes only the eldest, whatever order it was listed.
     assert_eq!(
@@ -172,22 +172,22 @@ async fn a_capture_prunes_the_oldest_backups_past_the_keep_count() {
 async fn retention_keeps_each_scope_on_its_own_count() {
     // A whole-stack capture prunes only whole-stack archives; a single service's
     // targeted backup is not swept away because later whole-stack ones are newer.
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         existing: Ok(vec![
             full(Instant::from_seconds(1_782_864_000)),
             service("sonarr", Instant::from_seconds(1_782_950_400)),
             full(Instant::from_seconds(1_785_283_200)),
         ]),
         ..FakeArchive::roomy()
-    };
+    });
     let report = capture(
-        &paths(),
+        &archiving(&archive),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
-        &archive,
+        &unkept(),
     )
     .await
     .map_err(|problem| *problem);
@@ -204,7 +204,7 @@ async fn the_archive_just_written_is_never_pruned() {
     // A clock running behind could stamp the fresh archive older than the ones
     // already there; retention must still keep it, so the guard excludes it by
     // name whatever its recorded time.
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         existing: Ok(vec![
             Existing {
                 name: FRESH.to_owned(),
@@ -213,17 +213,17 @@ async fn the_archive_just_written_is_never_pruned() {
             full(Instant::from_seconds(1_785_283_200)),
         ]),
         ..FakeArchive::roomy()
-    };
+    });
     // Keeping one of two would prune the eldest — which the skewed stamp makes
     // the fresh archive — so the guard, not the count, is what saves it.
     let report = capture(
-        &paths(),
+        &archiving(&archive),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
-        &archive,
+        &unkept(),
     )
     .await
     .map_err(|problem| *problem);
@@ -240,13 +240,13 @@ async fn the_archive_just_written_is_never_pruned() {
 
 #[tokio::test]
 async fn a_capture_that_would_not_fit_is_refused_before_writing() {
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         space: Ok(Space {
             needed: 1_000,
             available: 500,
         }),
         ..FakeArchive::roomy()
-    };
+    });
     let refusal = capturing(&archive).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(NO_ROOM));
     assert!(archive.writes().is_empty(), "nothing was written");
@@ -254,10 +254,10 @@ async fn a_capture_that_would_not_fit_is_refused_before_writing() {
 
 #[tokio::test]
 async fn a_capture_whose_room_cannot_be_measured_is_refused() {
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         space: Err(Fault::new("no such volume")),
         ..FakeArchive::roomy()
-    };
+    });
     let refusal = capturing(&archive).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(NOT_MEASURED));
     assert!(archive.writes().is_empty());
@@ -265,10 +265,10 @@ async fn a_capture_whose_room_cannot_be_measured_is_refused() {
 
 #[tokio::test]
 async fn a_capture_whose_archive_cannot_be_written_is_reported() {
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         write: Err(Fault::new("read-only filesystem")),
         ..FakeArchive::roomy()
-    };
+    });
     let refusal = capturing(&archive).await.err().map(|problem| problem.code);
     assert_eq!(refusal, Some(NOT_WRITTEN));
 }
@@ -277,10 +277,10 @@ async fn a_capture_whose_archive_cannot_be_written_is_reported() {
 async fn a_capture_still_succeeds_when_the_older_backups_cannot_be_listed() {
     // Retention is best-effort: an unreadable backups directory leaves the
     // pruning for next time, it does not undo a capture that has succeeded.
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         existing: Err(Fault::new("permission denied")),
         ..FakeArchive::roomy()
-    };
+    });
     let report = capturing(&archive).await;
     assert_eq!(report.map(|report| report.pruned), Ok(Vec::new()));
     assert!(archive.removes().is_empty());
@@ -288,24 +288,24 @@ async fn a_capture_still_succeeds_when_the_older_backups_cannot_be_listed() {
 
 #[tokio::test]
 async fn an_old_backup_that_will_not_delete_is_left_and_the_capture_still_succeeds() {
-    let archive = FakeArchive {
+    let archive = Arc::new(FakeArchive {
         existing: Ok(vec![
             full(Instant::from_seconds(1_782_864_000)),
             full(Instant::from_seconds(1_782_950_400)),
         ]),
         remove: Err(Fault::new("busy")),
         ..FakeArchive::roomy()
-    };
+    });
     // Keeping one of two prunes the eldest, but the delete failed, so the report
     // names nothing pruned even though the removal was attempted.
     let report = capture(
-        &paths(),
+        &archiving(&archive),
         crate::backup::plan(&paths(), &Scope::WholeStack, &[]),
         "0.3.0",
         Instant::from_seconds(1_785_369_600),
         "/srv/media",
         Taking::of(Retention::keeping(1), false),
-        &archive,
+        &unkept(),
     )
     .await
     .map_err(|problem| *problem);

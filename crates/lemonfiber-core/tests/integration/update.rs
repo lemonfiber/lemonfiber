@@ -77,6 +77,7 @@ impl Archive for Kept {
         dest: &Path,
         _manifest: &BackupManifest,
         _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         if !self.writes {
             return Err(ArchiveFault::new("the disk said no"));
@@ -111,6 +112,7 @@ impl Reader for Kept {
         &self,
         _src: &Path,
         _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("an update never reads an archive back"))
     }

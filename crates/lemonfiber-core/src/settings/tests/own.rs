@@ -1,6 +1,7 @@
 use crate::settings::own::{
-    is_configs, is_core, refusal, CODES_BY_ADDRESS, CODES_PERIOD, CODES_PER_PERIOD, CODES_WAITING,
-    DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH, DEVICE_KEY_APPS, DOMAIN, GUIDE_HOURS,
+    is_configs, is_core, refusal, BACKUP_LIMIT, CODES_BY_ADDRESS, CODES_PERIOD, CODES_PER_PERIOD,
+    CODES_WAITING, COPY_STALLED, DASHBOARD_SEARCH, DEFAULT_DOMAIN, DEFAULT_SEARCH, DEVICE_KEY_APPS,
+    DOMAIN, GUIDE_HOURS,
 };
 
 fn fingerprint() -> String {
@@ -383,4 +384,34 @@ fn the_zone_and_the_locale_are_published_from_what_holds_them_and_not_written_as
             );
         }
     }
+}
+
+#[test]
+fn the_backup_limit_and_the_stall_are_those_recorded_and_a_bad_one_is_refused() {
+    use crate::instant::MINUTE;
+    let scratch = lemonfiber_fixtures::scratch::Scratch::new("copying-settings");
+    let env = scratch.path().join(".env");
+    let _ = std::fs::write(&env, "");
+    let ctx = crate::test_support::a_context()
+        .settings(crate::config::Settings {
+            env_file: Some(env.clone()),
+            ..crate::config::Settings::default()
+        })
+        .build();
+    let settings = env.with_file_name(crate::config::paths::SETTINGS);
+    let record = |name: &str, value: &str| {
+        crate::settings::store::recorded(&settings, &[(name, Some(value))].into()).is_ok()
+    };
+
+    assert_eq!(crate::settings::backup_limit(&ctx), None);
+    assert_eq!(crate::settings::copy_stalled(&ctx), 5 * MINUTE);
+    assert!(record(BACKUP_LIMIT, "50"));
+    assert!(record(COPY_STALLED.0, "9"));
+    assert_eq!(crate::settings::backup_limit(&ctx), Some(50 << 20));
+    assert_eq!(crate::settings::copy_stalled(&ctx), 9 * MINUTE);
+
+    assert!(refusal(BACKUP_LIMIT, "fast").is_some());
+    assert_eq!(refusal(BACKUP_LIMIT, "off"), None);
+    assert!(refusal(COPY_STALLED.0, "0").is_some());
+    assert_eq!(refusal(COPY_STALLED.0, "1440"), None);
 }

@@ -386,6 +386,7 @@ impl Archive for Recorder {
         _dest: &Path,
         _manifest: &BackupManifest,
         _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("unused"))
     }
@@ -424,6 +425,7 @@ impl Reader for Recorder {
         &self,
         _src: &Path,
         _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("a bundle never reads an archive back"))
     }

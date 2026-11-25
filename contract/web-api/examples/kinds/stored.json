@@ -341,6 +341,12 @@
         "why": "Each one a copy of the configuration above, so an archive holds whatever that held — the credentials included. Nothing sends one anywhere."
       },
       {
+        "at": "/srv/lemonfiber/copying",
+        "secret": false,
+        "what": "the reading of the backup or restore running now",
+        "why": "How far the copy running on this machine has got, and the lock it holds while it runs, so any process can say so whoever started it. It names what is copied and never what the files hold, and the reading goes when the copy ends."
+      },
+      {
         "at": "/srv/lemonfiber/support",
         "secret": false,
         "what": "the support bundles kept for a browser",

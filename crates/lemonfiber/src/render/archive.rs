@@ -19,6 +19,7 @@ use lemonfiber_core::app::support::Bundle;
 use lemonfiber_core::backup::run::Report as Capture;
 use lemonfiber_core::backup::Scope;
 use lemonfiber_core::bytes::humanize;
+use lemonfiber_core::copying::Copied;
 
 use super::Lines;
 
@@ -216,13 +217,22 @@ fn written(report: &Bundle, path: &Path) -> Lines {
 }
 
 /// How a scope reads in a line of output.
-fn scope_name(scope: &Scope) -> String {
-    match scope {
-        Scope::WholeStack => "the whole stack".to_owned(),
-        Scope::Service { name } => format!("service {name}"),
+pub(super) fn scope_name(scope: &Scope) -> String {
+    copied_name(&Copied::from(scope.clone()))
+}
+
+/// What a copy copies, as a sentence names it.
+pub(super) fn copied_name(copied: &Copied) -> String {
+    match copied {
+        Copied::WholeStack => "the whole stack".to_owned(),
+        Copied::Service { name } => format!("service {name}"),
         // Named by the setup rather than by the trees, because the trees are listed
         // underneath it and the project is what the operator recognises it by.
-        Scope::Existing { project, .. } => format!("the setup {project}, taken over"),
+        Copied::Existing {
+            project: Some(project),
+            ..
+        } => format!("the setup {project}, taken over"),
+        Copied::Existing { project: None, .. } => "a setup taken over".to_owned(),
     }
 }
 

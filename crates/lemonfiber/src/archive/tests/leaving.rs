@@ -8,7 +8,7 @@ use lemonfiber_core::archive::{Archive, Reader};
 use lemonfiber_core::backup::{self, Item, Manifest, Scope};
 use lemonfiber_fixtures::ports::STAMPED;
 
-use super::{install, scratch, write_file};
+use super::{install, scratch, unmetered, write_file};
 use crate::archive::Tar;
 
 #[tokio::test]
@@ -52,11 +52,14 @@ async fn what_an_item_leaves_out_is_neither_packed_nor_measured() {
 
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
-    assert!(tar.write(&dest, &manifest, &items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &items, unmetered())
+        .await
+        .is_ok());
     let back = scratch("left-out-back");
     let restored = install(&back);
     assert!(tar
-        .extract(&dest, &backup::destinations(&restored))
+        .extract(&dest, &backup::destinations(&restored), unmetered())
         .await
         .is_ok());
     assert!(restored
@@ -84,7 +87,10 @@ async fn an_item_whose_source_is_not_there_is_left_out_rather_than_failing() {
     }];
 
     let tar = Tar;
-    assert!(tar.write(&dest, &manifest, &items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &items, unmetered())
+        .await
+        .is_ok());
     // It wrote an archive holding the manifest and nothing else.
     assert!(tar.read_manifest(&dest).await.is_ok());
 }
@@ -107,7 +113,10 @@ async fn a_link_in_a_captured_directory_is_left_out() {
     }];
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
-    assert!(Tar.write(&dest, &manifest, &items).await.is_ok());
+    assert!(Tar
+        .write(&dest, &manifest, &items, unmetered())
+        .await
+        .is_ok());
 
     let names: Vec<String> = File::open(&dest)
         .ok()

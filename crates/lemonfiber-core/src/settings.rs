@@ -130,6 +130,25 @@ pub(crate) fn sign_in_codes(ctx: &Ctx) -> crate::sign_in_codes::Limits {
 }
 
 /// What the setting `name` holds, where it holds anything.
+/// How fast a backup writes at most, in bytes a second: none where none is recorded, `off`
+/// is, or what is recorded is not a limit.
+pub(crate) fn backup_limit(ctx: &Ctx) -> Option<u64> {
+    recorded::Recorded::of(ctx)
+        .value(own::BACKUP_LIMIT)
+        .and_then(|value| own::backup_limit(value).ok().flatten())
+        .map(|mebibytes| u64::from(mebibytes) * crate::plugin::program::MEBIBYTE.unsigned_abs())
+}
+
+/// How many seconds a running copy may write nothing before it reads stalled: the minutes
+/// recorded, or the default where none is or what is recorded is not one.
+pub(crate) fn copy_stalled(ctx: &Ctx) -> u64 {
+    let minutes = recorded::Recorded::of(ctx)
+        .value(own::COPY_STALLED.0)
+        .and_then(|value| own::code_count(&own::COPY_STALLED, value).ok())
+        .unwrap_or(own::COPY_STALLED.3);
+    u64::from(minutes) * crate::instant::MINUTE
+}
+
 pub(crate) fn recorded_value(ctx: &Ctx, name: &str) -> Option<String> {
     recorded::Recorded::of(ctx).value(name).map(str::to_owned)
 }

@@ -11,6 +11,7 @@
 //! it were current; only a gather made since is.
 
 pub mod backlog;
+pub mod copying;
 pub mod dashboard;
 pub mod extending;
 pub mod live;

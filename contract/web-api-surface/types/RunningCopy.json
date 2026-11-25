@@ -1,0 +1,94 @@
+{
+  "fields": {
+    "job": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "limit": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "part": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "project": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "scope": {
+      "type": [
+        "const:\"existing\"",
+        "const:\"service\"",
+        "const:\"whole_stack\""
+      ],
+      "required": true
+    },
+    "started": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    },
+    "state": {
+      "type": [
+        "const:\"paced\"",
+        "const:\"stalled\"",
+        "const:\"working\""
+      ],
+      "required": true
+    },
+    "trees": {
+      "type": [
+        "array|null[ref:Tree]"
+      ],
+      "required": false
+    },
+    "what": {
+      "type": [
+        "ref:CopyWhat"
+      ],
+      "required": true
+    },
+    "whole": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "written": {
+      "type": [
+        "integer/uint64"
+      ],
+      "required": true
+    },
+    "wrote": {
+      "type": [
+        "ref:Instant"
+      ],
+      "required": true
+    }
+  },
+  "variants": [
+    "\"existing\"",
+    "\"paced\"",
+    "\"service\"",
+    "\"stalled\"",
+    "\"whole_stack\"",
+    "\"working\""
+  ]
+}

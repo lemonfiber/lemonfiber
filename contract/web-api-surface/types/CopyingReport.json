@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "running": {
+      "type": [
+        "anyOf(null,ref:RunningCopy)"
+      ],
+      "required": false
+    }
+  },
+  "variants": []
+}

@@ -68,6 +68,7 @@ pub mod companion;
 pub mod condition;
 pub mod config;
 pub mod contained;
+pub mod copying;
 pub mod credential;
 pub mod dashboard;
 pub mod device_keys;

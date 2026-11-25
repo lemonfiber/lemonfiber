@@ -197,6 +197,10 @@ pub const ASKS: &[Reach] = &[
         through: "/api/watcher",
     },
     Reach {
+        request: "copying",
+        through: "/api/copying",
+    },
+    Reach {
         request: "queue",
         through: "/api/queue",
     },

@@ -217,6 +217,15 @@ const fn queued(queueing: Queueing) -> Asked {
     }
 }
 
+/// What a settings command is: a read, or a change to the settings store.
+const fn settled(settling: &Settling) -> Asked {
+    match settling {
+        Settling::Read => reads("settings"),
+        Settling::Set { .. } => reports("settings set", &[kind::SETTINGS]),
+        Settling::Clear { .. } => reports("settings clear", &[kind::SETTINGS]),
+    }
+}
+
 /// What a doctor run is.
 ///
 /// The killswitch check *is* the disruption. It takes the tunnel's own route down
@@ -279,6 +288,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Stuck => reads("stuck"),
         Command::Boot => reads("boot"),
         Command::Watcher => reads("watcher"),
+        Command::Copying => reads("copying"),
         Command::Queue(queueing) => queued(*queueing),
         Command::FrontDoor(_) => reads("front-door"),
         Command::Stack => reads("stack"),
@@ -291,7 +301,7 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Clients => reads("clients"),
         Command::Catalogue => reads("catalogue"),
         Command::Wiring(Linking::Read) => reads("wiring"),
-        Command::Settings(Settling::Read) => reads("settings"),
+        Command::Settings(settling) => settled(settling),
         Command::Outbound => reads("outbound"),
         Command::Provenance => reads("provenance"),
         Command::Stored => reads("stored"),
@@ -347,8 +357,6 @@ pub const fn asked(command: &Command) -> Asked {
         Command::Authoring(asked) => authored(asked),
         Command::Password => cannot("ui --set-password", A_PASSWORD_IS_TYPED),
         Command::Wiring(Linking::Fill(_)) => reports("wiring fill", &[kind::SUBSTITUTION]),
-        Command::Settings(Settling::Set { .. }) => reports("settings set", &[kind::SETTINGS]),
-        Command::Settings(Settling::Clear { .. }) => reports("settings clear", &[kind::SETTINGS]),
         Command::Quality(_) => reports("quality", &[kind::QUALITY]),
         Command::Alerts(_) => reports("alerts", &[kind::ALERTS]),
         Command::QualityMusic { .. } => reports("quality music", &[kind::MUSIC]),

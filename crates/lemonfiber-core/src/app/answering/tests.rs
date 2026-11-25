@@ -83,6 +83,7 @@ fn reading() -> Vec<(Command, Kind)> {
         (Command::Playing { member: None }, kind::PLAYING),
         (Command::Boot, kind::BOOT),
         (Command::Watcher, kind::WATCHER),
+        (Command::Copying, kind::COPYING),
         (Command::Queue(Queueing::Read), kind::QUEUE),
         (
             Command::Wish(Wishing::Find {

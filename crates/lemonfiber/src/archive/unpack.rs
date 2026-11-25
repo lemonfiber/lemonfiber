@@ -11,7 +11,9 @@ use std::path::{Component, Path, PathBuf};
 use flate2::read::GzDecoder;
 use lemonfiber_core::archive::Fault;
 
-use super::{MANIFEST, STAGING};
+use lemonfiber_core::copying::Meter;
+
+use super::{Metered, MANIFEST, STAGING};
 
 /// Remove a path whether it is a file, a directory, or a symlink — and treat its
 /// absence as already done.
@@ -25,9 +27,16 @@ pub(super) fn remove_any(path: &Path) -> std::io::Result<()> {
 
 /// Unpack every entry into its area's staging directory, refusing any that would
 /// escape its area or that is not a plain file or directory.
-pub(super) fn stage(src: &Path, plan: &[(&str, &Path, PathBuf)]) -> Result<(), Fault> {
+pub(super) fn stage(
+    src: &Path,
+    plan: &[(&str, &Path, PathBuf)],
+    meter: &dyn Meter,
+) -> Result<(), Fault> {
     let file = File::open(src).map_err(fault)?;
-    let mut archive = tar::Archive::new(GzDecoder::new(file));
+    let mut archive = tar::Archive::new(Metered {
+        inner: GzDecoder::new(file),
+        meter,
+    });
     // Force every extracted file to owner-only access. A backup's own permission
     // bits are not trusted: a hostile or tampered archive could store a
     // secret-bearing file — `config/.env` carries the VPN key and provider
@@ -80,6 +89,7 @@ pub(super) fn stage(src: &Path, plan: &[(&str, &Path, PathBuf)]) -> Result<(), F
             )));
         };
 
+        meter.writing(&normalized.to_string_lossy());
         let rest: PathBuf = components.collect();
         let out = staging.join(&rest);
         if entry.header().entry_type() == tar::EntryType::Directory {
@@ -93,6 +103,7 @@ pub(super) fn stage(src: &Path, plan: &[(&str, &Path, PathBuf)]) -> Result<(), F
             entry.unpack(&out).map_err(fault)?;
         }
     }
+    std::io::copy(&mut archive.into_inner(), &mut std::io::sink()).map_err(fault)?;
     Ok(())
 }
 

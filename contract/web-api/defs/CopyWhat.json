@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Whether a copy is a backup or a restore.",
+  "oneOf": [
+    {
+      "description": "A backup, writing an archive.",
+      "type": "string",
+      "const": "backup"
+    },
+    {
+      "description": "A restore, writing an archive back.",
+      "type": "string",
+      "const": "restore"
+    }
+  ]
+}

@@ -23,6 +23,8 @@ const FROZEN: &[(&str, &str)] = &[
     ("crates/lemonfiber-plugin/src/vocabulary.rs", "Constraint"),
     // Values the web contract publishes, which the SDKs decode by name.
     ("crates/lemonfiber-core/src/backup.rs", "Scope"),
+    // No new spelling: the running copy's scope mirrors `Scope`'s values above.
+    ("crates/lemonfiber-core/src/copying.rs", "Copied"),
     ("crates/lemonfiber-core/src/repair.rs", "Outcome"),
     ("crates/lemonfiber-core/src/repair.rs", "Stance"),
     ("crates/lemonfiber-core/src/repair.rs", "Writing"),

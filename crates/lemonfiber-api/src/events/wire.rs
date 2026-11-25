@@ -7,7 +7,9 @@
 use std::time::Duration;
 
 use lemonfiber_core::alert::Alert;
+use lemonfiber_core::copying::Copying;
 use lemonfiber_core::dashboard::Snapshot;
+use lemonfiber_core::keys::Scope;
 use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::model::kind::{self, Kind};
 use lemonfiber_core::model::{
@@ -86,14 +88,19 @@ impl Item {
     }
 }
 
-/// Who on the shared stream may hear an event.
+/// Who on the shared stream may hear an event, and who a listener hears as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Audience {
-    /// Everyone the shared stream admits, a `read` or an `act` key included.
+    /// Everyone the shared stream admits, a `read` or an `act` key included; as a listener,
+    /// one that proved neither the operator nor such a key.
     Anyone,
     /// The per-run token and an operator session, and no key.
     Operator,
+    /// A `read` or an `act` key, and not the operator.
+    Key,
+    /// The operator and a `read` or an `act` key.
+    OperatorAndKeys,
 }
 
 impl Audience {
@@ -104,6 +111,10 @@ impl Audience {
             crate::admission::Caller::Machine | crate::admission::Caller::Operator => {
                 Self::Operator
             }
+            crate::admission::Caller::Key(crate::admission::Keyed {
+                scope: Scope::Read | Scope::Act,
+                ..
+            }) => Self::Key,
             crate::admission::Caller::Member(_) | crate::admission::Caller::Key(_) => Self::Anyone,
         }
     }
@@ -113,7 +124,9 @@ impl Audience {
     pub const fn hears(self, said: Self) -> bool {
         matches!(
             (self, said),
-            (Self::Operator, _) | (Self::Anyone, Self::Anyone)
+            (_, Self::Anyone)
+                | (Self::Operator, Self::Operator | Self::OperatorAndKeys)
+                | (Self::Key, Self::Key | Self::OperatorAndKeys)
         )
     }
 }
@@ -180,6 +193,8 @@ macro_rules! event_kinds {
 event_kinds! {
     /// One alert, at its onset or its resolution.
     Alert(Alert) = ALERT, Record, Anyone;
+    /// The backup or restore running on this machine now, or none.
+    Copying(Copying) = COPYING, State, OperatorAndKeys;
     /// One moment of the dashboard.
     Dashboard(Snapshot) = DASHBOARD, State, Anyone;
     /// What one member can watch.
@@ -217,6 +232,8 @@ pub struct Rendered {
     said: String,
     /// What it is about, where it is a line kept newest of each.
     item: Option<Item>,
+    /// Who on the shared stream may hear it.
+    to: Audience,
 }
 
 impl Rendered {
@@ -239,7 +256,15 @@ impl Rendered {
                 .said_by(job)
                 .to_json()?,
             item: None,
+            to: event.audience(),
         })
+    }
+
+    /// The same event, said to `audience` alone.
+    #[must_use]
+    pub fn to(mut self, audience: Audience) -> Self {
+        self.to = audience;
+        self
     }
 
     /// Render one line for the stream as an event of one kind, said by the work a job names.
@@ -265,6 +290,12 @@ impl Rendered {
     #[must_use]
     pub const fn kind(&self) -> Kind {
         self.event.kind()
+    }
+
+    /// Who on the shared stream may hear it.
+    #[must_use]
+    pub const fn audience(&self) -> Audience {
+        self.to
     }
 
     /// The envelope, as the command line renders it.
@@ -304,7 +335,7 @@ impl Event {
     /// Who may hear it.
     #[must_use]
     pub const fn audience(&self) -> Audience {
-        self.said.event.audience()
+        self.said.audience()
     }
 
     /// This event as it goes down the wire.

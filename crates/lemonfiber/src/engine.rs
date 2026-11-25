@@ -12,7 +12,7 @@ use lemonfiber_core::model::Envelope;
 use lemonfiber_core::ports::docker::LogLine;
 use lemonfiber_core::ports::Narrator;
 
-use lemonfiber::cli::RawSwitch;
+use lemonfiber::cli::{RawDown, RawSwitch};
 
 use crate::exit::{complain, settled, FAILURE};
 use crate::installing::Agreed;
@@ -252,14 +252,13 @@ pub(crate) async fn starting(
 /// Both happen before the teardown rather than during it: an operator who is going to
 /// be told a download is at ninety per cent wants to be told while stopping is still
 /// a question, not while it is already happening.
-pub(crate) async fn halting(
-    ctx: &Ctx,
-    forms: Vec<String>,
-    services: Vec<String>,
-    wait: bool,
-    yes: bool,
-    json: bool,
-) -> Command {
+pub(crate) async fn halting(ctx: &Ctx, down: RawDown, json: bool) -> Command {
+    let RawDown {
+        forms,
+        services,
+        wait,
+        yes,
+    } = down;
     if services.is_empty() {
         announce(ctx, &forms, json, Doing::Stopping).await;
     }

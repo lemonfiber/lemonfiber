@@ -8,6 +8,26 @@
       {
         "choices": null,
         "environment": null,
+        "name": "LEMONFIBER_BACKUP_LIMIT",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
+        "name": "LEMONFIBER_COPY_STALLED_MINUTES",
+        "readers": [],
+        "value": null,
+        "whose": {
+          "of": "core"
+        }
+      },
+      {
+        "choices": null,
+        "environment": null,
         "name": "LEMONFIBER_DASHBOARD_SEARCH",
         "readers": [],
         "value": null,

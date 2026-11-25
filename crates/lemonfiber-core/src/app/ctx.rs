@@ -149,6 +149,8 @@ pub struct Ctx {
     /// How this run serves the web surface, as it settled when it began, shared by every
     /// clone.
     pub served: Arc<crate::companion::served::Settled>,
+    /// The name an accepting reply gave the work this run does, where one did.
+    pub job: Option<String>,
 }
 
 /// A validator proving credentials against the real services, over `http` and over
@@ -225,6 +227,7 @@ impl Ctx {
             held: Arc::new(()),
             admitting: Arc::default(),
             served: Arc::default(),
+            job: None,
         }
     }
 
@@ -238,6 +241,13 @@ impl Ctx {
     #[must_use]
     pub fn with_archives(mut self, archives: Archiving) -> Self {
         self.archives = Some(archives);
+        self
+    }
+
+    /// The same context, doing the work an accepting reply named `job`.
+    #[must_use]
+    pub fn as_job(mut self, job: &str) -> Self {
+        self.job = Some(job.to_owned());
         self
     }
 

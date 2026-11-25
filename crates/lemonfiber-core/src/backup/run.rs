@@ -13,12 +13,13 @@
 //! block of a backup rather than a command run against a running stack.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::Serialize;
 
-use crate::archive::{Archive, Fault, Space};
+use crate::archive::{Archive, Archiving, Fault, Space};
 use crate::backup::{self, Manifest, Pace, Plan, Retention, Scope};
-use crate::config::paths::Paths;
+use crate::copying::{Meter, Starting, What};
 use crate::error::{Problem, Remedy, State};
 use crate::instant::Instant;
 
@@ -121,14 +122,15 @@ pub struct Report {
 /// fit, or where the archive could not be written. A failure to list or prune
 /// older archives is not one of these: the capture has succeeded by then.
 pub async fn capture(
-    paths: &Paths,
+    archives: &Archiving,
     plan: Plan,
     product_version: &str,
     stamp: Instant,
     data_root: &str,
     taking: Taking,
-    archive: &dyn Archive,
+    starting: &Starting,
 ) -> Result<Report, Box<Problem>> {
+    let (paths, archive) = (&archives.paths, archives.vault.as_ref());
     let scope = plan.scope.clone();
     let dir = paths.backups();
 
@@ -153,10 +155,17 @@ pub async fn capture(
             rehearsed: true,
         });
     }
-    archive
-        .write(&dest, &manifest, &plan.items)
-        .await
-        .map_err(|fault| Box::new(not_written(&fault)))?;
+    let meter = starting.begin(What::Backup, scope.clone(), space.needed, plan.areas());
+    let written = archive
+        .write(
+            &dest,
+            &manifest,
+            &plan.items,
+            Arc::clone(&meter) as Arc<dyn Meter>,
+        )
+        .await;
+    drop(meter);
+    written.map_err(|fault| Box::new(not_written(&fault)))?;
 
     let pruned = prune(&dir, taking.retention, &scope, &name, archive).await;
 
@@ -215,13 +224,13 @@ pub async fn behind(ctx: &Ctx, service: Option<String>) -> Result<Report, Box<Pr
 
     let plan = backup::plan(&archives.paths, &scope, &rebuilt(ctx));
     capture(
-        &archives.paths,
+        archives,
         plan,
         env!("CARGO_PKG_VERSION"),
         ctx.stamp(),
         &data_root,
         Taking::of(Retention::keeping(KEEP), ctx.dry_run),
-        archives.vault.as_ref(),
+        &Starting::of(ctx),
     )
     .await
 }
@@ -301,13 +310,13 @@ pub async fn existing(
         .ok_or_else(|| Box::new(nowhere_to_keep()))?;
 
     capture(
-        &archives.paths,
+        archives,
         backup::plan(&archives.paths, &Scope::existing(project, host_paths), &[]),
         env!("CARGO_PKG_VERSION"),
         ctx.stamp(),
         &data_root(ctx),
         Taking::of(Retention::keeping(KEEP), ctx.dry_run),
-        archives.vault.as_ref(),
+        &Starting::of(ctx),
     )
     .await
 }

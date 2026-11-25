@@ -27,12 +27,14 @@
 
 use std::fs::{self, File};
 use std::path::Path;
+use std::sync::Arc;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use lemonfiber_core::archive::{Archive, Reader};
 use lemonfiber_core::backup::{self, Item, Manifest, Scope};
 use lemonfiber_core::config::paths::Paths;
+use lemonfiber_core::copying::Meter;
 use lemonfiber_fixtures::ports::STAMPED;
 
 use super::{Tar, MANIFEST};
@@ -45,6 +47,11 @@ fn scratch(name: &str) -> lemonfiber_fixtures::scratch::Scratch {
 fn write_file(path: &Path, contents: &str) {
     let _ = path.parent().map(fs::create_dir_all);
     let _ = fs::write(path, contents);
+}
+
+/// A meter that is told everything and keeps none of it.
+pub(super) fn unmetered() -> Arc<dyn Meter> {
+    Arc::new(metered::Told::default())
 }
 
 /// Lay out a small install under `root` with something in each area, and return
@@ -69,7 +76,10 @@ async fn a_backup_written_reads_its_manifest_and_unpacks_its_contents_back() {
     let dest = paths.backups().join("backup.tar.gz");
 
     let tar = Tar;
-    assert!(tar.write(&dest, &manifest, &plan.items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &plan.items, unmetered())
+        .await
+        .is_ok());
     assert!(dest.exists(), "the archive was written");
 
     let read = tar.read_manifest(&dest).await;
@@ -82,7 +92,7 @@ async fn a_backup_written_reads_its_manifest_and_unpacks_its_contents_back() {
     // Restore onto a fresh, empty layout and confirm each area came back.
     let restored = install_empty(&scratch("round-trip-into"));
     let targets = backup::destinations(&restored);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
     assert_eq!(
         fs::read_to_string(restored.env_file()).ok().as_deref(),
         Some("DATA_ROOT=/srv/media\n")
@@ -141,7 +151,10 @@ async fn restoring_one_service_leaves_the_others_untouched() {
     );
     let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("sonarr.tar.gz");
-    assert!(tar.write(&dest, &manifest, &plan.items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &plan.items, unmetered())
+        .await
+        .is_ok());
 
     // Change the curator since the backup, so a real restore is observable.
     write_file(
@@ -150,7 +163,7 @@ async fn restoring_one_service_leaves_the_others_untouched() {
     );
 
     let targets = backup::destinations(&paths);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
 
     assert_eq!(
         fs::read_to_string(paths.service_config().join("radarr/config.xml"))
@@ -268,9 +281,14 @@ async fn a_backup_is_not_written_over_one_already_there() {
     let dest = paths.backups().join("backup.tar.gz");
 
     let tar = Tar;
-    assert!(tar.write(&dest, &manifest, &plan.items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &plan.items, unmetered())
+        .await
+        .is_ok());
     assert!(
-        tar.write(&dest, &manifest, &plan.items).await.is_err(),
+        tar.write(&dest, &manifest, &plan.items, unmetered())
+            .await
+            .is_err(),
         "a second capture to the same name is refused, not silently replaced"
     );
 }
@@ -284,7 +302,12 @@ async fn backups_are_listed_and_pruned() {
     let tar = Tar;
     for name in ["lemonfiber-full-a.tar.gz", "lemonfiber-full-b.tar.gz"] {
         assert!(tar
-            .write(&paths.backups().join(name), &manifest, &plan.items)
+            .write(
+                &paths.backups().join(name),
+                &manifest,
+                &plan.items,
+                unmetered()
+            )
             .await
             .is_ok());
     }
@@ -441,12 +464,15 @@ async fn a_directory_item_is_packed_whole_and_comes_back() {
     }];
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
-    assert!(tar.write(&dest, &manifest, &items).await.is_ok());
+    assert!(tar
+        .write(&dest, &manifest, &items, unmetered())
+        .await
+        .is_ok());
 
     let back = scratch("dir-item-back");
     let restored = install(&back);
     let targets = backup::destinations(&restored);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
     assert!(restored.service_config().join("sonarr/config.xml").exists());
 }
 
@@ -467,7 +493,7 @@ async fn an_archive_root_marker_is_not_taken_for_a_member() {
 
     let tar = Tar;
     let targets = backup::destinations(&restored);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
     // The leading `./` was dropped rather than the entry being skipped, so the
     // member landed where its area says — the partial-restore hazard.
     assert!(restored.env_file().exists());
@@ -486,7 +512,7 @@ async fn a_nested_entry_has_its_parents_made_for_it() {
 
     let tar = Tar;
     let targets = backup::destinations(&restored);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
     assert!(restored
         .service_config()
         .join("sonarr/deep/config.xml")
@@ -508,7 +534,7 @@ async fn a_staging_left_by_an_interrupted_restore_is_cleared_first() {
 
     let tar = Tar;
     let targets = backup::destinations(&restored);
-    assert!(tar.extract(&dest, &targets).await.is_ok());
+    assert!(tar.extract(&dest, &targets, unmetered()).await.is_ok());
     assert!(!stale_dir.join("left-over").exists());
 }
 
@@ -539,7 +565,7 @@ async fn an_entry_that_would_escape_its_area_is_refused() {
 
     let tar = Tar;
     let targets = backup::destinations(&restored);
-    let refused = tar.extract(&dest, &targets).await;
+    let refused = tar.extract(&dest, &targets, unmetered()).await;
     assert!(
         refused.is_err_and(|fault| fault.message.contains("outside its area")),
         "a traversing entry is refused rather than written"
@@ -574,7 +600,7 @@ async fn a_symlink_entry_is_refused() {
     let tar = Tar;
     let targets = backup::destinations(&restored);
     assert!(
-        tar.extract(&dest, &targets).await.is_err(),
+        tar.extract(&dest, &targets, unmetered()).await.is_err(),
         "a symlink entry is refused rather than followed"
     );
 }
@@ -589,7 +615,7 @@ async fn an_entry_in_an_unknown_area_is_refused() {
     let tar = Tar;
     let targets = backup::destinations(&restored);
     assert!(
-        tar.extract(&dest, &targets).await.is_err(),
+        tar.extract(&dest, &targets, unmetered()).await.is_err(),
         "an area this build does not know is refused, not written to a guess"
     );
 }
@@ -638,7 +664,7 @@ async fn an_archive_is_no_more_readable_than_the_settings_it_carries() {
     let plan = backup::plan(&paths, &Scope::WholeStack, &[]);
     let manifest = Manifest::describe(&plan, "0.3.0", STAMPED, "/srv/media");
     let dest = paths.backups().join("backup.tar.gz");
-    let written = Tar.write(&dest, &manifest, &plan.items).await;
+    let written = Tar.write(&dest, &manifest, &plan.items, unmetered()).await;
 
     let mode = |path: &Path| {
         fs::metadata(path)
@@ -717,3 +743,4 @@ async fn the_room_check_counts_the_bytes_that_are_really_there() {
 /// archive, and is not kept as a link either: what it points at stays out of a file the
 /// operator keeps and restores, and the files beside it are captured as ever.
 mod leaving;
+mod metered;

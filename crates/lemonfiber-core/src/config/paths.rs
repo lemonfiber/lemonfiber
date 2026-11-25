@@ -505,6 +505,13 @@ impl Paths {
         self.data.join("backups")
     }
 
+    /// Where the backup or restore running now keeps its reading, and the lock that says it
+    /// is still running. Outside every tree a capture takes and a restore replaces.
+    #[must_use]
+    pub fn copying(&self) -> PathBuf {
+        self.data.join("copying")
+    }
+
     /// Where support bundles are written for a caller that named no directory.
     ///
     /// Not the backups directory, though both hold a `.tar.gz`: retention prunes

@@ -60,6 +60,7 @@ impl Archive for Kept {
         _dest: &Path,
         _manifest: &BackupManifest,
         _items: &[Item],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Ok(())
     }
@@ -87,6 +88,7 @@ impl Reader for Kept {
         &self,
         _src: &Path,
         _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn lemonfiber_core::copying::Meter>,
     ) -> Result<(), ArchiveFault> {
         Err(ArchiveFault::new("a removal never reads an archive back"))
     }

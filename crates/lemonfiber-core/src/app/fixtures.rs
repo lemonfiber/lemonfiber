@@ -139,7 +139,13 @@ impl Archive for FakeArchive {
     async fn space(&self, _dir: &Path, _items: &[Item]) -> Result<Space, Fault> {
         self.space.clone()
     }
-    async fn write(&self, dest: &Path, _manifest: &Manifest, _items: &[Item]) -> Result<(), Fault> {
+    async fn write(
+        &self,
+        dest: &Path,
+        _manifest: &Manifest,
+        _items: &[Item],
+        _meter: std::sync::Arc<dyn crate::copying::Meter>,
+    ) -> Result<(), Fault> {
         self.record(dest)
     }
     async fn write_files(&self, dest: &Path, _files: &[(String, String)]) -> Result<(), Fault> {
@@ -158,7 +164,12 @@ impl Reader for FakeArchive {
     async fn read_manifest(&self, _src: &Path) -> Result<Manifest, Fault> {
         self.manifest.clone()
     }
-    async fn extract(&self, src: &Path, _targets: &[(String, PathBuf)]) -> Result<(), Fault> {
+    async fn extract(
+        &self,
+        src: &Path,
+        _targets: &[(String, PathBuf)],
+        _meter: std::sync::Arc<dyn crate::copying::Meter>,
+    ) -> Result<(), Fault> {
         extract(self, src, _targets)
     }
 }
@@ -169,10 +180,7 @@ impl Reader for FakeArchive {
 /// it over — so what a test drives is the run holding an adapter, not a function
 /// taking one.
 pub(crate) fn keeping(ctx: crate::app::Ctx, vault: &Arc<FakeArchive>) -> crate::app::Ctx {
-    ctx.with_archives(Archiving {
-        paths: paths(),
-        vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
-    })
+    ctx.with_archives(archiving(vault))
 }
 
 /// A scratch directory unique to one test, emptied first.
@@ -218,4 +226,22 @@ fn extract(archive: &FakeArchive, src: &Path, _targets: &[(String, PathBuf)]) ->
         extracted.push(src.to_path_buf());
     }
     archive.extract.clone()
+}
+
+/// The archives this fixture keeps: its paths, held by `vault`.
+pub(crate) fn archiving(vault: &Arc<FakeArchive>) -> Archiving {
+    Archiving {
+        paths: paths(),
+        vault: Arc::clone(vault) as Arc<dyn crate::archive::Vault>,
+    }
+}
+
+/// A copy started on still clocks, keeping no reading.
+pub(crate) fn unkept() -> crate::copying::Starting {
+    crate::copying::Starting::on(
+        lemonfiber_fixtures::ports::Stopped::at(STAMPED.seconds()),
+        lemonfiber_fixtures::ports::Waited::started(),
+        None,
+        None,
+    )
 }

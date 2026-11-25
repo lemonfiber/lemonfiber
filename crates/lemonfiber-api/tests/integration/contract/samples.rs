@@ -266,6 +266,7 @@ fn serving() -> Vec<Outcome> {
         Outcome::Stuck(StuckReport::default()),
         Outcome::Boot(a_boot()),
         Outcome::Watcher(a_watcher()),
+        Outcome::Copying(a_copy()),
         Outcome::Queue(healing::a_queue()),
         Outcome::Invitation(an_invitation()),
         Outcome::Handoff(lemonfiber_core::model::Handoff {
@@ -754,5 +755,25 @@ fn a_watcher() -> lemonfiber_core::model::WatcherReport {
             },
         ],
         uncovered: vec![Covers::Service("sonarr".to_owned())],
+    }
+}
+
+/// A restore of one service, stalled part-way.
+fn a_copy() -> lemonfiber_core::copying::Copying {
+    lemonfiber_core::copying::Copying {
+        running: Some(lemonfiber_core::copying::Running {
+            what: lemonfiber_core::copying::What::Restore,
+            scope: lemonfiber_core::copying::Copied::Service {
+                name: "sonarr".to_owned(),
+            },
+            job: Some("9f2c1a7e04b3d815".to_owned()),
+            started: lemonfiber_core::instant::Instant::from_seconds(1_795_563_600),
+            written: 1 << 20,
+            whole: 2 << 20,
+            part: "sonarr configuration".to_owned(),
+            state: lemonfiber_core::copying::State::Stalled {
+                wrote: lemonfiber_core::instant::Instant::from_seconds(1_795_563_660),
+            },
+        }),
     }
 }

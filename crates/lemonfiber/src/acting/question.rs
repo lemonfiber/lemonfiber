@@ -48,9 +48,10 @@ mod shape;
 pub(crate) use shape::{Narrows, Needed, Question, Wants};
 
 use lemonfiber_api::read::table::{
-    named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, CREDENTIALS, FORMS,
-    FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE, QUALITY,
-    QUEUE, REQUESTS, SETTLED, STACK, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION, WATCHER,
+    named, ALERTS, BANDWIDTH, BOOT, CATALOGUE, CHECKS, CLIENTS, CONFIG, COPYING, CREDENTIALS,
+    FORMS, FRONT_DOOR, HELD, HISTORY, HOSTING, MIGRATION, NEWS, OUTBOUND, PLAYING, PROVENANCE,
+    QUALITY, QUEUE, REQUESTS, SETTLED, STACK, STORED, STUCK, TRACE, UNINSTALL, UPDATE, VERSION,
+    WATCHER,
 };
 use lemonfiber_api::refusal::Refusal;
 use lemonfiber_core::app::Command;
@@ -346,6 +347,13 @@ static AFTER: &[Question] = &[
         about: "whether the monitor outside the stack answers, what each of its monitors sees \
                 beside what it covers, and what nothing watches",
         read: WATCHER,
+        needs: Needed::Nothing,
+    },
+    Question {
+        name: "what copy is running",
+        about: "the backup or restore running on this machine now, how far it has got, the part \
+                it is writing, and whether it is slowed on purpose or stalled",
+        read: COPYING,
         needs: Needed::Nothing,
     },
     Question {

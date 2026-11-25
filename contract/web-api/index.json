@@ -83,6 +83,11 @@
         "nature": "record",
         "audience": "anyone"
       },
+      "copying": {
+        "schema": "kinds/copying.json",
+        "nature": "state",
+        "audience": "operator-and-keys"
+      },
       "dashboard": {
         "schema": "kinds/dashboard.json",
         "nature": "state",
@@ -172,6 +177,7 @@
     "channels": "kinds/channels.json",
     "clients": "kinds/clients.json",
     "config": "kinds/config.json",
+    "copying": "kinds/copying.json",
     "credentials": "kinds/credentials.json",
     "dashboard": "kinds/dashboard.json",
     "device-challenge": "kinds/device-challenge.json",
@@ -325,6 +331,7 @@
       "channels": "examples/kinds/channels.json",
       "clients": "examples/kinds/clients.json",
       "config": "examples/kinds/config.json",
+      "copying": "examples/kinds/copying.json",
       "credentials": "examples/kinds/credentials.json",
       "dashboard": "examples/kinds/dashboard.json",
       "device-challenge": "examples/kinds/device-challenge.json",

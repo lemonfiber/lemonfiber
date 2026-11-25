@@ -236,8 +236,7 @@ pub enum Request {
         /// The word, as you would say it.
         word: Vec<String>,
     },
-    /// Show everything lemonfiber changed, newest first, and how far each could be put
-    /// back.
+    /// Show everything lemonfiber changed, newest first, and how far each could be put back.
     ///
     /// The record only. Putting one back is asked for by name, because it acts on a
     /// running stack, and this says beforehand which of them could be.
@@ -260,6 +259,8 @@ pub enum Request {
     /// Say what the outside watcher sees beside what each of its monitors covers, and what
     /// no active monitor covers.
     Watcher,
+    /// Say the backup or restore running here now, how far it has got and how it is moving.
+    Copying,
     /// Say what the download queue holds that is wedged, why, how many strikes each has,
     /// and what the newest runs did to it.
     Queue {

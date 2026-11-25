@@ -110,7 +110,7 @@ async fn a_listener_hearing_as_anyone_never_hears_the_settings() {
         ["dashboard", "news", "playing", "plugins", "wiring"].map(|name| Some(name.to_owned()))
     );
     let mut told = Vec::new();
-    for _ in 0..6 {
+    for _ in 0..7 {
         let said = operator.next().await.unwrap_or_default();
         told.push(named(&said).map(str::to_owned));
     }
@@ -127,10 +127,10 @@ fn only_the_per_run_token_and_an_operator_session_hear_as_the_operator() {
     };
     assert_eq!(Audience::of(&Caller::Machine), Audience::Operator);
     assert_eq!(Audience::of(&Caller::Operator), Audience::Operator);
+    assert_eq!(Audience::of(&key(Scope::Read)), Audience::Key);
+    assert_eq!(Audience::of(&key(Scope::Act)), Audience::Key);
     for caller in [
         Caller::Member("a7f3".to_owned()),
-        key(Scope::Read),
-        key(Scope::Act),
         key(Scope::Member {
             id: "a7f3".to_owned(),
             name: "ana".to_owned(),
@@ -138,9 +138,20 @@ fn only_the_per_run_token_and_an_operator_session_hear_as_the_operator() {
     ] {
         assert_eq!(Audience::of(&caller), Audience::Anyone, "{caller:?}");
     }
-    assert!(!Audience::Anyone.hears(Audience::Operator));
-    assert!(Audience::Anyone.hears(Audience::Anyone));
-    assert!(Audience::Operator.hears(Audience::Anyone));
+    for (listener, heard) in [
+        (Audience::Operator, [true, true, false, true]),
+        (Audience::Key, [true, false, true, true]),
+        (Audience::Anyone, [true, false, false, false]),
+    ] {
+        let said = [
+            Audience::Anyone,
+            Audience::Operator,
+            Audience::Key,
+            Audience::OperatorAndKeys,
+        ]
+        .map(|said| listener.hears(said));
+        assert_eq!(said, heard, "{listener:?}");
+    }
 }
 
 /// A stream opened over the route with `secret`, and the gather it listens to.

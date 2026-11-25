@@ -6,15 +6,28 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use lemonfiber::archive::Tar;
 use lemonfiber_core::archive::Reader;
+use lemonfiber_core::copying::Meter;
 use libfuzzer_sys::fuzz_target;
 
 /// Each run's own directory, so a restore never meets what the last one left.
 static RUN: AtomicU64 = AtomicU64::new(0);
+
+/// A restore nobody reads the progress of.
+struct Unmetered;
+
+impl Meter for Unmetered {
+    fn whole(&self, _bytes: u64) {}
+
+    fn writing(&self, _entry: &str) {}
+
+    fn wrote(&self, _bytes: u64) {}
+}
 
 fuzz_target!(|data: &[u8]| {
     // The bytes are the tar stream; compressing them here is what lets the fuzzer reach
@@ -46,7 +59,7 @@ fuzz_target!(|data: &[u8]| {
     };
     runtime.block_on(async {
         let _ = Tar.read_manifest(&archive).await;
-        let _ = Tar.extract(&archive, &targets).await;
+        let _ = Tar.extract(&archive, &targets, Arc::new(Unmetered)).await;
     });
     let _ = std::fs::remove_dir_all(&root);
 });

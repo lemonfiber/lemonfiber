@@ -192,6 +192,8 @@ outcomes! {
     Ran(crate::model::RunReport) => RAN [rehearsed],
     /// What the outside watcher sees, beside what each of its monitors covers.
     Watcher(crate::model::WatcherReport) => WATCHER,
+    /// The backup or restore running on this machine now, or none.
+    Copying(crate::copying::Copying) => COPYING,
     /// What the download queue holds that is wedged, and what the newest runs did to it.
     Queue(crate::model::QueueHealth) => QUEUE [rehearsed],
     /// What one of this product's words means.
