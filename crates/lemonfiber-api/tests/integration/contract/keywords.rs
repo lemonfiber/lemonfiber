@@ -97,6 +97,25 @@ fn what_every_generator_reads_is_not_reported() {
     assert_eq!(unread(&contract), Vec::<String>::new());
 }
 
+/// Fields beside a `oneOf` are read: every generator joins them to each branch, as a struct
+/// with one tagged enum flattened into it describes itself.
+#[test]
+fn fields_beside_a_union_are_read() {
+    let contract = serde_json::json!({
+        "kinds": { "copying": { "$defs": { "RunningCopy": {
+            "type": "object",
+            "properties": { "part": { "type": "string" } },
+            "required": ["part"],
+            "oneOf": [
+                { "type": "object", "properties": { "state": { "const": "working" } }, "required": ["state"] },
+                { "type": "object", "properties": { "state": { "const": "paced" }, "limit": { "type": "integer" } } }
+            ]
+        } } } }
+    });
+
+    assert_eq!(unread(&contract), Vec::<String>::new());
+}
+
 /// The artefact uses no keyword an SDK generator does not read.
 #[test]
 fn the_artefact_uses_only_what_every_generator_reads() {

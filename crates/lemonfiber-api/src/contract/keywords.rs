@@ -2,7 +2,8 @@
 //!
 //! A generator meeting a keyword it does not read refuses the artefact, so no SDK takes
 //! the release. This is the one list the artefact is held to; each generator holds what
-//! it reads in its own language and refuses anything beyond it.
+//! it reads in its own language and refuses anything beyond it. Fields beside a top-level
+//! `oneOf` are read: each generator joins them to every branch.
 
 /// Every keyword a kind's schema, and each definition it carries, may use.
 pub const KINDS: [&str; 27] = [
