@@ -6,6 +6,7 @@
 
 mod definitions;
 mod instants;
+mod keywords;
 mod openapi;
 mod reads;
 mod refusals;

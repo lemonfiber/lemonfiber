@@ -53,7 +53,7 @@ requirement = [
   { id = "ARCH-R70", state = "done", evidence = ["crates/lemonfiber-api/src/jobs.rs", "crates/lemonfiber-api/tests/integration/what_became_of_a_job.rs"] },
   { id = "ARCH-R71", state = "done", evidence = ["crates/lemonfiber-api/src/jobs.rs", "crates/lemonfiber-api/tests/integration/what_became_of_a_job.rs"] },
   { id = "ARCH-R72", state = "done", evidence = ["crates/lemonfiber-api/src/jobs.rs", "crates/lemonfiber-api/tests/integration/what_became_of_a_job.rs"] },
-  { id = "ARCH-R73", state = "done", evidence = [".github/workflows/release-contract.yml", ".github/workflows/contract-moved.yml"] },
+  { id = "ARCH-R73", state = "done", evidence = [".github/workflows/release-contract.yml", ".github/workflows/contract-moved.yml", "crates/lemonfiber-api/tests/integration/contract/keywords.rs"] },
   { id = "ARCH-R74", state = "done", evidence = ["crates/lemonfiber-error/src/problem.rs", "crates/lemonfiber-api/src/read.rs"] },
   { id = "ARCH-R75", state = "done", evidence = ["crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/router.rs", "crates/lemonfiber-api/tests/integration/what_the_door_asks.rs", "crates/lemonfiber-api/src/refusal.rs"] },
   { id = "ARCH-R76", state = "done", evidence = ["crates/lemonfiber-api/src/admission.rs", "crates/lemonfiber-api/src/router.rs", "crates/lemonfiber-api/tests/integration/what_the_door_asks.rs", "crates/lemonfiber-api/src/refusal.rs"] },

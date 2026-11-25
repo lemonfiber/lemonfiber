@@ -87,7 +87,6 @@ pub struct Running {
     /// Whether it is a backup or a restore.
     pub what: What,
     /// What it copies.
-    #[serde(flatten)]
     pub scope: Copied,
     /// The name an accepting reply gave the work, where one did.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -14,6 +14,10 @@
       "description": "The area being written now, named.",
       "type": "string"
     },
+    "scope": {
+      "description": "What it copies.",
+      "$ref": "CopiedScope.json"
+    },
     "started": {
       "description": "When it started.",
       "$ref": "Instant.json"
@@ -35,130 +39,62 @@
       "minimum": 0
     }
   },
-  "allOf": [
+  "oneOf": [
     {
-      "oneOf": [
-        {
-          "description": "Every service's configuration, plus lemonfiber's own and the stack.",
-          "type": "object",
-          "properties": {
-            "scope": {
-              "type": "string",
-              "const": "whole_stack"
-            }
-          },
-          "required": [
-            "scope"
-          ]
-        },
-        {
-          "description": "One named service's configuration alone.",
-          "type": "object",
-          "properties": {
-            "name": {
-              "description": "The service whose configuration it copies.",
-              "type": "string"
-            },
-            "scope": {
-              "type": "string",
-              "const": "service"
-            }
-          },
-          "required": [
-            "scope",
-            "name"
-          ]
-        },
-        {
-          "description": "An existing setup's own configuration.",
-          "type": "object",
-          "properties": {
-            "project": {
-              "description": "The Compose project it copies, to the operator alone.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "scope": {
-              "type": "string",
-              "const": "existing"
-            },
-            "trees": {
-              "description": "The host trees it copies, to the operator alone.",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "$ref": "Tree.json"
-              }
-            }
-          },
-          "required": [
-            "scope"
-          ]
+      "description": "Writing as fast as it can.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "working"
         }
+      },
+      "required": [
+        "state"
       ]
     },
     {
-      "oneOf": [
-        {
-          "description": "Writing as fast as it can.",
-          "type": "object",
-          "properties": {
-            "state": {
-              "type": "string",
-              "const": "working"
-            }
-          },
-          "required": [
-            "state"
-          ]
+      "description": "Held to the operator's limit.",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "The limit, in bytes a second.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
         },
-        {
-          "description": "Held to the operator's limit.",
-          "type": "object",
-          "properties": {
-            "limit": {
-              "description": "The limit, in bytes a second.",
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0
-            },
-            "state": {
-              "type": "string",
-              "const": "paced"
-            }
-          },
-          "required": [
-            "state",
-            "limit"
-          ]
-        },
-        {
-          "description": "Nothing written for the minutes the operator's setting holds.",
-          "type": "object",
-          "properties": {
-            "state": {
-              "type": "string",
-              "const": "stalled"
-            },
-            "wrote": {
-              "description": "The instant it last wrote.",
-              "$ref": "Instant.json"
-            }
-          },
-          "required": [
-            "state",
-            "wrote"
-          ]
+        "state": {
+          "type": "string",
+          "const": "paced"
         }
+      },
+      "required": [
+        "state",
+        "limit"
+      ]
+    },
+    {
+      "description": "Nothing written for the minutes the operator's setting holds.",
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "stalled"
+        },
+        "wrote": {
+          "description": "The instant it last wrote.",
+          "$ref": "Instant.json"
+        }
+      },
+      "required": [
+        "state",
+        "wrote"
       ]
     }
   ],
   "required": [
     "what",
+    "scope",
     "started",
     "written",
     "whole",

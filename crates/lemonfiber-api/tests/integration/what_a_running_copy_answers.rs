@@ -116,7 +116,7 @@ fn a_backup_running(paths: &Paths) -> Arc<Recorder> {
 fn the_running_backup() -> Value {
     json!({
         "what": "backup",
-        "scope": "whole_stack",
+        "scope": { "scope": "whole_stack" },
         "job": "9f2c1a7e04b3d815",
         "started": STAMPED.seconds(),
         "written": 700 << 20,
@@ -237,7 +237,7 @@ async fn a_key_reads_a_copy_of_an_existing_setup_without_its_project_trees_or_ho
     let (status, operators) = asked(ctx.clone(), Caller::Operator).await;
     assert_eq!(status, 200, "{operators}");
     assert_eq!(
-        operators.pointer("/data/running/project"),
+        operators.pointer("/data/running/scope/project"),
         Some(&json!("media"))
     );
     assert_eq!(
@@ -245,7 +245,7 @@ async fn a_key_reads_a_copy_of_an_existing_setup_without_its_project_trees_or_ho
         Some(&json!(HOST_PATH))
     );
     assert_eq!(
-        operators.pointer("/data/running/trees/0/host_path"),
+        operators.pointer("/data/running/scope/trees/0/host_path"),
         Some(&json!(HOST_PATH))
     );
 
@@ -255,15 +255,17 @@ async fn a_key_reads_a_copy_of_an_existing_setup_without_its_project_trees_or_ho
         let Some(running) = body.pointer("/data/running") else {
             unreachable!("a copy is running");
         };
-        assert_eq!(running.get("scope"), Some(&json!("existing")), "{body}");
+        assert_eq!(
+            running.get("scope"),
+            Some(&json!({ "scope": "existing" })),
+            "{body}"
+        );
         assert_eq!(
             running.get("part"),
             Some(&json!(lemonfiber_core::copying::EXISTING_PART)),
             "{body}"
         );
-        for withheld in ["job", "project", "trees"] {
-            assert_eq!(running.get(withheld), None, "{withheld}: {body}");
-        }
+        assert_eq!(running.get("job"), None, "{body}");
         for withheld in ["media", "/srv", "9f2c1a7e04b3d815"] {
             assert!(!body.to_string().contains(withheld), "{withheld}: {body}");
         }
@@ -375,7 +377,7 @@ async fn the_operator_hears_the_copy_whole_a_key_as_its_read_and_nobody_else_at_
     assert_eq!(
         whole
             .as_ref()
-            .and_then(|said| said.pointer("/data/running/project")),
+            .and_then(|said| said.pointer("/data/running/scope/project")),
         Some(&json!("media"))
     );
     assert_eq!(heard(&mut operator).await, None);
@@ -384,10 +386,8 @@ async fn the_operator_hears_the_copy_whole_a_key_as_its_read_and_nobody_else_at_
     let Some(running) = keys.as_ref().and_then(|said| said.pointer("/data/running")) else {
         unreachable!("a key hears the copy running");
     };
-    assert_eq!(running.get("scope"), Some(&json!("existing")));
-    for withheld in ["job", "project", "trees"] {
-        assert_eq!(running.get(withheld), None, "{withheld}: {running}");
-    }
+    assert_eq!(running.get("scope"), Some(&json!({ "scope": "existing" })));
+    assert_eq!(running.get("job"), None, "{running}");
     assert!(!running.to_string().contains("/srv"), "{running}");
     assert_eq!(heard(&mut keyed).await, None);
 
