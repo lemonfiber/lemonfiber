@@ -15,7 +15,7 @@ use lemonfiber_core::app::{
 };
 use lemonfiber_core::doctor::Narrowing;
 use lemonfiber_core::uninstall::Tier;
-use lemonfiber_core::update::run as update;
+use lemonfiber_core::update::run::Asked as Updating;
 
 use lemonfiber_core::collected::Unit;
 
@@ -48,7 +48,7 @@ pub(super) fn removing(tier: Option<String>) -> Result<Command, Refusal> {
 pub(super) fn moving(what: Option<&str>, to: Option<String>) -> Result<Command, Refusal> {
     match what {
         Some(THIS_BINARY) => Ok(Command::SelfUpdate { to }),
-        Some(THE_STACK) => Ok(Command::Update(update::Asked {
+        Some(THE_STACK) => Ok(Command::Update(Updating {
             service: None,
             confirm: false,
             wait: Waiting::Never,

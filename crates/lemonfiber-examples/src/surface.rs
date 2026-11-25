@@ -12,7 +12,7 @@ use lemonfiber_api::events::wire::BEAT_SAID;
 use lemonfiber_api::events::Streaming;
 use lemonfiber_api::guard::{Arrived, Binding, Token, TOKEN_HEADER};
 use lemonfiber_api::jobs::Jobs;
-use lemonfiber_api::router::{routes, Serving};
+use lemonfiber_api::router::{routes, Own, Serving};
 use lemonfiber_core::app::admitting::AtHand;
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::model::kind;
@@ -95,6 +95,10 @@ impl Surface {
             Binding::here(PORT),
             Jobs::default(),
             Arc::clone(&live),
+            Own {
+                clock: Arc::clone(&ctx.seams.clock),
+                random: Arc::clone(&ctx.seams.random),
+            },
         );
         let streaming = Arc::new(Streaming {
             token: Arc::clone(&token),

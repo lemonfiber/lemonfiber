@@ -1,6 +1,7 @@
 use super::{Answer, Outcome};
+use crate::app::exporting::Exported;
 use crate::app::standing::StackStanding;
-use crate::model::kind;
+use crate::model::{kind, Octets};
 use crate::notify::events::Heard;
 use crate::screening::{Renewed, Untuned};
 
@@ -23,6 +24,20 @@ fn each_answer_is_written_and_described_under_its_own_kind() {
             kind::RENEWED,
         ),
         (Answer::Untuned(Untuned { closed: 1 }), kind::UNTUNED),
+        (
+            Answer::Exported(Exported {
+                path: "lemonfiber-logs-1-1.txt".to_owned(),
+                rehearsed: false,
+            }),
+            kind::LOGS_EXPORTED,
+        ),
+        (
+            Answer::Octets(Octets {
+                media_type: "image/png",
+                bytes: b"png".to_vec(),
+            }),
+            kind::OCTETS,
+        ),
     ];
     for (answer, published) in answers {
         let outcome = Outcome::Surfaced(answer);
@@ -37,7 +52,8 @@ fn each_answer_is_written_and_described_under_its_own_kind() {
             kind::STANDING,
             kind::NOTIFY_HEARD,
             kind::RENEWED,
-            kind::UNTUNED
+            kind::UNTUNED,
+            kind::LOGS_EXPORTED
         ]
     );
 }

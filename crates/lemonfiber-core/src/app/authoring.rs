@@ -4,12 +4,28 @@ use std::path::{Path, PathBuf};
 
 use crate::error::codes::plugin::KEY_UNREADABLE;
 use crate::error::{Code, Problem, Remedy, State};
-use crate::plugin::{Key, Recorder, Retaking};
+use crate::model::Octets;
+use crate::plugin::{Key, Recorder, Retaking, Ungenerated, Unreadable};
 
 use super::{Ctx, Outcome};
 
 /// Every code what an author asks is refused with.
 pub const REFUSALS: [Code; 1] = [KEY_UNREADABLE];
+
+/// What a published document is handed over as.
+pub const PUBLISHED: &str = "application/json";
+
+/// A document this build publishes for whoever writes a plugin, byte for byte as the
+/// file it publishes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Document {
+    /// The schema a plugin's manifest is read against.
+    Schema,
+    /// The places a plugin may extend lemonfiber.
+    Points,
+    /// The capabilities a service can claim.
+    Vocabulary,
+}
 
 /// What an author asks of the plugin whose source is at `path`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +54,8 @@ pub enum Asked {
         /// Whether what is taken is written or held to what is there.
         taking: Retaking,
     },
+    /// A document this build publishes.
+    Published(Document),
 }
 
 /// Answer what an author asked.
@@ -57,7 +75,25 @@ pub(crate) async fn answered(ctx: &Ctx, asked: Asked) -> Result<Outcome, Box<Pro
             .map_err(|why| unreadable(&why)),
         Asked::Provenance { path, keys } => vouched(ctx, &path, &keys).await,
         Asked::Record { path, taking } => recorded(ctx, &path, &taking).await,
+        Asked::Published(document) => published(document)
+            .map(|octets| Outcome::Surfaced(super::surfacing::Answer::Octets(octets))),
     }
+}
+
+fn published(document: Document) -> Result<Octets, Box<Problem>> {
+    handed(match document {
+        Document::Schema => crate::plugin::schema().ok_or(Ungenerated::Unrenderable),
+        Document::Points => crate::plugin::points().ok_or(Ungenerated::Unrenderable),
+        Document::Vocabulary => crate::plugin::vocabulary(),
+    })
+}
+
+fn handed(text: Result<String, Ungenerated>) -> Result<Octets, Box<Problem>> {
+    let text = text.map_err(|why| unreadable(&Unreadable::Stack(why)))?;
+    Ok(Octets {
+        media_type: PUBLISHED,
+        bytes: text.into_bytes(),
+    })
 }
 
 /// What anybody has said about the images the plugin at `path` pins.

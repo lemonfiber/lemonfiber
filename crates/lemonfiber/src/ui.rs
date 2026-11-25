@@ -40,7 +40,7 @@ use lemonfiber_api::events::Streaming;
 use lemonfiber_api::frontend as serving;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::{Jobs, LEASE};
-use lemonfiber_api::router::{self, Serving};
+use lemonfiber_api::router::{self, Own, Serving};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Surfacing};
 use lemonfiber_core::companion::served::{Served, ServedReport};
 use lemonfiber_core::frontend::Source;
@@ -250,7 +250,7 @@ pub(crate) async fn run(
     };
     match refused {
         Some(code) => code,
-        None => serving(ctx, asked, embedded, until, LOOK).await,
+        None => serving(ctx, own(), asked, embedded, until, LOOK).await,
     }
 }
 
@@ -296,7 +296,7 @@ fn password_kept(ctx: &Ctx) -> bool {
     ctx.settings
         .admission
         .as_deref()
-        .and_then(lemonfiber_core::admission::at)
+        .and_then(lemonfiber_core::admission::Credential::at)
         .is_some()
 }
 
@@ -327,6 +327,16 @@ fn served_by(answered: Outcome) -> ServedReport {
     }
 }
 
+/// The clock and the randomness this run's web surface holds of its own: the machine's,
+/// the randomness being the operating system's CSPRNG, because the token and every job id
+/// are drawn from it and a guessed one opens what it guards.
+fn own() -> Own {
+    Own {
+        clock: Arc::new(lemonfiber_adapters::System),
+        random: Arc::new(lemonfiber_adapters::Os),
+    }
+}
+
 /// Serve, and go on serving until the operator stops it or the policy turns.
 ///
 /// The policy is read once before a socket exists and again while one is held, and it
@@ -336,19 +346,20 @@ fn served_by(answered: Outcome) -> ServedReport {
 /// would have been given and says why.
 async fn serving(
     ctx: Ctx,
+    own: Own,
     asked: Asked,
     embedded: Option<Source>,
     mut until: Until,
     look: Duration,
 ) -> ExitCode {
-    let Some(token) = Token::mint(ctx.seams.random.as_ref()) else {
+    let Some(token) = Token::mint(own.random.as_ref()) else {
         return complain(&tokenless());
     };
     // The one gather every listener hears, made before the context so that the
     // waits a command runs into have somewhere to say what they are waiting for:
     // a browser is told the name of the work and nothing else, and everything it
     // learns after that arrives here.
-    let live = Arc::new(Live::opening(Arc::clone(&ctx.seams.clock)));
+    let live = Arc::new(Live::opening(Arc::clone(&own.clock)));
     // A walk's steps go down the same stream, whole rather than rendered: the words
     // are the core's, and a second rendering of them here would be a second copy of
     // the walk's own prose beside the one the terminal draws.
@@ -396,7 +407,7 @@ async fn serving(
         let browser = match (browsing, at.first()) {
             (true, Some(first)) => {
                 opening(
-                    ctx.seams.runner.as_ref(),
+                    &lemonfiber_adapters::Local,
                     HOST_OS,
                     &address(*first, encrypting.is_some()),
                 )
@@ -421,6 +432,7 @@ async fn serving(
             bound.clone(),
             jobs.clone(),
             Arc::clone(&live),
+            own.clone(),
         );
         let streaming = Arc::new(Streaming {
             token: Arc::clone(&token),

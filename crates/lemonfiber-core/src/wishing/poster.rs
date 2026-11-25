@@ -15,13 +15,14 @@ use crate::app::Ctx;
 use crate::config::REACH_POSTERS_KEY;
 use crate::error::codes::wish::NO_PICTURE;
 use crate::error::Problem;
+use crate::model::Octets;
 use crate::outbound::POSTERS;
 use crate::outward::checked;
 use crate::ports::http::{Method, Request};
 use crate::ports::media::Kind;
 use crate::ports::service::{Image, PICTURE_MOST};
 use crate::schemes::SECURE_SCHEME;
-use crate::screening::{passed_on, Pictured};
+use crate::screening::passed_on;
 
 /// The poster of the title `id` of `kind`, as written, for the member `named`.
 ///
@@ -32,12 +33,12 @@ use crate::screening::{passed_on, Pictured};
 /// is not a raster image of at most [`PICTURE_MOST`] bytes; and where the location is not
 /// beneath the catalogue's address, stands for somewhere that is not out on the internet,
 /// or does not answer.
-pub async fn poster(
+pub(crate) async fn poster(
     ctx: &Ctx,
     named: &str,
     kind: &str,
     id: &str,
-) -> Result<Pictured, Box<Problem>> {
+) -> Result<Octets, Box<Problem>> {
     let reached = reached(ctx, named).await?;
     let kind = Kind::for_media_type(kind).ok_or_else(no_such_title)?;
     let detail = titled(&reached, kind, id, false).await?;
@@ -57,7 +58,7 @@ pub async fn poster(
 /// A [`Problem`] where the host stands for somewhere that is not out on the internet or
 /// does not answer, and where what came back is not a raster image of at most
 /// [`PICTURE_MOST`] bytes.
-async fn fetched(ctx: &Ctx, request: Request) -> Result<Pictured, Box<Problem>> {
+async fn fetched(ctx: &Ctx, request: Request) -> Result<Octets, Box<Problem>> {
     handed(ctx, outward(ctx, request).await?).await
 }
 
@@ -80,7 +81,7 @@ pub(super) async fn outward(ctx: &Ctx, request: Request) -> Result<Request, Box<
 ///
 /// A [`Problem`] where the host does not answer, and where what came back is not a
 /// raster image of at most [`PICTURE_MOST`] bytes.
-pub(super) async fn handed(ctx: &Ctx, request: Request) -> Result<Pictured, Box<Problem>> {
+pub(super) async fn handed(ctx: &Ctx, request: Request) -> Result<Octets, Box<Problem>> {
     let fetched = ctx
         .seams
         .http

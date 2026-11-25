@@ -1,6 +1,7 @@
 //! What a surface asks the core for itself, as each answer is written.
 
 use lemonfiber_core::app::admitting::{Admitted, Answer, Caller, Calling, SignInCode};
+use lemonfiber_core::app::exporting::Exported;
 use lemonfiber_core::app::password::PasswordReport;
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::surfacing::Answer as Surfaced;
@@ -56,6 +57,7 @@ pub(crate) fn samples() -> Vec<Outcome> {
             told: true,
             waiting: false,
             members_mint: false,
+            plays_from: lemonfiber_core::screening::Origin::of("https://watch.home.lan"),
         })),
         Outcome::Surfaced(Surfaced::Heard(Heard {
             service: "sonarr".to_owned(),
@@ -66,6 +68,10 @@ pub(crate) fn samples() -> Vec<Outcome> {
             rehearsed: false,
         })),
         Outcome::Surfaced(Surfaced::Untuned(Untuned { closed: 2 })),
+        Outcome::Surfaced(Surfaced::Exported(Exported {
+            path: "lemonfiber-logs-1791223200-1.txt".to_owned(),
+            rehearsed: false,
+        })),
         Outcome::Admitting(Answer::Admission(Admitted {
             token: "5e55".repeat(16),
             until: Instant::from_seconds(1_791_223_200),

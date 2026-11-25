@@ -55,6 +55,8 @@ pub(crate) mod ctx;
 pub mod disturbance;
 pub(crate) mod engine;
 pub(crate) mod expiring;
+pub mod exporting;
+mod fetching;
 #[cfg(test)]
 pub(crate) mod fixtures;
 pub mod forwarding;
@@ -107,10 +109,10 @@ pub(crate) mod watcher;
 
 pub use command::{
     AlertAction, Allowance, Answer, Arranged, Asking, BandwidthAsked, Chosen, Command, Decision,
-    Diagnosing, Doorway, Downloading, Filling, Gathering, Halting, Hostable, Inviting, Keeping,
-    LettingGo, Linking, Live, MigrateAction, PlayFrom, Polled, QualityAction, Queueing,
-    ReadingLogs, Reclaiming, Removing, Restarting, Restoring, Setting, Settling, Shelf, Surfacing,
-    Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
+    Diagnosing, Doorway, Downloading, Exporting, Fetching, Filling, Gathering, Halting, Hostable,
+    Inviting, Keeping, LettingGo, Linking, Live, MigrateAction, PlayFrom, Polled, QualityAction,
+    Queueing, ReadingLogs, Reclaiming, Removing, Restarting, Restoring, Setting, Settling, Shelf,
+    Surfacing, Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
 pub use ctx::{Ctx, PATIENCE};

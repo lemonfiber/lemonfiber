@@ -1,19 +1,20 @@
 use std::time::Duration;
 
 use super::refused::{
-    held, no_session, not_open, not_the_password, not_waiting, not_yours, short_choice,
-    signs_in_by_password, too_many_codes, unconfirmed,
+    no_session, not_open, not_the_password, not_waiting, short_choice, signs_in_by_password,
+    too_many_codes,
 };
+use super::Caller;
 use super::REFUSALS;
 use crate::error::codes::admit::{CODE_NOT_WAITING, NOT_OPEN, NOT_THE_PASSWORD};
 use crate::error::{Problem, Severity};
 
 fn every() -> Vec<Problem> {
     [
-        *not_yours(),
-        *unconfirmed(),
+        *Caller::not_yours(),
+        *Caller::unconfirmed(),
         *not_the_password(),
-        *held(Duration::from_secs(8)),
+        *Caller::held(Duration::from_secs(8)),
         *not_open(),
         *short_choice(),
         *not_waiting(),
@@ -55,7 +56,7 @@ fn only_the_refusals_that_are_not_faults_are_warnings() {
         vec![
             REFUSALS[0],
             REFUSALS[1],
-            held(Duration::ZERO).code,
+            Caller::held(Duration::ZERO).code,
             too_many_codes(Duration::ZERO).code,
         ]
     );
@@ -63,9 +64,14 @@ fn only_the_refusals_that_are_not_faults_are_warnings() {
 
 #[test]
 fn a_wait_is_said_in_whole_seconds_never_less_than_one() {
-    assert_eq!(held(Duration::from_millis(4_900)).retry_after, Some(4));
-    assert_eq!(held(Duration::ZERO).retry_after, Some(1));
-    assert!(held(Duration::from_secs(64)).summary.contains("64 seconds"));
+    assert_eq!(
+        Caller::held(Duration::from_millis(4_900)).retry_after,
+        Some(4)
+    );
+    assert_eq!(Caller::held(Duration::ZERO).retry_after, Some(1));
+    assert!(Caller::held(Duration::from_secs(64))
+        .summary
+        .contains("64 seconds"));
     assert_eq!(
         too_many_codes(Duration::from_secs(90)).retry_after,
         Some(90)

@@ -11,7 +11,7 @@ mod proving;
 
 pub use answering::{setup, SetupAction};
 pub(crate) use guarding::checking;
-pub use guarding::{asked, Asking, Guard};
+pub use guarding::{Asking, Guard};
 
 use std::path::Path;
 

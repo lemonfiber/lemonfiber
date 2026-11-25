@@ -286,7 +286,7 @@ async fn main() -> ExitCode {
         Request::Doctor(asked) => taken!(doctoring(&ctx, asked, cli.json).await),
         Request::Plugin { read } => match taken!(translate::plugin(read)) {
             translate::Under::Dispatched(command) => keyed(&mut ctx, command, cli.json),
-            translate::Under::Published(read) => return for_an_author(read, cli.json),
+            translate::Under::Published(read) => return for_an_author(&ctx, read, cli.json).await,
         },
         Request::Trace(asked) => traced(&asked.term, asked.season, asked.search),
         // Narrated for minutes and then one report, so the report goes through
@@ -397,15 +397,18 @@ fn agreed(offer: Option<String>) -> Option<String> {
 }
 
 /// Put a published document in front of a plugin author, and end with its code.
-fn for_an_author(read: authoring::Document, json: bool) -> ExitCode {
-    let answered = authoring::published(read, json);
-    if let Some(fault) = answered.fault {
-        complain!("error: {fault}");
+async fn for_an_author(
+    ctx: &Ctx,
+    read: lemonfiber_core::app::authoring::Document,
+    json: bool,
+) -> ExitCode {
+    match authoring::published(ctx, read, json).await {
+        Ok(lines) => {
+            lines.print();
+            ExitCode::SUCCESS
+        }
+        Err(problem) => complain(&problem),
     }
-    if let Some(lines) = answered.lines {
-        lines.print();
-    }
-    ExitCode::from(answered.code)
 }
 
 /// The app this binary serves a browser.

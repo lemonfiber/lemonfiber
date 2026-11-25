@@ -42,6 +42,7 @@ fn a_machine_with_nothing_configured_stands_with_every_predicate_off() {
             told: false,
             waiting: false,
             members_mint: false,
+            plays_from: None,
         }
     );
 }
@@ -69,5 +70,33 @@ async fn the_standing_is_dispatched_like_any_other_read() {
         Ok(Outcome::Surfaced(crate::app::surfacing::Answer::Standing(
             standing(&ctx)
         )))
+    );
+}
+
+#[test]
+fn a_household_reached_under_its_domain_plays_from_its_front_doors_origin_alone() {
+    let scratch = lemonfiber_fixtures::scratch::Scratch::named("standing-plays-from");
+    let dir = scratch.to_path_buf();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let mut ctx = a_context().holding(scratch).build();
+    ctx.settings.env_file = Some(dir.join(".env"));
+    ctx.settings.household_host = Some("192.168.1.20".to_owned());
+    ctx.settings.household_domain = Some("home.lan".to_owned());
+    crate::test_support::adapted::parts_recorded(&ctx);
+
+    let origin = standing(&ctx).plays_from;
+
+    let said = origin.as_ref().map(crate::screening::Origin::as_str);
+    assert!(
+        said.is_some_and(|origin| origin.starts_with("http") && origin.contains("home.lan")),
+        "{said:?}"
+    );
+    assert!(
+        said.is_some_and(|origin| origin
+            .split("://")
+            .nth(1)
+            .is_some_and(|rest| !rest.contains('/'))),
+        "an origin holds no path: {said:?}"
     );
 }

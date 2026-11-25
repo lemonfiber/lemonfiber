@@ -149,6 +149,8 @@ pub(super) fn surfaced(answer: &Answer) -> Lines {
         Answer::Heard(report) => heard(report),
         Answer::Renewed(report) => renewed(report),
         Answer::Untuned(report) => untuned(*report),
+        Answer::Exported(report) => super::logs::exported(report),
+        Answer::Octets(octets) => super::plugin::document(&String::from_utf8_lossy(&octets.bytes)),
     }
 }
 

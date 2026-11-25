@@ -21,6 +21,10 @@ pub(crate) fn every_polled() -> Vec<Polled> {
             member: Whom::Named("a7f3".to_owned()),
             most: 5,
         }),
+        Polled::Status { forms: Vec::new() },
+        Polled::Status {
+            forms: vec!["watching".to_owned()],
+        },
     ]
 }
 

@@ -156,14 +156,18 @@ pub(crate) async fn sent(
     let token = Arc::new(Token::mint(&given())?);
     let live = Arc::new(Live::opening(Stopped::at(0)));
     let router = routes(
-        Serving {
-            ctx: Arc::new(ctx),
-            token: Arc::clone(&token),
-            bound: bound(),
-            jobs: Jobs::default(),
-            live: Arc::clone(&live),
-            kept: Arc::default(),
-            answered: Arc::default(),
+        {
+            let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx);
+            Serving {
+                own: crate::own(&ctx),
+                ctx,
+                token: Arc::clone(&token),
+                bound: bound(),
+                jobs: Jobs::default(),
+                live: Arc::clone(&live),
+                kept: Arc::default(),
+                answered: Arc::default(),
+            }
         },
         Arc::new(Streaming {
             token,

@@ -31,7 +31,7 @@ static OPERATING: OnceLock<Option<String>> = OnceLock::new();
 /// machine in every payload would be noise, and a consumer that sees a host knows
 /// from its presence alone that the answer is about somewhere else.
 #[must_use]
-pub fn settle_host(host: Option<String>) -> Option<String> {
+pub(crate) fn settle_host(host: Option<String>) -> Option<String> {
     OPERATING.get_or_init(|| host).clone()
 }
 

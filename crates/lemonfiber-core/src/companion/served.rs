@@ -132,13 +132,13 @@ pub(crate) async fn serving(
     let directory = ctx.settings.companion.as_deref();
     let presented = if served.encrypted {
         let kept_in = directory.ok_or_else(|| {
-            Box::new(uncertified(
+            Box::new(ServedReport::uncertified(
                 "there is no configuration directory to keep one in",
             ))
         })?;
         Some(
             crate::certificate::kept_or_made(ctx.seams.confined.as_ref(), kept_in)
-                .map_err(|why| Box::new(uncertified(&why.to_string())))?,
+                .map_err(|why| Box::new(ServedReport::uncertified(&why.to_string())))?,
         )
     } else {
         None
@@ -146,8 +146,11 @@ pub(crate) async fn serving(
     let certificate = presented
         .as_ref()
         .map(|kept| {
-            kept.described()
-                .ok_or_else(|| Box::new(uncertified("what is kept does not read as a certificate")))
+            kept.described().ok_or_else(|| {
+                Box::new(ServedReport::uncertified(
+                    "what is kept does not read as a certificate",
+                ))
+            })
         })
         .transpose()?;
     let named = if served.network && served.encrypted {
@@ -197,21 +200,24 @@ fn not_serving() -> crate::error::Problem {
     )
 }
 
-/// The certificate to present could not be had, for the reason `why` gives.
-#[must_use]
-pub fn uncertified(why: &str) -> crate::error::Problem {
-    crate::error::Problem::new(
-        crate::error::codes::serve::NO_CERTIFICATE,
-        format!("{} could not serve encrypted", crate::PRODUCT),
-        format!("It presents a certificate it keeps beside its configuration, and {why}."),
-        crate::error::Remedy::new(
-            "Replace the certificate, knowing every paired phone will need pairing again",
+impl ServedReport {
+    /// The problem of a report that could not be had because the certificate to present
+    /// could not be, for the reason `why` gives.
+    #[must_use]
+    pub fn uncertified(why: &str) -> crate::error::Problem {
+        crate::error::Problem::new(
+            crate::error::codes::serve::NO_CERTIFICATE,
+            format!("{} could not serve encrypted", crate::PRODUCT),
+            format!("It presents a certificate it keeps beside its configuration, and {why}."),
+            crate::error::Remedy::new(
+                "Replace the certificate, knowing every paired phone will need pairing again",
+            )
+            .with_detail(format!(
+                "{} companion certificate --confirm",
+                crate::PRODUCT
+            )),
         )
-        .with_detail(format!(
-            "{} companion certificate --confirm",
-            crate::PRODUCT
-        )),
-    )
+    }
 }
 
 #[cfg(test)]

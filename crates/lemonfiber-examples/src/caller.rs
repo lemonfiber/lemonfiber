@@ -15,7 +15,7 @@ pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
         .settings
         .admission
         .as_deref()
-        .and_then(lemonfiber_core::admission::at)?;
+        .and_then(lemonfiber_core::admission::Credential::at)?;
     let session = ctx
         .admitting
         .sessions

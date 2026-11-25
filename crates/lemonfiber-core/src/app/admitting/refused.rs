@@ -24,29 +24,49 @@ pub const REFUSALS: [Code; 10] = [
 
 const AT_THE_DOOR: &str = "Nothing was opened, and no session was begun.";
 
-/// The account could not be checked with the media server.
-#[must_use]
-pub fn unconfirmed() -> Box<Problem> {
-    Box::new(Problem::new(
-        UNCONFIRMED,
-        "This account could not be checked with the media server, so nobody was identified. \
-         Nothing about the account has changed.",
-        "Nobody was identified, so nothing was answered. The account has not been removed and \
-         the session has not ended.",
-        Remedy::new("Try again once the media server is running"),
-    ))
-}
+impl super::Caller {
+    /// The refusal of a caller whose account could not be checked with the media server.
+    #[must_use]
+    pub fn unconfirmed() -> Box<Problem> {
+        Box::new(Problem::new(
+            UNCONFIRMED,
+            "This account could not be checked with the media server, so nobody was identified. \
+             Nothing about the account has changed.",
+            "Nobody was identified, so nothing was answered. The account has not been removed and \
+             the session has not ended.",
+            Remedy::new("Try again once the media server is running"),
+        ))
+    }
 
-/// What was asked for belongs to somebody else, or to whoever looks after this machine.
-#[must_use]
-pub fn not_yours() -> Box<Problem> {
-    Box::new(Problem::new(
-        NOT_YOURS,
-        "This is not something this account may ask for.",
-        "Nothing is wrong with the account. What was asked for belongs to somebody else, or \
-         to whoever looks after this machine.",
-        Remedy::new("Ask whoever looks after this machine if you need it"),
-    ))
+    /// The refusal of a caller asking for what belongs to somebody else, or to whoever
+    /// looks after this machine.
+    #[must_use]
+    pub fn not_yours() -> Box<Problem> {
+        Box::new(Problem::new(
+            NOT_YOURS,
+            "This is not something this account may ask for.",
+            "Nothing is wrong with the account. What was asked for belongs to somebody else, or \
+             to whoever looks after this machine.",
+            Remedy::new("Ask whoever looks after this machine if you need it"),
+        ))
+    }
+
+    /// The refusal of a caller whose wrong answers have earned a wait of `left`.
+    #[must_use]
+    pub fn held(left: Duration) -> Box<Problem> {
+        let seconds = left.as_secs().max(1);
+        Box::new(
+            Problem::new(
+                TOO_MANY_ATTEMPTS,
+                format!("Too many wrong passwords and keys. Try again in {seconds} seconds."),
+                "This surface has stopped looking at passwords and keys for a while. Another \
+                 attempt now makes the wait longer.",
+                Remedy::new("Wait as long as the refusal says, then try once more")
+                    .with_detail("Retry-After"),
+            )
+            .waiting(left),
+        )
+    }
 }
 
 /// The password offered proves nobody.
@@ -58,23 +78,6 @@ pub fn not_the_password() -> Box<Problem> {
         AT_THE_DOOR,
         Remedy::new("Check the password and try again"),
     ))
-}
-
-/// Wrong answers have earned a wait of `left`.
-#[must_use]
-pub fn held(left: Duration) -> Box<Problem> {
-    let seconds = left.as_secs().max(1);
-    Box::new(
-        Problem::new(
-            TOO_MANY_ATTEMPTS,
-            format!("Too many wrong passwords and keys. Try again in {seconds} seconds."),
-            "This surface has stopped looking at passwords and keys for a while. Another \
-             attempt now makes the wait longer.",
-            Remedy::new("Wait as long as the refusal says, then try once more")
-                .with_detail("Retry-After"),
-        )
-        .waiting(left),
-    )
 }
 
 /// The invitation cannot be claimed.

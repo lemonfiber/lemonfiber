@@ -9,7 +9,8 @@
 //! is called and what the viewer calls itself are vocabulary, and vocabulary that
 //! lives next to a state machine gets edited like a state machine.
 
-use lemonfiber_core::ports::docker::{Lifecycle, LogLine, Stream};
+use lemonfiber_core::docker::State;
+use lemonfiber_core::ports::docker::{LogLine, Stream};
 
 /// What the viewer calls itself when a line is its own rather than a service's.
 pub(super) const SELF: &str = "lemonfiber";
@@ -27,23 +28,25 @@ pub(super) fn remark(service: &str, said: &str) -> LogLine {
     }
 }
 
-/// A line saying what the engine reported about a service.
-pub(super) fn noticed(service: &str, lifecycle: Lifecycle) -> LogLine {
-    remark(service, &format!("{service} {}", becoming(lifecycle)))
+/// A line saying what the core reported about a service.
+pub(super) fn noticed(service: &str, state: State) -> LogLine {
+    remark(service, &format!("{service} {}", becoming(state)))
 }
 
 /// What to say about a service that has just reached this state.
 ///
-/// Said as what happened rather than as the engine's word for it: `Exited` is a
+/// Said as what happened rather than as the core's word for it: `Stopped` is a
 /// state, "has stopped" is news.
-const fn becoming(lifecycle: Lifecycle) -> &'static str {
-    match lifecycle {
-        Lifecycle::Created => "was created",
-        Lifecycle::Running => "is running again",
-        Lifecycle::Paused => "was paused",
-        Lifecycle::Restarting => "is restarting",
-        Lifecycle::Exited => "has stopped",
-        Lifecycle::Removing => "is being removed",
-        Lifecycle::Dead => "died",
+const fn becoming(state: State) -> &'static str {
+    match state {
+        State::Failed => "failed",
+        State::CrashLooping => "keeps restarting",
+        State::Unhealthy => "is unhealthy",
+        State::Absent => "is gone",
+        State::Stopped => "has stopped",
+        State::Starting => "is starting",
+        State::Running => "is running again",
+        State::Healthy => "is healthy again",
+        State::HostManaged => "is kept by the operating system",
     }
 }

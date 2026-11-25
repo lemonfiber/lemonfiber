@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "data": {
+    "path": "lemonfiber-logs-1893456000-1.txt",
+    "rehearsed": true
+  },
+  "kind": "logs-exported"
+}

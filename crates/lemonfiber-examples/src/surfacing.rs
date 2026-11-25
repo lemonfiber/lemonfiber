@@ -1,7 +1,8 @@
-//! What the web surface asks of the core on its own behalf: an event a service posted,
-//! a member's grant renewed as their client speaks, and the lapsed streams closed.
+//! What a surface asks of the core on its own behalf: an event a service posted, a
+//! member's grant renewed as their client speaks, the lapsed streams closed, and the
+//! log viewer's export, rehearsed so the example writes nothing.
 
-use lemonfiber_core::app::{dispatch, Command, Surfacing};
+use lemonfiber_core::app::{dispatch, Command, Exporting, Surfacing};
 use lemonfiber_core::config::paths::NOTIFY_EVENTS;
 use lemonfiber_core::notify::events::{Event, Happened, Telling};
 use lemonfiber_core::ports::digest::sha256;
@@ -58,5 +59,16 @@ pub(crate) async fn every(seen: &mut Seen) -> Option<()> {
                 .and_then(|outcome| world.read(outcome.envelope().to_json())),
         );
     }
+    let export = Command::Surface(Surfacing::Export(Exporting {
+        text: "sonarr | Grabbed an episode".to_owned(),
+        written: 1,
+    }));
+    let rehearsing = world.ctx.clone().rehearsing();
+    seen.answered(
+        dispatch(export, &rehearsing)
+            .await
+            .ok()
+            .and_then(|outcome| world.read(outcome.envelope().to_json())),
+    );
     Some(())
 }

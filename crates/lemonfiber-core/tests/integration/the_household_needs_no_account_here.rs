@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use lemonfiber_core::admission::{self as credential, Credential, Weak};
+use lemonfiber_core::admission::{Credential, Weak};
 use lemonfiber_core::ports::random::Random;
 use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_fixtures::support::a_password;
@@ -37,7 +37,7 @@ use lemonfiber_fixtures::support::a_password;
 fn nothing_in_the_credential_surface_takes_an_identity() {
     let set: fn(&str, &dyn Random) -> Result<Credential, Weak> = Credential::set;
     let verifies: fn(&Credential, &str) -> bool = Credential::verifies;
-    let read: fn(&Path) -> Option<Credential> = credential::at;
+    let read: fn(&Path) -> Option<Credential> = Credential::at;
 
     // Named above so a changed signature is a build failure, and called here so the
     // claim is about the functions that admit somebody rather than three bindings

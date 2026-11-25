@@ -6,6 +6,12 @@
       ],
       "required": true
     },
+    "plays_from": {
+      "type": [
+        "anyOf(null,ref:PlayOrigin)"
+      ],
+      "required": false
+    },
     "stack": {
       "type": [
         "null|string"

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The origin a browser plays a title from, as a content security policy names it:\nits scheme, host and port alone.",
+  "type": "string"
+}

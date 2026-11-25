@@ -1,7 +1,8 @@
 //! The words that extend the stack: installing, updating, removing, proving and running a
 //! plugin, browsing what the catalogue offers, and the documents an author reads.
 
-use lemonfiber_core::app::{plugins, Command};
+use lemonfiber_core::app::plugins::{Asked as Plugins, Consent, Inputs};
+use lemonfiber_core::app::Command;
 
 use super::Under;
 use crate::exit::USAGE;
@@ -25,16 +26,16 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             offer,
             approved,
             inputs,
-        } => plugins::Asked::Install {
+        } => Plugins::Install {
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: consented(offer, approved, &inputs)?,
         },
-        PluginCommand::Installed => plugins::Asked::Installed,
-        PluginCommand::Remove { plugin, offer } => plugins::Asked::Remove {
+        PluginCommand::Installed => Plugins::Installed,
+        PluginCommand::Remove { plugin, offer } => Plugins::Remove {
             plugin,
             consent: consented(offer, Vec::new(), &[])?,
         },
-        PluginCommand::Prove { plugin, offer } => plugins::Asked::Prove {
+        PluginCommand::Prove { plugin, offer } => Plugins::Prove {
             plugin,
             consent: consented(offer, Vec::new(), &[])?,
         },
@@ -44,7 +45,7 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             offer,
             approved,
             inputs,
-        } => plugins::Asked::Run {
+        } => Plugins::Run {
             plugin,
             recipe,
             consent: consented(offer, approved, &inputs)?,
@@ -55,7 +56,7 @@ pub(crate) fn plugin(read: PluginCommand) -> Result<Under, u8> {
             offer,
             approved,
             inputs,
-        } => plugins::Asked::Update {
+        } => Plugins::Update {
             plugin,
             source: lemonfiber_core::plugin::Source::named(&source),
             consent: consented(offer, approved, &inputs)?,
@@ -72,8 +73,8 @@ fn consented(
     agreement: Option<String>,
     approved: Vec<String>,
     inputs: &[String],
-) -> Result<plugins::Consent, u8> {
-    Ok(plugins::Consent {
+) -> Result<Consent, u8> {
+    Ok(Consent {
         agreement,
         approved,
         inputs: given(inputs)?,
@@ -85,8 +86,8 @@ fn consented(
 /// # Errors
 ///
 /// Where one is written without its `=`, said without repeating it.
-fn given(written: &[String]) -> Result<plugins::Inputs, u8> {
-    plugins::Inputs::written(written).ok_or_else(|| {
+fn given(written: &[String]) -> Result<Inputs, u8> {
+    Inputs::written(written).ok_or_else(|| {
         complain!(
             "error: an --input is written as the input's name, `=`, and its value, and one \
              was written without the `=`"

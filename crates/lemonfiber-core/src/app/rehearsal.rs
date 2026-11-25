@@ -492,6 +492,13 @@ pub const fn unsettled(command: &Command) -> bool {
 const fn authored(asked: &authoring::Asked) -> Asked {
     match asked {
         authoring::Asked::Claims { .. } => reads("plugin claims"),
+        authoring::Asked::Published(authoring::Document::Schema) => reads("plugin schema"),
+        authoring::Asked::Published(authoring::Document::Points) => {
+            reads("plugin extension-points")
+        }
+        authoring::Asked::Published(authoring::Document::Vocabulary) => {
+            reads("plugin capabilities")
+        }
         authoring::Asked::Conform { .. } => reads("plugin conform"),
         authoring::Asked::Provenance { .. } => reads("plugin provenance"),
         authoring::Asked::Record { taking, .. } if taking.check => reads("plugin record --check"),

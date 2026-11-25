@@ -1,12 +1,4 @@
-use super::{engine_is_desktop, engine_is_orbstack, manager, Environment, HostOs, Manager};
-
-#[test]
-fn each_platform_names_the_service_manager_it_actually_has() {
-    assert_eq!(manager(HostOs::MacOs), Manager::Launchd);
-    assert_eq!(manager(HostOs::Linux), Manager::Systemd);
-    assert_eq!(manager(HostOs::Windows), Manager::TaskScheduler);
-    assert!(!manager(HostOs::Other).configurable());
-}
+use super::{engine_is_desktop, engine_is_orbstack, Environment, HostOs};
 
 /// Docker Desktop on Linux is told apart by the context it installs and the socket it
 /// listens on, and anything else Linux is pointed at is Docker Engine.

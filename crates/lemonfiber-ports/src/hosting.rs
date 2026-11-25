@@ -27,6 +27,7 @@ use thiserror::Error;
 
 use lemonfiber_error::codes::host::{DEFINITION_UNWRITABLE, MANAGER_REFUSED, NOTHING_TO_HOST_WITH};
 use lemonfiber_error::{Diagnose, Problem, Remedy, State};
+use lemonfiber_platform::host::HostOs;
 
 /// The service manager a machine has, or the absence of one lemonfiber configures.
 ///
@@ -45,6 +46,24 @@ pub enum Manager {
     /// A platform lemonfiber does not configure.
     #[default]
     Unsupported,
+}
+
+impl Manager {
+    /// Which service manager keeps a long-running command going on `host`.
+    ///
+    /// A function over the host rather than a test of it, for the reason
+    /// [`lemonfiber_platform::host::Environment::resolve`] is one: every answer is
+    /// reachable from one laptop, so what a report says on a platform this machine is
+    /// not is proven here rather than hoped for.
+    #[must_use]
+    pub const fn on(host: HostOs) -> Self {
+        match host {
+            HostOs::MacOs => Self::Launchd,
+            HostOs::Linux => Self::Systemd,
+            HostOs::Windows => Self::TaskScheduler,
+            HostOs::Other => Self::Unsupported,
+        }
+    }
 }
 
 impl Manager {

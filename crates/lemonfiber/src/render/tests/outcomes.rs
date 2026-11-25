@@ -336,3 +336,23 @@ fn each_dispatched_read_renders_what_it_says() {
         assert!(rendered.contains(expected), "{rendered}");
     }
 }
+
+#[test]
+fn bytes_are_shown_as_they_are_and_an_export_says_where_it_went() {
+    use lemonfiber_core::app::surfacing::Answer;
+    let octets = Outcome::Surfaced(Answer::Octets(lemonfiber_core::model::Octets {
+        media_type: "application/json",
+        bytes: b"{\"a\": 1}".to_vec(),
+    }));
+    assert_eq!(super::super::shaped(&octets).text(), "{\"a\": 1}");
+    let exported = Outcome::Surfaced(Answer::Exported(
+        lemonfiber_core::app::exporting::Exported {
+            path: "lemonfiber-logs-1-1.txt".to_owned(),
+            rehearsed: false,
+        },
+    ));
+    assert_eq!(
+        super::super::shaped(&exported).text(),
+        "written to lemonfiber-logs-1-1.txt"
+    );
+}

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::http::{Answer, Fake as Transport};
 
-use super::{a_device, an_item, lapsed, picture, viewed, Pictured, PICTURE_MOST, RASTER};
+use super::{a_device, an_item, lapsed, picture, viewed, Octets, PICTURE_MOST, RASTER};
 use crate::app::{Ctx, Outcome, Viewing, Whom};
 use crate::error::codes::play;
 use crate::ports::service::{
@@ -643,7 +643,7 @@ const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nthe-poster";
 
 /// A backdrop asked for as Ada, with the media server answering `answer`, and the code it
 /// was refused with.
-async fn pictured(tag: &str, answer: Answer) -> Result<Pictured, String> {
+async fn pictured(tag: &str, answer: Answer) -> Result<Octets, String> {
     let transport = server(vec![(media::serve("picture"), answer)]);
     let ctx = ctx_over(transport, &format!("picture-{tag}"));
     picture(
@@ -672,7 +672,7 @@ async fn a_picture_is_asked_as_the_member_and_passed_on_as_a_raster() {
     .await;
     assert_eq!(
         shown.ok(),
-        Some(Pictured {
+        Some(Octets {
             media_type: "image/jpeg",
             bytes: BACKDROP.to_vec(),
         })
@@ -742,7 +742,7 @@ async fn the_households_defaults_are_shown_a_picture_without_naming_a_member() {
     let shown = picture(&ctx, &Whom::Defaults, FILM, Picture::Poster).await;
     assert_eq!(
         shown.ok(),
-        Some(Pictured {
+        Some(Octets {
             media_type: "image/png",
             bytes: POSTER.to_vec(),
         })

@@ -16,9 +16,9 @@ use crate::app::Ctx;
 use crate::collected::{Reference, Unit};
 use crate::config::REACH_POSTERS_KEY;
 use crate::error::Problem;
+use crate::model::Octets;
 use crate::ports::http::{Method, Request};
 use crate::schemes::SECURE_SCHEME;
-use crate::screening::Pictured;
 
 /// The cover of the `unit` the curator's `reference` names, for the member `named`.
 ///
@@ -27,12 +27,12 @@ use crate::screening::Pictured;
 /// A [`Problem`] wherever the member may not search, as [`reached`] judges; where no
 /// curator here answers for the unit's medium or it holds no such candidate; and where
 /// the cover cannot be fetched as [`fetched_cover`] says.
-pub async fn cover(
+pub(crate) async fn cover(
     ctx: &Ctx,
     named: &str,
     unit: Unit,
     reference: &str,
-) -> Result<Pictured, Box<Problem>> {
+) -> Result<Octets, Box<Problem>> {
     reached(ctx, named).await?;
     let (_, curator) = curator_of(ctx, unit).await?;
     let candidate = curator
@@ -52,11 +52,11 @@ pub async fn cover(
 /// A [`Problem`] where no kept ask goes by that reference or the member named did not
 /// make it, wherever [`reached`] refuses the member named, and where the cover cannot be
 /// fetched as [`fetched_cover`] says.
-pub async fn kept_cover(
+pub(crate) async fn kept_cover(
     ctx: &Ctx,
     named: Option<&str>,
     reference: &str,
-) -> Result<Pictured, Box<Problem>> {
+) -> Result<Octets, Box<Problem>> {
     let named_as: Reference = reference.parse().map_err(|_| no_such_title())?;
     let ask = crate::collected::run::every(ctx)
         .into_iter()
@@ -80,7 +80,7 @@ pub async fn kept_cover(
 /// came back is not a picture [`handed`] passes on; and where the location is not https,
 /// carries credentials, cannot be noted, or stands for somewhere that is not out on the
 /// internet.
-async fn fetched_cover(ctx: &Ctx, location: Option<&str>) -> Result<Pictured, Box<Problem>> {
+async fn fetched_cover(ctx: &Ctx, location: Option<&str>) -> Result<Octets, Box<Problem>> {
     if !ctx.settings.reaching.allows(REACH_POSTERS_KEY) {
         return Err(no_picture());
     }

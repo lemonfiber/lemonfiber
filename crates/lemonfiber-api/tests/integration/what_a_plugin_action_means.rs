@@ -78,14 +78,18 @@ async fn redeemed(ctx: Ctx, action: &str, body: &str) -> (u16, serde_json::Value
     };
     let jobs = Jobs::default();
     let router = actions::routes()
-        .with_state(Serving {
-            ctx: Arc::new(ctx),
-            token: Arc::new(token),
-            bound: lemonfiber_api::guard::Binding::here(8475),
-            jobs: jobs.clone(),
-            live: Arc::new(Live::opening(Stopped::at(0))),
-            kept: Arc::default(),
-            answered: Arc::default(),
+        .with_state({
+            let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx);
+            Serving {
+                own: crate::own(&ctx),
+                ctx,
+                token: Arc::new(token),
+                bound: lemonfiber_api::guard::Binding::here(8475),
+                jobs: jobs.clone(),
+                live: Arc::new(Live::opening(Stopped::at(0))),
+                kept: Arc::default(),
+                answered: Arc::default(),
+            }
         })
         .layer(Extension(Caller::Machine));
     let request = axum::http::Request::builder()

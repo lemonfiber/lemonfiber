@@ -6,8 +6,9 @@ use std::time::{Duration, SystemTime};
 
 use super::attempts::{Door, Ticket};
 use super::household::{claimable, named, opened, vouched};
-use super::refused::{held, no_session, not_open, not_the_password, short_choice, unconfirmed};
+use super::refused::{no_session, not_open, not_the_password, short_choice};
 use super::sessions::{Admitted, Opened};
+use super::Caller;
 use crate::app::Ctx;
 use crate::error::Problem;
 use crate::ports::random::Random;
@@ -53,7 +54,7 @@ pub(super) async fn signed_in(ctx: &Ctx, offered: &Offered) -> Result<Admitted, 
         .attempts
         .taken(offered.peer, offered.name.as_deref(), now)
         .await
-        .map_err(held)?;
+        .map_err(Caller::held)?;
     let random = ctx.seams.random.as_ref();
     let (who, door) = match offered.claim.as_deref() {
         Some(token) => claimed(ctx, offered, &password, token, &ticket, random).await?,
@@ -63,7 +64,11 @@ pub(super) async fn signed_in(ctx: &Ctx, offered: &Offered) -> Result<Admitted, 
     };
     admitting.attempts.right(&ticket, door, now).await;
     let name = match &who {
-        Opened::Member(signed) => Some(named(ctx, &signed.id).await.ok_or_else(unconfirmed)?),
+        Opened::Member(signed) => Some(
+            named(ctx, &signed.id)
+                .await
+                .ok_or_else(Caller::unconfirmed)?,
+        ),
         Opened::Operator(_) => None,
     };
     admitting
@@ -117,11 +122,11 @@ async fn claimed(
 ) -> Result<(Opened, Door), Box<Problem>> {
     let door = ticket.member.clone().ok_or_else(not_open)?;
     let asked = offered.name.as_deref().ok_or_else(not_open)?.to_lowercase();
-    let household = opened(ctx).await.ok_or_else(unconfirmed)?;
+    let household = opened(ctx).await.ok_or_else(Caller::unconfirmed)?;
     let member = household
         .household()
         .await
-        .map_err(|_| unconfirmed())?
+        .map_err(|_| Caller::unconfirmed())?
         .into_iter()
         .find(|member| member.name.to_lowercase() == asked)
         .filter(|member| !(member.claimed || member.access.disabled || member.access.administrator))
@@ -129,11 +134,11 @@ async fn claimed(
     if !claimable(ctx, &member.id, token).await {
         return Err(not_open());
     }
-    let device = device(random).ok_or_else(unconfirmed)?;
+    let device = device(random).ok_or_else(Caller::unconfirmed)?;
     let set = household
         .claim(&member.name, password, &device)
         .await
-        .map_err(|_| unconfirmed())?;
+        .map_err(|_| Caller::unconfirmed())?;
     if !set {
         return Err(not_open());
     }
@@ -141,7 +146,7 @@ async fn claimed(
     member_signed_in(ctx, household.as_ref(), &member.name, password, random)
         .await
         .map(|opened| (opened, door))
-        .ok_or_else(unconfirmed)
+        .ok_or_else(Caller::unconfirmed)
 }
 
 /// A fresh name for one sign-in at the media server.

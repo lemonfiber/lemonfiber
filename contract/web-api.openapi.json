@@ -8807,6 +8807,24 @@
         ],
         "type": "object"
       },
+      "LogsExported": {
+        "description": "Where an export went, or would have gone.",
+        "properties": {
+          "path": {
+            "description": "The file, named relative to the directory the viewer was run in.",
+            "type": "string"
+          },
+          "rehearsed": {
+            "description": "Whether it only said where it would have written.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "rehearsed"
+        ],
+        "type": "object"
+      },
       "LogsReport": {
         "description": "What reading the logs came to.",
         "properties": {
@@ -11770,6 +11788,10 @@
           "footprint"
         ],
         "type": "object"
+      },
+      "PlayOrigin": {
+        "description": "The origin a browser plays a title from, as a content security policy names it:\nits scheme, host and port alone.",
+        "type": "string"
       },
       "PlayReport": {
         "description": "Where one title plays from in a member's browser, at the stack's front door, on a\npass sealing a session on their own account.",
@@ -19581,6 +19603,17 @@
             "description": "Whether household members may mint keys for themselves.",
             "type": "boolean"
           },
+          "plays_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The origin a browser plays a title from, which the page's policy allows, where\nthe core knows one: built from the stack's front door, never from a request."
+          },
           "stack": {
             "description": "The stack's own identifier, the one pairing material carries; absent where this\nmachine has nowhere to keep one.",
             "type": [
@@ -24898,6 +24931,9 @@
             "$ref": "#/components/schemas/kind-logs"
           },
           {
+            "$ref": "#/components/schemas/kind-logs-exported"
+          },
+          {
             "$ref": "#/components/schemas/kind-migration"
           },
           {
@@ -27000,6 +27036,46 @@
           },
           "data": {
             "$ref": "#/components/schemas/LogsReport",
+            "description": "The payload."
+          },
+          "host": {
+            "description": "The machine this answer is about, where it is not the one lemonfiber runs on.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "description": "The work that said this, by the name its accepting reply gave it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Which payload this is, so a consumer can branch before parsing `data`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_version",
+          "kind",
+          "data"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "kind-logs-exported": {
+        "description": "The wrapper every machine-readable payload arrives in.",
+        "properties": {
+          "api_version": {
+            "description": "The output contract's version.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LogsExported",
             "description": "The payload."
           },
           "host": {

@@ -16,9 +16,11 @@
 
 use lemonfiber_core::filling::Filling;
 use lemonfiber_core::plugin::{
-    Asserted, Basis, Capabilities, Claimed, Claiming, Credential, Evidence, FailingAsDeclared,
-    Points, Probe, ProbeKind, Provenance, Ran, Verdict, Vouched,
+    Asserted, Basis, Claimed, Claiming, Evidence, FailingAsDeclared, Provenance, Ran, Verdict,
+    Vouched,
 };
+
+use crate::authoring::published::{AskedAs, Points, Probe, Put, Vocabulary};
 
 // The operator's half: what one machine has installed, and what installing one came
 // to. Its own file because it answers a different question from a different source —
@@ -41,7 +43,7 @@ pub(crate) fn document(text: &str) -> Lines {
 }
 
 /// What a service can be asked for, and what claiming one undertakes.
-pub(crate) fn capabilities(published: &Capabilities) -> Lines {
+pub(crate) fn capabilities(published: &Vocabulary) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
         "The capabilities a service can claim — generation {}, {} of them.",
@@ -49,17 +51,17 @@ pub(crate) fn capabilities(published: &Capabilities) -> Lines {
         published.capabilities.len()
     ));
     for capability in &published.capabilities {
-        lines.spaced(capability.name.to_owned());
+        lines.spaced(capability.name.clone());
         lines.put(format!("  {}", capability.summary));
         lines.put(format!("  {}", capability.contract));
         lines.put(format!(
             "  declared by  {}",
             capability.declared_by.join(", ")
         ));
-        for probe in capability.probes {
+        for probe in &capability.probes {
             lines.put(format!("  probe {} — {}", probe.id, probe.title));
             lines.put(format!("    asks     {}", probe.asks));
-            lines.put(format!("    put as   {}", put_as(probe.kind())));
+            lines.put(format!("    put as   {}", put_as(probe.kind)));
             lines.put(format!("    asked as {}", asked_as(probe.credential)));
             lines.put(format!("    answers  {}", answers(probe)));
         }
@@ -71,49 +73,39 @@ pub(crate) fn capabilities(published: &Capabilities) -> Lines {
     lines
 }
 
-/// Who a probe is asked as, in the words an author would use.
-fn asked_as(credential: Credential) -> &'static str {
+const fn asked_as(credential: AskedAs) -> &'static str {
     match credential {
-        Credential::None => "anybody, presenting nothing",
-        Credential::Operator => "the operator, with the credential they hold",
+        AskedAs::None => "anybody, presenting nothing",
+        AskedAs::Operator => "the operator, with the credential they hold",
     }
 }
 
-/// How a probe is put, in the words an author would use.
-const fn put_as(kind: ProbeKind) -> &'static str {
+const fn put_as(kind: Put) -> &'static str {
     match kind {
-        ProbeKind::Request => "a request of the running service",
-        ProbeKind::Run => "a run of the image's own program",
+        Put::Request => "a request of the running service",
+        Put::Run => "a run of the image's own program",
     }
 }
 
-/// What a probe accepts as an answer.
 fn answers(probe: &Probe) -> String {
-    let endings: Vec<String> = probe
-        .requires
-        .endings()
-        .iter()
-        .map(ToString::to_string)
-        .collect();
-    let ended = match probe.kind() {
-        ProbeKind::Request => endings.join(" or "),
-        ProbeKind::Run => format!("exit {}", endings.join(" or ")),
+    let endings = |codes: &[i64]| -> String {
+        codes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" or ")
     };
-    let body = probe.requires.body();
+    let ended = match probe.kind {
+        Put::Request => endings(&probe.requires.status),
+        Put::Run => format!("exit {}", endings(&probe.requires.exit)),
+    };
+    let body = &probe.requires.body;
     if body.is_empty() {
-        // A refusal or a redirect to HTTPS is an answer no port proxy produces, which is
-        // why this probe is allowed to constrain nothing but the status. Said rather than
-        // left blank, so it does not read as a gap in the document.
         return format!("{ended} — the status is the whole of it");
     }
-    let kinds: Vec<String> = body
-        .iter()
-        .map(|constraint| constraint.as_str().to_owned())
-        .collect();
-    format!("{ended}, and one of {}", kinds.join(", "))
+    format!("{ended}, and one of {}", body.join(", "))
 }
 
-/// Where a plugin may put a row, and what a row there carries.
 pub(crate) fn points(published: &Points) -> Lines {
     let mut lines = Lines::default();
     lines.put(format!(
@@ -122,25 +114,21 @@ pub(crate) fn points(published: &Points) -> Lines {
         published.points.len()
     ));
     for point in &published.points {
-        lines.spaced(point.name.to_owned());
+        lines.spaced(point.name.clone());
         lines.put(format!("  {}", point.summary));
         lines.put(format!("  joins     {}", point.register));
         lines.put(format!("  read by   {}", point.engine));
         lines.put(format!("  asks for  {}", point.requires));
         lines.put(format!("  required  {}", point.row.required.join(", ")));
         lines.put(format!("  optional  {}", point.row.optional.join(", ")));
-        for bound in point.row.bounds {
+        for (field, limits) in &point.row.bounds {
             lines.put(format!(
-                "  {} is {} to {}, and {} where a row does not say",
-                bound.field, bound.limits.min, bound.limits.max, bound.limits.default
+                "  {field} is {} to {}, and {} where a row does not say",
+                limits.min, limits.max, limits.default
             ));
         }
-        for closed in point.row.enums {
-            lines.put(format!(
-                "  {} is one of  {}",
-                closed.field,
-                closed.values.join(", ")
-            ));
+        for (field, values) in &point.row.enums {
+            lines.put(format!("  {field} is one of  {}", values.join(", ")));
         }
         lines.put(format!("  taken     {}", taken(&point.occupied)));
     }
@@ -151,7 +139,6 @@ pub(crate) fn points(published: &Points) -> Lines {
     lines
 }
 
-/// What is already standing in a register, or that nothing is.
 fn taken(occupied: &[String]) -> String {
     if occupied.is_empty() {
         return "nothing yet".to_owned();

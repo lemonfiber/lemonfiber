@@ -157,6 +157,8 @@ kinds! {
     LOG = "log",
     /// What reading the services' logs came to.
     LOGS = "logs",
+    /// Where what the log viewer showed was written, redacted.
+    LOGS_EXPORTED = "logs-exported",
     /// What is already on this machine, before anything is proposed.
     MIGRATION = "migration",
     /// A key minted, with its secret, shown this once.
@@ -283,3 +285,9 @@ kinds! {
     /// What one minute's look at a run-and-exit service came to.
     RAN = "ran",
 }
+
+/// Raw bytes and their media type: a picture, a support bundle, a published document.
+///
+/// Declared apart from [`ALL`], because the contract publishes no envelope for it: a
+/// surface hands the bytes over as they are.
+pub const OCTETS: Kind = Kind("octets");

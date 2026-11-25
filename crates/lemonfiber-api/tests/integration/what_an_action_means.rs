@@ -47,14 +47,18 @@ fn routed(random: Chance) -> axum::Router {
         unreachable!("cycling letters always supply bytes");
     };
     actions::routes()
-        .with_state(Serving {
-            ctx: Arc::new(ctx().with_random(Arc::new(random))),
-            token: Arc::new(token),
-            bound: lemonfiber_api::guard::Binding::here(8471),
-            jobs: Jobs::default(),
-            live: Arc::new(Live::opening(Stopped::at(0))),
-            kept: Arc::default(),
-            answered: Arc::default(),
+        .with_state({
+            let ctx: Arc<lemonfiber_core::app::Ctx> = Arc::new(ctx().with_random(Arc::new(random)));
+            Serving {
+                own: crate::own(&ctx),
+                ctx,
+                token: Arc::new(token),
+                bound: lemonfiber_api::guard::Binding::here(8471),
+                jobs: Jobs::default(),
+                live: Arc::new(Live::opening(Stopped::at(0))),
+                kept: Arc::default(),
+                answered: Arc::default(),
+            }
         })
         // The subject the guard puts on every request it admits. Mounted here because a
         // test builds these routes without the layer that carries it, and a handler that

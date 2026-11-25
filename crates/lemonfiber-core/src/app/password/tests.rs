@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use lemonfiber_fixtures::support::a_password;
 
-use crate::admission as credential;
+use crate::admission::Credential;
 use crate::app::{dispatch, Command, Ctx, Outcome, Rehearsal};
 use crate::error::codes::admit::MISTYPED;
 use crate::test_support::{a_context, Typing};
@@ -39,7 +39,7 @@ async fn a_password_typed_twice_is_kept_and_the_device_keys_under_the_last_one_r
             device_keys_revoked: true
         }))
     );
-    assert!(credential::at(&at).is_some_and(|held| held.verifies(&chosen)));
+    assert!(Credential::at(&at).is_some_and(|held| held.verifies(&chosen)));
     assert_eq!(
         typing.asked(),
         vec![(ASKS.to_owned(), true), (AGAIN.to_owned(), true)]
@@ -55,7 +55,7 @@ async fn two_answers_that_differ_are_refused_and_nothing_is_kept() {
     let refused = dispatch(Command::Password, &keeping(Some(at.clone()), &typing)).await;
 
     assert_eq!(refused.err().map(|problem| problem.code), Some(MISTYPED));
-    assert_eq!(credential::at(&at), None);
+    assert_eq!(Credential::at(&at), None);
 }
 
 #[tokio::test]
@@ -68,7 +68,7 @@ async fn a_password_with_nowhere_to_be_kept_or_too_short_is_refused() {
         let refused = dispatch(Command::Password, &keeping(kept, &typing)).await;
         assert!(refused.is_err(), "{refused:?}");
     }
-    assert_eq!(credential::at(&at), None);
+    assert_eq!(Credential::at(&at), None);
 }
 
 #[tokio::test]

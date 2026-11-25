@@ -7,9 +7,9 @@ use lemonfiber_fixtures::ports::Resolving;
 use super::{beneath_the_catalogue, poster};
 use crate::app::Ctx;
 use crate::config::{Reaching, REACH_POSTERS_KEY};
+use crate::model::Octets;
 use crate::ports::http::{Method, Request};
 use crate::ports::service::{Detail, PICTURE_MOST};
-use crate::screening::Pictured;
 use crate::test_support::requests::{answered, intake};
 use crate::wishing::tests::{asked_for, ctx_over, ctx_running, house, rated, titled_as, Route};
 
@@ -64,7 +64,7 @@ fn ctx_resolving(transport: &Arc<Transport>, tag: &str, resolving: Arc<Resolving
 }
 
 /// The code a poster was refused with, or nothing where it was handed over.
-fn code(outcome: &Result<Pictured, Box<crate::error::Problem>>) -> Option<String> {
+fn code(outcome: &Result<Octets, Box<crate::error::Problem>>) -> Option<String> {
     outcome
         .as_ref()
         .err()
@@ -80,7 +80,7 @@ async fn a_member_is_handed_the_poster_fetched_from_the_catalogue_with_nothing_o
 
     assert_eq!(
         handed.ok(),
-        Some(Pictured {
+        Some(Octets {
             media_type: "image/gif",
             bytes: GIF.as_bytes().to_vec(),
         })

@@ -91,16 +91,18 @@ impl Acknowledged {
     }
 }
 
-/// What was acknowledged, from where it is kept.
-///
-/// Nothing acknowledged where the file is absent or unreadable, which is the same
-/// answer and deliberately so: a first run and a damaged record both mean this
-/// operator should be told what the words are.
-#[must_use]
-pub fn at(path: &std::path::Path) -> Acknowledged {
-    std::fs::read_to_string(path)
-        .map(|text| Acknowledged::parse(&text))
-        .unwrap_or_default()
+impl Acknowledged {
+    /// What was acknowledged, from where it is kept.
+    ///
+    /// Nothing acknowledged where the file is absent or unreadable, which is the same
+    /// answer and deliberately so: a first run and a damaged record both mean this
+    /// operator should be told what the words are.
+    #[must_use]
+    pub fn at(path: &std::path::Path) -> Self {
+        std::fs::read_to_string(path)
+            .map(|text| Self::parse(&text))
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

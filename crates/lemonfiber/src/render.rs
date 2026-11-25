@@ -32,7 +32,7 @@ pub(crate) mod host;
 mod hosting;
 mod invitation;
 mod keys;
-mod logs;
+pub(crate) mod logs;
 mod migration;
 pub(crate) mod moving;
 mod news;

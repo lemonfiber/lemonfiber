@@ -11,7 +11,10 @@ use lemonfiber_core::copying::Copying;
 use lemonfiber_core::dashboard::Snapshot;
 use lemonfiber_core::keys::Scope;
 use lemonfiber_core::logs::Line as LogLine;
-use lemonfiber_core::model::kind::{self, Kind};
+use lemonfiber_core::model::kind::{
+    Kind, ALERT, COPYING, DASHBOARD, HELD, HOUSEHOLD, LOG, NEWS, PLAYING, PLUGINS, PULL, REPLAY,
+    SETTINGS, START, STEP, WIRING,
+};
 use lemonfiber_core::model::{
     Envelope, HeldReport, HouseholdReport, PlayingReport, SettingsReport, WiringReport,
 };
@@ -148,7 +151,7 @@ macro_rules! event_kinds {
             #[must_use]
             pub const fn kind(self) -> Kind {
                 match self {
-                    $(Self::$variant => kind::$kind,)*
+                    $(Self::$variant => $kind,)*
                 }
             }
 

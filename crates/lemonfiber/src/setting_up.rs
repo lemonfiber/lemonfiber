@@ -9,10 +9,9 @@ use std::path::PathBuf;
 
 use lemonfiber_core::app::Ctx;
 use lemonfiber_core::config::paths::Paths;
-use lemonfiber_core::config::{
-    data_root_from_env, service_user_from_env, store, Protocols, Settings,
-};
-use lemonfiber_core::model::{kind, Envelope, SetupOutcome, SetupReport};
+use lemonfiber_core::config::Settings;
+use lemonfiber_core::model::kind::SETUP;
+use lemonfiber_core::model::{Envelope, SetupOutcome, SetupReport};
 use lemonfiber_core::wizard::Step;
 use lemonfiber_error::Problem;
 
@@ -61,7 +60,7 @@ pub fn answering(
 #[must_use]
 pub fn report(outcome: SetupOutcome, settings: &Settings) -> Envelope<SetupReport> {
     Envelope::new(
-        kind::SETUP,
+        SETUP,
         SetupReport {
             outcome,
             protocols: settings.protocols,
@@ -76,16 +75,7 @@ pub fn report(outcome: SetupOutcome, settings: &Settings) -> Envelope<SetupRepor
 /// `ctx`'s settings with what setup decides read back from the env file `paths` names.
 #[must_use]
 pub fn as_written(ctx: &Ctx, paths: &Paths) -> Settings {
-    let recorded = store::read(&paths.env_file())
-        .map(|file| lemonfiber_core::stored_over(ctx, file))
-        .unwrap_or_default();
-    Settings {
-        protocols: Protocols::from_env(&recorded),
-        vpn_declined: lemonfiber_core::config::vpn_declined_from_env(&recorded),
-        data_root: data_root_from_env(&recorded),
-        service_user: service_user_from_env(&recorded),
-        ..ctx.settings.clone()
-    }
+    Settings::as_written(ctx, &paths.env_file())
 }
 
 /// Setup answered by `flags` on a machine with nothing set up yet, and the report it
