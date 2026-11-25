@@ -87,6 +87,11 @@ fn a_copy_of_an_existing_setup_is_named_by_its_project_and_as_a_key_reads_it_wit
         .text()
     };
     assert!(said(existing.clone()).contains("A backup of the setup media, taken over"));
+    let restore = Running {
+        what: What::Restore,
+        ..existing.clone()
+    };
+    assert!(said(restore).contains("A restore of the setup media, taken over"));
     let keys = said(existing.for_a_key());
     assert!(keys.contains("A backup of a setup taken over"), "{keys}");
     assert!(!keys.contains("media"), "{keys}");

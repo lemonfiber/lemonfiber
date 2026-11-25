@@ -75,9 +75,8 @@ pub(super) fn held(dir: &Path) -> Option<File> {
     .ok()?;
     for _ in 0..TRIES {
         match file.try_lock() {
-            Ok(()) => return Some(file),
             Err(TryLockError::WouldBlock) => std::thread::sleep(BETWEEN),
-            Err(TryLockError::Error(_)) => return None,
+            locked => return locked.is_ok().then_some(file),
         }
     }
     None

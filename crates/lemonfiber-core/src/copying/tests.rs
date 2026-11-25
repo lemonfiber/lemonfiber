@@ -348,6 +348,32 @@ fn a_reading_kept_by_a_process_of_this_user_that_has_died_reads_as_none() {
 }
 
 #[test]
+fn an_entry_no_area_holds_leaves_the_part_being_written() {
+    let scratch = Scratch::named("copying-unheld");
+    let paths = paths(&scratch);
+    let stopwatch = Waited::started();
+    let meter = starting(&stopwatch, None).kept_under(&paths).begin(
+        What::Backup,
+        Scope::WholeStack,
+        MIB,
+        whole_stack(&paths),
+    );
+    meter.writing("services/sonarr/config.xml");
+    meter.writing("manifest.json");
+    assert_eq!(
+        running(&paths, STAMPED).map(|running| running.part),
+        Some("sonarr configuration".to_owned())
+    );
+}
+
+#[test]
+fn the_real_stopwatch_waits_as_long_as_it_is_asked() {
+    let stopwatch = super::pacing::Monotonic::started();
+    stopwatch.wait(Duration::from_millis(2));
+    assert!(stopwatch.elapsed() >= Duration::from_millis(2));
+}
+
+#[test]
 fn a_second_copy_while_one_runs_leaves_the_first_ones_reading() {
     let scratch = Scratch::named("copying-second");
     let paths = paths(&scratch);
