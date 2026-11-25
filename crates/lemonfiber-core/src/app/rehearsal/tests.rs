@@ -1,6 +1,6 @@
 use super::refusing::refused;
 use super::{
-    asked, carried, not_taught_yet, unsettled, verdict, Asked, Rehearsal, A_PASSWORD_IS_TYPED,
+    carried, not_taught_yet, unsettled, verdict, Asked, Rehearsal, A_PASSWORD_IS_TYPED,
     A_RECORDING_IS_THE_RUN, A_SEARCH_IS_THE_ANSWER, MATERIAL_IS_MATERIAL,
     THE_CHECK_IS_THE_DISRUPTION, THE_WALK_IS_THE_OBSERVATION,
 };
@@ -59,8 +59,8 @@ fn the_two_refusals_carry_codes_of_their_own() {
     // its verdict, so any command names one — which matters, because nothing
     // carries `Untaught` today. What is asked here is about the two sentences, not
     // about which command happens to be on the board when somebody reads them.
-    let untaught = asked(&Command::Seed);
-    let never = asked(&Command::Walkthrough { item: None });
+    let untaught = Command::Seed.asked();
+    let never = (Command::Walkthrough { item: None }).asked();
     // Read with `reasoning` rather than with `matches!`, which expands to a match
     // whose second arm is only taken when the assertion is about to fail — a region
     // no passing run enters and one the coverage gate counts.
@@ -86,7 +86,7 @@ fn the_two_refusals_carry_codes_of_their_own() {
 /// sees the message without the command beside it.
 #[test]
 fn a_refusal_names_the_command_it_refused() {
-    let one = asked(&Command::Seed);
+    let one = Command::Seed.asked();
     assert!(
         not_taught_yet(one.named).summary.contains("seed"),
         "a refusal that does not name the command leaves the operator guessing"
@@ -98,20 +98,22 @@ fn a_refusal_names_the_command_it_refused() {
 /// read to a rule written for the write.
 #[test]
 fn reading_a_credential_is_not_read_the_way_rotating_one_is() {
-    assert!(asked(&Command::Credentials(Asking::Read)).rehearsal == Rehearsal::Reads);
+    assert!(Command::Credentials(Asking::Read).asked().rehearsal == Rehearsal::Reads);
     assert!(
-        asked(&Command::Credentials(Asking::Rotate {
+        Command::Credentials(Asking::Rotate {
             credential: "qbittorrent".to_owned(),
             agreement: None,
-        }))
+        })
+        .asked()
         .rehearsal
             == Rehearsal::Reports
     );
-    let revoke = asked(&Command::Credentials(Asking::Revoke {
+    let revoke = Command::Credentials(Asking::Revoke {
         plugin: "komga".to_owned(),
         credential: "SONARR_API_KEY".to_owned(),
         agreement: None,
-    }));
+    })
+    .asked();
     assert!(revoke.rehearsal == Rehearsal::Reports);
     assert_eq!(revoke.named, "credentials revoke");
 }
@@ -191,7 +193,7 @@ fn what_cannot_be_rehearsed_is_told_from_the_read_beside_it() {
         (recording(true), false),
         (recording(false), true),
     ] {
-        let asked = asked(&command);
+        let asked = command.asked();
         assert!(
             reasoning(asked.rehearsal).is_some() == refuses,
             "{command:?} was read as the wrong one of the two"
@@ -618,7 +620,7 @@ fn every_command_is_answered_the_way_the_table_says() {
         .into_iter()
         .filter_map(|(command, expected)| {
             let named = format!("{command:?}");
-            (asked(&command).rehearsal != expected).then_some(named)
+            (command.asked().rehearsal != expected).then_some(named)
         })
         .collect();
 
@@ -692,7 +694,7 @@ fn every_kind_a_rehearsal_is_reported_under_says_it_was_one() {
 #[test]
 fn every_command_that_reports_names_what_it_reports_under() {
     for command in reports() {
-        let answer = asked(&command);
+        let answer = command.asked();
         assert!(
             !answer.answers.is_empty(),
             "{} reports under no kind",
@@ -741,7 +743,7 @@ fn a_polled_read_settles_nothing_and_is_asked_as_its_route_is() {
         let polling = Command::Surface(Surfacing::Polled(polled));
         assert!(unsettled(&polling), "{polling:?}");
         assert!(!unsettled(&route), "{route:?}");
-        let (poll, read) = (asked(&polling), asked(&route));
+        let (poll, read) = (polling.asked(), route.asked());
         assert!(
             poll.named == read.named
                 && poll.rehearsal == read.rehearsal

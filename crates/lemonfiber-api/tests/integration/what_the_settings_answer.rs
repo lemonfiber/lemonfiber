@@ -298,7 +298,7 @@ async fn each_write_refuses_a_name_the_other_takes_naming_the_command_that_does(
 
         assert!(
             refused.as_ref().is_some_and(|problem| problem.code
-                == lemonfiber_core::error::codes::setting::TAKEN_ELSEWHERE
+                == lemonfiber_error::codes::setting::TAKEN_ELSEWHERE
                 && problem.summary == format!("{name} is written with {other}")),
             "{action}: {refused:?}"
         );

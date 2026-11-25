@@ -1,8 +1,8 @@
 //! The backup or restore running on this machine, as a terminal says it.
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::bytes::{a_second, humanize};
 use lemonfiber_core::copying::{Copying, State, What};
+use lemonfiber_words::bytes::{a_second, humanize};
 
 use super::archive::{copied_name, restoration};
 use super::Lines;

@@ -6,7 +6,7 @@ use lemonfiber_core::locale::Locale;
 use lemonfiber_core::model::{SettingReport, StorageFinding};
 use lemonfiber_core::origin::Origin;
 use lemonfiber_core::platform::Environment;
-use lemonfiber_core::prerequisites::prerequisites;
+use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Answer, House, Indexer, Library, Plan, Provider};
 use lemonfiber_core::zone::Zone;
@@ -176,7 +176,7 @@ fn each_way_of_fetching_content_can_be_chosen() {
 #[test]
 fn a_run_with_prerequisites_waits_on_the_operator_and_one_with_none_does_not() {
     let (terminal, unasked) = answered_watching(&[""]);
-    terminal.prerequisites(&prerequisites(Protocols::none()));
+    terminal.prerequisites(&PrerequisiteMap::of(Protocols::none()));
     assert_eq!(
         unasked.borrow().len(),
         1,
@@ -184,7 +184,7 @@ fn a_run_with_prerequisites_waits_on_the_operator_and_one_with_none_does_not() {
     );
 
     let (terminal, unasked) = answered_watching(&[""]);
-    terminal.prerequisites(&prerequisites(Protocols::both()));
+    terminal.prerequisites(&PrerequisiteMap::of(Protocols::both()));
     assert!(
         unasked.borrow().is_empty(),
         "the operator was shown a list and not waited on"

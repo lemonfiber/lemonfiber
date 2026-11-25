@@ -107,7 +107,7 @@ pub use profiled::{joining, profile_of, profiled, Profiled};
 pub use provenance::{
     based, held, vouched, Based, Basis, Key, Provenance, Unusable, Vouch, Vouched,
 };
-pub use recipes::{approval, approvals, Pair, Recipe, RecipeInput, Step};
+pub use recipes::{approval, Pair, Recipe, RecipeInput, Step};
 pub use recorded::{Answer, Asked, Recording};
 pub use recording::{record, Failed, Recorded, Recorder, Retaking, Taken, Took};
 pub use register::{Already, Register, Unreadable as Unrecorded};
@@ -117,8 +117,8 @@ pub use reports::{
 };
 pub use source::{unspoken, Source, SPOKEN};
 pub use stating::{
-    asked, changes, overrides, placeholding, proofs, reshipped, run_proof, sharing, speaking,
-    taking, Changing, Overriding, Placeholding, Proving, Puts, Reshipping, Sharing, Taking,
+    changes, overrides, placeholding, proofs, reshipped, run_proof, sharing, speaking, taking,
+    Changing, Overriding, Placeholding, Proving, Puts, Reshipping, Sharing, Taking,
 };
 pub use verified::{against, Changed, Verification};
 

@@ -1,4 +1,4 @@
-use super::{needed, off, switched_off, NEEDED};
+use super::{off, switched_off, NEEDED};
 use crate::app::Command;
 use crate::config::REACH_REGISTRY_KEY;
 
@@ -36,7 +36,9 @@ fn every_setting_a_command_needs_is_listed_where_it_is_off_and_nowhere_else() {
     let pull = Command::Pull {
         forms: vec!["library".to_owned()],
     };
-    assert!(needed(&pull).is_some_and(|setting| NEEDED.contains(&setting)));
+    assert!(pull
+        .needed_setting()
+        .is_some_and(|setting| NEEDED.contains(&setting)));
     assert_eq!(
         switched_off(&reaching(Some(REACH_REGISTRY_KEY))),
         [REACH_REGISTRY_KEY]

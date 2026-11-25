@@ -35,8 +35,9 @@ use lemonfiber_core::health::Summary;
 use lemonfiber_core::household::State;
 use lemonfiber_core::model::{FrontDoorReport, HouseholdReport, ScheduledService};
 use lemonfiber_core::queue::Stuck;
-use lemonfiber_core::text::{fitted, plain};
-use lemonfiber_core::walkthrough::{size, spell_out};
+use lemonfiber_words::bytes::decimal;
+use lemonfiber_words::text::{fitted, plain};
+use lemonfiber_words::wait::spell_out;
 use ratatui::text::{Line, Span};
 
 /// How many rows of a list are shown before the rest becomes a count.
@@ -170,10 +171,10 @@ pub(super) fn transfers(panel: &Panel<Vec<Transfer>>, room: usize) -> Vec<Line<'
 /// A speed, with a zero and a silence told apart.
 fn speed(reading: &Reading<u64>) -> Span<'static> {
     match reading {
-        Reading::Known(bytes) => Span::raw(format!("{:>9}/s", size(*bytes))),
+        Reading::Known(bytes) => Span::raw(format!("{:>9}/s", decimal(*bytes))),
         // Worth showing and worth marking: the last speed says more than a blank,
         // as long as nobody reads it as current.
-        Reading::Stale(bytes) => Span::styled(format!("{:>9}/s ·", size(*bytes)), quiet()),
+        Reading::Stale(bytes) => Span::styled(format!("{:>9}/s ·", decimal(*bytes)), quiet()),
         Reading::Unknown => Span::styled(format!("{:>11}", "not read"), quiet()),
     }
 }
@@ -269,8 +270,8 @@ pub(super) fn storage(panel: &Panel<Storage>, room: usize) -> Vec<Line<'static>>
         Panel::Pending => return pending(),
     };
     let free = match &storage.free {
-        Reading::Known(bytes) => Span::raw(format!("{} free", size(*bytes))),
-        Reading::Stale(bytes) => Span::styled(format!("{} free ·", size(*bytes)), quiet()),
+        Reading::Known(bytes) => Span::raw(format!("{} free", decimal(*bytes))),
+        Reading::Stale(bytes) => Span::styled(format!("{} free ·", decimal(*bytes)), quiet()),
         // "The volume could not be read" and "the disk is full" are opposite
         // things to an operator and must never render alike.
         Reading::Unknown => Span::styled("free space could not be read".to_owned(), quiet()),
@@ -357,7 +358,7 @@ fn rest(total: usize, noun: &str) -> Option<Line<'static>> {
             Line::styled(
                 format!(
                     "and {more} more {noun}{} — {total} in all",
-                    lemonfiber_core::plural::s(more)
+                    lemonfiber_error::plural::s(more)
                 ),
                 quiet(),
             )

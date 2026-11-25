@@ -33,7 +33,7 @@
 //! words on each row are the core's too, which is what keeps them the same words a
 //! household read says the limit back in.
 
-use lemonfiber_core::age_limit;
+use lemonfiber_core::age_limit::OFFERED;
 
 use super::chooser::{Chooser, Listed};
 use super::errand::{self, Errand, Given};
@@ -189,7 +189,7 @@ fn named(typed: &str) -> Vec<String> {
 /// file.
 fn limiting(errand: &'static Errand, name: &str, libraries: &[String]) -> Stage {
     let row = |age: Option<u32>, suits: &'static str| Limit {
-        name: age_limit::reading(age),
+        name: lemonfiber_words::age::reading(age),
         about: suits,
         answered: Answered {
             name: name.to_owned(),
@@ -201,7 +201,7 @@ fn limiting(errand: &'static Errand, name: &str, libraries: &[String]) -> Stage 
         errand,
         chooser: Chooser::over(
             row(None, NO_LIMIT),
-            age_limit::steps()
+            OFFERED
                 .iter()
                 .map(|step| row(Some(step.age), step.suits))
                 .collect(),

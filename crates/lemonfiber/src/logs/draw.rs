@@ -14,7 +14,7 @@
 //! as many rows as they need, and the title is built to fit the one it has.
 
 use lemonfiber_core::logs::Level;
-use lemonfiber_core::text::{wrapped, Overrun};
+use lemonfiber_words::text::{wrapped, Overrun};
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};

@@ -87,42 +87,44 @@ pub struct Line {
 impl From<LogLine> for Line {
     fn from(said: LogLine) -> Self {
         Self {
-            level: declared(&said.line),
+            level: Level::declared(&said.line),
             said,
         }
     }
 }
 
-/// What severity a line declares, or nothing where it declares none.
-///
-/// Reads the line and only the line. Not the stream it arrived on, not the service
-/// that wrote it, and not whether the word "failed" appears in a sentence — a release
-/// named `Error.404.S01E01` is not an error, and a line saying it could not find
-/// something may be a routine miss.
-///
-/// A level is **the first word of the line**, or the word after a key that says the
-/// next one names it. That is the whole rule, and it is deliberately narrow: services
-/// put the level first because that is where a reader looks for it, so a level word
-/// anywhere else is the line talking *about* a level rather than declaring one.
-///
-/// Timestamps do not count as words. They are the one thing that reliably comes
-/// before the level, and they are never purely alphabetic — which is also why the
-/// delimiter between them does not matter, and `|Info|`, `::INFO::`, `[Warn]` and a
-/// bare `ERROR` all read the same without a pattern per service.
-#[must_use]
-pub fn declared(line: &str) -> Option<Level> {
-    let head: Vec<String> = worded(line).take(HEAD).collect();
+impl Level {
+    /// What severity a line declares, or nothing where it declares none.
+    ///
+    /// Reads the line and only the line. Not the stream it arrived on, not the service
+    /// that wrote it, and not whether the word "failed" appears in a sentence — a release
+    /// named `Error.404.S01E01` is not an error, and a line saying it could not find
+    /// something may be a routine miss.
+    ///
+    /// A level is **the first word of the line**, or the word after a key that says the
+    /// next one names it. That is the whole rule, and it is deliberately narrow: services
+    /// put the level first because that is where a reader looks for it, so a level word
+    /// anywhere else is the line talking *about* a level rather than declaring one.
+    ///
+    /// Timestamps do not count as words. They are the one thing that reliably comes
+    /// before the level, and they are never purely alphabetic — which is also why the
+    /// delimiter between them does not matter, and `|Info|`, `::INFO::`, `[Warn]` and a
+    /// bare `ERROR` all read the same without a pattern per service.
+    #[must_use]
+    pub fn declared(line: &str) -> Option<Self> {
+        let head: Vec<String> = worded(line).take(HEAD).collect();
 
-    // `level=error`, `lvl=warn`: the key says the next word is the one that names the
-    // level, so that is the word read rather than the first.
-    if let Some(key) = head
-        .iter()
-        .position(|word| NAMES_ONE.contains(&word.as_str()))
-    {
-        return head.get(key + 1).and_then(|word| level(word));
+        // `level=error`, `lvl=warn`: the key says the next word is the one that names the
+        // level, so that is the word read rather than the first.
+        if let Some(key) = head
+            .iter()
+            .position(|word| NAMES_ONE.contains(&word.as_str()))
+        {
+            return head.get(key + 1).and_then(|word| level(word));
+        }
+
+        head.first().and_then(|word| level(word))
     }
-
-    head.first().and_then(|word| level(word))
 }
 
 /// How many words in are still the line announcing itself rather than saying

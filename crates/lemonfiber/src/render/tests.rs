@@ -12,7 +12,6 @@ use lemonfiber_core::backup::{Manifest, Scope, SCHEMA};
 use lemonfiber_core::bundle::Contents;
 use lemonfiber_core::docker::Condition;
 use lemonfiber_core::doctor::Overall;
-use lemonfiber_core::glossary::Vocabulary;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::migration::carrying::not_carried;
 use lemonfiber_core::migration::mode::offered;
@@ -27,6 +26,7 @@ use lemonfiber_core::origin::Origin;
 use lemonfiber_core::reconfigure::{Change, Cost, Findings, Review, Stance};
 use lemonfiber_core::repair::run::{Report as Mending, Reversal};
 use lemonfiber_core::wizard::{Phase, Step};
+use lemonfiber_words::glossary::Vocabulary;
 
 /// An archive's own account of itself, holding nothing.
 fn an_archive() -> Manifest {

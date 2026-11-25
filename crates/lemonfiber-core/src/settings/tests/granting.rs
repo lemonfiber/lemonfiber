@@ -115,13 +115,11 @@ fn a_third_party_install_asks_one_grant_for_each_credential_it_names_and_a_trust
     );
     assert!(trusted.is_empty());
     assert_eq!(
-        crate::plugin::asked(
-            &Installed {
-                granted: asked,
-                ..would
-            },
-            &[]
-        ),
+        Installed {
+            granted: asked,
+            ..would
+        }
+        .asked(&[]),
         vec![format!("{CROSSING}@reader")]
     );
 }

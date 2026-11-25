@@ -7,9 +7,9 @@ use lemonfiber_fixtures::ports::Chance;
 use lemonfiber_api::events::dashboard::Dashboard;
 use lemonfiber_api::events::live::Gathers as _;
 use lemonfiber_core::alert::{Alert, Moment, Notification, Outbox};
-use lemonfiber_core::error::Severity;
 use lemonfiber_core::ports::http::Http;
 use lemonfiber_core::push::run::{asked, Asked, WAITED_FOR};
+use lemonfiber_error::Severity;
 
 use crate::door::*;
 use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};

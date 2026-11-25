@@ -274,23 +274,24 @@ pub fn sharing(installed: &Installed) -> Vec<Sharing> {
         .collect()
 }
 
-/// What the reading lists as approved one by one: each value the recipes would carry
-/// elsewhere, each service taking a privileged shape, and each credential granted to the
-/// plugin.
-#[must_use]
-pub fn asked(would: &Installed, taking: &[Taking]) -> Vec<String> {
-    let mut asked: Vec<String> = super::approvals(&would.recipes)
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
-    asked.extend(taking.iter().map(|one| one.approval.clone()));
-    asked.extend(
-        would
-            .granted
-            .iter()
-            .map(|grant| grant.approval(&would.plugin)),
-    );
-    asked
+impl Installed {
+    /// What the reading lists as approved one by one: each value the recipes would carry
+    /// elsewhere, each service taking a privileged shape, and each credential granted to the
+    /// plugin.
+    #[must_use]
+    pub fn asked(&self, taking: &[Taking]) -> Vec<String> {
+        let mut asked: Vec<String> = super::Recipe::approvals(&self.recipes)
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        asked.extend(taking.iter().map(|one| one.approval.clone()));
+        asked.extend(
+            self.granted
+                .iter()
+                .map(|grant| grant.approval(&self.plugin)),
+        );
+        asked
+    }
 }
 
 /// Every change installing this plugin makes, in the order it makes them.

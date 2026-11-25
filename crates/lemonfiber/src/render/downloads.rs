@@ -2,8 +2,8 @@
 
 use lemonfiber_core::app::{InFlightReport, Unfinished};
 use lemonfiber_core::dashboard::Protocol;
-use lemonfiber_core::plural::s;
-use lemonfiber_core::text::fitted;
+use lemonfiber_error::plural::s;
+use lemonfiber_words::text::fitted;
 
 use super::Lines;
 

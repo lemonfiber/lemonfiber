@@ -12,8 +12,8 @@
 //! went wrong — reaches the screen through [`shortened`] and never past it, so no
 //! line can be put up by a route that skips being made safe for a terminal.
 
-use lemonfiber_core::plural::s;
-use lemonfiber_core::text::{fitted, plain};
+use lemonfiber_error::plural::s;
+use lemonfiber_words::text::{fitted, plain};
 use ratatui::text::{Line, Span};
 
 use super::super::chooser::{Chooser, Listed};

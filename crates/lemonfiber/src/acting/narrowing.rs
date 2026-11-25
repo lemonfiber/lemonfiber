@@ -26,7 +26,7 @@
 //! this screen wrote about there being nothing to choose.
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 use lemonfiber_core::app::Command;
 

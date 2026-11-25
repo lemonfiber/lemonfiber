@@ -1,9 +1,8 @@
 use super::{
-    agreement, escalation, exhausted, mendable, offerable, offered, Outcome, Repair, Stance,
-    ATTEMPTS,
+    agreement, escalation, exhausted, offerable, offered, Outcome, Repair, Stance, ATTEMPTS,
 };
 use crate::condition::{Condition, Fault};
-use crate::error::{Severity, State};
+use crate::error::Severity;
 use crate::instant::Instant;
 
 /// A raised condition for `check`, downstream of `cause` where one is given.
@@ -183,17 +182,6 @@ fn only_a_check_that_passes_afterwards_settles_a_fault() {
         leaving: "half of it".to_owned()
     }
     .settled());
-}
-
-/// The classification the operator sees is the one the problem already carried. A
-/// second vocabulary invented here would be a second thing to keep in step.
-#[test]
-fn what_lemonfiber_can_mend_is_what_the_problem_already_said() {
-    assert!(mendable(State::Remediable));
-    assert!(!mendable(State::Actionable));
-    assert!(!mendable(State::Guided));
-    assert!(!mendable(State::Unknown));
-    assert!(!mendable(State::Suppressed));
 }
 
 /// Three reasons not to offer one, and each is a different kind of no.

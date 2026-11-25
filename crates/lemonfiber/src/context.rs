@@ -21,13 +21,14 @@ use lemonfiber_core::config::paths::Paths;
 use lemonfiber_core::config::{
     data_root_from_env, exposed_from_env, front_door_from_env, household_host_from_env,
     indexer_from_env, ip_echo_from_env, port_forward_from_env, provider_host_from_env,
-    reads_as_off, reads_as_on, service_user_from_env, store, Protocols, Reaching, Settings,
-    AUTOSTART_ON_BATTERY_KEY, EXPLANATIONS_KEY,
+    service_user_from_env, store, Protocols, Reaching, Settings, AUTOSTART_ON_BATTERY_KEY,
+    EXPLANATIONS_KEY,
 };
 use lemonfiber_core::platform::{self, engine_is_desktop, Environment, HOST_OS};
 use lemonfiber_core::ports::hosting::Manager;
 use lemonfiber_core::ports::{Host, Runner};
 use lemonfiber_core::stack::Source;
+use lemonfiber_words::setting::{reads_as_off, reads_as_on};
 
 use lemonfiber::carried::STACK;
 

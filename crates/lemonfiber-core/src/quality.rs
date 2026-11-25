@@ -16,7 +16,7 @@
 
 pub(crate) mod run;
 
-pub use run::{offered, CHANGES};
+pub use run::CHANGES;
 
 use std::collections::BTreeMap;
 

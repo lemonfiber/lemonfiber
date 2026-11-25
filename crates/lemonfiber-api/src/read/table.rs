@@ -52,8 +52,8 @@ use lemonfiber_core::app::{
     Queueing, Settling,
 };
 use lemonfiber_core::doctor::{Category, Narrowing};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::notify::configuring::Asked as Notifying;
+use lemonfiber_error::Problem;
 
 use crate::refusal::Refusal;
 

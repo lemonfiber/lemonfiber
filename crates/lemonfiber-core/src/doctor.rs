@@ -62,7 +62,7 @@ use crate::repair::{Attempt, Repair, Writing};
 pub use narrowing::Narrowing;
 
 pub use bundled::BUNDLED_CHECKS;
-pub use examining::{attributed, examine, named, overall};
+pub use examining::{attributed, examine, named};
 
 /// The family a check belongs to, so a run can be narrowed to one of them.
 ///

@@ -92,7 +92,7 @@ fn an_empty_line_names_no_library() {
 #[test]
 fn the_rows_are_no_limit_and_the_steps_the_core_offers() {
     assert!(
-        age_limit::steps().len() > 1,
+        age_limit::OFFERED.len() > 1,
         "the core offers no ladder to read"
     );
     assert!(
@@ -128,7 +128,7 @@ fn what_was_typed_and_what_was_taken_reach_the_question_together() {
     assert_eq!(asked.libraries, ["Films".to_owned(), "Shows".to_owned()]);
     assert_eq!(
         asked.age_limit,
-        age_limit::steps().first().map(|step| step.age),
+        age_limit::OFFERED.first().map(|step| step.age),
         "the row under no limit did not become the youngest step the core offers"
     );
     assert!(

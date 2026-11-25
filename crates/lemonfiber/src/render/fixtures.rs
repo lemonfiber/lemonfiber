@@ -3,10 +3,8 @@
 //! Shared because several renderers are proven against the same shapes, and a
 //! fixture copied per module is a fixture that drifts per module.
 
-use lemonfiber_core::changelog::{told, Notes, Record};
+use lemonfiber_core::changelog::{Notes, Record};
 use lemonfiber_core::docker::{Criticality, Service, State};
-use lemonfiber_core::error::{Code, Problem, Remedy};
-use lemonfiber_core::glossary::{explain, Term};
 use lemonfiber_core::model::{
     FormReport, FormsReport, LifecycleReport, MusicChoice, PresetChoice, SupervisionReport,
     TraceReport, VersionReport,
@@ -16,6 +14,8 @@ use lemonfiber_core::seed::{
     State as SeedState, Wiring,
 };
 use lemonfiber_core::stack::closure::{Dropped, Plan};
+use lemonfiber_error::{Code, Problem, Remedy};
+use lemonfiber_words::glossary::{explain, Term};
 
 /// One wiring in the given state, with no severity raised.
 pub(super) fn wiring(connection: &str, state: SeedState) -> Wiring {
@@ -166,7 +166,7 @@ const QUIET: &str = r#"{
 
 /// What that record tells a build of the named version.
 pub(super) fn notes(running: &str) -> Notes {
-    told(
+    Notes::told(
         Record::read(&[
             ("0.4.0.json", NEWEST),
             ("0.3.1.json", PATCH),

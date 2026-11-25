@@ -90,7 +90,7 @@ fn a_request_with_nothing_configured_names_nowhere() {
     // And what a surface puts there instead, which is read from here by the
     // renderer in another crate — so it is exercised from both compilations of
     // this file rather than only from the one that draws it.
-    assert!(!super::nothing_configured().is_empty());
+    assert!(!super::NOTHING_CONFIGURED.is_empty());
 }
 
 #[test]

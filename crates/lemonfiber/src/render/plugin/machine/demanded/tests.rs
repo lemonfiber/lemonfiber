@@ -1,6 +1,6 @@
-use lemonfiber_core::error::Came;
 use lemonfiber_core::plugin::running::{Ran, StepRan};
 use lemonfiber_core::plugin::{Demand, Installs, On, Recipe, RecipeInput, Step};
+use lemonfiber_error::Came;
 
 use super::super::installs;
 use super::demanded;

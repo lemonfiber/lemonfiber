@@ -110,13 +110,13 @@ impl Drop for Screen {
 }
 
 /// A screen that could not be drawn, as a problem rather than a panic.
-pub(super) fn drawing(what: &str, reason: &str) -> lemonfiber_core::error::Problem {
-    lemonfiber_core::error::Problem::new(
-        lemonfiber_core::error::codes::tui::DRAWING,
+pub(super) fn drawing(what: &str, reason: &str) -> lemonfiber_error::Problem {
+    lemonfiber_error::Problem::new(
+        lemonfiber_error::codes::tui::DRAWING,
         format!("the {what} could not be drawn"),
         "The terminal stopped accepting output, which usually means it was closed or resized \
          out from under the process.",
-        lemonfiber_core::error::Remedy::new("Run it again in a terminal that stays open"),
+        lemonfiber_error::Remedy::new("Run it again in a terminal that stays open"),
     )
     .with_detail(reason.to_owned())
 }

@@ -7,9 +7,9 @@ use lemonfiber_core::docker::{Condition, Service, State, Undeclared};
 use lemonfiber_core::model::{
     ConflictReport, LifecycleReport, StatusReport, SupervisionReport, Switched, Vigil,
 };
-use lemonfiber_core::plural::s;
 use lemonfiber_core::stack::closure::{Filtered, Footprint, Plan, Protocol, Running};
-use lemonfiber_core::text::plain;
+use lemonfiber_error::plural::s;
+use lemonfiber_words::text::plain;
 
 use super::Lines;
 

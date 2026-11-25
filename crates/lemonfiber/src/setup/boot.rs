@@ -7,9 +7,10 @@
 
 use std::process::ExitCode;
 
-use lemonfiber_core::app::{dispatch, unforwarded, Command, Ctx, Diagnosing, Outcome};
+use lemonfiber_core::app::{dispatch, Command, Ctx, Diagnosing, Outcome};
 use lemonfiber_core::docker::Condition;
-use lemonfiber_core::doctor::{autostart, overall, Category, Finding, Narrowing, Overall};
+use lemonfiber_core::doctor::autostart::CHECK as AUTOSTART;
+use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall};
 use lemonfiber_core::model::DoctorReport;
 use lemonfiber_core::PRODUCT;
 
@@ -53,7 +54,7 @@ pub(super) async fn preflight(ctx: &Ctx) -> Result<(), ExitCode> {
     let findings = gating(found);
     let report = DoctorReport {
         rehearsed: false,
-        overall: overall(&findings),
+        overall: Overall::of(&findings),
         findings,
     };
 
@@ -83,7 +84,7 @@ fn found(answered: Outcome) -> Vec<Finding> {
 fn gating(findings: Vec<Finding>) -> Vec<Finding> {
     findings
         .into_iter()
-        .filter(|finding| finding.check != autostart::CHECK)
+        .filter(|finding| finding.check != AUTOSTART)
         .collect()
 }
 
@@ -173,7 +174,10 @@ enum Wired {
 /// next room, and the last thing on the screen is the thing that gets read.
 async fn afterwards(ctx: &Ctx) -> Vec<String> {
     let mut lines = Vec::new();
-    if let Some(cost) = unforwarded::at_setup(ctx.settings.supported(), &ctx.settings.port_forward)
+    if let Some(cost) = ctx
+        .settings
+        .port_forward
+        .unforwarded_at_setup(ctx.settings.supported())
     {
         lines.push(format!("\n{cost}"));
     }

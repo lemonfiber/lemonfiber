@@ -22,7 +22,7 @@
 use std::collections::BTreeSet;
 
 use lemonfiber_core::model::{ProvenanceReport, ServiceProvenance};
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 
 use super::Lines;
 

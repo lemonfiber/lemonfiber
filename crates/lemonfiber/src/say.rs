@@ -99,7 +99,7 @@ pub(crate) fn rendered(line: &str) -> String {
 /// with the escape it is really there to remove.
 fn drawable(text: &str) -> String {
     text.split('\n')
-        .map(lemonfiber_core::text::plain)
+        .map(lemonfiber_words::text::plain)
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -215,7 +215,7 @@ pub(crate) fn emitted(line: &str) {
 /// character raw, so a release title holding a right-to-left override reached a
 /// terminal through `--json` while every other way out disarmed it.
 fn written(line: &str) -> String {
-    lemonfiber_core::text::escaped(line)
+    lemonfiber_words::text::escaped(line)
 }
 
 /// Put a question out and leave the cursor beside it, for an answer on the same line.

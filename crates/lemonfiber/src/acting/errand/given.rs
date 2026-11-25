@@ -183,7 +183,7 @@ impl Given {
             format!("who can watch {}", libraries.join(", "))
         };
         let limited = age_limit.map_or_else(String::new, |age| {
-            format!(", and {}", lemonfiber_core::age_limit::reading(Some(age)))
+            format!(", and {}", lemonfiber_words::age::reading(Some(age)))
         });
         // Said only where it was asked. An offer that narrows nothing writes nothing,
         // so what would happen to unrated content is a question about an account

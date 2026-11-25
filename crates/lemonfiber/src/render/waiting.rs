@@ -2,7 +2,7 @@
 //! way status, the doctor and every rehearsal say them.
 
 use lemonfiber_core::model::{Waiting, Wanted};
-use lemonfiber_core::text::plain;
+use lemonfiber_words::text::plain;
 
 use super::Lines;
 

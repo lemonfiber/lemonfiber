@@ -129,7 +129,7 @@ pub(super) fn installing(
     changes: &[Changing],
     standing: &Standing,
 ) -> String {
-    let sent = crate::plugin::approvals(&would.recipes).join("\n");
+    let sent = crate::plugin::Recipe::approvals(&would.recipes).join("\n");
     crate::agreement::joined(&[
         the_plugin(read, would),
         crate::agreement::over(&[&json(changes)]),
@@ -149,7 +149,7 @@ pub(super) fn updating(
     standing: &Standing,
 ) -> String {
     let stops = stopping(was).join("\n");
-    let sent = crate::plugin::approvals(&would.recipes).join("\n");
+    let sent = crate::plugin::Recipe::approvals(&would.recipes).join("\n");
     crate::agreement::joined(&[
         the_plugin(read, would),
         crate::agreement::over(&[&json(was)]),
@@ -179,7 +179,7 @@ pub(super) fn proving(plugin: &Installed, kept: &[crate::plugin::Nonconforming])
 /// What running a demand recipe is offered as: the plugin as the record holds it, the
 /// recipe as the operator agrees to it, and every value it would carry where.
 pub(super) fn demanding(plugin: &Installed, recipe: &crate::plugin::Recipe) -> String {
-    let sent = crate::plugin::approvals(std::slice::from_ref(recipe)).join("\n");
+    let sent = crate::plugin::Recipe::approvals(std::slice::from_ref(recipe)).join("\n");
     crate::agreement::parted(&[&[&json(plugin)], &[&json(recipe)], &[&sent]])
 }
 
@@ -253,7 +253,7 @@ pub(super) fn answered(
     parts: &[&str],
 ) -> Result<(bool, Vec<Taking>), Box<Problem>> {
     let taking = crate::plugin::taking(would);
-    let asked = crate::plugin::asked(would, &taking);
+    let asked = would.asked(&taking);
     let asked: Vec<&str> = asked.iter().map(String::as_str).collect();
     let acts = acting(ctx, consent, &would.plugin, standing, parts, &asked)?;
     Ok((acts, taking))

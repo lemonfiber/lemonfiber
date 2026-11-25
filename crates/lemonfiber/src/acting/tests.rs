@@ -18,7 +18,6 @@ use lemonfiber_core::backup::{Manifest, Relocation, Scope, SCHEMA};
 use lemonfiber_core::bundle::run::Wanted as Bundled;
 use lemonfiber_core::bundle::{Contents, Filenames};
 use lemonfiber_core::doctor::{Category, Finding, Narrowing, Overall, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy};
 use lemonfiber_core::model::{
     Disposition, DoctorReport, FormsReport, PresetChoice, QualityReport, ResetReport, StackEdit,
     StuckEntry, StuckReport, SupervisionReport, TraceReport, UpgradeMedia, UpgradeReport,
@@ -29,6 +28,7 @@ use lemonfiber_core::repair::run::{Consent, Report as RepairReport};
 use lemonfiber_core::repair::{agreement, Repair};
 use lemonfiber_core::trace::Stage as TraceStage;
 use lemonfiber_core::walkthrough::Step as WalkStep;
+use lemonfiber_error::{Code, Problem, Remedy};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::PathBuf;
 

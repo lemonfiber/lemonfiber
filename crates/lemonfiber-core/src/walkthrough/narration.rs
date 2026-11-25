@@ -12,6 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::Step;
+use lemonfiber_words::{bytes, wait};
 
 /// One narrated line: a step, and what was specifically true of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -107,9 +108,12 @@ impl Speed {
     /// product separates facts on one line.
     #[must_use]
     pub fn detail(self) -> String {
-        let mut parts = vec![size(self.total), format!("{}/s", size(self.rate))];
+        let mut parts = vec![
+            bytes::decimal(self.total),
+            format!("{}/s", bytes::decimal(self.rate)),
+        ];
         if let Some(left) = self.remaining() {
-            parts.push(format!("~{}", spell_out(left)));
+            parts.push(format!("~{}", wait::spell_out(left)));
         }
         parts.join(" · ")
     }
@@ -142,41 +146,6 @@ pub struct Unheard;
 
 impl Narrator for Unheard {
     fn said(&self, _line: &Line) {}
-}
-
-/// A size in the decimal gigabytes the rest of the product quotes — the same units the
-/// quality presets and the free-space checks use, so two numbers an operator sees on one
-/// screen mean the same thing.
-#[must_use]
-pub fn size(bytes: u64) -> String {
-    /// One decimal gigabyte.
-    const GB: u64 = 1_000_000_000;
-    /// One decimal megabyte.
-    const MB: u64 = 1_000_000;
-
-    if bytes >= GB {
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "a size shown to one decimal place; the lost precision is far below \
-                      what is printed"
-        )]
-        return format!("{:.1} GB", bytes as f64 / GB as f64);
-    }
-    format!("{} MB", bytes / MB)
-}
-
-/// A duration in the coarsest unit that still says something useful — nobody waiting on a
-/// download wants it to the second.
-#[must_use]
-pub fn spell_out(left: std::time::Duration) -> String {
-    let seconds = left.as_secs();
-    if seconds >= 3600 {
-        return format!("{}h", seconds / 3600);
-    }
-    if seconds >= 60 {
-        return format!("{}m", seconds / 60);
-    }
-    format!("{seconds}s")
 }
 
 /// The singular or the plural, because "1 indexers" reads as a bug in the product.

@@ -136,9 +136,9 @@ fn a_pace_comes_round_once_its_interval_has_passed() {
 #[test]
 fn an_unmade_reading_is_unread_by_the_code_that_stopped_it() {
     use lemonfiber_core::app::Outcome;
-    use lemonfiber_core::error::codes::play::SERVER_SILENT;
-    use lemonfiber_core::error::household::Obstacle;
-    use lemonfiber_core::error::{Problem, Remedy};
+    use lemonfiber_error::codes::play::SERVER_SILENT;
+    use lemonfiber_error::household::Obstacle;
+    use lemonfiber_error::{Problem, Remedy};
     let problem = Problem::new(SERVER_SILENT, "silent", "silent", Remedy::new("wait"));
     let unread = vec![Obstacle::new(SERVER_SILENT, "silent")];
     assert!(
@@ -167,7 +167,7 @@ async fn a_stack_that_cannot_be_read_is_said_as_each_reading_unread() {
     };
     let said = theirs.gather(true).await;
     assert_eq!(said.len(), 3);
-    let fault = lemonfiber_core::error::household::FAULT;
+    let fault = lemonfiber_error::household::FAULT;
     assert!(
         said.iter().all(|one| one.said().contains(fault)),
         "a member was told something other than the household's words for a fault: {said:?}"

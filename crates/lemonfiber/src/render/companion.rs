@@ -8,9 +8,9 @@ use lemonfiber_core::app::surfacing::Answer;
 use lemonfiber_core::companion::served::ServedReport;
 use lemonfiber_core::companion::{Pairing, Replacement, LASTS};
 use lemonfiber_core::notify::events::Heard;
-use lemonfiber_core::plural::s;
 use lemonfiber_core::screening::{Renewed, Untuned};
 use lemonfiber_core::PRODUCT;
+use lemonfiber_error::plural::s;
 
 use super::{qr, Lines};
 use crate::say;

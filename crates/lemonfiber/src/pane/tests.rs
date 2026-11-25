@@ -2,7 +2,7 @@ use super::{
     explained_in, explaining, middle, room_on, showing, taught, taught_on, titled, SHORTEST, TITLES,
 };
 use lemonfiber_core::acknowledged::Acknowledged;
-use lemonfiber_core::glossary::{mentioned, TERMS};
+use lemonfiber_words::glossary::{mentioned, TERMS};
 use ratatui::layout::Rect;
 use ratatui::prelude::{Line, Span};
 

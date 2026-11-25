@@ -15,8 +15,8 @@
 //! before it reads the answer.
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::walkthrough::Line as Step;
+use lemonfiber_error::Problem;
 
 use super::reading::{complaint, lines_of, unexpected, Reading};
 use super::{errand, lasting, mending, narrowing, offer, quality, Acting, Asked, Chooser, Stage};

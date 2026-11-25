@@ -50,7 +50,7 @@ pub use outsized::Outsized;
 pub use survey::Survey;
 pub use tally::{Counting, Tally};
 pub use volume::{Freshness, Role, Volume};
-pub use waste::{ratio_reads, Candidate, Standing, RATIO_CONSEQUENCE};
+pub use waste::{Candidate, Standing, RATIO_CONSEQUENCE};
 
 use crate::error::codes::space::{
     HALTED, NOTHING_TO_ASK, NOT_HELD, NOT_ON_OFFER, NOWHERE_TO_MEASURE, WALK_REFUSED,

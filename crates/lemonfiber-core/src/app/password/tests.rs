@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::support::a_password;
 
 use crate::admission as credential;
-use crate::app::{dispatch, rehearsal, Command, Ctx, Outcome, Rehearsal};
+use crate::app::{dispatch, Command, Ctx, Outcome, Rehearsal};
 use crate::error::codes::admit::MISTYPED;
 use crate::test_support::{a_context, Typing};
 
@@ -83,6 +83,6 @@ async fn nowhere_to_keep_a_password_asks_for_none() {
 
 #[test]
 fn setting_a_password_cannot_be_rehearsed() {
-    let asked = rehearsal::asked(&Command::Password);
+    let asked = Command::Password.asked();
     assert!(matches!(asked.rehearsal, Rehearsal::Cannot(_)));
 }

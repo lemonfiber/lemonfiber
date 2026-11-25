@@ -4,15 +4,15 @@ use lemonfiber_core::app::Ctx;
 use lemonfiber_core::certificate;
 use lemonfiber_core::companion::{paired, served};
 use lemonfiber_core::config::Settings;
-use lemonfiber_core::error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
 use lemonfiber_core::platform::Environment;
+use lemonfiber_error::codes::serve::{NO_CERTIFICATE, UNSETTLED_PORT};
 use lemonfiber_fixtures::ports::Renamed;
 use lemonfiber_fixtures::scratch::Scratch;
 use lemonfiber_testing::context::a_context;
 
 use lemonfiber_core::app::{dispatch, Command, Outcome};
 use lemonfiber_core::companion::served::ServedReport;
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 use super::{bound, encrypting, port_settled, Encrypting};
 
@@ -102,7 +102,7 @@ async fn a_run_asked_to_encrypt_presents_the_certificate_it_keeps() {
 /// Each way of not being able to encrypt is refused by name.
 #[tokio::test]
 async fn a_run_that_cannot_encrypt_is_refused_by_name() {
-    async fn code(ctx: &Ctx, port: Option<u16>) -> Option<lemonfiber_core::error::Code> {
+    async fn code(ctx: &Ctx, port: Option<u16>) -> Option<lemonfiber_error::Code> {
         presenting(ctx, true, port)
             .await
             .err()

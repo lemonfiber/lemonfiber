@@ -145,7 +145,7 @@ async fn an_action_whose_command_cannot_be_rehearsed_is_refused_with_its_reason(
 #[test]
 fn the_reads_every_request_makes_rehearse_as_the_reads_they_are() {
     use lemonfiber_core::app::admitting::{Asked, Carried};
-    use lemonfiber_core::app::rehearsal::{asked, Rehearsal};
+    use lemonfiber_core::app::rehearsal::Rehearsal;
     use lemonfiber_core::app::Command;
 
     let caller = Command::Admission(Asked::Caller(Carried {
@@ -154,7 +154,7 @@ fn the_reads_every_request_makes_rehearse_as_the_reads_they_are() {
     }));
     for command in [Command::Surface(Surfacing::Standing), caller] {
         assert!(
-            matches!(asked(&command).rehearsal, Rehearsal::Reads),
+            matches!(command.asked().rehearsal, Rehearsal::Reads),
             "{command:?}"
         );
     }

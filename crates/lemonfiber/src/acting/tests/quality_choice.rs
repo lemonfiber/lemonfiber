@@ -115,7 +115,7 @@ fn what_an_upgrade_would_cost_is_read_before_it_is_agreed_to() {
         .unwrap_or_default();
     assert!(before.contains("television"), "{said}");
     assert!(
-        before.contains(&lemonfiber_core::bytes::humanize(UPGRADE_BYTES)),
+        before.contains(&lemonfiber_words::bytes::humanize(UPGRADE_BYTES)),
         "{said}"
     );
     assert!(before.contains("Nothing has been changed"), "{said}");

@@ -73,8 +73,8 @@ fn the_household_view_names_each_member_and_links_what_it_can_trace() {
             asking: None,
         }],
         available: true,
-        findings: vec![lemonfiber_core::error::household::Obstacle::new(
-            lemonfiber_core::error::codes::play::SERVER_SILENT,
+        findings: vec![lemonfiber_error::household::Obstacle::new(
+            lemonfiber_error::codes::play::SERVER_SILENT,
             "a library could not be read",
         )],
         noted: vec!["the media server holds no account under sam".to_owned()],
@@ -394,7 +394,7 @@ fn an_invitation_nobody_took_up_says_so_rather_than_never_signed_in() {
 /// the same setting under another name.
 #[test]
 fn a_limit_reads_in_the_words_it_was_chosen_in() {
-    let offered = lemonfiber_core::age_limit::steps();
+    let offered = lemonfiber_core::age_limit::OFFERED;
     assert!(
         !offered.is_empty(),
         "no step is offered, so this asserts nothing"
@@ -421,7 +421,7 @@ fn a_limit_reads_in_the_words_it_was_chosen_in() {
         };
 
         let text = household(&report).text();
-        let said = lemonfiber_core::age_limit::reading(Some(step.age));
+        let said = lemonfiber_words::age::reading(Some(step.age));
         assert!(
             text.contains(&said),
             "a limit of {} reads as something other than {said}: {text}",
@@ -563,8 +563,8 @@ fn an_empty_household_says_whether_it_was_read() {
         rehearsed: false,
         members: Vec::new(),
         available: false,
-        findings: vec![lemonfiber_core::error::household::Obstacle::new(
-            lemonfiber_core::error::codes::play::SERVER_SILENT,
+        findings: vec![lemonfiber_error::household::Obstacle::new(
+            lemonfiber_error::codes::play::SERVER_SILENT,
             "could not be read",
         )],
         noted: Vec::new(),

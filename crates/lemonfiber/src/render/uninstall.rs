@@ -8,9 +8,9 @@
 //! read before they agree is that their library survives, and putting it below the
 //! list is putting it where a long list buries it.
 
-use lemonfiber_core::bytes::humanize;
-use lemonfiber_core::plural::s;
 use lemonfiber_core::uninstall::{Item, Manifest, Removal, Uninstall};
+use lemonfiber_error::plural::s;
+use lemonfiber_words::bytes::humanize;
 
 use super::Lines;
 

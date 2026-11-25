@@ -23,8 +23,8 @@
 
 use axum::body::Body;
 use axum::http::{Response, StatusCode};
-use lemonfiber_core::error::codes::{admit, ask, read, serve};
-use lemonfiber_core::error::{Code, Problem, Remedy};
+use lemonfiber_error::codes::{admit, ask, read, serve};
+use lemonfiber_error::{Code, Problem, Remedy};
 
 use crate::read::answered_with;
 

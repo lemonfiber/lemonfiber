@@ -15,8 +15,8 @@
 //! list, and a reader who had to spot it is the reason nobody would.
 
 use lemonfiber_core::model::{SubstitutionReport, WiringReport};
-use lemonfiber_core::plural::s;
 use lemonfiber_core::wiring::{Reaches, Settled, Unfilled, Whose, Wired};
+use lemonfiber_error::plural::s;
 
 use super::Lines;
 
@@ -57,7 +57,7 @@ fn entry(link: &Wired) -> Lines {
             lines.spaced(format!(
                 "  {} asks for {capability}{}{}",
                 asker(link),
-                lemonfiber_core::wiring::filing(files.as_deref(), media_types),
+                lemonfiber_core::wiring::Unfilled::filing(files.as_deref(), media_types),
                 talking(
                     native
                         .as_ref()

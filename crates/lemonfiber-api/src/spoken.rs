@@ -5,16 +5,16 @@
 //! A household member's session,
 //! and a key acting as one, is answered with the same envelope worded for the household:
 //! an outcome through [`Outcome::for_household`], and a refusal through
-//! [`lemonfiber_core::error::household::spoken`], the one place a member's wording is
+//! [`lemonfiber_error::household::spoken`], the one place a member's wording is
 //! chosen. A refusal carries its problem on the response, so the guard every route sits
 //! behind words it for a member whichever route raised it.
 
 use axum::http::StatusCode;
 use axum::response::Response;
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::error::household;
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_error::household;
+use lemonfiber_error::Problem;
 
 use crate::admission::{Caller, RETRY_AFTER};
 use crate::read::enveloped;

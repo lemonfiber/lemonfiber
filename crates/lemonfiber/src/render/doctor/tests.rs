@@ -1,7 +1,7 @@
 use super::*;
 use crate::render::fixtures::*;
 use lemonfiber_core::doctor::{Category, Finding, Overall, Verdict};
-use lemonfiber_core::error::{Code, Problem, Remedy};
+use lemonfiber_error::{Code, Problem, Remedy};
 
 /// A finding that failed, for the tests that are about what is shown beside one.
 fn a_failing_finding() -> Finding {
@@ -105,7 +105,7 @@ fn a_finding_with_nothing_said_shows_no_heading() {
 /// where to go in their own remedies, so a label there would be noise.
 #[test]
 fn a_finding_lemonfiber_can_mend_says_so_and_names_the_command() {
-    use lemonfiber_core::error::State;
+    use lemonfiber_error::State;
 
     let mendable = remedies(&a_problem().in_state(State::Remediable)).text();
     assert!(

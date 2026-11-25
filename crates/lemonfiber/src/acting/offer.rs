@@ -32,7 +32,7 @@
 use lemonfiber_api::actions::{named, Arguments};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::model::FormsReport;
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 
 use super::chooser::{Chooser, Listed};
 use super::reading::Reading;

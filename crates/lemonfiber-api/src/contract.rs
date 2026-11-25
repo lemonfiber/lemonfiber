@@ -59,13 +59,13 @@ use lemonfiber_core::agreement;
 use lemonfiber_core::alert::Alert;
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::dashboard::Snapshot;
-use lemonfiber_core::error::codes::declared;
-use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{
     kind::{self, Kind},
     Envelope, SetupReport, API_VERSION,
 };
 use lemonfiber_core::wiring;
+use lemonfiber_error::codes::declared;
+use lemonfiber_error::{Code, Problem};
 
 use crate::actions::published::Action;
 use crate::actions::{self, named, Arguments, KEY_CALLABLE};
@@ -311,7 +311,7 @@ pub(crate) const CORE_REFUSALS: [&[Code]; 26] = [
     &lemonfiber_core::asking::REFUSALS,
     &lemonfiber_core::companion::served::REFUSALS,
     &lemonfiber_core::bandwidth::REFUSALS,
-    &lemonfiber_core::glossary::REFUSALS,
+    &lemonfiber_words::glossary::REFUSALS,
     &lemonfiber_core::keys::REFUSALS,
     &lemonfiber_core::device_keys::REFUSALS,
     &lemonfiber_core::push::REFUSALS,
@@ -411,7 +411,7 @@ pub fn rehearsable(action: &str) -> bool {
         .or_else(|| crate::actions::reached(action, Arguments::naming_everything()).ok())
         .is_some_and(|command| {
             matches!(
-                lemonfiber_core::app::rehearsal::asked(&command).rehearsal,
+                command.asked().rehearsal,
                 Rehearsal::Reads | Rehearsal::Reports
             )
         })

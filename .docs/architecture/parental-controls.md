@@ -102,7 +102,7 @@ no step is ever bare:
 These are the British names read off the pinned image under `GB`, which is the ladder
 the steps were written against. It lives in
 [`rating::FALLBACK`](../../crates/lemonfiber-core/src/rating.rs), and a test holds it
-to naming every step `age_limit::steps()` offers.
+to naming every step `age_limit::OFFERED` holds.
 
 ## Unrated content
 

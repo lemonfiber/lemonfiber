@@ -115,7 +115,7 @@ fn every_command_that_carries_both_is_split_on_which_it_is() {
         ),
     ] {
         assert!(
-            asked(&command).rehearsal == expected,
+            command.asked().rehearsal == expected,
             "{command:?} was read as the wrong half of what it carries"
         );
     }

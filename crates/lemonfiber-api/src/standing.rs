@@ -2,7 +2,7 @@
 
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, Surfacing};
-use lemonfiber_core::error::Problem;
+use lemonfiber_error::Problem;
 
 /// What this surface composes its routes and its answers from, as `ctx`'s machine stands:
 /// nothing standing where the dispatcher answers with anything else.

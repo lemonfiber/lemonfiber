@@ -35,8 +35,8 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::{Extension, Router};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Doorway};
-use lemonfiber_core::error::{Code, Problem};
 use lemonfiber_core::model::{kind, Envelope};
+use lemonfiber_error::{Code, Problem};
 
 use crate::admission::{Caller, RETRY_AFTER};
 use crate::entitled::{may, Door};

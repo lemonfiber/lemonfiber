@@ -51,7 +51,7 @@ pub(super) fn asking(asks: &[lemonfiber_core::wiring::Wired], recorded: bool) ->
                 lines.put(format!(
                     "      {} asks for {capability}{}{}, reaching {}",
                     link.by,
-                    lemonfiber_core::wiring::filing(files.as_deref(), media_types),
+                    lemonfiber_core::wiring::Unfilled::filing(files.as_deref(), media_types),
                     super::super::super::wiring::talking(
                         native
                             .as_ref()

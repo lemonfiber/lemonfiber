@@ -1,6 +1,6 @@
 use lemonfiber_plugin::Manifest;
 
-use super::{approvals, declared, reaching, Pair, Step};
+use super::{declared, reaching, Pair, Recipe, Step};
 
 /// A plugin with its own service, and one recipe that calls that service, a service of
 /// the stack's, and a host outside both — and carries a value it captured to that host,
@@ -186,7 +186,7 @@ fn each_approval_is_asked_for_once_in_the_order_declared() {
         .map(|manifest| declared(&manifest))
         .unwrap_or_default();
     assert_eq!(
-        approvals(&recipes),
+        Recipe::approvals(&recipes),
         vec!["token@metadata.example.org", "token@mirror.example.org"]
     );
 }

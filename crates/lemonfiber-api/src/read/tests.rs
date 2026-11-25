@@ -1,11 +1,11 @@
 use axum::http::StatusCode;
-use lemonfiber_core::error::codes::wish::{NOT_ASKABLE, NOT_CHECKED};
-use lemonfiber_core::error::{Problem, Remedy};
+use lemonfiber_error::codes::wish::{NOT_ASKABLE, NOT_CHECKED};
+use lemonfiber_error::{Problem, Remedy};
 
 use super::{failed, Reply, RETRY_AFTER};
 
 /// A refusal under `code`.
-fn refusal(code: lemonfiber_core::error::Code) -> Problem {
+fn refusal(code: lemonfiber_error::Code) -> Problem {
     Problem::new(code, "Refused.", "Refused.", Remedy::new("Try again."))
 }
 

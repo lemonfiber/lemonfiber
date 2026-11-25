@@ -16,8 +16,7 @@ use lemonfiber_core::app::putting_back::Reversal;
 use lemonfiber_core::doctor::Verdict as Checked;
 use lemonfiber_core::journal::{Action, Undo};
 use lemonfiber_core::plugin::{
-    asked, Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Verdict,
-    Verification,
+    Changing, Evidence, Installed, Installs, Overriding, Proving, Puts, Verdict, Verification,
 };
 
 use super::super::Lines;
@@ -111,7 +110,7 @@ pub(crate) fn installs(report: &Installs) -> Lines {
             lines.extend(answering::unanswered(
                 "run",
                 report.agreement.as_deref(),
-                &lemonfiber_core::plugin::approvals(std::slice::from_ref(&one.recipe)),
+                &lemonfiber_core::plugin::Recipe::approvals(std::slice::from_ref(&one.recipe)),
                 report.rehearsed,
             ));
         }
@@ -176,7 +175,7 @@ fn changes(made: &[Changing], recorded: bool) -> Lines {
 
 /// What answering `install`'s offer would take, said on a `verb` that did not act.
 fn unanswered(verb: &str, report: &Installs, install: &lemonfiber_core::plugin::Install) -> Lines {
-    let asked = asked(&install.would, &install.taking);
+    let asked = install.would.asked(&install.taking);
     answering::unanswered(
         verb,
         report.agreement.as_deref(),
@@ -483,8 +482,9 @@ fn overriding(overrides: &[Overriding], recorded: bool) -> Lines {
 fn container(one: &Installed) -> Lines {
     let mut lines = Lines::default();
     lines.spaced("    The container lemonfiber writes for it, from that and from nothing else:");
-    for line in
-        lemonfiber_core::project::entries(one, &lemonfiber_core::project::Reading::bare()).lines()
+    for line in one
+        .project_entries(&lemonfiber_core::project::Reading::bare())
+        .lines()
     {
         lines.put(format!("      {line}"));
     }

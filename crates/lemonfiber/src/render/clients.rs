@@ -9,7 +9,7 @@
 //! chooses one and a reader who meets it after the blocks has already decided.
 
 use lemonfiber_core::clients::{Device, Guidance, Straining, Support, Trouble};
-use lemonfiber_core::text::Overrun;
+use lemonfiber_words::text::Overrun;
 
 use super::Lines;
 
@@ -90,7 +90,7 @@ fn entry(lines: &mut Lines, device: &Device) {
 /// A statement true of every device, wrapped and unindented, after a blank line.
 fn closing(lines: &mut Lines, text: &str) {
     let mut first = true;
-    for line in lemonfiber_core::text::wrapped(text, WIDTH, Overrun::Allowed) {
+    for line in lemonfiber_words::text::wrapped(text, WIDTH, Overrun::Allowed) {
         if first {
             lines.spaced(line);
             first = false;
@@ -103,7 +103,7 @@ fn closing(lines: &mut Lines, text: &str) {
 /// A sentence indented under the device it is about, wrapped to the width.
 fn detail(lines: &mut Lines, text: &str) {
     let mut indent = UNDER;
-    for line in lemonfiber_core::text::wrapped(text, WIDTH, Overrun::Allowed) {
+    for line in lemonfiber_words::text::wrapped(text, WIDTH, Overrun::Allowed) {
         lines.put(format!("{indent}{line}"));
         indent = WRAPPED;
     }

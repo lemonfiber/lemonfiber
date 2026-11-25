@@ -316,7 +316,7 @@ fn a_wordy_snapshot() -> Snapshot {
         kind: "service.down".to_owned(),
         notification: lemonfiber_core::alert::Notification::Problem,
         moment: lemonfiber_core::alert::Moment::Onset,
-        severity: lemonfiber_core::error::Severity::Warning,
+        severity: lemonfiber_error::Severity::Warning,
         summary: a_long(4),
         meaning: a_long(4),
         remedies: vec!["start it".to_owned()],
@@ -405,7 +405,7 @@ fn the_reason_a_panel_is_down_keeps_both_of_its_ends() {
 #[test]
 fn no_width_leaves_an_explanation_on_this_screen_unfinished() {
     let snapshot = a_snapshot();
-    let explained: Vec<&str> = lemonfiber_core::glossary::TERMS
+    let explained: Vec<&str> = lemonfiber_words::glossary::TERMS
         .iter()
         .filter(|term| term.word == "hardlink")
         .flat_map(|term| term.short.split_whitespace())

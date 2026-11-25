@@ -177,12 +177,12 @@ fn found(check: &str, verdict: Checked) -> Finding {
 }
 
 /// A diagnosis with words on it, at either height.
-fn wrong(summary: &str) -> lemonfiber_core::error::Problem {
-    lemonfiber_core::error::Problem::new(
-        lemonfiber_core::error::Code::new("TEST-1"),
+fn wrong(summary: &str) -> lemonfiber_error::Problem {
+    lemonfiber_error::Problem::new(
+        lemonfiber_error::Code::new("TEST-1"),
         summary,
         "The thing did not happen",
-        lemonfiber_core::error::Remedy::new("Try again"),
+        lemonfiber_error::Remedy::new("Try again"),
     )
 }
 
@@ -253,7 +253,7 @@ fn a_check_the_install_made_worse_is_shown_at_both_readings() {
                             "providers.usenet",
                             Checked::Unverified {
                                 reason: "nothing answered".to_owned(),
-                                remedy: lemonfiber_core::error::Remedy::new("Try again"),
+                                remedy: lemonfiber_error::Remedy::new("Try again"),
                             },
                         ),
                         before: Some(Checked::Pass { note: None }),
@@ -330,7 +330,7 @@ fn every_way_a_check_can_read_has_a_sentence_of_its_own() {
     assert_eq!(
         stood(Some(&Checked::Unverified {
             reason: "nothing answered".to_owned(),
-            remedy: lemonfiber_core::error::Remedy::new("Try again"),
+            remedy: lemonfiber_error::Remedy::new("Try again"),
         })),
         "could not be told: nothing answered"
     );

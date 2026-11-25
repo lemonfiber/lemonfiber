@@ -74,6 +74,11 @@ crates/
 │                              detail passes through, retry wording, plurals.
 │                              Depends on nothing of ours.
 │
+├── lemonfiber-words/     lib — how a value with no stack behind it is worded:
+│                              text made safe for a terminal, sizes, ratios, waits,
+│                              age limits, a hand-edited setting, the glossary. The
+│                              surfaces name it directly. Depends on the error model.
+│
 ├── lemonfiber-bundled/   lib — the embedded stack's manifest, assembled from its
 │                              files when it is built. Depends on nothing of ours at
 │                              run time; its build reads the manifest crate.

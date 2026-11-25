@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use super::{candidates, ratio_reads, Standing, RATIO_CONSEQUENCE};
+use super::{candidates, Standing, RATIO_CONSEQUENCE};
 use crate::ports::filesystem::Identity;
 use crate::ports::occupancy::Occupant;
 use crate::ports::service::Seeded;
@@ -140,19 +140,6 @@ fn what_the_operator_asked_to_be_left_alone_is_never_offered() {
                 .as_deref()
                 .is_some_and(|said| said.contains("left alone"))),
         "it says whose instruction it is following: {one:?}"
-    );
-}
-
-#[test]
-fn a_ratio_reads_as_the_client_would_write_it() {
-    assert_eq!(ratio_reads(175).as_deref(), Some("1.75"));
-    assert_eq!(ratio_reads(0).as_deref(), Some("0.00"));
-    assert_eq!(ratio_reads(7).as_deref(), Some("0.07"));
-    assert_eq!(ratio_reads(1_000).as_deref(), Some("10.00"));
-    assert_eq!(
-        ratio_reads(u32::MAX),
-        None,
-        "a torrent that downloaded nothing has no ratio to divide"
     );
 }
 

@@ -13,7 +13,6 @@ mod offered;
 mod watching;
 
 use lemonfiber_core::app::Outcome;
-use lemonfiber_core::glossary::Vocabulary;
 use lemonfiber_core::model::{
     AdoptReport, AlertReport, BesideReport, CatalogueReport, CataloguedService, DoctorReport,
     FormsReport, HistoryReport, HostingReport, HouseholdReport, ImportReport, LifecycleReport,
@@ -22,6 +21,7 @@ use lemonfiber_core::model::{
     StuckReport, SupervisionReport, TraceReport, UpgradeReport, VersionReport,
 };
 use lemonfiber_core::scheduled::kept::ScheduledRun;
+use lemonfiber_words::glossary::Vocabulary;
 
 use built::{
     a_credential_inventory, a_front_door, a_reckoning, a_removal, a_repair, a_settings_report,
@@ -156,7 +156,7 @@ fn diagnosing() -> Vec<Outcome> {
             }],
             beyond: vec![lemonfiber_core::repair::run::Beyond {
                 check: "vpn.killswitch".to_owned(),
-                remedy: lemonfiber_core::error::Remedy::new("ask for help"),
+                remedy: lemonfiber_error::Remedy::new("ask for help"),
             }],
             acted: true,
         }),

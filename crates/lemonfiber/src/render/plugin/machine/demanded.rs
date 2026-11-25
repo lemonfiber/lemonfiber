@@ -1,8 +1,8 @@
 //! What asking for one of a plugin's demand recipes came to, on a terminal.
 
-use lemonfiber_core::error::Came;
 use lemonfiber_core::plugin::Demand;
-use lemonfiber_core::text::plain;
+use lemonfiber_error::Came;
+use lemonfiber_words::text::plain;
 
 use super::super::super::Lines;
 

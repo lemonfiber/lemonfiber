@@ -1,5 +1,3 @@
-use lemonfiber_core::app::answered_under;
-
 use super::{every, Read};
 use crate::read::table::{
     self, Wanted, ASKABLE_POSTER, BACKDROP, BUNDLE, LOGS, OFFERED, POSTER, REQUEST_POSTER,
@@ -143,7 +141,7 @@ fn however_a_read_is_asked_it_answers_under_a_published_kind() {
             let Ok(command) = table::named(read.path, given.clone()) else {
                 continue;
             };
-            for kind in answered_under(&command) {
+            for kind in command.answered_under() {
                 assert!(
                     read.kinds.contains(&kind.as_str()),
                     "{} answers under {kind} and is not published under it",

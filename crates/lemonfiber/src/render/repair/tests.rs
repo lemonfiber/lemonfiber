@@ -1,7 +1,7 @@
-use lemonfiber_core::error::Remedy;
 use lemonfiber_core::instant::Instant;
 use lemonfiber_core::repair::run::{Beyond, Mended, Report};
 use lemonfiber_core::repair::{agreement, Outcome, Repair};
+use lemonfiber_error::Remedy;
 
 use super::{mended, reversed, Reversal};
 use lemonfiber_core::journal::{Action, Undo};

@@ -29,8 +29,8 @@
 
 use serde::Serialize;
 
-use crate::error::codes::word::UNRECOGNISED;
-use crate::error::{Code, Problem, Remedy};
+use lemonfiber_error::codes::word::UNRECOGNISED;
+use lemonfiber_error::{Code, Problem, Remedy};
 
 /// Every refusal asking what a word means answers with, which a client names by its code.
 pub const REFUSALS: [Code; 1] = [UNRECOGNISED];

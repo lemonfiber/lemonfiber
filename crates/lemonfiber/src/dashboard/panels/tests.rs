@@ -129,8 +129,8 @@ fn a_request_service_that_was_not_read_says_so_rather_than_looking_empty() {
         rehearsed: false,
         members: Vec::new(),
         available: false,
-        findings: vec![lemonfiber_core::error::household::Obstacle::new(
-            lemonfiber_core::error::codes::quota::UNREACHABLE,
+        findings: vec![lemonfiber_error::household::Obstacle::new(
+            lemonfiber_error::codes::quota::UNREACHABLE,
             "seerr did not answer",
         )],
         noted: Vec::new(),
@@ -526,7 +526,7 @@ fn an_alert(summary: &str, moment: lemonfiber_core::alert::Moment) -> Alert {
         kind: "service.down".to_owned(),
         notification: lemonfiber_core::alert::Notification::Problem,
         moment,
-        severity: lemonfiber_core::error::Severity::Warning,
+        severity: lemonfiber_error::Severity::Warning,
         summary: summary.to_owned(),
         meaning: "nothing that needs it is working".to_owned(),
         remedies: vec!["start it".to_owned()],

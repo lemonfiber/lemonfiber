@@ -13,6 +13,11 @@ publish = false
 
 [dependencies]
 lemonfiber-core = { workspace = true }
+# The wording the core shares, the codes and plurals its problems are told in, and
+# the ports' own helpers, named where they live rather than through the core.
+lemonfiber-error = { workspace = true }
+lemonfiber-ports = { workspace = true }
+lemonfiber-words = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 # Reading a query string, which the router carries no parser for: what this surface

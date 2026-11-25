@@ -78,8 +78,8 @@ fn every_command_says_what_it_disturbs_before_it_disturbs_it() {
 /// prevent; without one, a new command stops the build until somebody has decided.
 #[test]
 fn what_a_command_disturbs_is_answered_without_a_wildcard() {
-    let Some(asked) = body("crates/lemonfiber-core/src/app/rehearsal.rs", "asked") else {
-        unreachable!("every command is described by `rehearsal::asked`");
+    let Some(asked) = body("crates/lemonfiber-core/src/app/rehearsal.rs", "described") else {
+        unreachable!("every command is described by `Command::asked`");
     };
     let arms: Vec<&Pat> = asked
         .stmts

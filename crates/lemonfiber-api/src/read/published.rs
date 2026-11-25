@@ -9,7 +9,6 @@
 
 use serde::Serialize;
 
-use lemonfiber_core::app::answered_under;
 use lemonfiber_core::model::kind::Kind;
 
 use super::logs;
@@ -100,7 +99,7 @@ fn answering(read: &str) -> Vec<Kind> {
         forking()
             .into_iter()
             .filter_map(|given| table::named(read, given).ok())
-            .flat_map(|command| answered_under(&command).iter().copied())
+            .flat_map(|command| command.answered_under().iter().copied())
             .collect()
     };
     kinds.sort_by_key(|kind| kind.as_str());

@@ -15,6 +15,7 @@ core:
           - 'crates/lemonfiber-fixtures/**'
           - 'crates/lemonfiber-ports/**'
           - 'crates/lemonfiber-testing/**'
+          - 'crates/lemonfiber-words/**'
 cli:
   - changed-files:
       - any-glob-to-any-file: ['crates/lemonfiber/**']

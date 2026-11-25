@@ -40,7 +40,7 @@ pub(super) async fn demand(
         return Err(Box::new(no_such_recipe(&installed, recipe)));
     };
     let offer = offering::demanding(&installed, &reading);
-    let asked = crate::plugin::approvals(std::slice::from_ref(&reading));
+    let asked = crate::plugin::Recipe::approvals(std::slice::from_ref(&reading));
     let acting = offering::acting(ctx, consent, plugin, &offer, &offering::DEMANDING, &asked)?;
     let mut demand = Demand {
         plugin: plugin.to_owned(),

@@ -1,4 +1,4 @@
-use super::{notes, told, Record, Requirement, State, Summary, CARRIED, RECORD_DIR};
+use super::{notes, Notes, Record, Requirement, State, Summary, CARRIED, RECORD_DIR};
 
 /// The newer of two releases, taken back.
 const NEWER: &str = r##"{
@@ -181,7 +181,7 @@ fn the_record_this_build_carries_does_not_claim_a_release_after_it() {
 
 #[test]
 fn a_build_whose_release_the_record_holds_is_current() {
-    let said = told(two().as_ref(), "0.2.0");
+    let said = Notes::told(two().as_ref(), "0.2.0");
     assert_eq!(said.state, State::Current);
     assert_eq!(
         said.running.map(|release| release.withdrawn),
@@ -196,35 +196,44 @@ fn a_build_cut_ahead_of_its_release_is_pending_rather_than_stale() {
     // for a release that has not happened, which is the lag `Pending` names.
     // Read whole, the version is not a dotted run of numbers and every comparison
     // answers untellable, which would have called an honest record a contradiction.
-    assert_eq!(told(two().as_ref(), "0.3.0-pre.1").state, State::Pending);
+    assert_eq!(
+        Notes::told(two().as_ref(), "0.3.0-pre.1").state,
+        State::Pending
+    );
 }
 
 #[test]
 fn a_version_that_is_not_one_is_still_a_contradiction() {
     // Dropping a suffix from something that was never a version leaves something
     // that still is not, so the answer this exists to give is unchanged.
-    assert_eq!(told(two().as_ref(), "not-a-version").state, State::Stale);
-    assert_eq!(told(two().as_ref(), "garbage").state, State::Stale);
+    assert_eq!(
+        Notes::told(two().as_ref(), "not-a-version").state,
+        State::Stale
+    );
+    assert_eq!(Notes::told(two().as_ref(), "garbage").state, State::Stale);
 }
 
 #[test]
 fn a_build_the_record_has_no_release_for_is_pending() {
-    assert_eq!(told(two().as_ref(), "0.3.0").state, State::Pending);
+    assert_eq!(Notes::told(two().as_ref(), "0.3.0").state, State::Pending);
 }
 
 #[test]
 fn a_record_claiming_a_release_after_this_build_is_stale() {
-    assert_eq!(told(two().as_ref(), "0.1.0").state, State::Stale);
+    assert_eq!(Notes::told(two().as_ref(), "0.1.0").state, State::Stale);
 }
 
 #[test]
 fn a_version_the_record_cannot_be_ordered_against_is_stale() {
-    assert_eq!(told(two().as_ref(), "not-a-version").state, State::Stale);
+    assert_eq!(
+        Notes::told(two().as_ref(), "not-a-version").state,
+        State::Stale
+    );
 }
 
 #[test]
 fn a_record_that_could_not_be_read_is_stale_and_empty() {
-    let said = told(None, "0.2.0");
+    let said = Notes::told(None, "0.2.0");
     assert_eq!(said.state, State::Stale);
     assert_eq!(said.running, None);
     assert_eq!(said.releases, Vec::new());
@@ -233,7 +242,7 @@ fn a_record_that_could_not_be_read_is_stale_and_empty() {
 
 #[test]
 fn every_release_is_listed_whether_or_not_it_is_the_one_being_read() {
-    let said = told(two().as_ref(), "0.2.0");
+    let said = Notes::told(two().as_ref(), "0.2.0");
     assert_eq!(
         said.releases
             .iter()
@@ -254,7 +263,7 @@ fn every_release_is_listed_whether_or_not_it_is_the_one_being_read() {
 
 #[test]
 fn only_the_requirements_the_release_being_read_cites_travel_with_it() {
-    let said = told(two().as_ref(), "0.2.0");
+    let said = Notes::told(two().as_ref(), "0.2.0");
     assert_eq!(
         said.requirements.keys().cloned().collect::<Vec<_>>(),
         vec!["A6-R1".to_owned()]
@@ -262,7 +271,7 @@ fn only_the_requirements_the_release_being_read_cites_travel_with_it() {
     // The one the other release cites is in the record and not in this reading.
     assert_eq!(said.requirements.get("A6-R9"), None);
     // And a release whose entries cite nothing carries none of them.
-    assert!(told(two().as_ref(), "0.1.0").requirements.is_empty());
+    assert!(Notes::told(two().as_ref(), "0.1.0").requirements.is_empty());
 }
 
 #[test]

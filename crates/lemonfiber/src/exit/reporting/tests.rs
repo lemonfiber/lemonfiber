@@ -1,8 +1,8 @@
 use super::reported;
-use lemonfiber_core::error::codes::handoff::{NOBODY_NAMED, NOT_SET_UP};
-use lemonfiber_core::error::codes::life::ALREADY_WORKING;
-use lemonfiber_core::error::codes::pair::{NOT_SERVED, NO_ADDRESS, NO_CERTIFICATE};
-use lemonfiber_core::error::{Code, Problem, Remedy};
+use lemonfiber_error::codes::handoff::{NOBODY_NAMED, NOT_SET_UP};
+use lemonfiber_error::codes::life::ALREADY_WORKING;
+use lemonfiber_error::codes::pair::{NOT_SERVED, NO_ADDRESS, NO_CERTIFICATE};
+use lemonfiber_error::{Code, Problem, Remedy};
 
 /// A failure carries text this product did not write, and a terminal is not a
 /// text box: one escape clears the screen, another writes over the line just

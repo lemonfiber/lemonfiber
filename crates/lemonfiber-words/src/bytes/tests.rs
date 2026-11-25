@@ -1,4 +1,4 @@
-use super::{a_second, humanize, read};
+use super::{a_second, decimal, humanize, read};
 
 #[test]
 fn a_figure_this_printed_can_be_handed_back_to_it() {
@@ -40,4 +40,11 @@ fn a_byte_count_reads_in_the_unit_a_person_would_use() {
     // the tenth that rounds up carries into the whole rather than showing 1.10.
     assert_eq!(humanize(2 * 1024 * 1024 * 1024 - 1), "2.0 GiB");
     assert_eq!(humanize(1024 * 1024 * 1024 + 550 * 1024 * 1024), "1.5 GiB");
+}
+
+#[test]
+fn sizes_read_in_the_units_the_rest_of_the_product_quotes() {
+    assert_eq!(decimal(2_100_000_000), "2.1 GB");
+    assert_eq!(decimal(999_000_000), "999 MB");
+    assert_eq!(decimal(0), "0 MB");
 }

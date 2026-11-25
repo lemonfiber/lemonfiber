@@ -16,10 +16,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
-use lemonfiber_core::error::household::Obstacle;
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::kind::Kind;
 use lemonfiber_core::model::{HeldReport, HouseholdReport, PlayingReport};
+use lemonfiber_error::household::Obstacle;
+use lemonfiber_error::Problem;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 

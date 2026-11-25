@@ -3,7 +3,7 @@
 //! session or device that asked alone, and the codes one source may ask for limited.
 
 use lemonfiber_api::admission::coded::CODE;
-use lemonfiber_core::error::codes::admit::{
+use lemonfiber_error::codes::admit::{
     CODE_NOT_WAITING, NOT_A_CODE_REQUEST, SIGNS_IN_BY_PASSWORD, TOO_MANY_CODES,
 };
 use lemonfiber_fixtures::household::{APPROVE_AT, CODE as SHOWN, CODE_ID};

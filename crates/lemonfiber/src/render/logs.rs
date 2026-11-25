@@ -1,6 +1,6 @@
 //! What reading the logs came to.
 
-use lemonfiber_core::plural::s;
+use lemonfiber_error::plural::s;
 
 use super::Lines;
 

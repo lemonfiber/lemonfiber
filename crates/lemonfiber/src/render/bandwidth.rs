@@ -14,7 +14,7 @@
 use lemonfiber_core::bandwidth::{
     Answer, Cap, Capacity, Held, Holding, Metered, Pauses, Pausing, Reached, Sharing,
 };
-use lemonfiber_core::bytes::{a_second, humanize};
+use lemonfiber_words::bytes::{a_second, humanize};
 
 use super::Lines;
 

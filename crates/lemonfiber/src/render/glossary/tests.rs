@@ -2,7 +2,7 @@ use super::{
     explanation, footnotes, known, settle, settle_known, vocabulary, wanted, wrapped, WIDTH,
 };
 use lemonfiber_core::acknowledged::Acknowledged;
-use lemonfiber_core::glossary::{explain, Term};
+use lemonfiber_words::glossary::{explain, Term};
 
 /// One word, or a word that stands for the table having lost it.
 ///
@@ -184,7 +184,7 @@ fn the_block_says_where_the_longer_form_is() {
 fn no_line_of_a_block_runs_past_a_terminal() {
     // Every word at once, which is the worst case: it leaves the longest list of
     // words the block named without explaining.
-    let every: Vec<&str> = lemonfiber_core::glossary::TERMS
+    let every: Vec<&str> = lemonfiber_words::glossary::TERMS
         .iter()
         .map(|term| term.word)
         .collect();
@@ -248,7 +248,7 @@ fn a_word_with_no_longer_form_still_answers() {
 /// asking what there is to ask about is answered with the whole table.
 #[test]
 fn asking_what_can_be_explained_lists_every_word_with_its_sentence() {
-    let listed = lemonfiber_core::glossary::vocabulary();
+    let listed = lemonfiber_words::glossary::vocabulary();
     let said = vocabulary(&listed).text();
 
     assert!(

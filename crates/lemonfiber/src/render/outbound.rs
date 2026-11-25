@@ -12,7 +12,7 @@
 //! to have it counted against the product that started it.
 
 use lemonfiber_core::config::OFFLINE_KEY;
-use lemonfiber_core::outbound::{nothing_configured, Elsewhere, Leaving, OnBehalf, Outbound};
+use lemonfiber_core::outbound::{Elsewhere, Leaving, OnBehalf, Outbound, NOTHING_CONFIGURED};
 
 use super::Lines;
 
@@ -53,7 +53,7 @@ fn ours(entry: &Outbound) -> Lines {
 /// Where a request goes, or that there is nowhere for it to go.
 fn where_to(entry: &Outbound) -> String {
     if entry.destination.is_empty() {
-        return nothing_configured().to_owned();
+        return NOTHING_CONFIGURED.to_owned();
     }
     entry.destination.join(", ")
 }

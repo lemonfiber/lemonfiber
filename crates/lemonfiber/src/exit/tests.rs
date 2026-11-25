@@ -1,6 +1,5 @@
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
-use lemonfiber_core::error::{Code, Problem, Remedy, Severity, State};
 use lemonfiber_core::model::WalkthroughReport;
 use lemonfiber_core::model::{
     Disposition, DoctorReport, LifecycleReport, MusicChoice, MusicReport, QualityReport,
@@ -14,6 +13,7 @@ use lemonfiber_core::seed::{
 use lemonfiber_core::stored::{stored, Left, Removal};
 use lemonfiber_core::walkthrough::{Shape, State as WalkState};
 use lemonfiber_core::wizard::{Phase, Step};
+use lemonfiber_error::{Code, Problem, Remedy, Severity, State};
 
 use lemonfiber_core::config::paths::Paths;
 use std::path::Path;
@@ -75,37 +75,37 @@ fn a_problem_the_operator_wrote_is_told_apart_from_one_they_can_only_report() {
         exit_code(&it)
     };
     assert_eq!(
-        coded(lemonfiber_core::error::codes::stack::STACK_INVALID),
+        coded(lemonfiber_error::codes::stack::STACK_INVALID),
         VALIDATION
     );
     // A file that will not parse and a name this build does not know are both
     // things the operator wrote, and a script that has to fix its own input
     // learns nothing from the same code it gets for a service being down.
     assert_eq!(
-        coded(lemonfiber_core::error::codes::stack::STACK_MALFORMED),
+        coded(lemonfiber_error::codes::stack::STACK_MALFORMED),
         VALIDATION
     );
     assert_eq!(
-        coded(lemonfiber_core::error::codes::stack::STACK_UNRECOGNISED),
+        coded(lemonfiber_error::codes::stack::STACK_UNRECOGNISED),
         VALIDATION
     );
     // A stack whose files are not laid out as the contract says is the operator's own
     // writing too.
     assert_eq!(
-        coded(lemonfiber_core::error::codes::stack::STACK_UNASSEMBLED),
+        coded(lemonfiber_error::codes::stack::STACK_UNASSEMBLED),
         VALIDATION
     );
     assert_eq!(
-        coded(lemonfiber_core::error::codes::config::CONFIG_UNREADABLE),
+        coded(lemonfiber_error::codes::config::CONFIG_UNREADABLE),
         VALIDATION
     );
     assert_eq!(
-        coded(lemonfiber_core::error::codes::docker::ENGINE_UNREACHABLE),
+        coded(lemonfiber_error::codes::docker::ENGINE_UNREACHABLE),
         super::PREFLIGHT
     );
     assert_eq!(
-        coded(lemonfiber_core::error::codes::life::NEVER_SETTLED),
-        lemonfiber_core::error::codes::Leaves::NeverSettled.exit()
+        coded(lemonfiber_error::codes::life::NEVER_SETTLED),
+        lemonfiber_error::codes::Leaves::NeverSettled.exit()
     );
     assert_eq!(coded(Code::new("SOMETHING-ELSE")), FAILURE);
 }

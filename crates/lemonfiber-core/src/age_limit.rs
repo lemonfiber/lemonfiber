@@ -38,7 +38,7 @@ pub struct Step {
 /// it. No limit at all is not on this list, because it is the absence of a limit rather
 /// than a step among them — a surface that offers it puts it where an answer that
 /// changes nothing belongs, which on a command line is leaving the flag out.
-const OFFERED: &[Step] = &[
+pub const OFFERED: &[Step] = &[
     Step {
         age: 0,
         suits: "nothing the media server rates for an older audience",
@@ -61,12 +61,6 @@ const OFFERED: &[Step] = &[
     },
 ];
 
-/// The steps offered, in the order they are read.
-#[must_use]
-pub fn steps() -> &'static [Step] {
-    OFFERED
-}
-
 /// What a limit here is, and what it is not — said wherever one is set or reported.
 ///
 /// **Overstating this is worse than an accurate modest claim**, because a parent may
@@ -78,20 +72,6 @@ pub fn steps() -> &'static [Step] {
 pub(crate) const A_FILTER_NOT_A_LOCK: &str = "These limits are a content filter, not a \
     security boundary: they decide what the media server offers an account, and \
     somebody with the run of the home network has other ways at the same files.";
-
-/// How an age limit reads, given the number the media server keeps it as.
-///
-/// Nought is said in words rather than as a figure, because "nothing above about 0" is
-/// a sentence about a number and this is a sentence about a household. Every other age
-/// is said as the age, whether or not it is one of the steps offered.
-#[must_use]
-pub fn reading(age: Option<u32>) -> String {
-    match age {
-        None => "anything".to_owned(),
-        Some(0) => "only what suits everyone".to_owned(),
-        Some(age) => format!("nothing above about {age}"),
-    }
-}
 
 #[cfg(test)]
 mod tests;

@@ -113,10 +113,9 @@ pub use command::{
     Teardown, Tracing, Viewing, Whom, Wishing, HOSTABLE,
 };
 pub(crate) mod outcome;
-pub use answering::answered_under;
 pub use ctx::{Ctx, PATIENCE};
 pub use outcome::Outcome;
-pub use rehearsal::{asked, carried, permitted, Asked, Rehearsal};
+pub use rehearsal::{carried, permitted, Asked, Rehearsal};
 pub use setup::SetupAction;
 
 pub use engine::{

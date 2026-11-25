@@ -165,7 +165,7 @@ fn unescaped_quotes(line: &str) -> Vec<usize> {
 fn no_other_services_word_is_written_as_if_it_were_ours() {
     let mut borrowed_words: Vec<String> = Vec::new();
     for (path, number, said) in shipped_prose() {
-        for (theirs, ours) in lemonfiber_core::glossary::borrowed(&said) {
+        for (theirs, ours) in lemonfiber_words::glossary::borrowed(&said) {
             borrowed_words.push(format!("{path}:{number}: `{theirs}` — say `{ours}`"));
         }
     }
@@ -271,7 +271,7 @@ fn unexplained_acronyms(said: &str) -> Vec<String> {
         .filter(|word| !word.contains('='))
         .flat_map(capitals)
         .filter(|short| !ORDINARY.contains(&short.as_str()))
-        .filter(|short| lemonfiber_core::glossary::explain(short).is_none())
+        .filter(|short| lemonfiber_words::glossary::explain(short).is_none())
         .collect()
 }
 

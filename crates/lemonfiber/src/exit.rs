@@ -24,9 +24,9 @@ pub(crate) use reports::{repairing, reset_exit, seed_exit, upgrade_exit};
 
 use lemonfiber_core::app::Outcome;
 use lemonfiber_core::doctor::Overall;
-use lemonfiber_core::error::codes::{leaves, Leaves};
-use lemonfiber_core::error::Problem;
 use lemonfiber_core::model::{Disposition, HandoffState, MusicReport, Triggered, WiringReport};
+use lemonfiber_error::codes::{leaves, Leaves};
+use lemonfiber_error::Problem;
 
 /// A general failure. Codes are meaningful so a script can branch on *why*
 /// something failed rather than merely on whether it did.

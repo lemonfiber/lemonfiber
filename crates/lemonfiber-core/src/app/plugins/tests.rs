@@ -291,7 +291,7 @@ pub(super) async fn answered(
                 .map(|demand| std::slice::from_ref(&demand.recipe))
         })
         .map(|recipes| {
-            crate::plugin::approvals(recipes)
+            crate::plugin::Recipe::approvals(recipes)
                 .into_iter()
                 .map(str::to_owned)
                 .collect()

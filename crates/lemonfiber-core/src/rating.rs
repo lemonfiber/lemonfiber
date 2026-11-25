@@ -55,6 +55,41 @@ pub struct Rated {
     pub fell_back: bool,
 }
 
+impl Rated {
+    /// The same sentence, from a reading already taken.
+    ///
+    /// Apart from [`reading`] because the two callers hold different things: the surface
+    /// that *sets* a limit has the media server in front of it and the surface that
+    /// *reports* one has only what a report carried. Both say it in these words, which is
+    /// the point of there being one function — a household list naming a limit differently
+    /// from the chooser that set it is two surfaces disagreeing about one setting.
+    #[must_use]
+    pub fn said(&self, age: u32) -> String {
+        let allows =
+            (!self.allows.is_empty()).then(|| format!(" — allows {}", self.allows.join(", ")));
+        let holds_back = (!self.holds_back.is_empty()).then(|| {
+            format!(
+                "{} holds back {}",
+                if self.allows.is_empty() { " —" } else { ";" },
+                self.holds_back.join(", ")
+            )
+        });
+        // Always said where it applies, and it applies whenever the table was empty: the
+        // mapping brackets every age on at least one side, so there is no reading from it
+        // that carries no certificate to attribute.
+        let attributed = self.fell_back.then(|| NOT_THIS_SERVERS.to_owned());
+        [
+            Some(lemonfiber_words::age::reading(Some(age))),
+            allows,
+            holds_back,
+            attributed,
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+}
+
 /// The mapping used where the media server's own table names nothing.
 ///
 /// One certificate per step [`crate::age_limit`] offers, so no step is ever bare. They
@@ -147,42 +182,9 @@ fn at(table: &[(u32, &str)], age: Option<u32>) -> Vec<String> {
 #[must_use]
 pub fn reading(named: &[Certificate], age: Option<u32>) -> String {
     match age {
-        None => crate::age_limit::reading(None),
-        Some(age) => said(age, &rated(named, age)),
+        None => lemonfiber_words::age::reading(None),
+        Some(age) => rated(named, age).said(age),
     }
-}
-
-/// The same sentence, from a reading already taken.
-///
-/// Apart from [`reading`] because the two callers hold different things: the surface
-/// that *sets* a limit has the media server in front of it and the surface that
-/// *reports* one has only what a report carried. Both say it in these words, which is
-/// the point of there being one function — a household list naming a limit differently
-/// from the chooser that set it is two surfaces disagreeing about one setting.
-#[must_use]
-pub fn said(age: u32, rated: &Rated) -> String {
-    let allows =
-        (!rated.allows.is_empty()).then(|| format!(" — allows {}", rated.allows.join(", ")));
-    let holds_back = (!rated.holds_back.is_empty()).then(|| {
-        format!(
-            "{} holds back {}",
-            if rated.allows.is_empty() { " —" } else { ";" },
-            rated.holds_back.join(", ")
-        )
-    });
-    // Always said where it applies, and it applies whenever the table was empty: the
-    // mapping brackets every age on at least one side, so there is no reading from it
-    // that carries no certificate to attribute.
-    let attributed = rated.fell_back.then(|| NOT_THIS_SERVERS.to_owned());
-    [
-        Some(crate::age_limit::reading(Some(age))),
-        allows,
-        holds_back,
-        attributed,
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
 }
 
 #[cfg(test)]

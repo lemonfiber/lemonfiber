@@ -226,19 +226,21 @@ fn report(
         customised,
         overwritten,
         disposition,
-        offered: offered(),
+        offered: QualityOffered::all(),
         changes: None,
     }
 }
 
-/// Every preset, music format and media type a choice may be made from.
-#[must_use]
-pub fn offered() -> QualityOffered {
-    let owned = |words: &[&str]| words.iter().map(|word| (*word).to_owned()).collect();
-    QualityOffered {
-        presets: owned(&Preset::ALL.map(Preset::label)),
-        formats: owned(&Format::ALL.map(Format::label)),
-        media_types: owned(&crate::ports::media::chosen_for()),
+impl QualityOffered {
+    /// Every preset, music format and media type a choice may be made from.
+    #[must_use]
+    pub fn all() -> Self {
+        let owned = |words: &[&str]| words.iter().map(|word| (*word).to_owned()).collect();
+        Self {
+            presets: owned(&Preset::ALL.map(Preset::label)),
+            formats: owned(&Format::ALL.map(Format::label)),
+            media_types: owned(&crate::ports::media::chosen_for()),
+        }
     }
 }
 

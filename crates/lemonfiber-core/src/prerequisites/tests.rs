@@ -1,9 +1,9 @@
-use super::{prerequisites, Cost};
+use super::{Cost, PrerequisiteMap};
 use crate::config::Protocols;
 
 /// The identifiers a map lists, in order.
 fn ids(protocols: Protocols) -> Vec<&'static str> {
-    prerequisites(protocols)
+    PrerequisiteMap::of(protocols)
         .items
         .into_iter()
         .map(|item| item.id)
@@ -12,7 +12,7 @@ fn ids(protocols: Protocols) -> Vec<&'static str> {
 
 #[test]
 fn nothing_chosen_needs_nothing_bought() {
-    let map = prerequisites(Protocols::none());
+    let map = PrerequisiteMap::of(Protocols::none());
     assert!(map.items.is_empty());
     let note = map.library_only.unwrap_or_default();
     assert!(
@@ -42,7 +42,7 @@ fn a_chosen_protocol_adds_only_its_own_prerequisites() {
 
 #[test]
 fn a_required_map_does_not_repeat_the_zero_cost_statement() {
-    let map = prerequisites(Protocols {
+    let map = PrerequisiteMap::of(Protocols {
         usenet: true,
         torrent: false,
     });
@@ -68,7 +68,7 @@ fn both_protocols_list_the_provider_before_the_indexer_that_searches_it() {
 
 #[test]
 fn the_indexer_is_told_apart_from_the_provider_it_is_confused_with() {
-    let map = prerequisites(Protocols {
+    let map = PrerequisiteMap::of(Protocols {
         usenet: true,
         torrent: false,
     });
@@ -86,7 +86,7 @@ fn the_indexer_is_told_apart_from_the_provider_it_is_confused_with() {
 
 #[test]
 fn the_vpn_states_port_forwarding_and_its_consequence() {
-    let map = prerequisites(Protocols {
+    let map = PrerequisiteMap::of(Protocols {
         usenet: false,
         torrent: true,
     });
@@ -119,7 +119,7 @@ fn every_prerequisite_explains_itself_and_costs_itself() {
             torrent: false,
         },
     ] {
-        let items = prerequisites(protocols).items;
+        let items = PrerequisiteMap::of(protocols).items;
         // A protocol that needs nothing is an answer this file has a shape for —
         // `library_only` — so a set of items that came back empty here means the
         // walk below asked nothing of anything.
@@ -147,7 +147,7 @@ fn guidance_names_no_vendors_and_links_nowhere() {
     // Recommending or linking a provider is exactly what this must not do;
     // criteria describe the choice instead. A URL is the easiest way that
     // rule breaks, so it is the one asserted against.
-    let items = prerequisites(Protocols::both()).items;
+    let items = PrerequisiteMap::of(Protocols::both()).items;
     assert!(!items.is_empty(), "nothing was checked for a vendor's name");
     for item in items {
         let corpus = format!("{} {} {}", item.what, item.why, item.criteria.join(" "));
@@ -168,7 +168,7 @@ fn each_cost_band_reads_as_something() {
 
 #[test]
 fn a_map_serialises_with_its_choices_and_its_items() {
-    let map = prerequisites(Protocols {
+    let map = PrerequisiteMap::of(Protocols {
         usenet: false,
         torrent: true,
     });

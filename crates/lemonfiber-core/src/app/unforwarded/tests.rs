@@ -1,4 +1,4 @@
-use super::{at_setup, on_change, COST};
+use super::{on_change, COST};
 use crate::config::{PortForward, Protocols, Supported};
 
 /// A forwarding configuration.
@@ -12,10 +12,7 @@ fn forwarding(enabled: bool, provider: Option<&str>) -> PortForward {
 #[test]
 fn a_torrent_stack_with_no_forwarded_port_is_told_what_it_costs() {
     assert_eq!(
-        at_setup(
-            Protocols::both().into(),
-            &forwarding(false, Some("mullvad"))
-        ),
+        forwarding(false, Some("mullvad")).unforwarded_at_setup(Protocols::both().into()),
         Some(COST)
     );
 }
@@ -23,7 +20,7 @@ fn a_torrent_stack_with_no_forwarded_port_is_told_what_it_costs() {
 #[test]
 fn a_stack_that_forwards_a_port_is_told_nothing() {
     assert_eq!(
-        at_setup(Protocols::both().into(), &forwarding(true, Some("pia"))),
+        forwarding(true, Some("pia")).unforwarded_at_setup(Protocols::both().into()),
         None
     );
 }
@@ -36,7 +33,10 @@ fn a_stack_that_does_not_torrent_is_told_nothing_either() {
         usenet: true,
         torrent: false,
     };
-    assert_eq!(at_setup(usenet.into(), &forwarding(false, None)), None);
+    assert_eq!(
+        forwarding(false, None).unforwarded_at_setup(usenet.into()),
+        None
+    );
 }
 
 #[test]
@@ -45,7 +45,10 @@ fn a_stack_torrenting_without_a_vpn_is_told_nothing_about_a_vpn_port() {
         protocols: Protocols::both(),
         vpn_declined: true,
     };
-    assert_eq!(at_setup(unguarded, &forwarding(false, None)), None);
+    assert_eq!(
+        forwarding(false, None).unforwarded_at_setup(unguarded),
+        None
+    );
 }
 
 #[test]

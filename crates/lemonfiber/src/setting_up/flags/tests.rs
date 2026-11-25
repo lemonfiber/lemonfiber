@@ -6,7 +6,7 @@ use lemonfiber_core::model::StorageFinding;
 use crate::setting_up::{CredentialChoice, Prompt, ProviderEntry};
 use lemonfiber_core::config::Protocols;
 
-use lemonfiber_core::prerequisites::prerequisites;
+use lemonfiber_core::prerequisites::PrerequisiteMap;
 use lemonfiber_core::validate::Validation;
 use lemonfiber_core::wizard::{Library, Step};
 
@@ -87,7 +87,7 @@ fn a_flag_run_answers_from_what_it_was_given() {
         CredentialChoice::Proceed
     ));
     // The interactive courtesies are nothing at all without a person.
-    prompt.prerequisites(&prerequisites(Protocols::both()));
+    prompt.prerequisites(&PrerequisiteMap::of(Protocols::both()));
     prompt.hardlinks(Path::new("/data"), None);
     prompt.credential_valid("Prowlarr");
 }

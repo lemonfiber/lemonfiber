@@ -1,8 +1,8 @@
 //! What the stack's run-and-exit services last did.
 
 use lemonfiber_core::model::ScheduledService;
-use lemonfiber_core::plural::s;
-use lemonfiber_core::text::plain;
+use lemonfiber_error::plural::s;
+use lemonfiber_words::text::plain;
 
 use super::super::Lines;
 
