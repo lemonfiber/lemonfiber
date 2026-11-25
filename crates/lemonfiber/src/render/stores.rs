@@ -36,10 +36,11 @@ fn listed(report: &SettingsReport) -> Lines {
 
 fn setting_lines(setting: &SettingRead) -> Lines {
     let mut lines = Lines::default();
-    let holds = setting.value.as_deref().map_or_else(
-        || "at its default".to_owned(),
-        |value| format!("set to {value}"),
-    );
+    let holds = match (&setting.value, &setting.default) {
+        (Some(value), _) => format!("set to {value}"),
+        (None, Some(default)) => format!("at its default, {default}"),
+        (None, None) => "at its default".to_owned(),
+    };
     lines.spaced(format!(
         "  {}  {holds}  ({})",
         setting.name,

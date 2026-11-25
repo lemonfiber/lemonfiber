@@ -7,6 +7,7 @@
     "settings": [
       {
         "choices": null,
+        "default": "off",
         "environment": null,
         "name": "LEMONFIBER_BACKUP_LIMIT",
         "readers": [],
@@ -17,6 +18,7 @@
       },
       {
         "choices": null,
+        "default": "5",
         "environment": null,
         "name": "LEMONFIBER_COPY_STALLED_MINUTES",
         "readers": [],
@@ -27,6 +29,7 @@
       },
       {
         "choices": null,
+        "default": "https://duckduckgo.com/?q=",
         "environment": null,
         "name": "LEMONFIBER_DASHBOARD_SEARCH",
         "readers": [],
@@ -37,6 +40,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": null,
         "name": "LEMONFIBER_DEVICE_KEY_APPS",
         "readers": [],
@@ -47,6 +51,7 @@
       },
       {
         "choices": null,
+        "default": "12",
         "environment": null,
         "name": "LEMONFIBER_GUIDE_HOURS",
         "readers": [],
@@ -57,6 +62,7 @@
       },
       {
         "choices": null,
+        "default": "en-US",
         "environment": null,
         "name": "LEMONFIBER_LOCALE",
         "readers": [],
@@ -67,6 +73,7 @@
       },
       {
         "choices": null,
+        "default": "off",
         "environment": null,
         "name": "LEMONFIBER_SIGN_IN_CODES_BY_ADDRESS",
         "readers": [],
@@ -77,6 +84,7 @@
       },
       {
         "choices": null,
+        "default": "15",
         "environment": null,
         "name": "LEMONFIBER_SIGN_IN_CODES_PERIOD",
         "readers": [],
@@ -87,6 +95,7 @@
       },
       {
         "choices": null,
+        "default": "10",
         "environment": null,
         "name": "LEMONFIBER_SIGN_IN_CODES_PER_PERIOD",
         "readers": [],
@@ -97,6 +106,7 @@
       },
       {
         "choices": null,
+        "default": "3",
         "environment": null,
         "name": "LEMONFIBER_SIGN_IN_CODES_WAITING",
         "readers": [],
@@ -107,6 +117,7 @@
       },
       {
         "choices": null,
+        "default": "managed",
         "environment": null,
         "name": "PLEX_LINK_MODE",
         "readers": [],
@@ -117,6 +128,7 @@
       },
       {
         "choices": null,
+        "default": "home.local",
         "environment": "DOMAIN",
         "name": "domain",
         "readers": [],
@@ -127,6 +139,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "FLARESOLVERR_LOG_LEVEL",
         "name": "flaresolverr:log-level",
         "readers": [
@@ -146,6 +159,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": null,
         "name": "gluetun:addresses",
         "readers": [
@@ -169,6 +183,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "VPN_COUNTRIES",
         "name": "gluetun:countries",
         "readers": [
@@ -188,6 +203,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": null,
         "name": "gluetun:endpoint-ip",
         "readers": [
@@ -211,6 +227,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": null,
         "name": "gluetun:endpoint-key",
         "readers": [
@@ -234,6 +251,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": null,
         "name": "gluetun:endpoint-port",
         "readers": [
@@ -275,6 +293,7 @@
             "value": "on"
           }
         ],
+        "default": null,
         "environment": "VPN_PORT_FORWARDING",
         "name": "gluetun:port-forwarding",
         "readers": [
@@ -468,6 +487,7 @@
             "value": "vyprvpn"
           }
         ],
+        "default": null,
         "environment": "VPN_PROVIDER",
         "name": "gluetun:provider",
         "readers": [
@@ -498,6 +518,7 @@
             "value": "openvpn"
           }
         ],
+        "default": null,
         "environment": null,
         "name": "gluetun:vpn-type",
         "readers": [
@@ -517,6 +538,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "HOMEPAGE_ALLOWED_HOSTS",
         "name": "homepage:allowed-hosts",
         "readers": [
@@ -536,6 +558,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "HOMEPAGE_VAR_LAN_HOST",
         "name": "lan-host",
         "readers": [
@@ -554,6 +577,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "RECYCLARR_CRON",
         "name": "recyclarr:cron",
         "readers": [
@@ -573,6 +597,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "SEERR_LOG_LEVEL",
         "name": "seerr:log-level",
         "readers": [
@@ -592,6 +617,7 @@
       },
       {
         "choices": null,
+        "default": null,
         "environment": "UMASK",
         "name": "unpackerr:umask",
         "readers": [

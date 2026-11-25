@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "default": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
     "environment": {
       "type": [
         "null|string"

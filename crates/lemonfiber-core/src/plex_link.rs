@@ -33,10 +33,9 @@ pub(crate) const FRONTED_CHANGE: &str = "the request service would resolve plex.
 pub(crate) const TRUSTED: &str = "NODE_EXTRA_CA_CERTS";
 
 /// How the request service is linked to Plex.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Mode {
     /// Its owner is its own managed account.
-    #[default]
     Managed,
     /// Its owner is the operator's own Plex account.
     Owner,
@@ -45,6 +44,9 @@ pub(crate) enum Mode {
 }
 
 impl Mode {
+    /// The mode where nothing is recorded.
+    pub(crate) const UNSET: Self = Self::Managed;
+
     /// Every mode, in the order the setting lists them.
     pub(crate) const ALL: [Self; 3] = [Self::Managed, Self::Owner, Self::Fronted];
 
@@ -76,7 +78,7 @@ impl Mode {
     /// The mode a recorded value leaves: `managed` where none is recorded.
     #[must_use]
     pub(crate) fn held(value: Option<&str>) -> Option<Self> {
-        value.map_or(Some(Self::Managed), Self::named)
+        value.map_or(Some(Self::UNSET), Self::named)
     }
 }
 
