@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a running copy copies, as its reading names it.",
+  "oneOf": [
+    {
+      "description": "Every service's configuration, plus lemonfiber's own and the stack.",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "const": "whole_stack"
+        }
+      },
+      "required": [
+        "scope"
+      ]
+    },
+    {
+      "description": "One named service's configuration alone.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The service whose configuration it copies.",
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "const": "service"
+        }
+      },
+      "required": [
+        "scope",
+        "name"
+      ]
+    },
+    {
+      "description": "An existing setup's own configuration.",
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The Compose project it copies, to the operator alone.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "const": "existing"
+        },
+        "trees": {
+          "description": "The host trees it copies, to the operator alone.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "Tree.json"
+          }
+        }
+      },
+      "required": [
+        "scope"
+      ]
+    }
+  ]
+}

@@ -3465,6 +3465,72 @@
         ],
         "type": "object"
       },
+      "CopiedScope": {
+        "description": "What a running copy copies, as its reading names it.",
+        "oneOf": [
+          {
+            "description": "Every service's configuration, plus lemonfiber's own and the stack.",
+            "properties": {
+              "scope": {
+                "const": "whole_stack",
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "One named service's configuration alone.",
+            "properties": {
+              "name": {
+                "description": "The service whose configuration it copies.",
+                "type": "string"
+              },
+              "scope": {
+                "const": "service",
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "An existing setup's own configuration.",
+            "properties": {
+              "project": {
+                "description": "The Compose project it copies, to the operator alone.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scope": {
+                "const": "existing",
+                "type": "string"
+              },
+              "trees": {
+                "description": "The host trees it copies, to the operator alone.",
+                "items": {
+                  "$ref": "#/components/schemas/Tree"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "scope"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "CopyWhat": {
         "description": "Whether a copy is a backup or a restore.",
         "oneOf": [
@@ -16667,129 +16733,60 @@
         "type": "object"
       },
       "RunningCopy": {
-        "allOf": [
+        "description": "A backup or restore running now.",
+        "oneOf": [
           {
-            "oneOf": [
-              {
-                "description": "Every service's configuration, plus lemonfiber's own and the stack.",
-                "properties": {
-                  "scope": {
-                    "const": "whole_stack",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "scope"
-                ],
-                "type": "object"
-              },
-              {
-                "description": "One named service's configuration alone.",
-                "properties": {
-                  "name": {
-                    "description": "The service whose configuration it copies.",
-                    "type": "string"
-                  },
-                  "scope": {
-                    "const": "service",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "scope",
-                  "name"
-                ],
-                "type": "object"
-              },
-              {
-                "description": "An existing setup's own configuration.",
-                "properties": {
-                  "project": {
-                    "description": "The Compose project it copies, to the operator alone.",
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "scope": {
-                    "const": "existing",
-                    "type": "string"
-                  },
-                  "trees": {
-                    "description": "The host trees it copies, to the operator alone.",
-                    "items": {
-                      "$ref": "#/components/schemas/Tree"
-                    },
-                    "type": [
-                      "array",
-                      "null"
-                    ]
-                  }
-                },
-                "required": [
-                  "scope"
-                ],
-                "type": "object"
+            "description": "Writing as fast as it can.",
+            "properties": {
+              "state": {
+                "const": "working",
+                "type": "string"
               }
-            ]
+            },
+            "required": [
+              "state"
+            ],
+            "type": "object"
           },
           {
-            "oneOf": [
-              {
-                "description": "Writing as fast as it can.",
-                "properties": {
-                  "state": {
-                    "const": "working",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state"
-                ],
-                "type": "object"
+            "description": "Held to the operator's limit.",
+            "properties": {
+              "limit": {
+                "description": "The limit, in bytes a second.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
               },
-              {
-                "description": "Held to the operator's limit.",
-                "properties": {
-                  "limit": {
-                    "description": "The limit, in bytes a second.",
-                    "format": "uint64",
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "state": {
-                    "const": "paced",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "limit"
-                ],
-                "type": "object"
-              },
-              {
-                "description": "Nothing written for the minutes the operator's setting holds.",
-                "properties": {
-                  "state": {
-                    "const": "stalled",
-                    "type": "string"
-                  },
-                  "wrote": {
-                    "$ref": "#/components/schemas/Instant",
-                    "description": "The instant it last wrote."
-                  }
-                },
-                "required": [
-                  "state",
-                  "wrote"
-                ],
-                "type": "object"
+              "state": {
+                "const": "paced",
+                "type": "string"
               }
-            ]
+            },
+            "required": [
+              "state",
+              "limit"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nothing written for the minutes the operator's setting holds.",
+            "properties": {
+              "state": {
+                "const": "stalled",
+                "type": "string"
+              },
+              "wrote": {
+                "$ref": "#/components/schemas/Instant",
+                "description": "The instant it last wrote."
+              }
+            },
+            "required": [
+              "state",
+              "wrote"
+            ],
+            "type": "object"
           }
         ],
-        "description": "A backup or restore running now.",
         "properties": {
           "job": {
             "description": "The name an accepting reply gave the work, where one did.",
@@ -16801,6 +16798,10 @@
           "part": {
             "description": "The area being written now, named.",
             "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CopiedScope",
+            "description": "What it copies."
           },
           "started": {
             "$ref": "#/components/schemas/Instant",
@@ -16825,6 +16826,7 @@
         },
         "required": [
           "what",
+          "scope",
           "started",
           "written",
           "whole",

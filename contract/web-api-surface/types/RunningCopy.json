@@ -12,29 +12,15 @@
       ],
       "required": true
     },
-    "name": {
-      "type": [
-        "string"
-      ],
-      "required": true
-    },
     "part": {
       "type": [
         "string"
       ],
       "required": true
     },
-    "project": {
-      "type": [
-        "null|string"
-      ],
-      "required": false
-    },
     "scope": {
       "type": [
-        "const:\"existing\"",
-        "const:\"service\"",
-        "const:\"whole_stack\""
+        "ref:CopiedScope"
       ],
       "required": true
     },
@@ -51,12 +37,6 @@
         "const:\"working\""
       ],
       "required": true
-    },
-    "trees": {
-      "type": [
-        "array|null[ref:Tree]"
-      ],
-      "required": false
     },
     "what": {
       "type": [
@@ -84,11 +64,8 @@
     }
   },
   "variants": [
-    "\"existing\"",
     "\"paced\"",
-    "\"service\"",
     "\"stalled\"",
-    "\"whole_stack\"",
     "\"working\""
   ]
 }

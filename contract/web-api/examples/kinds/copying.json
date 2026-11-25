@@ -5,7 +5,9 @@
       "job": "9f2c1a7e04b3d815",
       "limit": 52428800,
       "part": "sonarr configuration",
-      "scope": "whole_stack",
+      "scope": {
+        "scope": "whole_stack"
+      },
       "started": 1893456000,
       "state": "paced",
       "what": "backup",

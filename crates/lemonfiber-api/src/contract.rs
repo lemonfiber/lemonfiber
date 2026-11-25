@@ -41,6 +41,7 @@
 //! [`Outcome`]: lemonfiber_core::app::Outcome
 
 pub mod example;
+pub mod keywords;
 pub mod layout;
 pub mod openapi;
 mod path;

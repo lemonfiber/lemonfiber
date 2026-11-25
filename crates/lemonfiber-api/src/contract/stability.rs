@@ -88,7 +88,7 @@ const ANY: &str = "any";
 /// `properties` is not among them and is walked separately: its keys are field names
 /// rather than keywords, so a struct with a field called `const` or `items` would be
 /// read as a schema keyword by anything that treated the two alike.
-const DESCENDED: [&str; 6] = [
+pub const DESCENDED: [&str; 6] = [
     "items",
     "additionalProperties",
     "oneOf",
