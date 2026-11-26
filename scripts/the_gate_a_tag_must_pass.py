@@ -366,24 +366,40 @@ def check(version: str, spec: Path, work: Path) -> list[Step]:
     if any(not step.ok for step in cloned):
         return steps
 
-    ok, said = ran(
-        sys.executable, str(spec / "scripts" / "gate.py"),
-        f"--manifest={manifest.as_posix()}", *repos,
-        cwd=ROOT,
-    )
-    steps.append(Step("every locked goal is satisfied", ok, said))
-
-    # Inside the spec checkout, which is where the no-stub gate resolves the feature
-    # catalogue and the version directory from, so this tree is named by where it is
-    # rather than as the working directory.
-    here = f"--repo={SELF}="
-    ok, said = ran(
-        sys.executable, "scripts/check_no_stubs.py", f"--version={version}",
-        *(f"{here}{ROOT.as_posix()}" if one.startswith(here) else one for one in repos),
-        cwd=spec,
-    )
-    steps.append(Step("no requirement it locks is unbuilt", ok, said))
+    for name, command in asked(spec, manifest, version, repos):
+        ok, said = ran(*command, cwd=ROOT)
+        steps.append(Step(name, ok, said))
     return steps
+
+
+def asked(spec: Path, manifest: Path, version: str, repos: list[str]) -> list[tuple[str, tuple[str, ...]]]:
+    """The two questions in `MUST_ASK`, each as the command asking it from ROOT.
+
+    Both spec gates refuse a path outside the directory they run in, so both run here,
+    with the spec checkout inside this tree and the same `--repo` list.
+    """
+    gates = spec / "scripts"
+    return [
+        (MUST_ASK[0], (sys.executable, str(gates / "gate.py"),
+                       f"--manifest={manifest.as_posix()}", *repos)),
+        (MUST_ASK[1], (sys.executable, str(gates / "check_no_stubs.py"), f"--version={version}",
+                       f"--spec={spec.as_posix()}", *repos)),
+    ]
+
+
+def escaping(command: tuple[str, ...], cwd: Path) -> list[str]:
+    """Each path a spec gate takes on `command` that lies outside `cwd`, which the gate
+    refuses: a `--repo` checkout, `--spec`, `--manifest` or `--status`."""
+    found = []
+    for one in command:
+        key, _, value = one.partition("=")
+        if key == "--repo":
+            value = value.partition("=")[2]
+        elif key not in ("--spec", "--manifest", "--status"):
+            continue
+        if not (cwd / value).resolve().is_relative_to(cwd.resolve()):
+            found.append(one)
+    return found
 
 
 def self_test() -> int:
@@ -460,6 +476,22 @@ def self_test() -> int:
         broken.append("an unproven bundled claim was dropped from a run that passed")
     if "demonstrated: x" in joined:
         broken.append("the judge's ordinary output was printed from a run that passed")
+
+    # Both spec gates are asked from ROOT with every path they take inside it, the
+    # spec checkout and the clones included, since each refuses one that is not.
+    root = Path("/gate/tree")
+    commands = asked(root / SPEC, root / SPEC / "70-operations" / "versions" / "0.18.0.toml",
+                     "0.18.0", [f"--repo={SELF}=.", f"--repo=sdk-ts={WORK}/sdk-ts"])
+    if [name for name, _ in commands] != list(MUST_ASK):
+        broken.append("the gates asked are not the two questions this gate is")
+    for name, command in commands:
+        if escaping(command, root):
+            broken.append(f"{name!r} is asked with a path outside where it runs: "
+                          f"{', '.join(escaping(command, root))}")
+        if f"--repo={SELF}=." not in command:
+            broken.append(f"{name!r} is not handed the tagged tree as it is handed to the other")
+    if not escaping(("x", f"--repo={SELF}={root.as_posix()}"), root / SPEC):
+        broken.append("a tracker outside the gate's working directory was not caught")
 
     # The record: the release being tagged may lack notes, an earlier one may not,
     # and a tag that is not a release tag is not a release.
