@@ -281,6 +281,9 @@ pub enum Kind {
         /// The environment file's setting it was moved out of, where it was.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filed: Option<String>,
+        /// What it fell back to while it held no operator value, as it was at the act.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        default: Option<crate::model::SettingDefault>,
     },
     /// A secret in the secret store was kept, replaced or forgotten, recorded by
     /// fingerprints alone.

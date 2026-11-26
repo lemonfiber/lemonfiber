@@ -55,6 +55,7 @@ fn a_fresh_setting(name: &str, value: &str) -> Change {
             previous: None,
             current: Some(value.to_owned()),
             filed: None,
+            default: None,
         },
     }
 }

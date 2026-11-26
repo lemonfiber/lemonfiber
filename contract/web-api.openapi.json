@@ -15283,6 +15283,36 @@
         ],
         "type": "object"
       },
+      "ReaderDefault": {
+        "description": "One reader's own default for a setting.",
+        "properties": {
+          "default": {
+            "description": "What its manifest declares while no value is recorded, where it declares one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "met": {
+            "description": "Whether the settings it needs hold what it needs, so the variable is written.",
+            "type": "boolean"
+          },
+          "service": {
+            "description": "The service.",
+            "type": "string"
+          },
+          "variable": {
+            "description": "The variable it is read into.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "variable",
+          "met"
+        ],
+        "type": "object"
+      },
       "Reason": {
         "description": "Why a walkthrough could not go on.",
         "oneOf": [
@@ -18469,6 +18499,81 @@
         ],
         "type": "object"
       },
+      "SettingDefault": {
+        "description": "What a setting falls back to while it holds no operator value.",
+        "oneOf": [
+          {
+            "description": "One of the core's own settings, with what the core reads while none is recorded.",
+            "properties": {
+              "of": {
+                "const": "core",
+                "type": "string"
+              },
+              "value": {
+                "description": "The value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "of",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The one default every reader whose `needs` are met declares. Empty is empty by\ndefault.",
+            "properties": {
+              "of": {
+                "const": "declared",
+                "type": "string"
+              },
+              "value": {
+                "description": "The value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "of",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Each reader's own, where the readers whose `needs` are met declare different ones.",
+            "properties": {
+              "of": {
+                "const": "per-reader",
+                "type": "string"
+              },
+              "readers": {
+                "description": "Every reader, those whose `needs` are unmet included.",
+                "items": {
+                  "$ref": "#/components/schemas/ReaderDefault"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "of",
+              "readers"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Nothing declares one, so nothing is written for it.",
+            "properties": {
+              "of": {
+                "const": "none",
+                "type": "string"
+              }
+            },
+            "required": [
+              "of"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "SettingMove": {
         "description": "One setting a change moves.",
         "properties": {
@@ -18478,6 +18583,10 @@
               "string",
               "null"
             ]
+          },
+          "default": {
+            "$ref": "#/components/schemas/SettingDefault",
+            "description": "What it falls back to while it holds no operator value, read with the change in\nplace."
           },
           "setting": {
             "description": "The setting.",
@@ -18499,7 +18608,8 @@
           }
         },
         "required": [
-          "setting"
+          "setting",
+          "default"
         ],
         "type": "object"
       },

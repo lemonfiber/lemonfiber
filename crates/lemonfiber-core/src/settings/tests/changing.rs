@@ -282,6 +282,9 @@ async fn an_answered_change_is_one_journalled_run_written_after_its_record() {
             previous: None,
             current: Some("fast".to_owned()),
             filed: None,
+            default: Some(crate::model::SettingDefault::Declared {
+                value: "slow".to_owned(),
+            }),
         }));
     assert!(run.iter().any(|one| matches!(&one.kind,
         Kind::Rewritten { path, previous, .. }
@@ -714,4 +717,37 @@ async fn a_change_over_a_linked_directory_recreates_nothing_and_says_why() {
     let said = made.and_then(|one| one.unrestarted).unwrap_or_default();
     assert!(said.contains("reached through a link"), "{said}");
     assert!(upped(&machine.runner).is_empty());
+}
+
+/// Each setting a change moves carries the default it falls back to, read with the change
+/// in place: the one both readers declare, on a rehearsal as on the write, and the journal
+/// keeps it as it was at the act.
+#[tokio::test]
+async fn a_moved_setting_names_the_default_it_falls_back_to() {
+    let machine = machine("defaulted", running(&[]));
+    let declared = crate::model::SettingDefault::Declared {
+        value: "slow".to_owned(),
+    };
+
+    let rehearsed = change(asked(&machine.ctx, MODE, Some("fast"), None).await);
+    let set = change(agreed(&machine.ctx, MODE, Some("fast")).await);
+    let cleared = change(agreed(&machine.ctx, MODE, None).await);
+
+    for one in [&rehearsed, &set, &cleared] {
+        assert_eq!(
+            one.as_ref()
+                .and_then(|one| one.settings.first())
+                .map(|one| &one.default),
+            Some(&declared),
+            "{one:?}"
+        );
+    }
+    let kept: Vec<Option<crate::model::SettingDefault>> = journal(&machine.ctx)
+        .into_iter()
+        .filter_map(|one| match one.kind {
+            Kind::Setting { default, .. } => Some(default),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(kept, vec![Some(declared.clone()), Some(declared)]);
 }

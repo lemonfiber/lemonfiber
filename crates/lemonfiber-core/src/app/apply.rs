@@ -301,6 +301,7 @@ fn guarded(taken: &Guarded, applying: &Applying, log: &mut Journal) -> Result<()
                 previous: held.value(name).map(str::to_owned),
                 current: Some(value.clone()),
                 filed: None,
+                default: None,
             },
         ));
     }

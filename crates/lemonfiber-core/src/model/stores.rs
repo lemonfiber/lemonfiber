@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Every setting and secret the stack's services read, and what changing a setting came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -151,6 +151,68 @@ pub struct SettingMove {
     pub value: Option<String>,
     /// What moving it costs, where it costs anything.
     pub consequence: Option<String>,
+    /// What it falls back to while it holds no operator value, read with the change in
+    /// place.
+    pub default: SettingDefault,
+}
+
+/// What a setting falls back to while it holds no operator value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "of", rename_all = "kebab-case")]
+pub enum SettingDefault {
+    /// One of the core's own settings, with what the core reads while none is recorded.
+    Core {
+        /// The value.
+        value: String,
+    },
+    /// The one default every reader whose `needs` are met declares. Empty is empty by
+    /// default.
+    Declared {
+        /// The value.
+        value: String,
+    },
+    /// Each reader's own, where the readers whose `needs` are met declare different ones.
+    PerReader {
+        /// Every reader, those whose `needs` are unmet included.
+        readers: Vec<ReaderDefault>,
+    },
+    /// Nothing declares one, so nothing is written for it.
+    #[serde(rename = "none")]
+    Nothing,
+}
+
+impl SettingDefault {
+    /// The one value it falls back to, where there is one.
+    #[must_use]
+    pub fn value(&self) -> Option<&str> {
+        match self {
+            Self::Core { value } | Self::Declared { value } => Some(value),
+            Self::PerReader { .. } | Self::Nothing => None,
+        }
+    }
+
+    /// That value as a sentence says it, `empty` for an empty one.
+    #[must_use]
+    pub fn said(&self) -> Option<&str> {
+        self.value()
+            .map(|value| if value.is_empty() { EMPTY } else { value })
+    }
+}
+
+/// How a sentence says a default that is empty.
+const EMPTY: &str = "empty";
+
+/// One reader's own default for a setting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ReaderDefault {
+    /// The service.
+    pub service: String,
+    /// The variable it is read into.
+    pub variable: String,
+    /// What its manifest declares while no value is recorded, where it declares one.
+    pub default: Option<String>,
+    /// Whether the settings it needs hold what it needs, so the variable is written.
+    pub met: bool,
 }
 
 /// A service held back until the operator gives what it needs to start.

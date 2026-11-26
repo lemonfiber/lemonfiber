@@ -474,6 +474,7 @@ fn filed_setting(name: &str, value: &str, key: Option<String>, stamp: Instant) -
             previous: None,
             current: Some(value.to_owned()),
             filed: key,
+            default: None,
         },
     }
 }

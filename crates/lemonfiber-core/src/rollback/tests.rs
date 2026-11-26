@@ -584,6 +584,7 @@ fn settled(name: &str, previous: Option<&str>, current: Option<&str>) -> Change 
             previous: previous.map(str::to_owned),
             current: current.map(str::to_owned),
             filed: None,
+            default: None,
         },
     }
 }

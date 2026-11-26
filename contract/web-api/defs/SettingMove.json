@@ -10,6 +10,10 @@
         "null"
       ]
     },
+    "default": {
+      "description": "What it falls back to while it holds no operator value, read with the change in\nplace.",
+      "$ref": "SettingDefault.json"
+    },
     "setting": {
       "description": "The setting.",
       "type": "string"
@@ -30,6 +34,7 @@
     }
   },
   "required": [
-    "setting"
+    "setting",
+    "default"
   ]
 }
