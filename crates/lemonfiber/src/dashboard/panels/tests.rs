@@ -14,6 +14,9 @@ use lemonfiber_core::queue::Stuck;
 /// A panel with more room than anything here is testing the edge of.
 const WIDE: usize = 200;
 
+/// The room a panel has where no screen is being drawn.
+const UNDRAWN: (usize, usize) = (WIDE, crate::dashboard::UNBOUNDED);
+
 /// The words of a panel, one string per line.
 fn said(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
     lines
@@ -358,7 +361,7 @@ fn a_panel_whose_source_has_not_answered_says_it_is_waiting() {
     assert_eq!(said(&queues(&Panel::Pending, WIDE)), waiting);
     assert_eq!(said(&storage(&Panel::Pending, WIDE)), waiting);
     assert_eq!(said(&services(&Panel::Pending, &[], WIDE)), waiting);
-    assert_eq!(said(&front_door(&Panel::Pending, WIDE)), waiting);
+    assert_eq!(said(&front_door(&Panel::Pending, UNDRAWN)), waiting);
     assert_eq!(said(&household(&Panel::Pending, WIDE)), waiting);
 }
 

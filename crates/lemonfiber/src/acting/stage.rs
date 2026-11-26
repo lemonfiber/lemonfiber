@@ -95,6 +95,8 @@ pub(super) enum Stage {
     },
     /// What it came to, until it is put away.
     Came(Reading),
+    /// The front door's code, full size, until it is put away.
+    Door(Reading),
     /// Choosing what to ask this stack.
     Wondering(Chooser<&'static Question>),
     /// Typing the words a question has to be given, one line at a time.

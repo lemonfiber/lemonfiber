@@ -22,6 +22,9 @@ use super::super::service::Inside;
 /// What the box holding a report calls itself.
 pub(super) const CAME: &str = " what it came to ";
 
+/// What the box holding the front door's code calls itself.
+pub(super) const DOOR: &str = " the front door ";
+
 /// What the box holding the questions calls itself.
 pub(super) const ASK: &str = " ask ";
 

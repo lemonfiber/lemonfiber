@@ -243,6 +243,7 @@ fn starting(action: &str) -> Acting {
 
 mod asking_more;
 mod choosing;
+mod door;
 mod errands;
 mod quality_choice;
 mod questions;

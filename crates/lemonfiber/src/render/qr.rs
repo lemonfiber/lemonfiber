@@ -29,20 +29,39 @@ const QUIET: i32 = 4;
 /// `ascii` picks the drawing rather than being looked up here, so both can be tested
 /// without settling a value that would outlive the test — the same division
 /// `say::shown` makes for the fold.
-pub(super) fn rows(address: &str, ascii: bool) -> Option<Vec<String>> {
+pub(crate) fn rows(address: &str, ascii: bool) -> Option<Vec<String>> {
     // Medium correction: a code read off a screen is not creased or faded, so the
     // budget is better spent on staying small than on surviving damage.
     let code = QrCode::encode_text(address, QrCodeEcc::Medium).ok()?;
     Some(if ascii { wide(&code) } else { stacked(&code) })
 }
 
-/// `text` drawn as a code under `label`, where it fits in one.
+/// What is said in place of a code where the text is too long to draw as one.
+pub(crate) const TOO_LONG: &str =
+    "Type this one in: it is too long to draw as a code a camera could read.";
+
+/// `text` drawn as a code under `label`, or said to be too long for one.
 pub(super) fn labelled(lines: &mut super::Lines, label: &str, text: &str) {
-    if let Some(drawn) = rows(text, crate::say::folding()) {
-        lines.spaced(label);
-        for row in drawn {
-            lines.put(format!("  {row}"));
+    match rows(text, crate::say::folding()) {
+        Some(drawn) => {
+            lines.spaced(label);
+            for row in drawn {
+                lines.put(format!("  {row}"));
+            }
         }
+        None => lines.spaced(TOO_LONG),
+    }
+}
+
+/// `text` drawn as a code, or said to be too long for one.
+pub(super) fn drawn(lines: &mut super::Lines, text: &str) {
+    match rows(text, crate::say::folding()) {
+        Some(drawn) => {
+            for row in drawn {
+                lines.put(format!("  {row}"));
+            }
+        }
+        None => lines.put(format!("  {TOO_LONG}")),
     }
 }
 

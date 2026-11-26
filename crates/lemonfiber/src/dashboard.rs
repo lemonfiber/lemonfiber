@@ -35,6 +35,9 @@ const TWO_COLUMNS: u16 = 96;
 
 /// The room a panel is built for where no screen is being drawn.
 ///
+/// Down as well as across: a panel built with this many rows is not on a screen, so
+/// it draws no code and offers no key to open one.
+///
 /// [`showing`] is asked what a snapshot says rather than what one terminal is
 /// showing it at, and a word left out because a panel was narrow is not a word
 /// this product declined to say.
@@ -143,30 +146,41 @@ pub(crate) fn listed(snapshot: &Snapshot) -> crate::render::Lines {
     said
 }
 
-/// The room each panel's own lines have, inside its border.
-fn rooms(places: &[Rect]) -> Vec<usize> {
+/// The room each panel's own lines have inside its border: across, then down.
+fn rooms(places: &[Rect]) -> Vec<(usize, usize)> {
     places
         .iter()
-        .map(|place| usize::from(place.width.saturating_sub(2)))
+        .map(|place| {
+            (
+                usize::from(place.width.saturating_sub(2)),
+                usize::from(place.height.saturating_sub(2)),
+            )
+        })
         .collect()
 }
 
 /// Each panel, in the order they are read: what is wrong first, then what is
 /// happening, then what it is running on.
-fn sections(snapshot: &Snapshot, rooms: &[usize]) -> Vec<(&'static str, Vec<Line<'static>>)> {
+fn sections(
+    snapshot: &Snapshot,
+    rooms: &[(usize, usize)],
+) -> Vec<(&'static str, Vec<Line<'static>>)> {
     // Taken in the order the panels are built below, which is the order their
     // places were laid out in — so no panel is ever built for another's width.
-    let mut given = rooms.iter().copied().chain(std::iter::repeat(UNBOUNDED));
-    let mut room = || given.next().unwrap_or(UNBOUNDED);
-    let vpn = panels::vpn(snapshot.vpn.as_ref(), room());
-    let transfers = panels::transfers(&snapshot.transfers, room());
-    let queues = panels::queues(&snapshot.queue, room());
-    let storage = panels::storage(&snapshot.storage, room());
-    let services = panels::services(&snapshot.services, &snapshot.scheduled, room());
-    let stuck = panels::stuck(&snapshot.stuck, room());
-    let alerts = panels::alerts(&snapshot.alerts, room());
+    let mut given = rooms
+        .iter()
+        .copied()
+        .chain(std::iter::repeat((UNBOUNDED, UNBOUNDED)));
+    let mut room = || given.next().unwrap_or((UNBOUNDED, UNBOUNDED));
+    let vpn = panels::vpn(snapshot.vpn.as_ref(), room().0);
+    let transfers = panels::transfers(&snapshot.transfers, room().0);
+    let queues = panels::queues(&snapshot.queue, room().0);
+    let storage = panels::storage(&snapshot.storage, room().0);
+    let services = panels::services(&snapshot.services, &snapshot.scheduled, room().0);
+    let stuck = panels::stuck(&snapshot.stuck, room().0);
+    let alerts = panels::alerts(&snapshot.alerts, room().0);
     let door = panels::front_door(&snapshot.door, room());
-    let household = panels::household(&snapshot.household, room());
+    let household = panels::household(&snapshot.household, room().0);
     vec![
         ("VPN", vpn),
         ("Transfers", transfers),

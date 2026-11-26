@@ -112,3 +112,17 @@ fn a_code_is_found_under_its_label_only_for_the_text_it_was_drawn_from() {
         "{said}"
     );
 }
+
+#[test]
+fn a_text_too_long_for_a_code_is_said_to_be_rather_than_drawn_as_nothing() {
+    let far_too_long = "h".repeat(8000);
+    let mut labelled = crate::render::Lines::default();
+    super::labelled(&mut labelled, "Scan this:", &far_too_long);
+    let mut drawn = crate::render::Lines::default();
+    super::drawn(&mut drawn, &far_too_long);
+
+    for said in [labelled.text(), drawn.text()] {
+        assert!(said.contains(super::TOO_LONG), "{said}");
+        assert!(!said.contains("Scan this:"), "{said}");
+    }
+}

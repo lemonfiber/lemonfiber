@@ -13,7 +13,6 @@ use lemonfiber_core::PRODUCT;
 use lemonfiber_error::plural::s;
 
 use super::{qr, Lines};
-use crate::say;
 
 /// What an operator is shown to pair a phone.
 pub(super) fn pairing(report: &Pairing) -> Lines {
@@ -21,12 +20,7 @@ pub(super) fn pairing(report: &Pairing) -> Lines {
     lines.put(
         "Point the phone's camera at this, or type the line under it where it has none:".to_owned(),
     );
-    for row in qr::rows(&report.written, say::folding())
-        .into_iter()
-        .flatten()
-    {
-        lines.put(format!("  {row}"));
-    }
+    qr::drawn(&mut lines, &report.written);
     lines.put(format!("  {}", report.written));
     lines.spaced(format!(
         "It reaches this stack at {}, which presents the certificate",

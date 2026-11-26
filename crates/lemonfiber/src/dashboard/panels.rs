@@ -405,7 +405,10 @@ fn width(line: &Line<'static>) -> usize {
 /// The address is its own line and the whole of it is shown, because an address is
 /// only worth having if it can be read out; the name and the phrase beside it share
 /// the line above, which is where the room is spent when there is not enough.
-pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Line<'static>> {
+pub(super) fn front_door(
+    panel: &Panel<FrontDoorReport>,
+    (room, rows): (usize, usize),
+) -> Vec<Line<'static>> {
     let report = match panel {
         Panel::Ready(report) => report,
         Panel::Unavailable { reason } => return unavailable(reason, room),
@@ -436,7 +439,40 @@ pub(super) fn front_door(panel: &Panel<FrontDoorReport>, room: usize) -> Vec<Lin
     {
         lines.push(Line::styled(shortened(&said, room), quiet()));
     }
+    if let Some(address) = report.address.as_ref().filter(|_| rows != super::UNBOUNDED) {
+        let left = rows.saturating_sub(lines.len());
+        lines.extend(code(&address.url, room, left));
+    }
     lines
+}
+
+/// The front door's code under its address where the panel has the room for it, and
+/// where it has not, the key that opens it full size.
+///
+/// A code is drawn whole or not at all: a camera reads none of a code cut at the
+/// panel's edge.
+fn code(address: &str, room: usize, rows: usize) -> Vec<Line<'static>> {
+    let Some(drawn) = crate::render::qr::rows(address, crate::say::folding()) else {
+        return vec![Line::styled(
+            shortened(crate::render::qr::TOO_LONG, room),
+            quiet(),
+        )];
+    };
+    let wide = drawn
+        .iter()
+        .map(|row| row.chars().count())
+        .max()
+        .unwrap_or(0);
+    if wide <= room && drawn.len() <= rows {
+        return drawn.into_iter().map(Line::raw).collect();
+    }
+    vec![Line::styled(
+        shortened(
+            &format!("No room for its code: press {}", crate::acting::door::KEY),
+            room,
+        ),
+        quiet(),
+    )]
 }
 
 /// The household panel: what somebody has asked for that is not moving.
