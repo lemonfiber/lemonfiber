@@ -39,6 +39,13 @@
 # and the core then pauses and resumes every client, the one standing in read back stopped
 # and then fetching, every other being a service of the part it replaced.
 #
+# An identity source standing in is run live as a curator arm is, put in the place of the
+# one the bundle fills the capability with once the stack is first seeded: the household
+# member is invited into it, given a policy there, and asks as that member.
+#
+# Every substitute put in place is asked again, through `plugin prove`, whether its
+# adapters speak what they declare, before its arm goes on.
+#
 # One [[curator]] table per curator the bundle pins that is run live through its own
 # media's household request: set up and started by this build, wired by its seed alone,
 # asked for one title by a household member, proved to grab it where the indexer site the
@@ -97,6 +104,16 @@ claimed       = false
 [[substitute]]
 arm           = "media-serve-emby"
 capability    = "media.serve"
+plugin        = "emby"
+origin        = "https://github.com/lemonfiber/plugin-emby"
+revision      = "1bdfb74636ddd4e6a975268d4b3ad7a599945a27"
+stands_in_for = "jellyfin"
+media_type    = "movies"
+claimed       = true
+
+[[substitute]]
+arm           = "identity-source-emby"
+capability    = "identity.source"
 plugin        = "emby"
 origin        = "https://github.com/lemonfiber/plugin-emby"
 revision      = "1bdfb74636ddd4e6a975268d4b3ad7a599945a27"

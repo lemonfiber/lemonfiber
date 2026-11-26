@@ -18,12 +18,7 @@ const ARM: &str = "SUBSTITUTE_ARM";
 const TREE: &str = "SUBSTITUTE_TREE";
 
 /// The capabilities a substitute proves.
-const NAMED: [&str; 4] = [
-    "media.serve",
-    "indexer.search",
-    "library.curate",
-    "identity.source",
-];
+const NAMED: [&str; 4] = ["media.serve", "indexer.search", CURATES, IDENTIFIES];
 
 /// The further capabilities an arm proves, each as those [`NAMED`] are proved.
 const FURTHER: [&str; 1] = [SOLVES];
@@ -92,6 +87,44 @@ impl Pinned {
 
 /// The capability a curator arm proves.
 const CURATES: &str = "library.curate";
+
+/// The capability the household's members are held in.
+const IDENTIFIES: &str = lemonfiber_contract::capabilities::identity::source::CAPABILITY;
+
+impl Substitute {
+    /// It put in place, given `settings`.
+    fn substitution(&self, settings: Vec<(String, String)>) -> live::Substitution {
+        live::Substitution {
+            plugin: self.plugin.clone(),
+            capability: self.capability.clone(),
+            stands_in_for: self.stands_in_for.clone(),
+            settings,
+        }
+    }
+}
+
+/// The arm the job runs, the substitute it pins where that proves one of `capabilities`,
+/// and the household request run for its media type, or nothing where the job runs no
+/// such arm.
+///
+/// # Panics
+///
+/// Where the file does not read, or no household request is run for the arm's media type.
+fn standing_in(capabilities: &[&str]) -> Option<(String, Substitute, &'static live::Asked)> {
+    let arm = std::env::var(ARM).ok()?;
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let one = pinned
+        .ok()?
+        .substitute
+        .into_iter()
+        .find(|one| one.arm == arm && capabilities.contains(&one.capability.as_str()))?;
+    let asked = live::ASKED
+        .iter()
+        .find(|asked| Some(asked.media) == one.media_type.as_deref());
+    assert!(asked.is_some(), "{one:?}");
+    Some((arm, one, asked?))
+}
 
 /// The workspace's root, where the file is.
 fn root() -> PathBuf {
@@ -392,26 +425,7 @@ fn settings_of(plugin: &str) -> Result<Vec<(String, String)>, String> {
 
 #[test]
 fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
-    let Ok(arm) = std::env::var(ARM) else {
-        return;
-    };
-    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    assert!(pinned.is_ok(), "{pinned:?}");
-    let Ok(pinned) = pinned else {
-        return;
-    };
-    let Some(one) = pinned
-        .substitute
-        .iter()
-        .find(|one| one.arm == arm && one.capability == CURATES)
-    else {
-        return;
-    };
-    let asked = live::ASKED
-        .iter()
-        .find(|asked| Some(asked.media) == one.media_type.as_deref());
-    assert!(asked.is_some(), "{one:?}");
-    let Some(asked) = asked else {
+    let Some((arm, one, asked)) = standing_in(&[CURATES]) else {
         return;
     };
     let settings = match settings_of(&one.plugin) {
@@ -421,12 +435,16 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
             return;
         }
     };
-    let substitution = live::Substitution {
-        plugin: one.plugin.clone(),
-        capability: one.capability.clone(),
-        stands_in_for: one.stands_in_for.clone(),
-        settings,
+    let substitution = one.substitution(settings);
+    live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
+}
+
+#[test]
+fn an_identity_source_standing_in_holds_the_member_whose_request_reaches_a_grab_and_undoes_it() {
+    let Some((arm, one, asked)) = standing_in(&[IDENTIFIES]) else {
+        return;
     };
+    let substitution = one.substitution(Vec::new());
     live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
 }
 
@@ -447,13 +465,7 @@ fn a_solver_standing_in_is_told_to_the_indexer_and_fetches_only_pages_outside() 
     else {
         return;
     };
-    let substitution = live::Substitution {
-        plugin: one.plugin.clone(),
-        capability: one.capability.clone(),
-        stands_in_for: one.stands_in_for.clone(),
-        settings: Vec::new(),
-    };
-    live::solving::run(&scratch(&arm), &substitution);
+    live::solving::run(&scratch(&arm), &one.substitution(Vec::new()));
 }
 
 /// The directory `arm` runs its stack beneath, emptied of any earlier run's.
@@ -465,34 +477,17 @@ fn scratch(arm: &str) -> PathBuf {
 
 #[test]
 fn a_download_client_standing_in_takes_a_household_requests_grab_and_is_paused_and_resumed() {
-    let Ok(arm) = std::env::var(ARM) else {
+    let Some((arm, one, asked)) = standing_in(&DOWNLOADS.map(|(capability, _)| capability)) else {
         return;
     };
-    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    assert!(pinned.is_ok(), "{pinned:?}");
-    let Ok(pinned) = pinned else {
-        return;
-    };
-    let Some((one, downloads)) = pinned.substitute.iter().find_map(|one| {
-        DOWNLOADS
-            .iter()
-            .find(|(capability, _)| one.arm == arm && *capability == one.capability)
-            .map(|(_, downloads)| (one, *downloads))
-    }) else {
-        return;
-    };
-    let asked = live::ASKED
+    let downloads = DOWNLOADS
         .iter()
-        .find(|asked| Some(asked.media) == one.media_type.as_deref());
-    assert!(asked.is_some(), "{one:?}");
-    let Some(asked) = asked else {
+        .find(|(capability, _)| *capability == one.capability)
+        .map(|(_, downloads)| *downloads);
+    assert!(downloads.is_some(), "{one:?}");
+    let Some(downloads) = downloads else {
         return;
     };
-    let substitution = live::Substitution {
-        plugin: one.plugin.clone(),
-        capability: one.capability.clone(),
-        stands_in_for: one.stands_in_for.clone(),
-        settings: Vec::new(),
-    };
+    let substitution = one.substitution(Vec::new());
     live::run(&scratch(&arm), asked, downloads, Some(&substitution));
 }
