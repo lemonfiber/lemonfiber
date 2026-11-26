@@ -1,27 +1,39 @@
-//! The front door as a household member is told it: the services facing them alone, in
-//! their words, and no address that will not answer from where they are.
+//! The front door as a household member is told it: the services facing them alone, each
+//! called by what it is to them rather than by its name, in their words, and no address
+//! that will not answer from where they are.
 
 use crate::door::{Address, Facing, Reaches};
 use crate::model::{Beside, FrontDoorReport, Standing};
 
 /// What is said of an address that does not answer from where the member is.
-const AWAY: &str = "This can't be reached from where you are. It opens at home, on the house's \
-                    own network.";
+const AWAY: &str =
+    "Open this at home, on the house's own network. It can't be reached from where you are.";
 
 /// What is said where there is no address to hand a member.
-const NO_ADDRESS: &str = "There's no address for this yet. Whoever runs the house can set one up.";
+const NO_ADDRESS: &str = "Ask whoever runs the house to set this up. It has no address yet.";
 
 /// What is said where there is nowhere to send a member.
-const NOWHERE: &str = "There's nowhere to send you yet.";
+const NOWHERE: &str = "Ask whoever runs the house where to start. There's nowhere to send you yet.";
+
+/// What is said where the place to start is where a member asks.
+const ASK_FIRST: &str =
+    "Start where you ask: ask for what you want there, and it leads on to where you watch it.";
+
+/// What is said where the place to start is where a member watches.
+const WATCH_FIRST: &str = "Start where you watch, to watch what the house already has.";
+
+/// What is said where the place to start is not answering.
+const NOT_ANSWERING: &str =
+    "Try again a little later. The place to start isn't answering right now.";
+
+/// What is said where the place to start has no address yet.
+const NOT_SET_UP: &str =
+    "Ask whoever runs the house to set up the place to start. It has no address yet.";
 
 /// `report` as a household member is told it.
 pub(super) fn told(report: FrontDoorReport) -> FrontDoorReport {
-    let door = report
-        .facing
-        .and_then(Facing::household)
-        .and(report.service.clone());
+    let door = report.facing.and_then(Facing::called);
     let (address, unaddressed) = handed(report.address, report.reaches);
-    let meaning = meaning(report.standing, door.as_deref());
     FrontDoorReport {
         standing: report.standing,
         chosen: None,
@@ -30,19 +42,20 @@ pub(super) fn told(report: FrontDoorReport) -> FrontDoorReport {
         } else {
             Reaches::Unknown
         },
-        address: door.as_ref().and(address),
-        unaddressed: door.as_ref().and(unaddressed),
-        facing: door.as_ref().and(report.facing),
-        service: door,
-        meaning,
+        address: door.and(address),
+        unaddressed: door.and(unaddressed),
+        facing: door.and(report.facing),
+        service: door.map(str::to_owned),
+        meaning: meaning(report.standing, door.is_some()).to_owned(),
         beside: report
             .beside
             .into_iter()
             .filter_map(|beside| {
+                let called = beside.facing.called()?;
                 let because = beside.facing.household()?;
                 let (address, unaddressed) = handed(beside.address, beside.reaches);
                 Some(Beside {
-                    service: beside.service,
+                    service: called.to_owned(),
                     facing: beside.facing,
                     because: because.to_owned(),
                     address,
@@ -63,19 +76,18 @@ fn handed(address: Option<Address>, reaches: Reaches) -> (Option<Address>, Optio
     }
 }
 
-/// What the door comes to, in the household's words.
-fn meaning(standing: Standing, door: Option<&str>) -> String {
-    let Some(name) = door else {
-        return NOWHERE.to_owned();
-    };
+/// What the door comes to, in the household's words, where there is a `door` to send a
+/// member to.
+const fn meaning(standing: Standing, door: bool) -> &'static str {
+    if !door {
+        return NOWHERE;
+    }
     match standing {
-        Standing::Established => {
-            format!("Start at {name}: ask for what you want there, and it leads on to where you watch it.")
-        }
-        Standing::LibraryOnly => format!("Start at {name} to watch what the house already has."),
-        Standing::Unreachable => format!("{name} isn't answering right now. Try again a little later."),
-        Standing::Stranded => format!("{name} is running, but there's no address for it yet. Whoever runs the house can set one up."),
-        Standing::Absent => NOWHERE.to_owned(),
+        Standing::Established => ASK_FIRST,
+        Standing::LibraryOnly => WATCH_FIRST,
+        Standing::Unreachable => NOT_ANSWERING,
+        Standing::Stranded => NOT_SET_UP,
+        Standing::Absent => NOWHERE,
     }
 }
 

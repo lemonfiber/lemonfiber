@@ -27,7 +27,7 @@
       "$ref": "FrontDoorReaches.json"
     },
     "service": {
-      "description": "The service, by the name it shows itself under.",
+      "description": "The service, by the name it shows itself under, or for a household member by what\nit is to them.",
       "type": "string"
     },
     "unaddressed": {

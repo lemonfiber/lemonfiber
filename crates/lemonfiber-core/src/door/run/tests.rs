@@ -726,7 +726,8 @@ async fn a_household_member_is_told_the_door_in_their_words() {
     assert_eq!(report.as_ref().and_then(|one| one.chosen.clone()), None);
     assert!(report
         .as_ref()
-        .is_some_and(|one| one.meaning.starts_with("Start at Seerr")));
+        .is_some_and(|one| one.meaning.starts_with("Start where you ask")
+            && one.service.as_deref() == Some("Where you ask")));
     assert!(report
         .iter()
         .flat_map(|one| one.beside.iter())

@@ -52,7 +52,7 @@
       "$ref": "FrontDoorReaches.json"
     },
     "service": {
-      "description": "The service the household begins at, by the name it shows itself under.\nAbsent where this stack publishes nothing they could begin at.",
+      "description": "The service the household begins at, by the name it shows itself under, or for a\nhousehold member by what it is to them. Absent where this stack publishes nothing\nthey could begin at.",
       "type": [
         "string",
         "null"

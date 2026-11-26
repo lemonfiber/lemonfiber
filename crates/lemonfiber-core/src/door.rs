@@ -103,6 +103,18 @@ impl Facing {
         }
     }
 
+    /// What a household member calls this, in place of the service's name, where a member
+    /// may be handed the way there.
+    #[must_use]
+    pub const fn called(self) -> Option<&'static str> {
+        match self {
+            Self::Asking => Some("Where you ask"),
+            Self::Watching => Some("Where you watch"),
+            Self::Shelf => Some("A shelf"),
+            Self::Operators | Self::Carriage | Self::Unstated => None,
+        }
+    }
+
     /// Whether the household can be sent here as a place to start.
     #[must_use]
     pub const fn begins(self) -> bool {

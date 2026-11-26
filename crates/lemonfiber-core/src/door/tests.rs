@@ -87,19 +87,18 @@ fn a_service_is_no_door_by_its_name() {
     }
 }
 
+const EVERY_FACING: [Facing; 6] = [
+    Facing::Asking,
+    Facing::Watching,
+    Facing::Shelf,
+    Facing::Operators,
+    Facing::Carriage,
+    Facing::Unstated,
+];
+
 #[test]
 fn every_facing_says_why_it_is_or_is_not_a_way_in() {
-    let said: Vec<&str> = [
-        Facing::Asking,
-        Facing::Watching,
-        Facing::Shelf,
-        Facing::Operators,
-        Facing::Carriage,
-        Facing::Unstated,
-    ]
-    .into_iter()
-    .map(Facing::because)
-    .collect();
+    let said: Vec<&str> = EVERY_FACING.into_iter().map(Facing::because).collect();
     for because in &said {
         assert!(!because.is_empty());
     }
@@ -107,6 +106,22 @@ fn every_facing_says_why_it_is_or_is_not_a_way_in() {
     unique.sort_unstable();
     unique.dedup();
     assert_eq!(unique.len(), said.len(), "each says something of its own");
+}
+
+#[test]
+fn a_member_is_handed_a_place_by_both_its_name_and_its_meaning_or_by_neither() {
+    for facing in EVERY_FACING {
+        assert_eq!(
+            facing.called().is_some(),
+            facing.household().is_some(),
+            "{facing:?}"
+        );
+    }
+    let handed: Vec<Facing> = EVERY_FACING
+        .into_iter()
+        .filter(|facing| facing.household().is_some())
+        .collect();
+    assert_eq!(handed, [Facing::Asking, Facing::Watching, Facing::Shelf]);
 }
 
 /// What the plugin's first service is to the household, judged among `installed` alone.
