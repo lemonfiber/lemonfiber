@@ -39,8 +39,8 @@ use shapes::{
     agreed, choosing, dimmed, elsewhere, named, read, setting, shortened, typing, AGREEING,
 };
 use titles::{
-    asked, changing, keeping, narrowing, righting, sending, titled, ASK, CAME, KEEPS_GOING, MORE,
-    PUT_RIGHT, QUALITY, WEB,
+    asked, changing, keeping, narrowing, righting, sending, titled, ASK, CAME, DOOR, KEEPS_GOING,
+    MORE, PUT_RIGHT, QUALITY, WEB,
 };
 
 /// What the box says while the core is working out what a change would cost.
@@ -118,6 +118,7 @@ fn on_a_key(stage: &Stage, rows: usize, across: usize) -> Option<(String, Vec<Li
             agreed(INSTALLS, INSTALLS_ABOUT, Some(account), rows, across),
         ),
         Stage::Came(reading) => (CAME.to_owned(), read(reading, rows, across)),
+        Stage::Door(reading) => (DOOR.to_owned(), read(reading, rows, across)),
         Stage::Wondering(chooser) => (ASK.to_owned(), choosing(chooser, rows, across)),
         Stage::Typing {
             question,

@@ -42,7 +42,7 @@ mod overlay;
 mod playing;
 pub(crate) mod plugin;
 mod provenance;
-mod qr;
+pub(crate) mod qr;
 mod quality;
 mod queue;
 mod ran;

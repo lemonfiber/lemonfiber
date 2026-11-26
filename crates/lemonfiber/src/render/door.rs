@@ -11,7 +11,6 @@
 use lemonfiber_core::model::{FrontDoorReport, Standing};
 
 use super::{qr, Lines};
-use crate::say;
 
 /// What the household begins at, and what stands beside it that is not it.
 pub(super) fn front_door(report: &FrontDoorReport) -> Lines {
@@ -42,15 +41,12 @@ pub(super) fn front_door(report: &FrontDoorReport) -> Lines {
     // Last, under everything. An operator who wanted the address to send has it in
     // the second line, and a picture put between that and the working would push
     // the working off the screen for the reader who wanted that instead.
-    if let Some(drawn) = report
-        .address
-        .as_ref()
-        .and_then(|address| qr::rows(&address.url, say::folding()))
-    {
-        lines.spaced("Or point a phone's camera at this:");
-        for row in drawn {
-            lines.put(format!("  {row}"));
-        }
+    if let Some(address) = &report.address {
+        qr::labelled(
+            &mut lines,
+            "Or point a phone's camera at this:",
+            &address.url,
+        );
     }
     lines
 }
@@ -68,6 +64,16 @@ pub(crate) const fn standing(standing: Standing) -> &'static str {
         Standing::Stranded => "the front door, and there is no address to arrive at",
         Standing::Absent => "There is no front door.",
     }
+}
+
+/// The front door's address as a code a camera reads, under what it is and over the
+/// address it was drawn from, for a box that shows it full size.
+pub(crate) fn code(address: &str) -> Lines {
+    let mut lines = Lines::default();
+    lines.put("Point a phone's camera at this to open the front door:".to_owned());
+    qr::drawn(&mut lines, address);
+    lines.put(format!("  {address}"));
+    lines
 }
 
 #[cfg(test)]

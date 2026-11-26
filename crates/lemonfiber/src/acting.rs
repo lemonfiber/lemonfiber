@@ -65,6 +65,7 @@ mod answering;
 mod bundling;
 mod chooser;
 mod disturbing;
+pub(crate) mod door;
 mod errand;
 mod installing;
 mod inviting;
@@ -81,8 +82,9 @@ mod surface;
 mod words;
 
 use lemonfiber_core::app::Command;
-use lemonfiber_core::dashboard::Panel;
+use lemonfiber_core::dashboard::{Panel, Snapshot};
 use lemonfiber_core::docker::Service;
+use lemonfiber_core::model::FrontDoorReport;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 
@@ -211,6 +213,9 @@ pub(crate) struct Acting {
     /// which is why the one read this screen makes that way is a file on disk — and
     /// what each service is doing reaches the container engine.
     services: Vec<(String, String, String)>,
+    /// The front door's address the panels are showing, for the key that opens its
+    /// code full size.
+    door: Option<String>,
 }
 
 impl Acting {
@@ -222,6 +227,7 @@ impl Acting {
             words: false,
             explanations: true,
             services: Vec::new(),
+            door: None,
         }
     }
 
@@ -233,6 +239,24 @@ impl Acting {
     /// the manifest.
     pub(crate) fn gathered(&mut self, services: &Panel<Vec<Service>>) {
         self.services = service::gathered(services);
+    }
+
+    /// Take what the screen's own state keeps out of a gather that has just landed:
+    /// the services, and the front door's address.
+    pub(crate) fn landed(&mut self, snapshot: &Snapshot) {
+        self.gathered(&snapshot.services);
+        self.at_the_door(&snapshot.door);
+    }
+
+    /// Take the front door's address out of a gather that has just landed.
+    ///
+    /// Every gather, for the reason the services are: the code a key opens is drawn
+    /// from the address the panel is showing now.
+    pub(crate) fn at_the_door(&mut self, door: &Panel<FrontDoorReport>) {
+        self.door = match door {
+            Panel::Ready(report) => report.address.as_ref().map(|address| address.url.clone()),
+            Panel::Unavailable { .. } | Panel::Pending => None,
+        };
     }
 
     /// The same, on a run that does not explain its words.
@@ -411,6 +435,7 @@ impl Acting {
                 narrowing::narrowing(&mut self.stage, question, chooser, press)
             }
             Stage::Came(reading) => reading::came(&mut self.stage, reading, press),
+            Stage::Door(reading) => door::door(&mut self.stage, reading, press),
             Stage::Answered {
                 question,
                 widening,
@@ -459,6 +484,12 @@ impl Acting {
             Press::Typed(mending::KEY) => {
                 let (first, rest) = mending::all();
                 self.stage = Stage::Righting(Chooser::over(first, rest));
+                Wanted::Nothing
+            }
+            Press::Typed(door::KEY) => {
+                if let Some(opened) = door::opened(self.door.as_deref()) {
+                    self.stage = opened;
+                }
                 Wanted::Nothing
             }
             Press::Typed(surface::KEY) => {

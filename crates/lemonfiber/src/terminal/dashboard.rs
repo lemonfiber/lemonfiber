@@ -230,10 +230,11 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
             },
             read = &mut refreshing => {
                 if let Ok(Some(fresh)) = read {
-                    // The services go to the screen's own state as well as to the
-                    // panels, because the lists that name one are built from what the
-                    // panels are already showing rather than from a read of their own.
-                    acting.gathered(&fresh.services);
+                    // The services and the door go to the screen's own state as well
+                    // as to the panels, because the lists that name a service and the
+                    // code a key opens are built from what the panels are already
+                    // showing rather than from a read of their own.
+                    acting.landed(&fresh);
                     gathered = Some(fresh);
                     while first.try_recv().is_ok() {}
                     early = None;
@@ -242,7 +243,7 @@ async fn run(screen: &mut Screen, ctx: Ctx) -> (ExitCode, Option<Unfinished>, Af
             }
             shown = first.recv() => {
                 if let Some(snapshot) = shown {
-                    acting.gathered(&snapshot.services);
+                    acting.landed(&snapshot);
                     early = Some(snapshot);
                 }
             }
