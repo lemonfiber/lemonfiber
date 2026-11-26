@@ -80,13 +80,16 @@ async fn every_legacy_setting_is_recorded_in_the_store_and_never_in_the_environm
             .iter()
             .rev()
             .find(|change| matches!(change.kind, Kind::Setting { .. }))
-            .is_some_and(|last| last.kind
-                == Kind::Setting {
-                    name: row.name.to_owned(),
+            .is_some_and(|last| matches!(
+                &last.kind,
+                Kind::Setting {
+                    name,
                     previous: None,
-                    current: Some(value.clone()),
+                    current: Some(current),
                     filed: None,
-                }));
+                    default: Some(_),
+                } if name == row.name && *current == value
+            )));
 
         let cleared = agreed(&machine.ctx, row.name, None).await;
 
@@ -172,6 +175,7 @@ fn the_stack_is_filed_once_into_the_stores_and_journalled_by_fingerprint() {
         previous: None,
         current: Some("Belgium".to_owned()),
         filed: Some("VPN_COUNTRIES".to_owned()),
+        default: None,
     }));
     assert!(kinds.contains(&&Kind::Secret {
         name: "gluetun:wireguard-key".to_owned(),
@@ -439,6 +443,7 @@ fn a_first_party_plugins_values_are_filed_from_where_its_was_says_and_no_one_els
             previous: None,
             current: Some("debug".to_owned()),
             filed: Some("OLD_LEVEL".to_owned()),
+            default: None,
         }));
     assert_eq!(setting(&env, "stranger:level"), None);
     assert!(secrets.is_some_and(|kept| kept.value("stranger:key").is_none()));

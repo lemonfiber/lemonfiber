@@ -1,0 +1,29 @@
+{
+  "fields": {
+    "default": {
+      "type": [
+        "null|string"
+      ],
+      "required": false
+    },
+    "met": {
+      "type": [
+        "boolean"
+      ],
+      "required": true
+    },
+    "service": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "variable": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    }
+  },
+  "variants": []
+}

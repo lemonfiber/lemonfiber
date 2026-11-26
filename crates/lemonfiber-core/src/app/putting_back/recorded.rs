@@ -71,12 +71,14 @@ fn inverted(kind: &crate::journal::Kind) -> Option<crate::journal::Kind> {
             name,
             previous,
             current,
+            default,
             ..
         } => Some(Kind::Setting {
             name: name.clone(),
             previous: current.clone(),
             current: previous.clone(),
             filed: None,
+            default: default.clone(),
         }),
         Kind::Secret {
             name,

@@ -1,6 +1,6 @@
 use lemonfiber_core::model::{
-    Choosable, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingMove, SettingRead,
-    SettingsReport,
+    Choosable, Owner, Reader, ReaderDefault, SecretFrom, SecretRead, SettingChange, SettingDefault,
+    SettingMove, SettingRead, SettingsReport,
 };
 
 fn reader(service: &str, variable: &str, default: Option<&str>) -> Reader {
@@ -81,6 +81,9 @@ fn change(value: Option<&str>, applied: bool) -> SettingChange {
             was: Some("Netherlands".to_owned()),
             value: value.map(str::to_owned),
             consequence: None,
+            default: lemonfiber_core::model::SettingDefault::Declared {
+                value: String::new(),
+            },
         }],
         regenerates: vec!["gluetun".to_owned()],
         restarts: Vec::new(),
@@ -152,7 +155,7 @@ fn a_clear_made_says_the_default_is_written_again_and_what_was_not_restarted() {
     };
     assert_eq!(
         super::settings(&report).text(),
-        "gluetun:countries was cleared, so its default is written again.\n\
+        "gluetun:countries was cleared, so its default, empty, is written again.\n\
          \x20 was          Netherlands\n\
          \x20 regenerates  gluetun\n\
          \x20 restarts     gluetun\n\
@@ -173,12 +176,18 @@ fn a_change_moving_several_settings_names_each_and_answers_them_together() {
             was: None,
             value: Some("private internet access".to_owned()),
             consequence: None,
+            default: lemonfiber_core::model::SettingDefault::Declared {
+                value: "mullvad".to_owned(),
+            },
         },
         SettingMove {
             setting: "gluetun:vpn-type".to_owned(),
             was: Some("wireguard".to_owned()),
             value: Some("openvpn".to_owned()),
             consequence: None,
+            default: lemonfiber_core::model::SettingDefault::Declared {
+                value: "wireguard".to_owned(),
+            },
         },
     ];
     let report = SettingsReport {
@@ -188,7 +197,7 @@ fn a_change_moving_several_settings_names_each_and_answers_them_together() {
     assert_eq!(
         super::settings(&report).text(),
         "gluetun:provider would hold private internet access.\n\
-         \x20 was          at its default\n\
+         \x20 was          at its default, mullvad\n\
          \n\
          gluetun:vpn-type would hold openvpn.\n\
          \x20 was          wireguard\n\
@@ -376,5 +385,108 @@ fn a_setting_with_choices_lists_each_and_a_reference_says_what_it_is_written_bes
              (where gluetun:vpn-type is wireguard)"
         ),
         "{text}"
+    );
+}
+
+fn moving(value: Option<&str>, was: Option<&str>, default: SettingDefault) -> SettingChange {
+    let mut one = change(value, true);
+    if let Some(first) = one.settings.first_mut() {
+        first.was = was.map(str::to_owned);
+        first.default = default;
+    }
+    one
+}
+
+fn first_lines(change: &SettingChange) -> String {
+    super::changed(change, false)
+        .text()
+        .lines()
+        .take(4)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn a_value_equal_to_its_default_is_said_to_be_the_same_as_it() {
+    let said = first_lines(&moving(
+        Some("Sweden"),
+        None,
+        SettingDefault::Declared {
+            value: "Sweden".to_owned(),
+        },
+    ));
+
+    assert!(
+        said.starts_with("gluetun:countries now holds Sweden, the same as its default.\n"),
+        "{said}"
+    );
+    assert!(
+        said.contains("  was          at its default, Sweden"),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_setting_that_held_no_value_says_what_it_fell_back_to() {
+    let per_reader = SettingDefault::PerReader {
+        readers: vec![ReaderDefault {
+            service: "sonarr".to_owned(),
+            variable: "TZ".to_owned(),
+            default: Some("UTC".to_owned()),
+            met: true,
+        }],
+    };
+    for (default, was) in [
+        (
+            SettingDefault::Nothing,
+            "at no value, as nothing declares a default",
+        ),
+        (per_reader, "at each reader's own default"),
+    ] {
+        let said = first_lines(&moving(Some("Sweden"), None, default));
+
+        assert!(said.contains(&format!("  was          {was}\n")), "{said}");
+    }
+}
+
+#[test]
+fn a_cleared_setting_with_nothing_declared_writes_nothing() {
+    let said = first_lines(&moving(None, Some("Sweden"), SettingDefault::Nothing));
+
+    assert!(
+        said.starts_with(
+            "gluetun:countries was cleared, and nothing declares a default, so nothing is \
+             written for it.\n"
+        ),
+        "{said}"
+    );
+}
+
+#[test]
+fn a_cleared_setting_whose_readers_differ_names_each_met_reader() {
+    let reader = |service: &str, default: &str, met: bool| ReaderDefault {
+        service: service.to_owned(),
+        variable: "TZ".to_owned(),
+        default: Some(default.to_owned()),
+        met,
+    };
+    let said = first_lines(&moving(
+        None,
+        Some("Europe/Amsterdam"),
+        SettingDefault::PerReader {
+            readers: vec![
+                reader("sonarr", "UTC", true),
+                reader("radarr", "", true),
+                reader("idle", "Asia/Tokyo", false),
+            ],
+        },
+    ));
+
+    assert_eq!(
+        said,
+        "gluetun:countries was cleared, so each reader's own default is written again:\n\
+         \x20 was          Europe/Amsterdam\n\
+         \x20 sonarr as TZ, UTC by default\n\
+         \x20 radarr as TZ, empty by default"
     );
 }

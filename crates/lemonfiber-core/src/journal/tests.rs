@@ -658,6 +658,7 @@ fn undoing_a_setting_or_a_secret_puts_back_what_it_replaced_against_what_it_left
             previous: Some("slow".to_owned()),
             current: None,
             filed: None,
+            default: None,
         },
     };
     assert_eq!(

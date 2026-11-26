@@ -286,6 +286,7 @@ pub(super) fn a_settings_report() -> SettingsReport {
                 was: Some("Netherlands".to_owned()),
                 value: Some("Belgium".to_owned()),
                 consequence: None,
+                default: lemonfiber_core::model::SettingDefault::Nothing,
             }],
             regenerates: vec!["gluetun".to_owned()],
             restarts: vec!["gluetun".to_owned()],

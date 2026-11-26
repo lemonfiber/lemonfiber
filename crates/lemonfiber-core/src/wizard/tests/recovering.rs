@@ -176,6 +176,7 @@ fn a_written_change_is_said_plainly_enough_to_recognise() {
             previous: None,
             current: Some("fast".to_owned()),
             filed: None,
+            default: None,
         })),
         "the setting komga:mode"
     );

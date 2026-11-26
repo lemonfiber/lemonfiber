@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One reader's own default for a setting.",
+  "type": "object",
+  "properties": {
+    "default": {
+      "description": "What its manifest declares while no value is recorded, where it declares one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "met": {
+      "description": "Whether the settings it needs hold what it needs, so the variable is written.",
+      "type": "boolean"
+    },
+    "service": {
+      "description": "The service.",
+      "type": "string"
+    },
+    "variable": {
+      "description": "The variable it is read into.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "variable",
+    "met"
+  ]
+}

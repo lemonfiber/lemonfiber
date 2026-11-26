@@ -730,6 +730,9 @@ fn a_setting_changed_and_left_unrestarted_is_a_failure() {
                     was: None,
                     value: Some("Belgium".to_owned()),
                     consequence: None,
+                    default: lemonfiber_core::model::SettingDefault::Declared {
+                        value: "wireguard".to_owned(),
+                    },
                 }],
                 regenerates: vec!["gluetun".to_owned()],
                 restarts: vec!["gluetun".to_owned()],

@@ -6,6 +6,12 @@
       ],
       "required": false
     },
+    "default": {
+      "type": [
+        "ref:SettingDefault"
+      ],
+      "required": true
+    },
     "setting": {
       "type": [
         "string"

@@ -275,6 +275,7 @@ fn a_setting_reads_with_its_values_and_a_secret_by_its_name_alone() {
         previous: None,
         current: current.map(str::to_owned),
         filed: None,
+        default: None,
     };
     let secret = |previous: Option<&str>, current: Option<&str>| Kind::Secret {
         name: "komga:token".to_owned(),
@@ -340,6 +341,7 @@ fn a_setting_recorded_since_is_read_off_the_settings_store() {
             previous: None,
             current: Some("fast".to_owned()),
             filed: None,
+            default: None,
         },
     };
     let _ = std::fs::create_dir_all(&config);
@@ -433,5 +435,45 @@ fn a_restart_reads_as_its_service() {
             service: "recyclarr".to_owned(),
         }),
         "restarted recyclarr"
+    );
+}
+
+#[test]
+fn a_cleared_setting_reads_with_the_default_kept_at_the_act() {
+    use crate::journal::Kind;
+    use crate::model::{ReaderDefault, SettingDefault};
+    let cleared = |default: SettingDefault| Kind::Setting {
+        name: "komga:mode".to_owned(),
+        previous: Some("fast".to_owned()),
+        current: None,
+        filed: None,
+        default: Some(default),
+    };
+    assert_eq!(
+        did(&cleared(SettingDefault::Declared {
+            value: "slow".to_owned()
+        })),
+        "cleared komga:mode, so its default, slow, was written again"
+    );
+    assert_eq!(
+        did(&cleared(SettingDefault::Declared {
+            value: String::new()
+        })),
+        "cleared komga:mode, so its default, empty, was written again"
+    );
+    assert_eq!(
+        did(&cleared(SettingDefault::Nothing)),
+        "cleared komga:mode, and nothing declared a default, so nothing was written"
+    );
+    assert_eq!(
+        did(&cleared(SettingDefault::PerReader {
+            readers: vec![ReaderDefault {
+                service: "komga".to_owned(),
+                variable: "MODE".to_owned(),
+                default: None,
+                met: true,
+            }],
+        })),
+        "cleared komga:mode, so its readers' defaults were written again"
     );
 }

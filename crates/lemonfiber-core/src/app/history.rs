@@ -89,6 +89,20 @@ fn told(change: &Change, standing: crate::rollback::Standing, alongside: usize) 
 }
 
 /// What a change did, in the operator's terms rather than the journal's.
+/// A cleared setting, with the default the journal kept for it at the act where it kept one.
+fn cleared(name: &str, default: Option<&crate::model::SettingDefault>) -> String {
+    let Some(default) = default else {
+        return format!("cleared {name}");
+    };
+    match default.said() {
+        Some(said) => format!("cleared {name}, so its default, {said}, was written again"),
+        None if *default == crate::model::SettingDefault::Nothing => {
+            format!("cleared {name}, and nothing declared a default, so nothing was written")
+        }
+        None => format!("cleared {name}, so its readers' defaults were written again"),
+    }
+}
+
 fn did(kind: &Kind) -> String {
     match kind {
         Kind::Created { resource, .. } => format!("added a {resource}"),
@@ -138,7 +152,7 @@ fn did(kind: &Kind) -> String {
             current: Some(current),
             ..
         } => format!("set {name} to {current}"),
-        Kind::Setting { name, .. } => format!("cleared {name}"),
+        Kind::Setting { name, default, .. } => cleared(name, default.as_ref()),
         Kind::Secret {
             name,
             current: None,

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What a setting falls back to while it holds no operator value.",
+  "oneOf": [
+    {
+      "description": "One of the core's own settings, with what the core reads while none is recorded.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "core"
+        },
+        "value": {
+          "description": "The value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "of",
+        "value"
+      ]
+    },
+    {
+      "description": "The one default every reader whose `needs` are met declares. Empty is empty by\ndefault.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "declared"
+        },
+        "value": {
+          "description": "The value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "of",
+        "value"
+      ]
+    },
+    {
+      "description": "Each reader's own, where the readers whose `needs` are met declare different ones.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "per-reader"
+        },
+        "readers": {
+          "description": "Every reader, those whose `needs` are unmet included.",
+          "type": "array",
+          "items": {
+            "$ref": "ReaderDefault.json"
+          }
+        }
+      },
+      "required": [
+        "of",
+        "readers"
+      ]
+    },
+    {
+      "description": "Nothing declares one, so nothing is written for it.",
+      "type": "object",
+      "properties": {
+        "of": {
+          "type": "string",
+          "const": "none"
+        }
+      },
+      "required": [
+        "of"
+      ]
+    }
+  ]
+}

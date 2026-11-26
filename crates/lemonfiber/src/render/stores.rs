@@ -1,5 +1,6 @@
 use lemonfiber_core::model::{
-    Choosable, Owner, Reader, SecretFrom, SecretRead, SettingChange, SettingRead, SettingsReport,
+    Choosable, Owner, Reader, ReaderDefault, SecretFrom, SecretRead, SettingChange, SettingDefault,
+    SettingMove, SettingRead, SettingsReport,
 };
 
 use super::Lines;
@@ -142,33 +143,37 @@ fn whose(whose: &Owner) -> String {
 }
 
 fn read_as(reader: &Reader) -> String {
-    match &reader.default {
-        Some(default) if default.is_empty() => format!(
-            "{} as {}, empty by default",
-            reader.service, reader.variable
-        ),
-        Some(default) => format!(
-            "{} as {}, {default} by default",
-            reader.service, reader.variable
-        ),
-        None => format!("{} as {}", reader.service, reader.variable),
+    defaulted(&reader.service, &reader.variable, reader.default.as_deref())
+}
+
+/// A service reading a setting into a variable, with its default where it declares one.
+fn defaulted(service: &str, variable: &str, default: Option<&str>) -> String {
+    match default {
+        Some("") => format!("{service} as {variable}, empty by default"),
+        Some(default) => format!("{service} as {variable}, {default} by default"),
+        None => format!("{service} as {variable}"),
     }
 }
 
 fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
     let mut lines = Lines::default();
     for (index, one) in change.settings.iter().enumerate() {
-        let now = match (&one.value, change.applied) {
-            (Some(value), true) => format!("{} now holds {value}.", one.setting),
-            (Some(value), false) => format!("{} would hold {value}.", one.setting),
-            (None, true) => format!(
-                "{} was cleared, so its default is written again.",
-                one.setting
+        let now = match &one.value {
+            Some(value) => format!(
+                "{} {} {value}{}.",
+                one.setting,
+                if change.applied {
+                    "now holds"
+                } else {
+                    "would hold"
+                },
+                if one.default.value() == Some(value.as_str()) {
+                    ", the same as its default"
+                } else {
+                    ""
+                }
             ),
-            (None, false) => format!(
-                "{} would be cleared, so its default is written again.",
-                one.setting
-            ),
+            None => cleared(one, change.applied),
         };
         if index == 0 {
             lines.put(now);
@@ -177,8 +182,17 @@ fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
         }
         lines.put(format!(
             "  was          {}",
-            one.was.as_deref().unwrap_or("at its default")
+            one.was
+                .clone()
+                .unwrap_or_else(|| at_its_default(&one.default))
         ));
+        if one.value.is_none() {
+            if let SettingDefault::PerReader { readers } = &one.default {
+                for reader in readers.iter().filter(|reader| reader.met) {
+                    lines.put(format!("  {}", reader_default(reader)));
+                }
+            }
+        }
     }
     let regenerates = format!(
         "  regenerates  {}",
@@ -218,6 +232,43 @@ fn changed(change: &SettingChange, rehearsed: bool) -> Lines {
         lines.extend(answering(change, rehearsed));
     }
     lines
+}
+
+/// The sentence a cleared setting is said in, naming what is written in its place.
+fn cleared(one: &SettingMove, applied: bool) -> String {
+    let is = if applied {
+        "was cleared"
+    } else {
+        "would be cleared"
+    };
+    match (&one.default, one.default.said()) {
+        (_, Some(said)) => format!(
+            "{} {is}, so its default, {said}, is written again.",
+            one.setting
+        ),
+        (SettingDefault::Nothing, None) => format!(
+            "{} {is}, and nothing declares a default, so nothing is written for it.",
+            one.setting
+        ),
+        (_, None) => format!(
+            "{} {is}, so each reader's own default is written again:",
+            one.setting
+        ),
+    }
+}
+
+/// What a setting held before the change where it held no operator value.
+fn at_its_default(default: &SettingDefault) -> String {
+    match (default, default.said()) {
+        (_, Some(said)) => format!("at its default, {said}"),
+        (SettingDefault::Nothing, None) => "at no value, as nothing declares a default".to_owned(),
+        (_, None) => "at each reader's own default".to_owned(),
+    }
+}
+
+/// One reader's own default, as a cleared setting lists it.
+fn reader_default(reader: &ReaderDefault) -> String {
+    defaulted(&reader.service, &reader.variable, reader.default.as_deref())
 }
 
 fn listed_or(names: &[String], none: &str) -> String {

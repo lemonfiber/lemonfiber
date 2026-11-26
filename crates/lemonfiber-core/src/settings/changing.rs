@@ -10,7 +10,9 @@ use crate::error::codes::setting::{ALREADY_HOLDS, OWNER_SET_UP, SETTINGS_MOVED};
 use crate::error::{Diagnose, Problem, Remedy, State};
 use crate::instant::Instant;
 use crate::journal::{Change, Kind};
-use crate::model::{SettingChange, SettingMove, SettingsReport, Waiting};
+use crate::model::{
+    Owner, ReaderDefault, SettingChange, SettingDefault, SettingMove, SettingsReport, Waiting,
+};
 
 use super::readers::{self, Readers};
 use super::recorded::Recorded;
@@ -21,12 +23,13 @@ pub(super) const REFUSING: writing::Refusing = writing::Refusing {
     unwritten: crate::error::codes::config::CONFIG_NOT_WRITTEN,
 };
 
-const OFFERED: [&str; 5] = [
+const OFFERED: [&str; 6] = [
     "the change itself",
     "what it holds now",
     "the entries it regenerates",
     "the services it restarts",
     "the services it starts",
+    "the defaults it falls back to",
 ];
 
 pub(super) struct Asked<'a> {
@@ -71,15 +74,7 @@ pub(super) async fn changed(ctx: &Ctx, asked: &Asked<'_>) -> Result<SettingsRepo
     if !outside.is_empty() {
         return Err(Box::new(super::choosing::refused(&outside)));
     }
-    let settings: Vec<SettingMove> = changing
-        .iter()
-        .map(|(setting, value)| SettingMove {
-            setting: (*setting).to_owned(),
-            was: held(setting),
-            value: value.map(str::to_owned),
-            consequence: consequence(ctx, setting, *value),
-        })
-        .collect();
+    let settings = moves(ctx, (&manifest, installed), &changing, &held);
     let regenerates = regenerating(
         ctx,
         &manifest,
@@ -210,6 +205,69 @@ fn journalled(one: &SettingMove, stamp: Instant) -> Change {
             previous: one.was.clone(),
             current: one.value.clone(),
             filed: None,
+            default: Some(one.default.clone()),
+        },
+    }
+}
+
+/// Each setting `changing` moves, with what it held under `held` and the default it falls
+/// back to with the change in place.
+fn moves(
+    ctx: &Ctx,
+    (manifest, installed): (&lemonfiber_manifest::Manifest, &[crate::plugin::Installed]),
+    changing: &BTreeMap<&str, Option<&str>>,
+    held: &dyn Fn(&str) -> Option<String>,
+) -> Vec<SettingMove> {
+    let after = |name: &str| match changing.get(name) {
+        Some(value) => value.map(str::to_owned),
+        None => held(name),
+    };
+    let reading_after = readers::readers(manifest, installed, &after);
+    changing
+        .iter()
+        .map(|(setting, value)| SettingMove {
+            setting: (*setting).to_owned(),
+            was: held(setting),
+            value: value.map(str::to_owned),
+            consequence: consequence(ctx, setting, *value),
+            default: fallback(setting, &reading_after),
+        })
+        .collect()
+}
+
+/// What `setting` falls back to under `readers`: the core's own default for one of its
+/// settings that has one, or else what the readers whose `needs` are met declare.
+fn fallback(setting: &str, readers: &Readers) -> SettingDefault {
+    if readers::whose(setting) == Owner::Core {
+        if let Some(value) = super::own::unset(setting).and_then(super::own::Unset::written) {
+            return SettingDefault::Core { value };
+        }
+    }
+    let reading = readers
+        .settings
+        .get(setting)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let declared: std::collections::BTreeSet<Option<&str>> = reading
+        .iter()
+        .filter(|reader| reader.met)
+        .map(|reader| reader.default.as_deref())
+        .collect();
+    match declared.into_iter().collect::<Vec<_>>().as_slice() {
+        [] | [None] => SettingDefault::Nothing,
+        [Some(value)] => SettingDefault::Declared {
+            value: (*value).to_owned(),
+        },
+        _ => SettingDefault::PerReader {
+            readers: reading
+                .iter()
+                .map(|reader| ReaderDefault {
+                    service: reader.service.clone(),
+                    variable: reader.variable.clone(),
+                    default: reader.default.clone(),
+                    met: reader.met,
+                })
+                .collect(),
         },
     }
 }
@@ -316,7 +374,12 @@ fn offer(
     let regenerates: Vec<&str> = regenerates.iter().map(String::as_str).collect();
     let restarts: Vec<&str> = restarts.iter().map(String::as_str).collect();
     let starts: Vec<&str> = starts.iter().map(String::as_str).collect();
-    crate::agreement::parted(&[&asked, &was, &regenerates, &restarts, &starts])
+    let defaults: Vec<String> = moves
+        .iter()
+        .map(|one| serde_json::to_string(&one.default).unwrap_or_default())
+        .collect();
+    let defaults: Vec<&str> = defaults.iter().map(String::as_str).collect();
+    crate::agreement::parted(&[&asked, &was, &regenerates, &restarts, &starts, &defaults])
 }
 
 /// The names of `changing`'s settings, as one phrase.
@@ -356,3 +419,6 @@ fn offer_moved(changing: &BTreeMap<&str, Option<&str>>, moved: &[&str], standing
     )
     .in_state(State::Guided)
 }
+
+#[cfg(test)]
+mod defaults;
