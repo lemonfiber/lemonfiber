@@ -467,8 +467,9 @@ fn paused_and_resumed(core: &Core, client: &str, passed_over: &[String]) {
 }
 
 /// A stack this build sets up beneath `root` and starts with `forms`, downloading as
-/// `downloads` says, seeded, and `substitution` put in place once it is first seeded.
-/// Nothing where the household has no address to reach it at.
+/// `downloads` says, seeded, and `substitution` put in place once it is first seeded,
+/// seeded again and its adapters proved. Nothing where the household has no address to
+/// reach it at.
 ///
 /// # Panics
 ///
@@ -523,6 +524,10 @@ fn started(
         let made = substitution.made(&core);
         assert!(made.is_ok(), "{made:?}");
         step(&core.run(&["seed"], ""), "seed after the substitution");
+        step(
+            &core.agreed(&["plugin", "prove", &substitution.plugin]),
+            "conformance",
+        );
     }
     Some(core)
 }

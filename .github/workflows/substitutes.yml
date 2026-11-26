@@ -102,6 +102,7 @@ jobs:
           - media-serve-audiobooks
           - media-serve-plex-unclaimed
           - media-serve-emby
+          - identity-source-emby
           - library-curate-medusa
           - indexer-proxy
           - download-usenet
