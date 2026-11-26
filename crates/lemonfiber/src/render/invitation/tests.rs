@@ -514,6 +514,33 @@ fn what_they_ask_for_not_held_is_said() {
     assert!(!said.contains(Policy::EverythingWaits.means()), "{said}");
 }
 
+/// An offer naming no library lets them watch every library, and says so.
+#[test]
+fn an_offer_naming_no_library_lets_them_watch_every_library() {
+    let mut everywhere = narrowing(Some(Policy::EverythingWaits), Linked::Made);
+    if let Some(applied) = everywhere.applied.as_mut() {
+        applied.libraries.clear();
+    }
+    let said = invitation(&everywhere).text();
+
+    assert!(
+        said.contains("They may watch: every library; nothing above about 12"),
+        "{said}"
+    );
+}
+
+/// Where the request service was never asked to hold them, nothing is said about what
+/// becomes of what they ask for.
+#[test]
+fn what_they_ask_for_is_not_mentioned_where_nothing_was_asked_of_the_request_service() {
+    for requesting in [Linked::Made, Linked::NotTried] {
+        let said = invitation(&narrowing(None, requesting)).text();
+
+        assert!(said.contains("They may watch: Films"), "{said}");
+        assert!(!said.contains("What they ask for:"), "{said}");
+    }
+}
+
 /// An offer that set nothing about access says nothing about it.
 #[test]
 fn an_offer_that_set_nothing_says_nothing_about_access() {
