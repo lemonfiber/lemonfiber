@@ -1,6 +1,6 @@
-//! The door's own cases, `check_door.py`'s in the media stack, each asked of a guard
-//! enforcing Jellyfin's declaration and nothing else. The four that turn on which client
-//! a request came from are the envelope's proxy, not the declaration, and are not here.
+//! The door's own cases, each asked of a guard enforcing Jellyfin's declaration and nothing
+//! else. The four that turn on which client a request came from are the envelope's proxy,
+//! not the declaration, and are not here.
 
 use super::declared;
 use super::guard::{matching, passes, CLOSED, MEMBER, OPEN};
