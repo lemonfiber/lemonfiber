@@ -151,25 +151,26 @@ async fn made(ctx: &Ctx, data_root: Option<&Path>, asking: &[Asked<'_>]) -> Vec<
     };
     let folders: BTreeSet<&(String, String)> =
         asking.iter().flat_map(|(_, _, serves)| serves).collect();
-    let mut unmade = Vec::new();
-    for (media_type, folder) in folders {
+    let hosts = folders.into_iter().filter_map(|(media_type, folder)| {
         let at = RootFolder {
             path: folder.clone(),
             media_type: media_type.clone(),
         };
-        if let Some(host) = crate::seed::on_host(&at, DATA_ROOT, data_root) {
-            if let Err(fault) = ctx.seams.filesystem.make_beneath(&host, data_root).await {
-                unmade.push(Wiring::settled(
-                    format!("the folder for {media_type} beneath the data root"),
-                    State::Failed {
-                        detail: format!(
-                            "the directory {} could not be made: {}",
-                            host.display(),
-                            fault.message
-                        ),
-                    },
-                ));
-            }
+        crate::seed::on_host(&at, DATA_ROOT, data_root).map(|host| (media_type, host))
+    });
+    let mut unmade = Vec::new();
+    for (media_type, host) in hosts {
+        if let Err(fault) = ctx.seams.filesystem.make_beneath(&host, data_root).await {
+            unmade.push(Wiring::settled(
+                format!("the folder for {media_type} beneath the data root"),
+                State::Failed {
+                    detail: format!(
+                        "the directory {} could not be made: {}",
+                        host.display(),
+                        fault.message
+                    ),
+                },
+            ));
         }
     }
     unmade
