@@ -47,3 +47,6 @@ pub(crate) fn abridged(envelope: &mut Value) {
         requirements.retain(|id, _| cited.contains(id));
     }
 }
+
+#[cfg(test)]
+mod tests;
