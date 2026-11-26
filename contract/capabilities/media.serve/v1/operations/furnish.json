@@ -8,7 +8,7 @@
             "$defs": {
               "FiledAt": {
                 "additionalProperties": false,
-                "description": "One media type the stack files, and the folder the media server reads it at.",
+                "description": "One media type the stack files or the media server serves, and the folder the media\nserver reads it at.",
                 "properties": {
                   "folder": {
                     "description": "The folder holding it, as a path inside the media server's container.",

@@ -27,6 +27,16 @@ fn server(also: &[&str]) -> crate::plugin::Installed {
     installed
 }
 
+/// The media server's plugin, speaking `media.serve` and declaring each of `media` as
+/// its own.
+fn serving(media: &[&str]) -> crate::plugin::Installed {
+    let mut installed = server(&[]);
+    for placed in &mut installed.services {
+        placed.media_types = media.iter().map(|one| (*one).to_owned()).collect();
+    }
+    installed
+}
+
 /// A curator's plugin filing each of `media` over `library.curate`.
 fn curating(media: &[&str]) -> crate::plugin::Installed {
     let mut installed = contracted("curating", "shows", "library.curate");
@@ -49,14 +59,45 @@ fn answering(body: &str) -> Arc<Fake> {
     Fake::by_path(vec![(FURNISH, Answer::reply(200, body))])
 }
 
-/// What the media server is given on a seed of `fillers`, with `baseline` and `kept_off`.
+/// Where the data root is on the host in these tests.
+const DATA_ROOT: &str = "/srv/data";
+
+/// What the media server is given on a seed of `fillers`, with `baseline` and `kept_off`,
+/// where no data root is known.
 async fn furnished(
     ctx: &Ctx,
     fillers: &crate::wiring::Fillers,
     baseline: &Baseline,
     kept_off: &BTreeSet<String>,
 ) -> Vec<crate::seed::Wiring> {
-    super::super::furnishing::seed_furnishing(ctx, fillers, baseline, kept_off).await
+    super::super::furnishing::seed_furnishing(ctx, fillers, baseline, kept_off, None).await
+}
+
+/// What the media server is given on a seed of `fillers` with the data root at
+/// [`DATA_ROOT`].
+async fn furnished_beneath(
+    ctx: &Ctx,
+    fillers: &crate::wiring::Fillers,
+) -> Vec<crate::seed::Wiring> {
+    super::super::furnishing::seed_furnishing(
+        ctx,
+        fillers,
+        &Baseline::new(),
+        &BTreeSet::new(),
+        Some(std::path::Path::new(DATA_ROOT)),
+    )
+    .await
+}
+
+/// The wirings saying a folder could not be made.
+fn unmade(wirings: &[crate::seed::Wiring]) -> Vec<&str> {
+    wirings
+        .iter()
+        .filter_map(|wiring| match &wiring.state {
+            crate::seed::State::Failed { detail } => Some(detail.as_str()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The bodies the adapter was asked `furnish` with.
@@ -280,6 +321,114 @@ async fn a_stack_filing_only_media_types_outside_the_vocabulary_asks_nothing() {
 
     assert!(
         matches!(wirings.as_slice(), [one] if matches!(one.state, crate::seed::State::Unmatched { .. })),
+        "{wirings:?}"
+    );
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_media_server_whose_media_no_curator_files_is_handed_its_own_media_types() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-its-own");
+    let http = answering(r#"[{"media_type":"music","held":true}]"#);
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None)));
+    let fillers = stack(&project, &[serving(&["music"])]);
+
+    let wirings = furnished_beneath(&ctx, &fillers).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    let bodies = asked(&http);
+    let folder = super::super::baseline::media_folder("music").unwrap_or_default();
+    assert!(
+        matches!(bodies.as_slice(), [body] if body.contains("\"music\"") && body.contains(&folder)),
+        "{bodies:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_media_type_both_filed_and_served_is_handed_over_once() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-once");
+    let http = answering("[]");
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+    let fillers = stack(
+        &project,
+        &[serving(&["tv", "music"]), curating(&["tv", "movies"])],
+    );
+
+    let wirings = furnished(&ctx, &fillers, &Baseline::new(), &BTreeSet::new()).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    let bodies = asked(&http);
+    assert_eq!(bodies.len(), 1, "{bodies:?}");
+    for media in ["movies", "music", "tv"] {
+        let named = format!("\"{media}\"");
+        assert!(
+            bodies.iter().all(|body| body.matches(&named).count() == 1),
+            "{media} not handed over exactly once in {bodies:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn each_folder_is_made_beneath_the_data_root_before_the_media_server_is_asked() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-made");
+    let http = answering("[]");
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None).missing(vec!["media/music"])));
+    let fillers = stack(&project, &[serving(&["music"]), curating(&["tv"])]);
+
+    let wirings = furnished_beneath(&ctx, &fillers).await;
+
+    let made = format!("the directory {DATA_ROOT}/media/music could not be made");
+    assert!(
+        matches!(unmade(&wirings).as_slice(), [one] if one.starts_with(&made)),
+        "{wirings:?}"
+    );
+    let at = |connection: &str| {
+        wirings
+            .iter()
+            .position(|one| one.connection.contains(connection))
+    };
+    assert!(
+        at("beneath the data root") < at("given a library"),
+        "the folder was not made before the media server was asked: {wirings:?}"
+    );
+    assert_eq!(asked(&http).len(), 1, "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_rehearsal_makes_no_folder() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-rehearsed-unmade");
+    let http = answering("[]");
+    let mut ctx = contracted_ctx(&project, SERVICE, true, http.clone())
+        .with_filesystem(Arc::new(SeedFs::keyed(None).missing(vec!["media/"])));
+    ctx.dry_run = true;
+    let fillers = stack(&project, &[serving(&["music"])]);
+
+    let wirings = furnished_beneath(&ctx, &fillers).await;
+
+    assert!(unmade(&wirings).is_empty(), "{wirings:?}");
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+#[tokio::test]
+async fn a_media_type_a_media_server_serves_outside_the_vocabulary_is_reported() {
+    let project = lemonfiber_fixtures::scratch::Scratch::new("furnishing-serves-outside");
+    let http = answering("[]");
+    let ctx = contracted_ctx(&project, SERVICE, true, http.clone());
+    let fillers = stack(&project, &[serving(&["../escaped"])]);
+
+    let wirings = furnished(&ctx, &fillers, &Baseline::new(), &BTreeSet::new()).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.connection.contains("serving")
+            && matches!(one.state, crate::seed::State::Unmatched { .. })),
         "{wirings:?}"
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());

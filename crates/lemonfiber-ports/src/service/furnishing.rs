@@ -1,10 +1,11 @@
-//! A media server, given a library for each media type the stack files.
+//! A media server, given a library for each media type the stack files or it serves.
 
 use async_trait::async_trait;
 
 use super::Failure;
 
-/// One media type the stack files, and the folder the media server reads it at.
+/// One media type the stack files or the media server serves, and the folder the media
+/// server reads it at.
 #[derive(
     Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
@@ -28,8 +29,8 @@ pub struct Furnished {
     pub held: bool,
 }
 
-/// A media server, given a library for each media type the stack files, never changing
-/// one the operator arranged.
+/// A media server, given a library for each media type the stack files or it serves,
+/// never changing one the operator arranged.
 #[async_trait]
 pub trait Furnishing: Send + Sync {
     /// Add a library for each of `filed` whose folder exists and that no library reads,
