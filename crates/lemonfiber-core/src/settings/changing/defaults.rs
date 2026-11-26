@@ -45,31 +45,30 @@ fn readers_that_differ_are_each_named_with_whether_they_are_met() {
         reader("idle", None, false),
     ]);
 
-    let SettingDefault::PerReader { readers } = fallback("comics:mode", &readers) else {
-        unreachable!("readers declaring different defaults were not listed one by one");
-    };
     assert_eq!(
-        readers,
-        vec![
-            ReaderDefault {
-                service: "komga".to_owned(),
-                variable: "MODE".to_owned(),
-                default: Some("slow".to_owned()),
-                met: true,
-            },
-            ReaderDefault {
-                service: "worker".to_owned(),
-                variable: "MODE".to_owned(),
-                default: Some(String::new()),
-                met: true,
-            },
-            ReaderDefault {
-                service: "idle".to_owned(),
-                variable: "MODE".to_owned(),
-                default: None,
-                met: false,
-            },
-        ]
+        fallback("comics:mode", &readers),
+        SettingDefault::PerReader {
+            readers: vec![
+                ReaderDefault {
+                    service: "komga".to_owned(),
+                    variable: "MODE".to_owned(),
+                    default: Some("slow".to_owned()),
+                    met: true,
+                },
+                ReaderDefault {
+                    service: "worker".to_owned(),
+                    variable: "MODE".to_owned(),
+                    default: Some(String::new()),
+                    met: true,
+                },
+                ReaderDefault {
+                    service: "idle".to_owned(),
+                    variable: "MODE".to_owned(),
+                    default: None,
+                    met: false,
+                },
+            ],
+        }
     );
 }
 
@@ -89,17 +88,18 @@ fn with_nothing_declared_or_nobody_met_there_is_no_default() {
 
 #[test]
 fn a_core_setting_falls_back_to_the_cores_own_default() {
-    let Some((name, default)) = crate::settings::own::CORE.iter().find_map(|(name, _)| {
+    let declared = crate::settings::own::CORE.iter().find_map(|(name, _)| {
         crate::settings::own::unset(name)
             .and_then(crate::settings::own::Unset::written)
             .map(|default| (*name, default))
-    }) else {
-        unreachable!("no core setting declares a default");
-    };
+    });
 
+    assert!(declared.is_some(), "no core setting declares a default");
     assert_eq!(
-        fallback(name, &Readers::default()),
-        SettingDefault::Core { value: default }
+        declared
+            .as_ref()
+            .map(|(name, _)| fallback(name, &Readers::default())),
+        declared.map(|(_, value)| SettingDefault::Core { value })
     );
 }
 

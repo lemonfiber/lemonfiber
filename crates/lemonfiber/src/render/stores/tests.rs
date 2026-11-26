@@ -427,6 +427,29 @@ fn a_value_equal_to_its_default_is_said_to_be_the_same_as_it() {
 }
 
 #[test]
+fn a_setting_that_held_no_value_says_what_it_fell_back_to() {
+    let per_reader = SettingDefault::PerReader {
+        readers: vec![ReaderDefault {
+            service: "sonarr".to_owned(),
+            variable: "TZ".to_owned(),
+            default: Some("UTC".to_owned()),
+            met: true,
+        }],
+    };
+    for (default, was) in [
+        (
+            SettingDefault::Nothing,
+            "at no value, as nothing declares a default",
+        ),
+        (per_reader, "at each reader's own default"),
+    ] {
+        let said = first_lines(&moving(Some("Sweden"), None, default));
+
+        assert!(said.contains(&format!("  was          {was}\n")), "{said}");
+    }
+}
+
+#[test]
 fn a_cleared_setting_with_nothing_declared_writes_nothing() {
     let said = first_lines(&moving(None, Some("Sweden"), SettingDefault::Nothing));
 
