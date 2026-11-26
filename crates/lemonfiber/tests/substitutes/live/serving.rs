@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use super::core::{strings_under, Core};
 use super::{
-    fixture, providing, started, step, undone, waited_every, Asked, Substitution, IDENTIFIES,
-    LOOKING, MEMBER,
+    fixture, providing, started, step, undone, waited_every, Substitution, IDENTIFIES, LOOKING,
+    MEMBER,
 };
 
 /// What setup is told to fetch over: nothing, which makes it a stack serving a library
@@ -28,13 +28,13 @@ fn holds(core: &Core, whom: &[&str]) -> bool {
 }
 
 /// Run `substitution`, a media server, live through a stack this build sets up beneath
-/// `root` for `asked`'s media type alone, chosen as the identity source too where it is
+/// `root` with `forms`, serving `media`, chosen as the identity source too where it is
 /// one, since installing it contests the stack's.
 ///
 /// # Panics
 ///
 /// At the first step that does not come to what it should, naming it and what was said.
-pub fn run(root: &Path, asked: &Asked, substitution: &Substitution) {
+pub fn run(root: &Path, media: &str, forms: &[&str], substitution: &Substitution) {
     let identifies = providing(&substitution.plugin, IDENTIFIES).is_some();
     let substitution = Substitution {
         also: identifies
@@ -43,23 +43,17 @@ pub fn run(root: &Path, asked: &Asked, substitution: &Substitution) {
             .collect(),
         ..substitution.clone()
     };
-    let Some(core) = started(
-        root,
-        asked.forms,
-        (NOTHING_FETCHED, &[]),
-        Some(&substitution),
-    ) else {
+    let Some(core) = started(root, forms, (NOTHING_FETCHED, &[]), Some(&substitution)) else {
         return;
     };
 
-    let library = super::library(root, asked.media);
+    let library = super::library(root, media);
     assert!(
         library.is_dir(),
-        "the seed furnished no library for {} at {}",
-        asked.media,
+        "the seed furnished no library for {media} at {}",
         library.display()
     );
-    let written = fixture::written(&library, asked.media);
+    let written = fixture::written(&library, media);
     assert!(written.is_ok(), "{written:?}");
     assert!(
         waited_every(HELD_WITHIN, LOOKING, || {
