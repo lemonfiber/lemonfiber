@@ -11,131 +11,39 @@
     {
       "title": "New",
       "entries": [
-        {
-          "summary": "Decide what an archive holds and whether it restores",
-          "requirements": ["E3-R2"],
-          "reference": "#115"
-        },
-        {
-          "summary": "Capture a configuration to an archive, pruning older ones",
-          "requirements": ["E3-R2"],
-          "reference": "#116"
-        },
-        {
-          "summary": "Verify a backup and unpack it back over the layout",
-          "requirements": ["E3-R7"],
-          "reference": "#117"
-        },
-        {
-          "summary": "Run backup and restore over a real tar archive",
-          "requirements": ["E3-R7"],
-          "reference": "#118"
-        },
-        {
-          "summary": "Re-point the restored data root, and name the reconcile",
-          "requirements": ["E3-R10"],
-          "reference": "#119"
-        },
-        {
-          "summary": "The read-only screen's shape, kept honest by its types",
-          "requirements": ["B3-R5"],
-          "reference": "#120"
-        },
-        {
-          "summary": "Assemble a snapshot from the live stack, degrading not failing",
-          "requirements": ["B3-R7"],
-          "reference": "#121"
-        },
-        {
-          "summary": "Fill the storage panel with live free space",
-          "requirements": ["B3-R8"],
-          "reference": "#122"
-        },
-        {
-          "summary": "Read a service's queue depth and stuck count",
-          "requirements": ["B3-R2"],
-          "reference": "#123"
-        },
-        {
-          "summary": "Fill the queue panel from each arr",
-          "requirements": ["B3-R2"],
-          "reference": "#124"
-        },
-        {
-          "summary": "The transfers panel — port, adapters, gather driver + dedup sweep",
-          "requirements": ["B3-R2"],
-          "reference": "#126"
-        },
-        {
-          "summary": "Fill the VPN panel from the tunnel it shares with the leak check",
-          "requirements": ["B3-R3"],
-          "reference": "#127"
-        },
-        {
-          "summary": "Fill the storage panel's hardlink status and exhaustion",
-          "requirements": ["B3-R8"],
-          "reference": "#128"
-        },
-        {
-          "summary": "Project free-space exhaustion from the download queue",
-          "requirements": ["C5-R6"],
-          "reference": "#129"
-        }
+        {"summary": "Decide what an archive holds and whether it restores", "requirements": ["E3-R2"], "reference": "#115"},
+        {"summary": "Capture a configuration to an archive, pruning older ones", "requirements": ["E3-R2"], "reference": "#116"},
+        {"summary": "Verify a backup and unpack it back over the layout", "requirements": ["E3-R7"], "reference": "#117"},
+        {"summary": "Run backup and restore over a real tar archive", "requirements": ["E3-R7"], "reference": "#118"},
+        {"summary": "Re-point the restored data root, and name the reconcile", "requirements": ["E3-R10"], "reference": "#119"},
+        {"summary": "The read-only screen's shape, kept honest by its types", "requirements": ["B3-R5"], "reference": "#120"},
+        {"summary": "Assemble a snapshot from the live stack, degrading not failing", "requirements": ["B3-R7"], "reference": "#121"},
+        {"summary": "Fill the storage panel with live free space", "requirements": ["B3-R8"], "reference": "#122"},
+        {"summary": "Read a service's queue depth and stuck count", "requirements": ["B3-R2"], "reference": "#123"},
+        {"summary": "Fill the queue panel from each arr", "requirements": ["B3-R2"], "reference": "#124"},
+        {"summary": "The transfers panel — port, adapters, gather driver + dedup sweep", "requirements": ["B3-R2"], "reference": "#126"},
+        {"summary": "Fill the VPN panel from the tunnel it shares with the leak check", "requirements": ["B3-R3"], "reference": "#127"},
+        {"summary": "Fill the storage panel's hardlink status and exhaustion", "requirements": ["B3-R8"], "reference": "#128"},
+        {"summary": "Project free-space exhaustion from the download queue", "requirements": ["C5-R6"], "reference": "#129"}
       ]
     },
     {
       "title": "Fixed",
       "entries": [
-        {
-          "summary": "Upgrade cargo-dist to 0.32 and lint the release pipeline",
-          "requirements": ["L1-R1"],
-          "reference": "#133"
-        },
-        {
-          "summary": "Resolve the LICENSE asset and defer the Windows target",
-          "requirements": ["L1-R1"],
-          "reference": "#136"
-        },
-        {
-          "summary": "Create the draft directly (create-release=true + --draft)",
-          "requirements": ["L1-R1"],
-          "reference": "#138"
-        }
+        {"summary": "Upgrade cargo-dist to 0.32 and lint the release pipeline", "requirements": ["L1-R1"], "reference": "#133"},
+        {"summary": "Resolve the LICENSE asset and defer the Windows target", "requirements": ["L1-R1"], "reference": "#136"},
+        {"summary": "Create the draft directly (create-release=true + --draft)", "requirements": ["L1-R1"], "reference": "#138"}
       ]
     },
     {
       "title": "Maintenance",
       "entries": [
-        {
-          "summary": "Give M5 and M6 their real deliverable rows",
-          "requirements": ["GOV-R12"],
-          "reference": "#125"
-        },
-        {
-          "summary": "Renumber the tracker to the new milestone scheme",
-          "requirements": ["GOV-R12"],
-          "reference": "#130"
-        },
-        {
-          "summary": "Set the workspace version to 0.3.0",
-          "requirements": ["OPS-R1"],
-          "reference": "#131"
-        },
-        {
-          "summary": "Generate the real cargo-dist release pipeline",
-          "requirements": ["L1-R1"],
-          "reference": "#132"
-        },
-        {
-          "summary": "Make the pipeline leave a draft, not auto-publish",
-          "requirements": ["L1-R1"],
-          "reference": "#134"
-        },
-        {
-          "summary": "Defer Homebrew + PowerShell to 1.0.0",
-          "requirements": ["L1-R1"],
-          "reference": "#137"
-        }
+        {"summary": "Give M5 and M6 their real deliverable rows", "requirements": ["GOV-R12"], "reference": "#125"},
+        {"summary": "Renumber the tracker to the new milestone scheme", "requirements": ["GOV-R12"], "reference": "#130"},
+        {"summary": "Set the workspace version to 0.3.0", "requirements": ["OPS-R1"], "reference": "#131"},
+        {"summary": "Generate the real cargo-dist release pipeline", "requirements": ["L1-R1"], "reference": "#132"},
+        {"summary": "Make the pipeline leave a draft, not auto-publish", "requirements": ["L1-R1"], "reference": "#134"},
+        {"summary": "Defer Homebrew + PowerShell to 1.0.0", "requirements": ["L1-R1"], "reference": "#137"}
       ]
     }
   ],

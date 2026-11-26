@@ -24,6 +24,10 @@
     ],
     "updates": [
       {
+        "delivers": "Plugins — what the bundled stack can do, and where a plugin comes from",
+        "version": "0.17.0"
+      },
+      {
         "delivers": "Plugins — what one is, installing one, and what that leaves readable",
         "version": "0.16.0"
       },
