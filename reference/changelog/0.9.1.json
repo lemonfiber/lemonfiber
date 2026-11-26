@@ -11,51 +11,19 @@
     {
       "title": "Fixed",
       "entries": [
-        {
-          "summary": "Mint a token that may create a release",
-          "requirements": ["OPS-R34"],
-          "reference": "#432"
-        },
-        {
-          "summary": "The guard is about branches, and lets a tag through",
-          "requirements": ["Q-R28"],
-          "reference": "#431"
-        }
+        {"summary": "Mint a token that may create a release", "requirements": ["OPS-R34"], "reference": "#432"},
+        {"summary": "The guard is about branches, and lets a tag through", "requirements": ["Q-R28"], "reference": "#431"}
       ]
     },
     {
       "title": "Maintenance",
       "entries": [
-        {
-          "summary": "Bump etcetera from 0.10.0 to 0.11.0",
-          "requirements": [],
-          "reference": "#385"
-        },
-        {
-          "summary": "Bump toml from 0.9.12+spec-1.1.0 to 1.1.4+spec-1.1.0",
-          "requirements": [],
-          "reference": "#384"
-        },
-        {
-          "summary": "Bump the cargo group across 1 directory with 6 updates",
-          "requirements": [],
-          "reference": "#402"
-        },
-        {
-          "summary": "Bump actions/cache/restore from 4.3.0 to 6.1.0",
-          "requirements": [],
-          "reference": "#388"
-        },
-        {
-          "summary": "Bump Swatinem/rust-cache",
-          "requirements": [],
-          "reference": "#387"
-        },
-        {
-          "summary": "Bump the workspace to 0.9.1",
-          "requirements": ["GOV-R12"],
-          "reference": "#434"
-        }
+        {"summary": "Bump etcetera from 0.10.0 to 0.11.0", "requirements": [], "reference": "#385"},
+        {"summary": "Bump toml from 0.9.12+spec-1.1.0 to 1.1.4+spec-1.1.0", "requirements": [], "reference": "#384"},
+        {"summary": "Bump the cargo group across 1 directory with 6 updates", "requirements": [], "reference": "#402"},
+        {"summary": "Bump actions/cache/restore from 4.3.0 to 6.1.0", "requirements": [], "reference": "#388"},
+        {"summary": "Bump Swatinem/rust-cache", "requirements": [], "reference": "#387"},
+        {"summary": "Bump the workspace to 0.9.1", "requirements": ["GOV-R12"], "reference": "#434"}
       ]
     }
   ],

@@ -20,8 +20,9 @@ releases shipped a requirement is not stored anywhere: it is read off the releas
 entries, so it cannot disagree with them.
 
 Every file is written by one formatter: two-space indent, keys in the order the
-record builds them, and an array or object holding only strings, numbers, booleans
-or nulls on one line. Reading a file and writing it again gives the same bytes.
+record builds them, an array holding only strings, numbers, booleans or nulls on one
+line, and an object holding only those or such arrays on one line, so each entry of
+a release is one line. Reading a file and writing it again gives the same bytes.
 
 Run:  python3 scripts/a_release_written_once.py --self-test
 """
@@ -49,11 +50,17 @@ def scalar(value: object) -> bool:
     return value is None or isinstance(value, (str, int, float, bool))
 
 
+def flat(value: object) -> bool:
+    """Whether a value is written on one line inside an object: a scalar, or an array
+    of scalars."""
+    return scalar(value) or (isinstance(value, list) and all(scalar(item) for item in value))
+
+
 def dumps(value: object, depth: int = 0) -> str:
     """One value as a release file writes it, without the trailing newline."""
     inner = INDENT * (depth + 1)
     if isinstance(value, dict):
-        if all(scalar(item) for item in value.values()):
+        if all(flat(item) for item in value.values()):
             return json.dumps(value, ensure_ascii=False)
         fields = [f"{inner}{json.dumps(key, ensure_ascii=False)}: {dumps(item, depth + 1)}" for key, item in value.items()]
         return "{\n" + ",\n".join(fields) + "\n" + INDENT * depth + "}"
@@ -234,12 +241,20 @@ def self_test() -> int:
         "requirements": {"A6-R1": {**page, "shipped_in": ["0.2.0", "0.1.0"]}, "A6-R2": {**page, "shipped_in": ["0.2.0"]}},
     }
 
-    # The formatter: scalar arrays on one line, nesting indented, and a file read
-    # and written again is the same bytes.
-    shaped = rendered({"a": [1, "two", None, True], "b": [{"c": []}], "d": {}, "e": {"f": "g", "h": 1}})
+    # The formatter: scalar arrays and objects of scalars or scalar arrays on one line,
+    # nesting indented, and a file read and written again is the same bytes.
+    shaped = rendered(
+        {
+            "a": [1, "two", None, True],
+            "b": [{"c": []}, {"s": "x", "r": ["A6-R1"]}],
+            "d": {},
+            "e": {"f": "g", "h": 1},
+            "i": {"j": [{"k": 1}]},
+        }
+    )
     expected = (
-        '{\n  "a": [1, "two", null, true],\n  "b": [\n    {\n      "c": []\n    }\n  ],\n'
-        '  "d": {},\n  "e": {"f": "g", "h": 1}\n}\n'
+        '{\n  "a": [1, "two", null, true],\n  "b": [\n    {"c": []},\n    {"s": "x", "r": ["A6-R1"]}\n  ],\n'
+        '  "d": {},\n  "e": {"f": "g", "h": 1},\n  "i": {\n    "j": [\n      {"k": 1}\n    ]\n  }\n}\n'
     )
     if shaped != expected:
         failures.append(f"the formatter wrote {shaped!r}")
