@@ -1,5 +1,6 @@
 //! The contract's examples, written by running every read, every action and every
-//! route beside them against the core's fixture fakes, and keeping what each answered.
+//! route beside them against the core's fixture fakes, and keeping what each answered,
+//! the release record an answer carries cut to a fixed few of each list.
 //!
 //! Every world has a stopped clock, randomness that cycles, and a directory of its own
 //! that every answer names by one stand-in path, so what is written is the same on
@@ -15,6 +16,7 @@ mod companion;
 mod devices;
 mod disk;
 mod house;
+mod record;
 mod standing;
 mod surface;
 mod surfacing;
@@ -69,7 +71,8 @@ pub(crate) struct Seen {
 impl Seen {
     /// Each of `envelopes` kept as its kind's example, where that kind has none yet.
     pub(crate) fn answered(&mut self, envelopes: impl IntoIterator<Item = Value>) {
-        for envelope in envelopes {
+        for mut envelope in envelopes {
+            record::abridged(&mut envelope);
             let kind = envelope
                 .get("kind")
                 .and_then(Value::as_str)
