@@ -244,6 +244,7 @@ async fn pass(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem
             &manifest.services,
             &fillers,
             (&mut baseline, &kept_off),
+            data_root.as_deref(),
         )
         .await,
     );
@@ -433,6 +434,7 @@ async fn seed_media_server(
         &mut crate::baseline::Baseline,
         &std::collections::BTreeSet<String>,
     ),
+    data_root: Option<&std::path::Path>,
 ) -> Vec<crate::seed::Wiring> {
     // Boxed, because it is carried across every await of the passes below.
     let server = crate::app::targets::MediaServer::of(fillers)
@@ -447,7 +449,7 @@ async fn seed_media_server(
     let mut wirings = Vec::new();
     let admin = identity::seed_media_server_admin(ctx, server).await;
 
-    wirings.extend(furnishing::seed_furnishing(ctx, fillers, baseline, kept_off).await);
+    wirings.extend(furnishing::seed_furnishing(ctx, fillers, baseline, kept_off, data_root).await);
 
     // Which origins a browser may read the media server from: the front door's alone.
     // After the identity's first half, because that is what records the administrator

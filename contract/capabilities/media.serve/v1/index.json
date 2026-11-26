@@ -115,7 +115,7 @@
     },
     {
       "path": "media.serve/v1/operations/furnish.json",
-      "sha256": "27b30aa23e446f1cb948bc96096c04ca601ad8689283d401f1bd9b62b22ec856"
+      "sha256": "1bb1ce6642058facb104796662e3836a67e315551e119309d33a0ebf5450820b"
     },
     {
       "path": "media.serve/v1/operations/serve_tls.json",

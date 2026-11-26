@@ -710,6 +710,7 @@ async fn a_fresh_media_server_is_given_its_libraries_after_its_administrator_is_
             &mut crate::baseline::Baseline::new(),
             &std::collections::BTreeSet::new(),
         ),
+        None,
     )
     .await;
 
