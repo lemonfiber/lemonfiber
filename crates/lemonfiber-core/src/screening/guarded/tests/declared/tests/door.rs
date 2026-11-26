@@ -141,3 +141,45 @@ fn a_trickplay_tile_asks_about_the_source_it_names_under_every_spelling_jellyfin
         );
     }
 }
+
+#[test]
+fn a_bearer_of_jellyfins_shape_passes_with_the_scheme_in_any_case_after_any_leading_space() {
+    let declared = declared();
+    for value in [format!("bearer {MEMBER}"), format!("  BEARER {MEMBER}")] {
+        let presented = [("Authorization".to_owned(), value)];
+        assert!(
+            passes(&declared, &target("/Videos/{open}/stream"), &presented),
+            "{presented:?}"
+        );
+    }
+}
+
+#[test]
+fn a_bearer_of_any_other_shape_is_refused_on_every_path_whatever_else_presents_the_member() {
+    let declared = declared();
+    let member = ("X-Emby-Token".to_owned(), MEMBER.to_owned());
+    let paths = ["/Videos/{open}/stream", "/System/Info/Public"];
+    for path in paths {
+        assert!(
+            passes(&declared, &target(path), std::slice::from_ref(&member)),
+            "{path}"
+        );
+    }
+    for value in [
+        "Bearer".to_owned(),
+        "Bearer ".to_owned(),
+        format!("Bearer  {MEMBER}"),
+        format!("bearer\t{MEMBER}"),
+        format!("Bearer {}", "z".repeat(32)),
+        format!("  Bearer {MEMBER}x"),
+        format!(r#"Bearer {MEMBER}", DeviceId="door"#),
+    ] {
+        let presented = [("authorization".to_owned(), value), member.clone()];
+        for path in paths {
+            assert!(
+                !passes(&declared, &target(path), &presented),
+                "{path} {presented:?}"
+            );
+        }
+    }
+}

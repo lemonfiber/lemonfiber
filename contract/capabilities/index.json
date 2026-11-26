@@ -130,7 +130,7 @@
       ],
       "openapi": "media.serve/v1/openapi.json",
       "operations": 34,
-      "sha256": "d739e41bf36bc6845cff01846c511c369609b5c8018d708b929bbf06a0156691"
+      "sha256": "856d606d1a5fa800ae1aa67c035f97a7fbb80e32247cdc60599721d2c0d1ecfb"
     },
     {
       "capability": "proxy.front",
@@ -190,7 +190,7 @@
       ],
       "openapi": "stream.guard/v1/openapi.json",
       "operations": 3,
-      "sha256": "b3135de66884cae542b3a451cbe9bde24155b3588bc320ce5b24aac6c44b7cfb"
+      "sha256": "70faa789445e07b3ccf6123cb99fc240706d57f68b0a12e5dbe1871a483bb21f"
     },
     {
       "capability": "invite.decline",
