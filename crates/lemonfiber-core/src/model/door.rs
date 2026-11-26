@@ -46,7 +46,8 @@ pub enum Standing {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[schemars(rename = "FrontDoorBeside")]
 pub struct Beside {
-    /// The service, by the name it shows itself under.
+    /// The service, by the name it shows itself under, or for a household member by what
+    /// it is to them.
     pub service: String,
     /// What it is to the household.
     pub facing: Facing,
@@ -89,8 +90,9 @@ pub struct FrontDoorReport {
     /// Absent for a household member.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chosen: Option<Chosen>,
-    /// The service the household begins at, by the name it shows itself under.
-    /// Absent where this stack publishes nothing they could begin at.
+    /// The service the household begins at, by the name it shows itself under, or for a
+    /// household member by what it is to them. Absent where this stack publishes nothing
+    /// they could begin at.
     pub service: Option<String>,
     /// The address to hand them, read from this machine at the moment of asking
     /// rather than remembered. Absent where there is no door, and where there is
