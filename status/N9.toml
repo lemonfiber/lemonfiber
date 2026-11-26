@@ -2,5 +2,5 @@
 # status_check.py and the release gate.
 
 requirement = [
-  { id = "N9-R5", state = "partial", evidence = ["crates/lemonfiber-core/src/app/invite.rs"] },
+  { id = "N9-R5", state = "done", evidence = ["crates/lemonfiber-core/src/app/invite.rs", "crates/lemonfiber-core/src/model/invitation.rs", "crates/lemonfiber/src/render/invitation.rs", "crates/lemonfiber-core/tests/integration/what_an_invitation_lets_them_watch/asking.rs::a_rehearsal_says_what_they_would_be_held_to_when_they_ask"] },
 ]

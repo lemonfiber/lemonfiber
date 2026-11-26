@@ -9,7 +9,7 @@
 //! will watch on, and typing an address and then a password on a phone keyboard is
 //! exactly the friction that makes people give up before they start.
 
-use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
+use lemonfiber_core::model::{Applied, Invitation, InvitationStanding, Linked};
 
 use super::{qr, Lines};
 
@@ -63,6 +63,9 @@ pub(super) fn invitation(report: &Invitation) -> Lines {
         lines.put("  If they would rather not, they can decline it here:".to_owned());
         lines.put(format!("  {decline}"));
     }
+    if let Some(applied) = &report.applied {
+        granted(&mut lines, applied);
+    }
 
     if let Some(join) = &report.join {
         qr::labelled(
@@ -111,6 +114,29 @@ fn footer(mut lines: Lines, report: &Invitation) -> Lines {
     }
     withdrawals(lines, report)
 }
+
+/// What the invitation lets them watch and ask for, where it set anything.
+fn granted(lines: &mut Lines, applied: &Applied) {
+    let mut watching = vec![if applied.libraries.is_empty() {
+        "every library".to_owned()
+    } else {
+        applied.libraries.join(", ")
+    }];
+    watching.extend(applied.limit.clone());
+    watching.push(super::trace::unrated(applied.unrated).to_owned());
+    lines.spaced(format!("They may watch: {}", watching.join("; ")));
+    match (applied.asking, applied.requesting) {
+        (Some(policy), _) => lines.put(format!("What they ask for: {}", policy.means())),
+        (None, Linked::NotYet) => lines.put(NOT_HELD.to_owned()),
+        (None, Linked::Made | Linked::NotTried) => {}
+    }
+    lines.put(format!("  {}", applied.filtering));
+}
+
+/// Said where the request service could not be told to hold what a narrowed member
+/// asks for.
+const NOT_HELD: &str = "What they ask for: the request service could not be told to \
+    hold it for you, so it may arrive without anybody saying yes first.";
 
 /// What the sweep took back on the way past, where it took anything.
 fn withdrawals(mut lines: Lines, report: &Invitation) -> Lines {

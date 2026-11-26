@@ -691,6 +691,7 @@ fn an_invitation() -> lemonfiber_core::model::Invitation {
             libraries: vec!["Films".to_owned()],
             unrated: lemonfiber_core::ports::service::Unrated::HeldBack,
             requesting: lemonfiber_core::model::Linked::Made,
+            asking: Some(lemonfiber_core::asking::Policy::EverythingWaits),
             filtering: "These limits are a content filter, not a lock".to_owned(),
         }),
     }

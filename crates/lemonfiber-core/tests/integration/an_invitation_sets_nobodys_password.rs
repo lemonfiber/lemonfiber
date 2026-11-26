@@ -397,7 +397,14 @@ async fn what_an_offer_says_it_wrote_carries_no_password() {
 
     assert_eq!(
         fields,
-        ["filtering", "libraries", "limit", "requesting", "unrated"],
+        [
+            "asking",
+            "filtering",
+            "libraries",
+            "limit",
+            "requesting",
+            "unrated"
+        ],
         "an empty list means nothing was written and this asserts nothing; a field \
          beside these means what an offer reports about an account gained somewhere \
          to carry a password"

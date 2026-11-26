@@ -1,10 +1,12 @@
 //! What an invited member may ask for, and what travels back.
 
 use super::{
-    a_stack_asking, a_stack_where_requests_arrive_unseen, ana_requesting, driving, held_first,
-    offering, requesting,
+    a_stack_asking, a_stack_where_requests_arrive_unseen, ana_requesting, answering, driving,
+    held_first, held_to, made_an_account, offering, requesting,
 };
 use lemonfiber_core::app::{Allowance, Outcome};
+use lemonfiber_core::asking::Policy;
+use lemonfiber_core::model::Linked;
 use lemonfiber_core::ports::service::{Requesting, Unrated};
 use lemonfiber_testing::requests;
 
@@ -33,6 +35,38 @@ async fn what_a_narrowed_member_may_ask_for_is_held_to_the_same_decision() {
         held_first(&sent),
         vec!["4".to_owned()],
         "what a narrowed member may ask for was left arriving unseen"
+    );
+    assert_eq!(
+        held_to(made.as_ref()),
+        Some(Policy::EverythingWaits),
+        "the invitation did not say what the member is now held to when they ask"
+    );
+}
+
+/// A rehearsal says what the write would do: the request service would hold them, and
+/// what they ask for would wait. Nothing is sent to either service.
+#[tokio::test]
+async fn a_rehearsal_says_what_they_would_be_held_to_when_they_ask() {
+    let (sent, made) = answering(
+        "requests-rehearsed",
+        a_stack_where_requests_arrive_unseen(),
+        Allowance {
+            libraries: Vec::new(),
+            age_limit: Some(12),
+            unrated: None,
+        },
+        false,
+    )
+    .await;
+
+    let held = held_to(made.as_ref());
+    assert_eq!(requesting(made), Some(Linked::Made));
+    assert_eq!(held, Some(Policy::EverythingWaits));
+    assert!(!made_an_account(&sent), "a rehearsal made an account");
+    let service = requests::intake("answers").trim_end_matches("answers");
+    assert!(
+        sent.iter().all(|one| !one.url.contains(service)),
+        "a rehearsal asked the request service: {sent:?}"
     );
 }
 
@@ -150,6 +184,11 @@ async fn a_request_service_that_will_not_hold_still_leaves_the_invitation() {
     )
     .await;
 
+    assert_eq!(
+        held_to(made.as_ref()),
+        None,
+        "a member the request service would not hold was said to be held"
+    );
     assert_eq!(
         requesting(made),
         Some(lemonfiber_core::model::Linked::NotYet),

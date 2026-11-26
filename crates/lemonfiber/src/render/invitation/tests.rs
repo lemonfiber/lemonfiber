@@ -1,6 +1,8 @@
 use super::invitation;
 use crate::render::fixtures::drawn_under;
-use lemonfiber_core::model::{Invitation, InvitationStanding, Linked};
+use lemonfiber_core::asking::Policy;
+use lemonfiber_core::model::{Applied, Invitation, InvitationStanding, Linked};
+use lemonfiber_core::ports::service::Unrated;
 
 fn offered(withdrawn: Vec<String>) -> Invitation {
     Invitation {
@@ -465,4 +467,85 @@ fn without_a_decline_service_nothing_is_said_about_declining() {
     let said = invitation(&offered(Vec::new())).text();
 
     assert!(!said.contains("decline"));
+}
+
+/// What a narrowed member is offered, as a rehearsal hands it back.
+fn narrowing(asking: Option<Policy>, requesting: Linked) -> Invitation {
+    Invitation {
+        applied: Some(Applied {
+            limit: Some("nothing above about 12".to_owned()),
+            libraries: vec!["Films".to_owned()],
+            unrated: Unrated::HeldBack,
+            requesting,
+            asking,
+            filtering: "These limits are a content filter, not a lock".to_owned(),
+        }),
+        ..rehearsed(Vec::new())
+    }
+}
+
+/// A rehearsal states what the invitation grants before it is sent: what they may
+/// watch, what becomes of what they ask for, and what a limit here is not.
+#[test]
+fn a_rehearsal_states_what_the_invitation_grants() {
+    let said = invitation(&narrowing(Some(Policy::EverythingWaits), Linked::Made)).text();
+
+    assert!(
+        said.contains("They may watch: Films; nothing above about 12; nothing unrated"),
+        "{said}"
+    );
+    assert!(
+        said.contains(&format!(
+            "What they ask for: {}",
+            Policy::EverythingWaits.means()
+        )),
+        "{said}"
+    );
+    assert!(said.contains("not a lock"), "{said}");
+}
+
+/// A request service that would not hold them is said, rather than left to read as
+/// nothing to ask for.
+#[test]
+fn what_they_ask_for_not_held_is_said() {
+    let said = invitation(&narrowing(None, Linked::NotYet)).text();
+
+    assert!(said.contains(super::NOT_HELD), "{said}");
+    assert!(!said.contains(Policy::EverythingWaits.means()), "{said}");
+}
+
+/// An offer naming no library lets them watch every library, and says so.
+#[test]
+fn an_offer_naming_no_library_lets_them_watch_every_library() {
+    let mut everywhere = narrowing(Some(Policy::EverythingWaits), Linked::Made);
+    if let Some(applied) = everywhere.applied.as_mut() {
+        applied.libraries.clear();
+    }
+    let said = invitation(&everywhere).text();
+
+    assert!(
+        said.contains("They may watch: every library; nothing above about 12"),
+        "{said}"
+    );
+}
+
+/// Where the request service was never asked to hold them, nothing is said about what
+/// becomes of what they ask for.
+#[test]
+fn what_they_ask_for_is_not_mentioned_where_nothing_was_asked_of_the_request_service() {
+    for requesting in [Linked::Made, Linked::NotTried] {
+        let said = invitation(&narrowing(None, requesting)).text();
+
+        assert!(said.contains("They may watch: Films"), "{said}");
+        assert!(!said.contains("What they ask for:"), "{said}");
+    }
+}
+
+/// An offer that set nothing about access says nothing about it.
+#[test]
+fn an_offer_that_set_nothing_says_nothing_about_access() {
+    let said = invitation(&rehearsed(Vec::new())).text();
+
+    assert!(!said.contains("They may watch:"), "{said}");
+    assert!(!said.contains("What they ask for:"), "{said}");
 }
