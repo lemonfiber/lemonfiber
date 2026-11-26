@@ -39,3 +39,13 @@ fn a_record_without_its_lists_is_left_as_it_was() {
 
     assert_eq!(envelope, unread);
 }
+
+#[test]
+fn an_answer_carrying_no_record_is_left_as_it_was() {
+    let answered = json!({ "kind": "status", "data": { "running": true } });
+    let mut envelope = answered.clone();
+
+    abridged(&mut envelope);
+
+    assert_eq!(envelope, answered);
+}

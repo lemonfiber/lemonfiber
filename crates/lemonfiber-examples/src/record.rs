@@ -19,24 +19,14 @@ pub(crate) fn abridged(envelope: &mut Value) {
     let Some(notes) = envelope.pointer_mut("/data/changelog") else {
         return;
     };
-    if let Some(releases) = notes.get_mut("releases").and_then(Value::as_array_mut) {
-        releases.truncate(KEPT);
-    }
+    kept(notes.get_mut("releases"));
     let mut cited = BTreeSet::new();
-    if let Some(groups) = notes
-        .pointer_mut("/running/groups")
-        .and_then(Value::as_array_mut)
-    {
-        groups.truncate(KEPT);
-        for entries in groups
-            .iter_mut()
-            .filter_map(|group| group.get_mut("entries").and_then(Value::as_array_mut))
-        {
-            entries.truncate(KEPT);
+    for group in kept(notes.pointer_mut("/running/groups")) {
+        for entry in kept(group.get_mut("entries")) {
+            let listed = entry.get("requirements").and_then(Value::as_array);
             cited.extend(
-                entries
-                    .iter()
-                    .filter_map(|entry| entry.get("requirements").and_then(Value::as_array))
+                listed
+                    .into_iter()
                     .flatten()
                     .filter_map(Value::as_str)
                     .map(str::to_owned),
@@ -46,6 +36,14 @@ pub(crate) fn abridged(envelope: &mut Value) {
     if let Some(requirements) = notes.get_mut("requirements").and_then(Value::as_object_mut) {
         requirements.retain(|id, _| cited.contains(id));
     }
+}
+
+/// The first [`KEPT`] of `list`, the rest dropped, or nothing where it is not a list.
+fn kept(list: Option<&mut Value>) -> &mut [Value] {
+    list.and_then(Value::as_array_mut).map_or(&mut [], |list| {
+        list.truncate(KEPT);
+        list.as_mut_slice()
+    })
 }
 
 #[cfg(test)]
