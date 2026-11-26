@@ -489,7 +489,7 @@
                       "description": "How a bearer token is presented."
                     },
                     "shape": {
-                      "description": "The shape a token has; a bearer value of any other shape is left as it came.",
+                      "description": "The shape a token has; a request whose `Authorization` names the bearer scheme,\nin any case and after any leading space, with anything but one space and a token\nof this shape after it is refused on every path, and nothing is asked or forwarded.",
                       "type": "string"
                     }
                   },

@@ -101,17 +101,43 @@ fn may(item: &str, read: Option<&str>) -> bool {
     read == Some(MEMBER) && id == OPEN
 }
 
+/// What `value` holds after the bearer scheme, the scheme read in any case and after any
+/// leading space; nothing where it names another scheme.
+fn after_bearer(value: &str) -> Option<&str> {
+    let (scheme, rest) = value.trim_start().split_at_checked("Bearer".len())?;
+    (scheme.eq_ignore_ascii_case("Bearer") && rest.chars().next().is_none_or(char::is_whitespace))
+        .then_some(rest)
+}
+
+/// The token of `shape` an `Authorization` value names the bearer scheme with, behind one
+/// space.
+fn bearer_token<'a>(shape: &str, value: &'a str) -> Option<&'a str> {
+    after_bearer(value)?
+        .strip_prefix(' ')
+        .filter(|token| matching(shape, token))
+}
+
+/// Whether `headers` carry an `Authorization` naming the bearer scheme with anything but
+/// one space and a token of `shape` after it.
+fn misshapen_bearer(shape: &str, headers: &[(String, String)]) -> bool {
+    headers.iter().any(|(name, value)| {
+        name.eq_ignore_ascii_case("authorization")
+            && after_bearer(value).is_some()
+            && bearer_token(shape, value).is_none()
+    })
+}
+
 /// The token Jellyfin reads off `headers` once the guard has presented any bearer
 /// grant, where it reads one.
 fn read_token(declared: &Declared, headers: &[(String, String)]) -> Option<String> {
     let token = &declared.token;
     for (name, value) in headers {
-        let presented = match value.strip_prefix("Bearer ") {
-            Some(bearer) if matching(&token.shape, bearer) => match &token.presented {
+        let presented = match bearer_token(&token.shape, value) {
+            Some(bearer) => match &token.presented {
                 Presentation::Header { value, .. } => value.replace(TOKEN, bearer),
                 Presentation::AsIs | Presentation::Query { .. } => value.clone(),
             },
-            Some(_) | None => value.clone(),
+            None => value.clone(),
         };
         let read = if name.eq_ignore_ascii_case("authorization") {
             presented
@@ -144,7 +170,7 @@ pub(super) fn passes(declared: &Declared, target: &str, headers: &[(String, Stri
         && !matching(ABNORMAL, raw)
         && !matching(ENCODED_UNRESERVED, raw)
         && query.iter().all(|(name, _)| !name.contains('%'));
-    if !normal {
+    if !normal || misshapen_bearer(&declared.token.shape, headers) {
         return false;
     }
     let tokens: Vec<&str> = declared

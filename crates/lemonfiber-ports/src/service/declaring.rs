@@ -290,7 +290,9 @@ pub enum Presentation {
 pub struct Token {
     /// How a bearer token is presented.
     pub presented: Presentation,
-    /// The shape a token has; a bearer value of any other shape is left as it came.
+    /// The shape a token has; a request whose `Authorization` names the bearer scheme,
+    /// in any case and after any leading space, with anything but one space and a token
+    /// of this shape after it is refused on every path, and nothing is asked or forwarded.
     pub shape: String,
     /// The query parameters the upstream also reads a token from, carried into the
     /// question as it came; a request carrying more than one of them, one under another
