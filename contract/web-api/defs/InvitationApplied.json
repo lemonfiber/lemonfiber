@@ -3,6 +3,17 @@
   "description": "What an invitation wrote on the account, in the household's own words.\n\n**Said back so an absence later is explicable.** A member held to a rating who\ncannot find half the library is either this working or a defect, and an operator\nwith nothing on record cannot tell which. So the limit, the libraries, what happened\nto content the media server has no rating for, and whether the request service was\nheld to the same decision all travel back on the answer that applied them.\n\nAbsent where the offer set nothing at all, which is not the same as an offer that\nset no restrictions: naming neither a library nor a limit is saying nothing about\naccess, and nothing is what gets written.\n\nSerialised in the field names the household read uses for the same facts, rather\nthan in the invitation's own spelling: one setting named two ways across two shapes\nis two shapes a client has to be told are about the same thing.",
   "type": "object",
   "properties": {
+    "asking": {
+      "description": "What happens to what they ask for, in the words the household read gives a\nmember's policy: `everything-waits` once the request service holds them.\n\nAbsent where it does not hold them: no request service, or one that could not\nbe reached.",
+      "anyOf": [
+        {
+          "$ref": "Policy.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "filtering": {
       "description": "What a limit here is, and what it is not.\n\nCarried on the answer rather than left to a document, because the reader who\nmost needs it is the parent who has just set one.",
       "type": "string"
@@ -22,7 +33,7 @@
       ]
     },
     "requesting": {
-      "description": "Whether the request service was held to the same decision.\n\nThe same three answers a link carries, and for the same reason: what somebody\nmay *ask for* is a second service's business, and that service can be down while\nthe media server is not. `NotTried` here is a service with no account for them\nyet — nothing to hold rather than a failure to hold something.",
+      "description": "Whether the request service was held to the same decision.\n\nThe same three answers a link carries, and for the same reason: what somebody\nmay *ask for* is a second service's business, and that service can be down while\nthe media server is not. `NotTried` here is a service with no account for them\nyet — nothing to hold rather than a failure to hold something.\n\nOn a rehearsal, what the run would do: `Made` where a request service is wired\nand can be asked, `NotTried` where there is none.",
       "$ref": "Linked.json"
     },
     "unrated": {

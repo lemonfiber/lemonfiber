@@ -143,6 +143,16 @@ async fn driving(
     http: Arc<Fake>,
     allowance: Allowance,
 ) -> (Vec<Request>, Option<Outcome>) {
+    answering(scratch, http, allowance, true).await
+}
+
+/// The same, confirmed or rehearsed as `confirm` says.
+async fn answering(
+    scratch: &str,
+    http: Arc<Fake>,
+    allowance: Allowance,
+    confirm: bool,
+) -> (Vec<Request>, Option<Outcome>) {
     let env = recorded_admin(scratch);
     let ctx = context(&env, http.clone());
 
@@ -150,7 +160,7 @@ async fn driving(
         Command::Invite(Inviting {
             name: "ana".to_owned(),
             allowance,
-            confirm: true,
+            confirm,
         }),
         &ctx,
     )
@@ -202,6 +212,17 @@ fn requesting(made: Option<Outcome>) -> Option<lemonfiber_core::model::Linked> {
         Some(Outcome::Invitation(invitation)) => {
             invitation.applied.map(|applied| applied.requesting)
         }
+        _ => None,
+    }
+}
+
+/// What an invitation says a member being narrowed would be held to when they ask.
+fn held_to(made: Option<&Outcome>) -> Option<lemonfiber_core::asking::Policy> {
+    match made {
+        Some(Outcome::Invitation(invitation)) => invitation
+            .applied
+            .as_ref()
+            .and_then(|applied| applied.asking),
         _ => None,
     }
 }

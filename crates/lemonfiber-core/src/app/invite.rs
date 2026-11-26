@@ -126,7 +126,13 @@ pub(crate) async fn offer(
             // Said in full on a rehearsal, because every part of it is known without
             // writing anything: the certificates are a read, and what would be written
             // has already been decided.
-            applied: applied(server, &allowance, allowed.as_ref(), Linked::NotTried).await,
+            applied: applied(
+                server,
+                &allowance,
+                allowed.as_ref(),
+                would_hold(ctx, &manifest, allowed.as_ref()).await,
+            )
+            .await,
         });
     }
 
@@ -312,6 +318,26 @@ async fn holding(access: &crate::app::targets::HouseholdAccess, member: &str) ->
     }
 }
 
+/// Whether the request service would hold the one being narrowed, said by a rehearsal
+/// before anything is written.
+///
+/// `Made` where a request service is wired and can be asked, as the run would ask it;
+/// `NotTried` where there is none, or nobody is being narrowed. Nothing is sent to the
+/// service: reaching it is a read of the stack and its key.
+async fn would_hold(
+    ctx: &Ctx,
+    manifest: &lemonfiber_manifest::Manifest,
+    allowed: Option<&crate::ports::service::Allowed>,
+) -> Linked {
+    if allowed.is_none() {
+        return Linked::NotTried;
+    }
+    match crate::app::targets::household_requests(ctx, manifest).await {
+        Some(_) => Linked::Made,
+        None => Linked::NotTried,
+    }
+}
+
 /// What was written on the account, said back in the household's own words.
 ///
 /// **Said so an absence later is explicable.** A restricted member who cannot find half
@@ -337,6 +363,7 @@ async fn applied(
             .map(|age| crate::rating::reading(&certificates, Some(age))),
         libraries: allowance.libraries.clone(),
         unrated: allowed.unrated.unwrap_or_default(),
+        asking: (requesting == Linked::Made).then_some(crate::asking::Policy::EverythingWaits),
         requesting,
         filtering: crate::age_limit::A_FILTER_NOT_A_LOCK.to_owned(),
     })

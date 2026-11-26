@@ -264,10 +264,7 @@ fn standing(member: &HouseholdMember) -> String {
     // silence does not tell an operator which. Nobody unnarrowed is missing anything,
     // so the line stays off theirs.
     if member.access.restriction != Restriction::Unrestricted {
-        said.push(match member.access.unrated {
-            Unrated::HeldBack => "nothing unrated".to_owned(),
-            Unrated::LetThrough => "including what has no rating".to_owned(),
-        });
+        said.push(unrated(member.access.unrated).to_owned());
     }
     // The gap the setting exists to close, on the member's own line rather than only
     // in a finding at the foot: half a limit looks exactly like a whole one.
@@ -457,6 +454,14 @@ pub(super) fn stuck(report: &StuckReport) -> Lines {
         lines.spaced("A curator's queue could not be read, so this list may be incomplete.");
     }
     lines
+}
+
+/// What becomes of content with no rating, as a member's line says it.
+pub(super) const fn unrated(unrated: Unrated) -> &'static str {
+    match unrated {
+        Unrated::HeldBack => "nothing unrated",
+        Unrated::LetThrough => "including what has no rating",
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 
-use super::{told, Linked};
+use super::{told, would_hold, Linked};
+use crate::ports::service::Allowed;
 use crate::test_support::{a_context, beside_contracted_requests, CONTRACTED_REQUESTS_AT};
 
 /// A stack with nothing to reach the request service with tells it nothing, and
@@ -102,5 +103,48 @@ async fn a_request_service_speaking_the_contract_without_its_key_is_told_nothing
 
     assert_eq!(said.linked, Linked::NotTried);
     assert_eq!(said.requesting, Linked::NotTried);
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// Somebody being narrowed, as the rehearsal is handed them.
+fn narrowed() -> Allowed {
+    Allowed {
+        age_limit: Some(12),
+        ..Allowed::default()
+    }
+}
+
+/// A rehearsal says the request service would hold the narrowed one where it can be
+/// asked, and asks it nothing.
+#[tokio::test]
+async fn a_rehearsal_would_hold_them_where_a_request_service_can_be_asked() {
+    let http = intake();
+    let ctx = beside_contracted_requests("invite-rehearsed", true, http.clone());
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the stack without its request service does not read");
+    };
+
+    assert_eq!(
+        would_hold(&ctx, &manifest, Some(&narrowed())).await,
+        Linked::Made
+    );
+    assert_eq!(would_hold(&ctx, &manifest, None).await, Linked::NotTried);
+    assert!(http.requests().is_empty(), "{:?}", http.requests());
+}
+
+/// A rehearsal on a stack whose request service cannot be asked says nothing would be
+/// tried.
+#[tokio::test]
+async fn a_rehearsal_with_no_request_service_to_ask_tries_nothing() {
+    let http = intake();
+    let ctx = beside_contracted_requests("invite-rehearsed-unkeyed", false, http.clone());
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the stack without its request service does not read");
+    };
+
+    assert_eq!(
+        would_hold(&ctx, &manifest, Some(&narrowed())).await,
+        Linked::NotTried
+    );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }

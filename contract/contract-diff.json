@@ -329,6 +329,7 @@
       "HouseholdReport",
       "Inventory",
       "Invitation",
+      "InvitationApplied",
       "KeyState",
       "Leaving",
       "LifecycleReport",

@@ -1,5 +1,11 @@
 {
   "fields": {
+    "asking": {
+      "type": [
+        "anyOf(null,ref:Policy)"
+      ],
+      "required": false
+    },
     "filtering": {
       "type": [
         "string"
