@@ -92,6 +92,9 @@ pub struct Filler {
     /// The secret lemonfiber minted as its credential, by the name the secret store holds it
     /// under, where its plugin declares one.
     pub minted: Option<String>,
+    /// The settings of the account an adapter of its plugin signs in to it as, its name and
+    /// its password, which open nothing as a key.
+    pub account: Vec<String>,
     /// The majors of its image that run here: the first number of the tag it is pinned
     /// by, or nothing where the tag does not open with one.
     pub majors: Vec<u32>,

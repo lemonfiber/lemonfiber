@@ -24,6 +24,10 @@ const PURPOSE: &str = "other";
 /// How many times an ask the core could not check yet is asked again.
 const CHECKED_AGAIN: u32 = 3;
 
+/// How long a member whose ask was refused waits before searching and asking once more,
+/// as a member does who searches again.
+const ASKED_AGAIN_AFTER: Duration = Duration::from_secs(30);
+
 /// The web surface, served for as long as this is held.
 pub struct Served {
     /// The process serving it.
@@ -71,11 +75,13 @@ impl Served {
     }
 }
 
-/// `member`'s request for `asked`, sent with a key the operator minted for them alone.
+/// `member`'s request for `asked`, sent with a key the operator minted for them alone,
+/// searched for and asked once more after [`ASKED_AGAIN_AFTER`] where the first is refused.
 ///
 /// # Errors
 ///
-/// Where the key is not minted, or the web surface does not take the request.
+/// Where the key is not minted, or the web surface takes neither request, each named with
+/// the title it asked for.
 pub fn asked(
     core: &Core,
     served: &Served,
@@ -114,23 +120,43 @@ pub fn asked(
         .enable_all()
         .build()
         .map_err(|why| why.to_string())?;
+    let asking = || runtime.block_on(searched_and_acted(&client, member, asked, &seasons));
+    let Err(first) = asking() else {
+        return Ok(());
+    };
+    std::thread::sleep(ASKED_AGAIN_AFTER);
+    asking().map_err(|again| format!("{first}\nasked once more: {again}"))
+}
+
+/// `member`'s ask for `asked`, its seasons `seasons`, of the title as they find it now.
+///
+/// # Errors
+///
+/// Where the search finds nothing, or the ask is refused, naming the title asked for.
+async fn searched_and_acted(
+    client: &Client,
+    member: &str,
+    asked: &super::Asked,
+    seasons: &[u32],
+) -> Result<(), String> {
     let (id, unit, found) = match asked.title {
         super::Title::Catalogued(id) => (id.to_owned(), None, None),
         super::Title::Found { unit, term, named } => {
-            let (id, token) =
-                runtime.block_on(found(&client, member, asked.kind, unit, term, named))?;
+            let (id, token) = found(client, member, asked.kind, unit, term, named).await?;
             (id, Some(unit.to_owned()), token)
         }
     };
     let ask = AskAction {
-        id: Some(id),
+        id: Some(id.clone()),
         kind: Some(asked.kind.to_owned()),
-        seasons: (!seasons.is_empty()).then_some(seasons),
+        seasons: (!seasons.is_empty()).then(|| seasons.to_vec()),
         unit,
         found,
         ..AskAction::default()
     };
-    runtime.block_on(acted(&client, &ask))
+    acted(client, &ask)
+        .await
+        .map_err(|why| format!("asking for {id}: {why}"))
 }
 
 /// Ask, and ask again after the wait the core names while it could not yet check the

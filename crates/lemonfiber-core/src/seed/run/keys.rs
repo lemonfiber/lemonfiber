@@ -5,10 +5,19 @@ use lemonfiber_contract::adapter::{UPSTREAM_PASSWORD, UPSTREAM_USERNAME};
 use super::Ctx;
 use crate::ports::service::Credential;
 
-/// The credential lemonfiber minted for `filler`, from the secret store, where its plugin
+/// The setting of the key lemonfiber minted for `filler`, where its plugin declares one: a
+/// minted secret that is not the account an adapter signs in to it as.
+pub(super) fn keyed(filler: &crate::wiring::Filler) -> Option<&str> {
+    filler
+        .minted
+        .as_deref()
+        .filter(|minted| !filler.account.iter().any(|one| one == minted))
+}
+
+/// The key lemonfiber minted for `filler`, from the secret store, where its plugin
 /// declares one and the store holds it.
 pub(super) fn minted_key(ctx: &Ctx, filler: &crate::wiring::Filler) -> Option<String> {
-    crate::app::targets::stored_secret(ctx, filler.minted.as_ref()?)
+    crate::app::targets::stored_secret(ctx, keyed(filler)?)
 }
 
 /// The account the adapter fronting `filler` signs in to it as, from the secret store,

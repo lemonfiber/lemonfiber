@@ -118,8 +118,13 @@ pub(super) enum Connection {
     /// this kind.
     Quality(Kind),
     /// The filler, told to the asker as an aggregator it pulls indexers from, with the
-    /// filler's own key to read it with.
-    Aggregator,
+    /// filler's own key to read it with: where the filler's app sync serves the media the
+    /// asker files, only once the filler answers that it has no app sync.
+    Aggregator {
+        /// Whether the asker answers in the Servarr API, filing media an indexer's app sync
+        /// serves.
+        synced: bool,
+    },
     /// The filler, told to the indexer as a challenge solver it fetches through, under the
     /// tag that sends an indexer site through it.
     Solver,
@@ -163,10 +168,6 @@ pub(super) enum Unmade {
     /// The filler is a curator the request gate would ask, and nothing in front of it
     /// speaks the curator's contract.
     Uncontracted,
-    /// The asker answers in the Servarr API and the filler's application sync serves the
-    /// media it files, so the filler is told about the asker rather than the asker about
-    /// the filler.
-    Synced,
     /// The two are connected for some media, and the filler files none of them.
     Files,
     /// The connection would hand the asker's own credential to a filler the gate does
@@ -255,8 +256,9 @@ fn connection(
         (sync::CAPABILITY, CURATES, ApiKind::Servarr) => Kind::of_declared(media)
             .map(Connection::Quality)
             .ok_or(Unmade::Files),
-        (pull::CAPABILITY, SEARCHES, _) if synced(asker) => Err(Unmade::Synced),
-        (pull::CAPABILITY, SEARCHES, _) => Ok(Connection::Aggregator),
+        (pull::CAPABILITY, SEARCHES, _) => Ok(Connection::Aggregator {
+            synced: synced(asker),
+        }),
         (search::CAPABILITY, SOLVES, ApiKind::Flaresolverr) => Ok(Connection::Solver),
         (extract::CAPABILITY, CURATES, ApiKind::Servarr) => media
             .first()
@@ -403,7 +405,7 @@ pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
 
 /// Whether the filler asks for something the asker fills, itself or through the adapter
 /// in front of it.
-fn from_its_end(fillers: &Fillers, pairing: &Pairing<'_>) -> bool {
+pub(super) fn from_its_end(fillers: &Fillers, pairing: &Pairing<'_>) -> bool {
     fillers.asks().iter().any(|ask| {
         ask.by == pairing.filler.id
             && ask
@@ -434,10 +436,6 @@ fn reason(pairing: &Pairing<'_>, why: Unmade) -> String {
         Unmade::Uncontracted => format!(
             "{fills} and nothing in front of it speaks {CURATES}, which the request gate asks a \
              curator over"
-        ),
-        Unmade::Synced => format!(
-            "{fills} and syncs the media {asker} files to it itself, so {filler} is told about \
-             {asker} rather than {asker} about {filler}"
         ),
         Unmade::Files if pairing.filler.media_types.is_empty() => format!(
             "{fills} and names no media it files, so lemonfiber cannot say what to hand {asker}"
