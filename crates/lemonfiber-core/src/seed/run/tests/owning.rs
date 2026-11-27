@@ -576,3 +576,84 @@ async fn a_moved_part_somebody_else_holds_is_refused_naming_its_minted_account()
 mod coded;
 
 mod restarting;
+
+/// The media server the stack's every installed part is served by, chosen over the rest.
+pub(super) const SERVING: &str = "navidrome-adapter";
+
+/// Every part the bundle installs, with `media.serve` chosen to be [`SERVING`], and each
+/// part speaking `capability` at `major` that the choice takes out of its form, with the
+/// part each fronts recorded as lemonfiber's.
+pub(super) fn served_by_one(
+    capability: &str,
+    major: u32,
+) -> (
+    Vec<crate::plugin::Installed>,
+    crate::wiring::Fillers,
+    Vec<crate::wiring::Filler>,
+    Baseline,
+) {
+    let installed = crate::test_support::adapted::installed_parts();
+    let choice = format!(
+        "{}={SERVING}",
+        lemonfiber_contract::capabilities::media::serve::CAPABILITY
+    );
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| {
+            crate::wiring::Fillers::of(
+                &manifest,
+                &installed,
+                &crate::wiring::Chosen::read(Some(&choice)),
+                Some(stack_root()),
+            )
+        })
+        .unwrap_or_default();
+    let passed: Vec<crate::wiring::Filler> = fillers
+        .services()
+        .filter(|one| fillers.passed_over(one) && one.contracted(capability, major))
+        .cloned()
+        .collect();
+    let mut baseline = Baseline::new();
+    for one in &passed {
+        baseline.record(
+            &fillers.fronted_by(one).unwrap_or(one).id,
+            super::super::owning::FIELD,
+            "ours",
+            Instant::from_seconds(1_792_886_400),
+        );
+    }
+    (installed, fillers, passed, baseline)
+}
+
+/// No wiring of `wirings` names any of `parts`, each as the part its adapter fronts.
+pub(super) fn naming_none_of(
+    wirings: &[crate::seed::Wiring],
+    fillers: &crate::wiring::Fillers,
+    parts: &[crate::wiring::Filler],
+) -> bool {
+    parts.iter().all(|one| {
+        let name = &fillers.fronted_by(one).unwrap_or(one).name;
+        wirings
+            .iter()
+            .all(|wiring| !wiring.connection.starts_with(name.as_str()))
+    })
+}
+
+/// A part the operator's choice of another media server took out of its form is stopped
+/// with it, so it is neither claimed nor said to be unknown.
+#[tokio::test]
+async fn a_part_a_choice_took_out_of_its_form_is_not_claimed() {
+    use lemonfiber_contract::capabilities::owner::claim;
+    let (installed, fillers, passed, mut baseline) = served_by_one(claim::CAPABILITY, claim::MAJOR);
+    let ctx = seed_ctx(true, None, None).with_http(Fake::always(holding("ours")));
+
+    let wirings = super::super::owning::owned(&ctx, &fillers, &installed, &mut baseline).await;
+
+    assert!(
+        passed
+            .iter()
+            .any(|one| one.id == crate::test_support::listening::ADAPTER),
+        "{passed:?}"
+    );
+    assert!(naming_none_of(&wirings, &fillers, &passed), "{wirings:?}");
+}

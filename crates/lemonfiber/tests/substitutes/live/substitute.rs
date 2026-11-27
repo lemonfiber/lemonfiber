@@ -2,7 +2,7 @@
 //! one in its place: installed from what this build offers, chosen to fill the capability,
 //! and given the settings it is asked with.
 
-use super::core::{Core, Ran, WITHHELD};
+use super::core::{strings_under, Core, Ran, WITHHELD};
 
 /// What every download capability is named under.
 const DOWNLOADS: &str = "download.";
@@ -18,6 +18,9 @@ pub struct Substitution {
     pub plugin: String,
     /// The capability it stands in for.
     pub capability: String,
+    /// Each further capability it is chosen to fill as it is put in place, where its
+    /// install contests what fills it.
+    pub also: Vec<String>,
     /// The plugin the bundle fills the capability with, which it replaces.
     pub stands_in_for: String,
     /// Each setting it is given, as `config set` names it, with its value.
@@ -34,6 +37,7 @@ impl std::fmt::Debug for Substitution {
         f.debug_struct("Substitution")
             .field("plugin", &self.plugin)
             .field("capability", &self.capability)
+            .field("also", &self.also)
             .field("stands_in_for", &self.stands_in_for)
             .field("settings", &settings)
             .finish()
@@ -57,29 +61,23 @@ impl Substitution {
             .collect()
     }
 
-    /// Install it, choose it, and give it its settings, each step held to succeeding.
+    /// Install it where the stack's own forms did not, choose it for its capability and
+    /// each of [`Self::also`], and give it its settings, each step held to succeeding.
     ///
     /// # Errors
     ///
     /// The first step that did not, with what was said.
     pub fn made(&self, core: &Core) -> Result<(), String> {
-        held(
-            &core.agreed(&["plugin", "install", &self.plugin]),
-            "install",
-        )?;
-        let service = super::providing(&self.plugin, &self.capability)
-            .ok_or_else(|| format!("no service of {} provides {}", self.plugin, self.capability))?;
-        held(
-            &core.agreed(&[
-                "wiring",
-                "fill",
-                &self.capability,
-                &service,
-                "--reason",
-                BECAUSE,
-            ]),
-            "the choice",
-        )?;
+        let installed = strings_under(&core.run(&["plugin", "installed"], "").said, "plugin");
+        if !installed.contains(&self.plugin) {
+            held(
+                &core.agreed(&["plugin", "install", &self.plugin]),
+                "install",
+            )?;
+        }
+        for capability in std::iter::once(&self.capability).chain(&self.also) {
+            self.chosen_for(core, capability)?;
+        }
         for (setting, value) in &self.settings {
             held(
                 &core.withholding(
@@ -91,6 +89,20 @@ impl Substitution {
             )?;
         }
         Ok(())
+    }
+
+    /// It chosen to fill `capability`, by the service of it that provides it.
+    ///
+    /// # Errors
+    ///
+    /// Where none of its services provides it, or the choice does not succeed.
+    fn chosen_for(&self, core: &Core, capability: &str) -> Result<(), String> {
+        let service = super::providing(&self.plugin, capability)
+            .ok_or_else(|| format!("no service of {} provides {capability}", self.plugin))?;
+        held(
+            &core.agreed(&["wiring", "fill", capability, &service, "--reason", BECAUSE]),
+            "the choice",
+        )
     }
 }
 

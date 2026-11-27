@@ -344,3 +344,26 @@ fn an_unread_defaults_shelf_names_nobody() {
     assert!(!report.available);
     assert_eq!(report.member, "");
 }
+
+/// With no media server that can be asked, a member's shelf and the defaults are each
+/// unread for want of one, the member's under their name.
+#[tokio::test]
+async fn with_no_media_server_to_ask_every_shelf_is_unread_for_want_of_one() {
+    let context = ctx_with(&Server::default(), "unkeyed");
+    if let Some(key) = media::key_at(&context) {
+        let _ = std::fs::remove_file(key);
+    }
+
+    for (whose, member) in [(named("Ada"), "Ada"), (Whom::Defaults, "")] {
+        let report = held(&context, &whose, 100).await.unwrap_or_default();
+        assert!(!report.available, "{report:?}");
+        assert_eq!(report.member, member);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == crate::error::codes::play::NOTHING_TO_PLAY_FROM),
+            "{report:?}"
+        );
+    }
+}

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_fixtures::scratch::Scratch;
 
-use super::{identified, identity, media, served, serving};
+use super::{filled_serve, filling_serve, identified, identity, media, served, serving};
 use crate::app::Ctx;
 use crate::instant::Instant;
 use crate::plugin::Installed;
@@ -105,6 +105,14 @@ async fn an_adapter_that_cannot_be_reached_is_asked_nothing_and_nothing_else_is_
     );
 
     assert!(identified(&ctx, &fillers).await.is_none());
+    let named = |capability: &str| {
+        fillers
+            .filling(capability)
+            .map(|(filler, _)| super::named(&fillers, filler))
+    };
+    assert!(named("media.serve").is_some());
+    assert_ne!(named("media.serve"), named("identity.source"));
+
     assert!(served(&ctx, &fillers).await.is_none());
     assert!(fake.request().is_none());
 }
@@ -234,6 +242,7 @@ async fn members_reach_a_media_server_claimed_against_an_outside_account_only_on
         unreachable!("the repository's stack reads")
     };
     assert!(media(&ctx, &manifest).await.is_none());
+    assert!(filling_serve(&ctx, &manifest).await.is_none());
     assert!(serving(&ctx, &manifest).await.is_some());
 
     let fillers = super::fillers_here(&ctx, &manifest);
@@ -252,4 +261,53 @@ async fn members_reach_a_media_server_claimed_against_an_outside_account_only_on
     );
     crate::seed::run::save_baseline(&ctx, &baseline);
     assert!(media(&ctx, &manifest).await.is_some());
+    assert!(filling_serve(&ctx, &manifest).await.is_some());
+}
+
+#[test]
+fn the_shipped_stack_fills_both_of_the_media_servers_capabilities_with_one_service() {
+    let ctx = moved("one-server", true);
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the repository's stack reads")
+    };
+    let fillers = super::fillers_here(&ctx, &manifest);
+    let serving = fillers
+        .filling(lemonfiber_contract::capabilities::media::serve::CAPABILITY)
+        .map(|(filler, _)| filler.id.clone());
+    let identifying = fillers
+        .filling(lemonfiber_contract::capabilities::identity::source::CAPABILITY)
+        .map(|(filler, _)| filler.id.clone());
+
+    assert!(serving.is_some());
+    assert_eq!(serving, identifying);
+    assert!(super::filling_serve_named(&ctx, &manifest).is_some());
+    assert_eq!(
+        super::filling_serve_named(&ctx, &manifest),
+        super::server_named(&ctx, &manifest)
+    );
+}
+
+#[tokio::test]
+async fn the_service_chosen_to_fill_media_serve_is_asked_what_is_held_and_not_the_identity_source()
+{
+    let (project, ctx, fake) = adapted("shelving", true);
+    let chosen = Chosen::read(Some("media.serve=plex-adapter"));
+    let installed = [adapting(&["media.serve"], &["media.serve@1"])];
+    let fillers = crate::test_support::stack()
+        .manifest()
+        .map(|manifest| Fillers::of(&manifest, &installed, &chosen, Some(&project)))
+        .unwrap_or_default();
+
+    assert!(served(&ctx, &fillers).await.is_none());
+    assert!(fake.request().is_none());
+
+    let playing = match filled_serve(&ctx, &fillers).await {
+        Some(serve) => serve.playing(None).await.ok(),
+        None => None,
+    };
+    assert_eq!(playing.map(|playing| playing.len()), Some(0));
+    assert_eq!(
+        fake.request().map(|request| request.url),
+        Some("http://127.0.0.1:8080/lemonfiber/media.serve/v1/playing".to_owned())
+    );
 }

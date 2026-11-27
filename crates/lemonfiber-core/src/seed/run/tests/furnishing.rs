@@ -433,3 +433,33 @@ async fn a_media_type_a_media_server_serves_outside_the_vocabulary_is_reported()
     );
     assert!(http.requests().is_empty(), "{:?}", http.requests());
 }
+
+/// A media server the operator's choice of another took out of its form is stopped with
+/// it, so it is given no library and is not said to be unreachable.
+#[tokio::test]
+async fn a_media_server_a_choice_took_out_of_its_form_is_given_no_library() {
+    use lemonfiber_contract::capabilities::media::serve;
+    let (_, fillers, passed, baseline) =
+        super::owning::served_by_one(serve::CAPABILITY, serve::MAJOR);
+    let ctx = seed_ctx(true, None, None).with_http(Fake::always(Answer::reply(200, "{}")));
+
+    let wirings = super::super::furnishing::seed_furnishing(
+        &ctx,
+        &fillers,
+        &baseline,
+        &BTreeSet::new(),
+        None,
+    )
+    .await;
+
+    assert!(
+        passed
+            .iter()
+            .any(|one| one.id == crate::test_support::listening::ADAPTER),
+        "{passed:?}"
+    );
+    assert!(
+        super::owning::naming_none_of(&wirings, &fillers, &passed),
+        "{wirings:?}"
+    );
+}

@@ -30,7 +30,7 @@ use reading::{
     account_explainable, asking, beside, library_presence, providers, troubles, Fragments, Reads,
 };
 
-use super::targets::{open_curators, server_named, serving};
+use super::targets::{filling_serve, filling_serve_named, open_curators};
 use super::Ctx;
 use crate::error::{Diagnose, Problem};
 use crate::model::{StuckEntry, StuckReport, TraceReport};
@@ -57,8 +57,8 @@ pub(crate) async fn trace(
         .map_err(|err| Box::new(err.problem()))?;
     // The media server is resolved once, ahead of the match: the last stage of a trace is
     // the same read whichever curator the item turns up in.
-    let served = serving(ctx, &manifest).await;
-    let media_server = server_named(ctx, &manifest).unwrap_or_default();
+    let served = filling_serve(ctx, &manifest).await;
+    let media_server = filling_serve_named(ctx, &manifest).unwrap_or_default();
 
     for curator in open_curators(ctx, &manifest).await {
         let (kind, service) = (curator.kind, curator.service);

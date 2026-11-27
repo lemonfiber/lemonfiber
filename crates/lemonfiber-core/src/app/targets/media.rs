@@ -247,10 +247,7 @@ impl MediaServer {
     /// The server as its administrator, over `media.serve`: nothing where it cannot be
     /// asked over it.
     pub(crate) async fn administering(&self, ctx: &Ctx) -> Option<Arc<dyn serve::Fills>> {
-        match Box::pin(spoken(ctx, &self.filler, serve::CAPABILITY, serve::MAJOR)).await {
-            Spoken::Over(adapter) => Some(Arc::new(serve::Adapter(adapter))),
-            Spoken::Unanswered | Spoken::Not => None,
-        }
+        super::filled::asked_to_serve(ctx, &self.filler).await
     }
 
     /// Whether the adapter in front of the media server says its upstream answers; not

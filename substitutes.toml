@@ -43,6 +43,13 @@
 # one the bundle fills the capability with once the stack is first seeded: the household
 # member is invited into it, given a policy there, and asks as that member.
 #
+# A media server standing in is run live on a stack that fetches nothing, put in the place of
+# the bundle's media server once the stack is first seeded: a title generated into the library
+# the seed furnished it for its media type is held once the walkthrough has it look again, and
+# where it holds the household's members too it is chosen for that as well and a member invited
+# into it holds the title. An arm whose media type no stack is started for says so and does
+# not run.
+#
 # Every substitute put in place is asked again, through `plugin prove`, whether its
 # adapters speak what they declare, before its arm goes on.
 #
