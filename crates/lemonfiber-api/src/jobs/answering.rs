@@ -31,8 +31,6 @@ pub fn routes() -> Serves<Serving> {
 fn standing() -> Vec<Kind> {
     let mut kinds = crate::actions::answered_under();
     kinds.push(ENDED);
-    kinds.sort_by_key(|kind| kind.as_str());
-    kinds.dedup();
     kinds
 }
 

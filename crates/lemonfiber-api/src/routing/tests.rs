@@ -5,6 +5,8 @@ use axum::http::{Request, StatusCode};
 use axum::Router;
 use lemonfiber_core::model::kind;
 
+use axum::http::Method;
+
 use super::{Route, Serves, Taking};
 
 fn two_on_one_path() -> Serves<()> {
@@ -39,13 +41,13 @@ fn each_route_declared_is_listed_with_its_method_body_and_kinds() {
         two_on_one_path().routes(),
         &[
             Route {
-                method: "GET",
+                method: Method::GET,
                 path: "/api/thing/{name}",
                 body: false,
                 kinds: vec!["keys"],
             },
             Route {
-                method: "DELETE",
+                method: Method::DELETE,
                 path: "/api/thing/{name}",
                 body: true,
                 kinds: vec!["keys", "minted-key"],
@@ -70,6 +72,22 @@ fn a_route_taking_nothing_is_listed_without_a_body() {
     let posted = Serves::<()>::new().post("/api/x", || async {}, Taking::Nothing, &[]);
     assert!(posted.routes().iter().all(|route| !route.body));
     assert!(posted.routes().iter().all(|route| route.kinds.is_empty()));
+}
+
+#[test]
+fn a_routes_kinds_are_listed_once_each_and_in_order() {
+    let posted = Serves::<()>::new().post(
+        "/api/x",
+        || async {},
+        Taking::Nothing,
+        &[kind::MINTED_KEY, kind::KEYS, kind::MINTED_KEY],
+    );
+    let listed: Vec<&[&str]> = posted
+        .routes()
+        .iter()
+        .map(|route| route.kinds.as_slice())
+        .collect();
+    assert_eq!(listed, [["keys", "minted-key"].as_slice()]);
 }
 
 /// Every Rust file under `dir`, at any depth.

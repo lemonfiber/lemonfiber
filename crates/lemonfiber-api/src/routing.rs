@@ -6,23 +6,25 @@
 //! cannot name a route nothing serves.
 
 use axum::handler::Handler;
+use axum::http::Method;
 use axum::routing::{delete, get, post, MethodRouter};
 use axum::Router;
 use lemonfiber_core::model::kind::Kind;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 /// One route the surface serves, as the contract lists it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Route {
-    /// The method it is served at.
-    pub method: &'static str,
+    /// The method it is served at, spelled as HTTP spells it.
+    #[serde(serialize_with = "spelled")]
+    pub method: Method,
     /// Its path as the surface routes it, `{name}` and `{job}` left as they are.
     pub path: &'static str,
     /// Whether it takes a body: the one `bodies` describes under its path, or for an
     /// action the arguments `actions` lists.
     pub body: bool,
-    /// Every kind its answer may be written under, by name. Empty for a route that
-    /// answers with a file.
+    /// Every kind its answer may be written under, by name, each once and in order. Empty
+    /// for a route that answers with a file.
     pub kinds: Vec<&'static str>,
 }
 
@@ -66,7 +68,7 @@ impl<S: Clone + Send + Sync + 'static> Serves<S> {
         H: Handler<T, S>,
         T: 'static,
     {
-        self.served("GET", path, get(handler), Taking::Nothing, kinds)
+        self.served(Method::GET, path, get(handler), Taking::Nothing, kinds)
     }
 
     /// `handler` serving `POST` at `path`, taking what `taking` says and answering under
@@ -77,7 +79,7 @@ impl<S: Clone + Send + Sync + 'static> Serves<S> {
         H: Handler<T, S>,
         T: 'static,
     {
-        self.served("POST", path, post(handler), taking, kinds)
+        self.served(Method::POST, path, post(handler), taking, kinds)
     }
 
     /// `handler` serving `DELETE` at `path`, taking what `taking` says and answering under
@@ -94,7 +96,7 @@ impl<S: Clone + Send + Sync + 'static> Serves<S> {
         H: Handler<T, S>,
         T: 'static,
     {
-        self.served("DELETE", path, delete(handler), taking, kinds)
+        self.served(Method::DELETE, path, delete(handler), taking, kinds)
     }
 
     /// These routes and `other`'s.
@@ -119,21 +121,29 @@ impl<S: Clone + Send + Sync + 'static> Serves<S> {
     /// One route routed and listed.
     fn served(
         mut self,
-        method: &'static str,
+        method: Method,
         path: &'static str,
         routed: MethodRouter<S>,
         taking: Taking,
         kinds: &[Kind],
     ) -> Self {
         self.router = self.router.route(path, routed);
+        let mut kinds: Vec<&'static str> = kinds.iter().map(|kind| kind.as_str()).collect();
+        kinds.sort_unstable();
+        kinds.dedup();
         self.routes.push(Route {
             method,
             path,
             body: taking == Taking::Body,
-            kinds: kinds.iter().map(|kind| kind.as_str()).collect(),
+            kinds,
         });
         self
     }
+}
+
+/// `method` as the token HTTP names it by, which is case-sensitive.
+fn spelled<W: Serializer>(method: &Method, writer: W) -> Result<W::Ok, W::Error> {
+    writer.serialize_str(method.as_str())
 }
 
 impl<S: Clone + Send + Sync + 'static> From<Serves<S>> for Router<S> {

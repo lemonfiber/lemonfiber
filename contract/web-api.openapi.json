@@ -36810,10 +36810,10 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "$ref": "#/components/schemas/kind-sign-in-code"
+                      "$ref": "#/components/schemas/kind-admission"
                     },
                     {
-                      "$ref": "#/components/schemas/kind-admission"
+                      "$ref": "#/components/schemas/kind-sign-in-code"
                     }
                   ]
                 }

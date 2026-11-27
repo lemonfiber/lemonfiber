@@ -74,7 +74,7 @@ fn no_revocation_shares_its_path_with_a_read_or_an_action() {
         );
         let served_otherwise = crate::router::served()
             .into_iter()
-            .any(|route| route.path == revocation && route.method != "DELETE");
+            .any(|route| route.path == revocation && route.method != axum::http::Method::DELETE);
         assert!(
             !served_otherwise,
             "{revocation} is served at another method too"

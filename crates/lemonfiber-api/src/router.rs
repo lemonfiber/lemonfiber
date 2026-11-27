@@ -166,7 +166,9 @@ pub fn served() -> Vec<Route> {
         .chain(crate::events::served().routes())
         .cloned()
         .collect();
-    every.sort_by(|one, other| (one.path, one.method).cmp(&(other.path, other.method)));
+    every.sort_by(|one, other| {
+        (one.path, one.method.as_str()).cmp(&(other.path, other.method.as_str()))
+    });
     every
 }
 

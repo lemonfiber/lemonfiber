@@ -11,6 +11,7 @@ mod openapi;
 mod reads;
 mod refusals;
 mod released;
+mod routes;
 mod samples;
 mod split;
 mod surface;

@@ -499,8 +499,8 @@
     "path": "/api/logs",
     "body": false,
     "kinds": [
-      "log",
-      "job"
+      "job",
+      "log"
     ]
   },
   {
@@ -666,8 +666,8 @@
     "path": "/api/session/code",
     "body": true,
     "kinds": [
-      "sign-in-code",
-      "admission"
+      "admission",
+      "sign-in-code"
     ]
   },
   {

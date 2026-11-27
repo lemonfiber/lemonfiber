@@ -154,15 +154,12 @@ pub fn routes() -> Serves<Serving> {
 /// Every kind an action may answer under: what each action's command answers with, and
 /// the name of the work an action that outlives its request is started under.
 pub(crate) fn answered_under() -> Vec<Kind> {
-    let mut kinds: Vec<Kind> = OFFERED
+    OFFERED
         .iter()
         .filter_map(|action| reached(action, Arguments::naming_everything()).ok())
         .flat_map(|command| command.answered_under().iter().copied())
         .chain([JOB])
-        .collect();
-    kinds.sort_by_key(|kind| kind.as_str());
-    kinds.dedup();
-    kinds
+        .collect()
 }
 
 /// One action, carried out or refused.
