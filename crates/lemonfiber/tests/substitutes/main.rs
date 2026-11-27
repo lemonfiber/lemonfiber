@@ -45,7 +45,7 @@ const CLAIMABLE: &str = SERVES;
 
 /// The forms a media server standing in is started with where no household request is run
 /// for its media type: the library alone.
-const SERVING_ALONE: [&str; 1] = ["library"];
+const SERVING_ALONE: &[&str] = &["library"];
 
 /// Where every first-party plugin's repository lives, before its id.
 const ORIGINS: &str = "https://github.com/lemonfiber/plugin-";
@@ -448,31 +448,52 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
     live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
 }
 
+/// The media-serving arm the job runs, where its substitute's upstream is run `claimed`,
+/// with the forms its stack is started with.
+///
+/// # Panics
+///
+/// Where the file does not read, or the arm names no media type.
+fn serving(claimed: bool) -> Option<(String, Substitute, &'static [&'static str])> {
+    let arm = std::env::var(ARM).ok()?;
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let one = pinned
+        .ok()?
+        .substitute
+        .into_iter()
+        .find(|one| one.arm == arm && one.capability == SERVES && one.claimed == claimed)?;
+    assert!(one.media_type.is_some(), "{one:?}");
+    let forms = live::ASKED
+        .iter()
+        .find(|asked| Some(asked.media) == one.media_type.as_deref())
+        .map_or(SERVING_ALONE, |asked| asked.forms);
+    Some((arm, one, forms))
+}
+
 #[test]
 fn a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furnished_and_undoes_it(
 ) {
-    let Ok(arm) = std::env::var(ARM) else {
+    let Some((arm, one, forms)) = serving(true) else {
         return;
     };
-    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    assert!(pinned.is_ok(), "{pinned:?}");
-    let Some(one) = pinned.ok().and_then(|pinned| {
-        pinned
-            .substitute
-            .into_iter()
-            .find(|one| one.arm == arm && one.capability == SERVES && one.claimed)
-    }) else {
-        return;
-    };
-    assert!(one.media_type.is_some(), "{one:?}");
     let Some(media) = one.media_type.as_deref() else {
         return;
     };
-    let forms = live::ASKED
-        .iter()
-        .find(|asked| asked.media == media)
-        .map_or(&SERVING_ALONE[..], |asked| asked.forms);
     live::serving::run(&scratch(&arm), media, forms, &one.substitution(Vec::new()));
+}
+
+#[test]
+fn a_media_server_claimed_outside_the_house_is_installed_unclaimed_and_read_as_held_by_nobody() {
+    let Some((arm, _, forms)) = serving(false) else {
+        return;
+    };
+    let tree = std::env::var(TREE);
+    assert!(tree.is_ok(), "{arm} names no checkout in {TREE}");
+    let Ok(tree) = tree else {
+        return;
+    };
+    live::serving::unclaimed(&scratch(&arm), forms, Path::new(&tree));
 }
 
 #[test]

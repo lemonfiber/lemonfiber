@@ -22,6 +22,9 @@ pub const SECRETS: [(&str, &str); 4] = [
 /// The keys an answer names the offer it is read with under.
 const OFFERS: [&str; 2] = ["offer", "agreement"];
 
+/// The key a reading names a value it lists for approval as itself under.
+const APPROVAL: &str = "approval";
+
 /// One lemonfiber, kept beneath a directory of its own.
 pub struct Core {
     /// Where its configuration is kept.
@@ -137,12 +140,40 @@ impl Core {
     /// Run `args`, and where it names an offer, run it again answering that offer.
     #[must_use]
     pub fn agreed(&self, args: &[&str]) -> Ran {
+        self.answered(args, |_| Vec::new())
+    }
+
+    /// Run `args`, and where it names an offer, run it again answering that offer and
+    /// approving as itself each value the reading lists for approval.
+    #[must_use]
+    pub fn approved(&self, args: &[&str]) -> Ran {
+        self.answered(args, |said| {
+            let mut listed = strings_under(said, APPROVAL);
+            listed.sort();
+            listed.dedup();
+            listed
+        })
+    }
+
+    /// Run `args`, and where it names an offer, run it again answering that offer with
+    /// each value `approving` reads from the reading approved.
+    fn answered(
+        &self,
+        args: &[&str],
+        approving: impl FnOnce(&serde_json::Value) -> Vec<String>,
+    ) -> Ran {
         let read = self.run(args, "");
         let Some(offer) = offer_in(&read.said) else {
             return read;
         };
+        let approvals = approving(&read.said);
         let mut answered: Vec<&str> = args.to_vec();
         answered.extend(["--offer", offer.as_str()]);
+        answered.extend(
+            approvals
+                .iter()
+                .flat_map(|approval| ["--approve", approval.as_str()]),
+        );
         self.run(&answered, "")
     }
 }
