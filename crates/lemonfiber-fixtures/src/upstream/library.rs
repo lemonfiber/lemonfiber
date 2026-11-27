@@ -87,10 +87,13 @@ impl Maintenance for Upstream {
 
 /// How `Upstream` answers `cutoff_unmet`.
 fn cutoff_unmet(kind: TitleKind) -> Result<CutoffUnmet, Failure> {
-    if kind == TitleKind::Books {
+    if matches!(
+        kind,
+        TitleKind::Books | TitleKind::Audiobooks | TitleKind::Podcasts
+    ) {
         return Err(Failure::Unsupported {
             service: SERVICE.to_owned(),
-            detail: "it files no books".to_owned(),
+            detail: format!("it files no {}", kind.media_type()),
         });
     }
     Ok(CutoffUnmet {
@@ -179,7 +182,9 @@ const fn probe_releases(kind: TitleKind) -> ReleaseProbe {
         TitleKind::Tv => ReleaseProbe::Matching,
         TitleKind::Movies => ReleaseProbe::NoneFound,
         TitleKind::Music => ReleaseProbe::NoneMatch,
-        TitleKind::Books => ReleaseProbe::NothingWanted,
+        TitleKind::Books | TitleKind::Audiobooks | TitleKind::Podcasts => {
+            ReleaseProbe::NothingWanted
+        }
     }
 }
 

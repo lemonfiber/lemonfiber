@@ -7,7 +7,7 @@
 //! everything after the first play is the same for both.
 
 use super::walk::Walk;
-use crate::app::targets::{filling_serve, household_requests};
+use crate::app::targets::{filling_serve, filling_serve_kinds, household_requests};
 use crate::model::WalkthroughReport;
 use crate::ports::media::TitleKind;
 use crate::walkthrough::{Line, Reason, Shape, Step};
@@ -34,7 +34,8 @@ pub(super) async fn walk(
     // With nothing named, the question is whether the library holds anything at all —
     // which an empty search term answers, since every title contains it.
     let looking_for = term.unwrap_or_default();
-    let found = holds(server.as_ref(), looking_for).await;
+    let kinds = filling_serve_kinds(walk.ctx, manifest);
+    let found = holds(server.as_ref(), &kinds, looking_for).await;
     if !found {
         return walk.stopped(
             Shape::LibraryOnly,
@@ -51,14 +52,20 @@ pub(super) async fn walk(
     walk.finished(Shape::LibraryOnly, &named, None, household)
 }
 
-/// Whether the media server holds anything matching, of any kind of title.
+/// Whether the media server holds anything matching, of any of `kinds`, the kinds of title
+/// it declares it serves.
 ///
-/// Every kind is asked because a library-only household's media is whatever they have, and
-/// answering "no" about films to someone whose library is entirely music would be a wrong
-/// answer to a question they did not ask.
-async fn holds(server: &dyn crate::ports::service::Library, term: &str) -> bool {
-    for kind in TitleKind::ALL {
-        if server.has_item(kind, term).await.unwrap_or(false) {
+/// Every kind it serves is asked because a library-only household's media is whatever they
+/// have, and answering "no" about films to someone whose library is entirely music would be
+/// a wrong answer to a question they did not ask; no other kind is, since a server is asked
+/// only for what it says it holds.
+async fn holds(
+    server: &dyn crate::ports::service::Library,
+    kinds: &[TitleKind],
+    term: &str,
+) -> bool {
+    for kind in kinds {
+        if server.has_item(*kind, term).await.unwrap_or(false) {
             return true;
         }
     }

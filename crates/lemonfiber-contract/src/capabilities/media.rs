@@ -20,7 +20,9 @@ use lemonfiber_ports::service::{
 };
 use serde_json::Value;
 
-use super::{FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH};
+use super::{
+    media_case, wire, FOLDER, NOWHERE, PROXY, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH,
+};
 use crate::conformance::Placeholder;
 
 /// The most a picture's answer carries: its bytes written as base64, and room for the rest.
@@ -213,30 +215,52 @@ crate::contract! {
 /// The operation each media type is given a library by.
 const FURNISH: &str = "furnish";
 
+/// The operation asked whether the library holds an item of one kind.
+const HAS_ITEM: &str = "has_item";
+
+/// Where a case of [`HAS_ITEM`] posts the kind it asks for.
+const KIND: &str = "/kind";
+
+/// The minor at which [`HAS_ITEM`] is asked once for each kind of title but the one its
+/// own case asks.
+const EACH_KIND_HELD: u32 = 6;
+
 /// `media.serve`, the operation giving a library asked once for each media type, with
-/// the folder the conformance cases file into.
+/// the folder the conformance cases file into, and the operation asking whether the
+/// library holds an item asked once for each kind of title beside its own case.
 #[must_use]
 pub fn capability() -> crate::Capability {
     let mut served = serve::capability();
-    for operation in served
-        .operations
-        .iter_mut()
-        .filter(|operation| operation.name == FURNISH)
-    {
-        operation.filed = MEDIA
-            .iter()
-            .map(|media_type| {
-                let mut asked = operation.asks.clone();
-                if let Some(at) = asked.pointer_mut("/filed/0/media_type") {
-                    *at = Value::String((*media_type).to_owned());
-                }
-                crate::MediaCase {
-                    media_type,
-                    asks: asked,
-                    since: 0,
-                }
-            })
-            .collect();
+    for operation in &mut served.operations {
+        match operation.name {
+            FURNISH => {
+                operation.filed = MEDIA
+                    .iter()
+                    .map(|media_type| {
+                        media_case(
+                            &operation.asks,
+                            "/filed/0/media_type",
+                            media_type,
+                            Value::String((*media_type).to_owned()),
+                            0,
+                        )
+                    })
+                    .collect();
+            }
+            HAS_ITEM => {
+                let own = operation.asks.pointer(KIND).cloned();
+                operation.filed = TitleKind::ALL
+                    .iter()
+                    .map(|kind| (kind.media_type(), wire(kind)))
+                    .filter(|(_, kind)| Some(kind) != own.as_ref())
+                    .map(|(media_type, kind)| {
+                        media_case(&operation.asks, KIND, media_type, kind, EACH_KIND_HELD)
+                    })
+                    .collect();
+                operation.unfiled_too = true;
+            }
+            _ => {}
+        }
     }
     served
 }

@@ -280,3 +280,28 @@ pub fn all() -> Vec<crate::Capability> {
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+/// The case for `media_type` of an operation whose own case posts `asks`: `asks` with
+/// `value` at `pointer`, added at minor `since`.
+fn media_case(
+    asks: &serde_json::Value,
+    pointer: &str,
+    media_type: &'static str,
+    value: serde_json::Value,
+    since: u32,
+) -> crate::MediaCase {
+    let mut asked = asks.clone();
+    if let Some(at) = asked.pointer_mut(pointer) {
+        *at = value;
+    }
+    crate::MediaCase {
+        media_type,
+        asks: asked,
+        since,
+    }
+}
+
+/// `value` as the wire writes it.
+fn wire<T: serde::Serialize>(value: &T) -> serde_json::Value {
+    serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
+}

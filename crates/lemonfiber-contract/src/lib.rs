@@ -95,6 +95,9 @@ pub struct Operation {
     /// For an operation bound to a kind of media, what its case for each media type posts
     /// instead, by media type; none for every other operation.
     pub filed: Vec<MediaCase>,
+    /// Whether its own case is asked beside those of [`Operation::filed`], of every
+    /// adapter whatever its upstream files.
+    pub unfiled_too: bool,
     /// Whether it may answer that what it applied is in force once the upstream restarts.
     pub restarts: bool,
     /// The statuses its conformance case is to be refused with, where what the case asks
@@ -107,6 +110,13 @@ pub struct Operation {
 }
 
 impl Operation {
+    /// Whether its own case is asked: where it is bound to no kind of media, or its own
+    /// case is asked beside those of each.
+    #[must_use]
+    pub fn asks_its_own_case(&self) -> bool {
+        self.filed.is_empty() || self.unfiled_too
+    }
+
     /// The operation `name` of `capability`'s major, asked as `A` and answered as `R`.
     #[must_use]
     pub fn new<A, R>(capability: &'static str, major: u32, name: &'static str) -> Self
@@ -124,6 +134,7 @@ impl Operation {
             secret: &[],
             asks: serde_json::Value::Null,
             filed: Vec::new(),
+            unfiled_too: false,
             restarts: lemonfiber_ports::service::may_restart::<R>(),
             refused: None,
             since: 0,

@@ -1,9 +1,11 @@
 {
   "fields": {},
   "variants": [
+    "\"audiobooks\"",
     "\"books\"",
     "\"movies\"",
     "\"music\"",
+    "\"podcasts\"",
     "\"tv\""
   ]
 }

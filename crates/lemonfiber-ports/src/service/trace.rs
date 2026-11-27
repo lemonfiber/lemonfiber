@@ -202,7 +202,7 @@ pub trait Pipeline: Send + Sync {
 pub trait Library: Send + Sync {
     /// Whether an item whose title matches `term` is present in the library, for the
     /// media type `kind` names — a series for television, a movie for film, an album for
-    /// music, a book for books.
+    /// music, a book for books, an audiobook for audiobooks and a podcast for podcasts.
     ///
     /// # Errors
     ///

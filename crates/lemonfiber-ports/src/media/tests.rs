@@ -1,4 +1,4 @@
-use super::{offered, Kind, TitleKind, BOOKS, MUSIC};
+use super::{offered, Kind, TitleKind, AUDIOBOOKS, BOOKS, MEDIA, MUSIC, PODCASTS};
 
 fn declared(of: &[&str]) -> Vec<String> {
     of.iter().map(|&media| media.to_owned()).collect()
@@ -82,6 +82,39 @@ fn every_kind_a_curator_files_is_read_from_what_it_declares_video_first() {
         Some(TitleKind::Movies)
     );
     assert_eq!(TitleKind::of_declared(&declared(&["comics"])), None);
+    assert_eq!(
+        TitleKind::of_declared(&declared(&["audiobooks", "podcasts"])),
+        None
+    );
+}
+
+#[test]
+fn every_kind_a_service_serves_is_read_from_what_it_declares_in_one_order() {
+    assert_eq!(
+        TitleKind::declared(&declared(&["podcasts", "audiobooks"])),
+        [TitleKind::Audiobooks, TitleKind::Podcasts]
+    );
+    assert_eq!(
+        TitleKind::declared(&declared(&["comics", "books"])),
+        [TitleKind::Books]
+    );
+    assert_eq!(TitleKind::declared(&declared(&["comics"])), []);
+    assert_eq!(TitleKind::declared(&declared(&MEDIA)), TitleKind::ALL);
+}
+
+/// Every kind of title is one of the manifest's media types, written as that type.
+#[test]
+fn every_kind_of_title_is_written_as_the_media_type_it_names() {
+    for kind in TitleKind::ALL {
+        assert!(MEDIA.contains(&kind.media_type()), "{kind:?}");
+        assert_eq!(
+            serde_json::to_value(kind).ok(),
+            Some(serde_json::Value::String(kind.media_type().to_owned()))
+        );
+    }
+    assert!(TitleKind::CURATED
+        .iter()
+        .all(|kind| TitleKind::ALL.contains(kind)));
 }
 
 #[test]
@@ -97,6 +130,8 @@ fn each_kind_names_its_media_type_its_item_and_whether_it_is_video() {
             ("movies", "film", Some(Kind::Movies)),
             (MUSIC, "album", None),
             (BOOKS, "book", None),
+            (AUDIOBOOKS, "audiobook", None),
+            (PODCASTS, "podcast", None),
         ]
     );
     for kind in Kind::ALL {

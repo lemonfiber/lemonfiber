@@ -15,6 +15,7 @@ use lemonfiber_manifest::Manifest;
 
 use crate::app::plugins::conformance;
 use crate::app::Ctx;
+use crate::ports::media::TitleKind;
 use crate::wiring::{Filler, Fillers};
 
 use super::media::{fillers_here, MediaServer, IDENTITY};
@@ -60,6 +61,15 @@ pub(crate) async fn serving(ctx: &Ctx, manifest: &Manifest) -> Option<Arc<dyn se
 /// the house that is not yet the household's, or it cannot be asked over the contract.
 pub(crate) async fn filling_serve(ctx: &Ctx, manifest: &Manifest) -> Option<Arc<dyn serve::Fills>> {
     filled_serve(ctx, &fillers_here(ctx, manifest)).await
+}
+
+/// Every kind of title the service filling `media.serve` declares in its `media_types`,
+/// none where no one service is settled on for it.
+pub(crate) fn filling_serve_kinds(ctx: &Ctx, manifest: &Manifest) -> Vec<TitleKind> {
+    fillers_here(ctx, manifest)
+        .filling(serve::CAPABILITY)
+        .map(|(filler, _)| TitleKind::declared(&filler.media_types))
+        .unwrap_or_default()
 }
 
 /// The service filling `media.serve`, where one does.

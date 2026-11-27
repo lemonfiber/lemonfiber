@@ -247,20 +247,18 @@ fn keyed(operation: &Operation) -> Vec<Case<'_>> {
     if operation.refused.is_some() {
         return vec![asked(refuses(operation.name), &operation.asks, None, 0)];
     }
-    if operation.filed.is_empty() {
-        return vec![asked(answers(operation.name), &operation.asks, None, 0)];
-    }
-    operation
-        .filed
-        .iter()
-        .map(|filed| {
+    let own = operation
+        .asks_its_own_case()
+        .then(|| asked(answers(operation.name), &operation.asks, None, 0));
+    own.into_iter()
+        .chain(operation.filed.iter().map(|filed| {
             asked(
                 format!("{}-{}", answers(operation.name), filed.media_type),
                 &filed.asks,
                 Some(filed.media_type),
                 filed.since,
             )
-        })
+        }))
         .collect()
 }
 

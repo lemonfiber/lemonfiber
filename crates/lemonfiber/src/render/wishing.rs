@@ -80,6 +80,8 @@ const fn called(kind: TitleKind) -> &'static str {
         TitleKind::Movies => "films",
         TitleKind::Music => "music",
         TitleKind::Books => "books",
+        TitleKind::Audiobooks => "audiobooks",
+        TitleKind::Podcasts => "podcasts",
     }
 }
 

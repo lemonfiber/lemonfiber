@@ -44,6 +44,12 @@ pub const MUSIC: &str = "music";
 /// The media type a service declares for books.
 pub const BOOKS: &str = "books";
 
+/// The media type a service declares for audiobooks.
+pub const AUDIOBOOKS: &str = "audiobooks";
+
+/// The media type a service declares for podcasts.
+pub const PODCASTS: &str = "podcasts";
+
 /// `words` as one choice is offered from them: `a, b, or c`.
 #[must_use]
 pub fn offered<T: AsRef<str>>(words: &[T]) -> String {
@@ -120,7 +126,7 @@ impl Kind {
 }
 
 /// What kind of title a curator files, a member asks for and a media server holds: a
-/// series, a film, music or books.
+/// series, a film, music, books, an audiobook or a podcast.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum TitleKind {
@@ -132,11 +138,25 @@ pub enum TitleKind {
     Music,
     /// A book, or a whole author or series of books asked for.
     Books,
+    /// An audiobook.
+    Audiobooks,
+    /// A podcast.
+    Podcasts,
 }
 
 impl TitleKind {
     /// Every kind, the kinds of video first.
-    pub const ALL: [Self; 4] = [Self::Tv, Self::Movies, Self::Music, Self::Books];
+    pub const ALL: [Self; 6] = [
+        Self::Tv,
+        Self::Movies,
+        Self::Music,
+        Self::Books,
+        Self::Audiobooks,
+        Self::Podcasts,
+    ];
+
+    /// Every kind a curator files, the kinds of video first.
+    pub const CURATED: [Self; 4] = [Self::Tv, Self::Movies, Self::Music, Self::Books];
 
     /// The media type a service declares for this kind.
     #[must_use]
@@ -146,6 +166,8 @@ impl TitleKind {
             Self::Movies => Kind::Movies.media_type(),
             Self::Music => MUSIC,
             Self::Books => BOOKS,
+            Self::Audiobooks => AUDIOBOOKS,
+            Self::Podcasts => PODCASTS,
         }
     }
 
@@ -157,6 +179,8 @@ impl TitleKind {
             Self::Movies => Kind::Movies.noun(),
             Self::Music => "album",
             Self::Books => "book",
+            Self::Audiobooks => "audiobook",
+            Self::Podcasts => "podcast",
         }
     }
 
@@ -167,32 +191,47 @@ impl TitleKind {
         match self {
             Self::Music => "album and artist",
             Self::Books => "book, author and series",
-            Self::Tv | Self::Movies => self.noun(),
+            Self::Tv | Self::Movies | Self::Audiobooks | Self::Podcasts => self.noun(),
         }
     }
 
-    /// The kind of video it is, or `None` for music and books.
+    /// The kind of video it is, or `None` for every other kind.
     #[must_use]
     pub const fn video(self) -> Option<Kind> {
         match self {
             Self::Tv => Some(Kind::Tv),
             Self::Movies => Some(Kind::Movies),
-            Self::Music | Self::Books => None,
+            Self::Music | Self::Books | Self::Audiobooks | Self::Podcasts => None,
         }
     }
 
     /// The kind a curator files, read from the media types it declares, or `None` for a
-    /// service that files none.
+    /// service that files none a curator files.
     ///
-    /// In [`TitleKind::ALL`]'s order whatever order they are declared in, so a service
+    /// In [`TitleKind::CURATED`]'s order whatever order they are declared in, so a service
     /// declaring more than one is filed as the same one every run.
     #[must_use]
     pub fn of_declared(media_types: &[String]) -> Option<Self> {
-        Self::ALL.into_iter().find(|kind| {
-            media_types
-                .iter()
-                .any(|media| media.as_str() == kind.media_type())
-        })
+        Self::CURATED
+            .into_iter()
+            .find(|kind| kind.declared_in(media_types))
+    }
+
+    /// Every kind a service declares among `media_types`, in [`TitleKind::ALL`]'s order
+    /// whatever order they are declared in.
+    #[must_use]
+    pub fn declared(media_types: &[String]) -> Vec<Self> {
+        Self::ALL
+            .into_iter()
+            .filter(|kind| kind.declared_in(media_types))
+            .collect()
+    }
+
+    /// Whether `media_types` names this kind's media type.
+    fn declared_in(self, media_types: &[String]) -> bool {
+        media_types
+            .iter()
+            .any(|media| media.as_str() == self.media_type())
     }
 }
 
