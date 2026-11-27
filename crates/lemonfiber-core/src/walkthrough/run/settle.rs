@@ -11,7 +11,7 @@
 
 use super::choose::Chosen;
 use super::walk::Walk;
-use crate::app::targets::{data_root, household_requests, serving};
+use crate::app::targets::{data_root, filling_serve, household_requests};
 use crate::app::Ctx;
 use crate::model::WalkthroughReport;
 use crate::storage::Linked;
@@ -27,7 +27,7 @@ pub(super) async fn settle(
     let link = linked(walk.ctx).await;
     walk.say(Line::saying(Step::Importing, note(link)));
 
-    let Some(server) = serving(walk.ctx, manifest).await else {
+    let Some(server) = filling_serve(walk.ctx, manifest).await else {
         // Imported, with nothing running to play it from. Complete through the import and
         // said plainly, because "it worked and you cannot watch it" is not a failure of
         // the pipeline — it is a form that does not include a media server.

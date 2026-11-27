@@ -16,7 +16,7 @@
 //! invitation that chose nothing grants, read about no account, so the operator can see
 //! the member's side without reading any member's.
 
-use super::targets::media;
+use super::targets::{filling_serve, media};
 use super::{Ctx, Outcome, Shelf, Whom};
 
 use crate::error::codes::play::{NOTHING_TO_PLAY_FROM, NOT_IN_THE_HOUSEHOLD, SERVER_SILENT};
@@ -25,6 +25,10 @@ use crate::error::{Diagnose, Problem};
 use crate::model::HeldReport;
 use crate::ports::service::{Failure, Item, Member};
 use crate::screening::door::{located, Door};
+
+/// Why a shelf could not be read at all.
+const NO_SERVER: &str = "there is no media server to ask what the household holds, or it \
+                         cannot be asked over its contracts";
 
 /// Read what one member holds, or what the household's defaults would.
 ///
@@ -44,24 +48,24 @@ async fn held(ctx: &Ctx, whose: &Whom, most: u32) -> Result<HeldReport, Box<Prob
         .checked_manifest(ctx.today())
         .map_err(|err| Box::new(err.problem()))?;
 
-    let Some(server) = media(ctx, &manifest).await else {
-        return Ok(unread(
-            whose,
-            NOTHING_TO_PLAY_FROM,
-            "there is no media server to ask what the household holds, or it cannot be \
-             asked over its contracts",
-        ));
-    };
-
-    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
     let Whom::Named(member) = whose else {
+        let Some(serve) = filling_serve(ctx, &manifest).await else {
+            return Ok(unread(whose, NOTHING_TO_PLAY_FROM, NO_SERVER));
+        };
+        let door = crate::screening::door::standing(ctx, serve.as_ref()).await;
         return Ok(shelved(
-            server.serve.holdings(None, most).await,
+            serve.holdings(None, most).await,
             String::new(),
             String::new(),
             (&door, ctx.seams.random.as_ref()),
         ));
     };
+
+    let Some(server) = media(ctx, &manifest).await else {
+        return Ok(unread(whose, NOTHING_TO_PLAY_FROM, NO_SERVER));
+    };
+
+    let door = crate::screening::door::standing(ctx, server.serve.as_ref()).await;
 
     let Ok(accounts) = server.identity.household().await else {
         return Ok(unread(

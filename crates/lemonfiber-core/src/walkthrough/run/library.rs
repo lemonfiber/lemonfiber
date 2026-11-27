@@ -7,9 +7,9 @@
 //! everything after the first play is the same for both.
 
 use super::walk::Walk;
-use crate::app::targets::{household_requests, serving};
+use crate::app::targets::{filling_serve, household_requests};
 use crate::model::WalkthroughReport;
-use crate::ports::media::Kind;
+use crate::ports::media::TitleKind;
 use crate::walkthrough::{Line, Reason, Shape, Step};
 
 /// Point the media server at what is already on disk and confirm it can see it.
@@ -18,7 +18,7 @@ pub(super) async fn walk(
     manifest: &lemonfiber_manifest::Manifest,
     term: Option<&str>,
 ) -> WalkthroughReport {
-    let Some(server) = serving(walk.ctx, manifest).await else {
+    let Some(server) = filling_serve(walk.ctx, manifest).await else {
         return walk.stopped(Shape::LibraryOnly, None, Reason::NoMediaServer);
     };
 
@@ -51,14 +51,14 @@ pub(super) async fn walk(
     walk.finished(Shape::LibraryOnly, &named, None, household)
 }
 
-/// Whether the media server holds anything matching, of either media type.
+/// Whether the media server holds anything matching, of any kind of title.
 ///
-/// Both are asked because a library-only household's media is whatever they have, and
-/// answering "no" about films to someone whose library is entirely television would be a
-/// wrong answer to a question they did not ask.
+/// Every kind is asked because a library-only household's media is whatever they have, and
+/// answering "no" about films to someone whose library is entirely music would be a wrong
+/// answer to a question they did not ask.
 async fn holds(server: &dyn crate::ports::service::Library, term: &str) -> bool {
-    for kind in Kind::ALL {
-        if server.has_item(kind.into(), term).await.unwrap_or(false) {
+    for kind in TitleKind::ALL {
+        if server.has_item(kind, term).await.unwrap_or(false) {
             return true;
         }
     }

@@ -55,6 +55,13 @@ pub(crate) async fn serving(ctx: &Ctx, manifest: &Manifest) -> Option<Arc<dyn se
     served(ctx, &fillers_here(ctx, manifest)).await
 }
 
+/// What the service filling `media.serve` holds, asked over that contract: nothing where
+/// no one service is settled on for it, it is a part claimed against an account outside
+/// the house that is not yet the household's, or it cannot be asked over the contract.
+pub(crate) async fn filling_serve(ctx: &Ctx, manifest: &Manifest) -> Option<Arc<dyn serve::Fills>> {
+    filled_serve(ctx, &fillers_here(ctx, manifest)).await
+}
+
 /// The service filling `media.serve`, where one does.
 pub(crate) fn served_by(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
     provider(&fillers_here(ctx, manifest), serve::CAPABILITY).map(|filler| filler.id.clone())
@@ -82,6 +89,23 @@ async fn identified(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn source::Fill
     provider(fillers, source::CAPABILITY)?;
     let server = MediaServer::of(fillers)?;
     Box::pin(server.identifying(ctx)).await
+}
+
+async fn filled_serve(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn serve::Fills>> {
+    let (filler, _) = fillers.filling(serve::CAPABILITY)?;
+    let kept_off = crate::seed::run::owning::kept_off_here(ctx, fillers);
+    if crate::seed::run::owning::off(fillers, filler, &kept_off) {
+        return None;
+    }
+    asked_to_serve(ctx, filler).await
+}
+
+/// `filler` asked over `media.serve`, where it can be.
+pub(crate) async fn asked_to_serve(ctx: &Ctx, filler: &Filler) -> Option<Arc<dyn serve::Fills>> {
+    match Box::pin(spoken(ctx, filler, serve::CAPABILITY, serve::MAJOR)).await {
+        Spoken::Over(adapter) => Some(Arc::new(serve::Adapter(adapter))),
+        Spoken::Unanswered | Spoken::Not => None,
+    }
 }
 
 async fn served(ctx: &Ctx, fillers: &Fillers) -> Option<Arc<dyn serve::Fills>> {
