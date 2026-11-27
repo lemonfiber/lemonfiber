@@ -69,10 +69,10 @@ pub fn answered(rendered: String) -> Response<Body> {
 /// where the caller is not a member.
 ///
 /// For the routes that are not a command and so never reach [`crate::entitled::may`]:
-/// a bundle, the logs, the work begun under a job's name and the event stream. Each
-/// carries what the operator is shown — a whole support bundle, every container's
-/// log lines, another caller's results — and none of it is narrowed to a member, so
-/// a member is refused outright rather than handed the operator's copy. A key scoped to
+/// a bundle, the logs and the event stream. Each carries what the operator is
+/// shown — a whole support bundle, every container's log lines — and none of it is
+/// narrowed to a member, so a member is refused outright rather than handed the
+/// operator's copy. A key scoped to
 /// a member is that member here as everywhere, and is refused the same way; a `read` or
 /// `act` key is admitted, since the served reads and the stream are what it is for, and
 /// it passes over what the stream says to the operator alone.

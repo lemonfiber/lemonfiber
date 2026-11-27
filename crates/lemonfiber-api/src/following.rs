@@ -33,6 +33,7 @@ use axum::response::Response;
 use lemonfiber_core::app::{Ctx, ReadingLogs};
 
 use crate::actions::unnameable;
+use crate::admission::Caller;
 use crate::events::live::Live;
 use crate::jobs::ended::Ending;
 use crate::jobs::{accepted, Job, Lease, Standing};
@@ -52,6 +53,7 @@ const ASKED_FOR: &str = "logs";
 /// being two different answers to one request depending on how far it got.
 pub(crate) async fn followed(
     serving: &Serving,
+    by: &Caller,
     forms: Vec<String>,
     services: Vec<String>,
     tail: u32,
@@ -62,7 +64,7 @@ pub(crate) async fn followed(
     let (ctx, live) = (Arc::clone(&serving.ctx), Arc::clone(&serving.live));
     serving
         .jobs
-        .begin(&job, ASKED_FOR, Lease::WhileAsked, async move {
+        .begin(&job, ASKED_FOR, Lease::WhileAsked, by, async move {
             following(&ctx, live, forms, services, tail).await
         })
         .await;

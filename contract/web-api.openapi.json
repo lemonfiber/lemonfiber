@@ -35265,6 +35265,52 @@
         }
       ]
     },
+    "/api/jobs/{job}/forget": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "job",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelope"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-job"
+                }
+              }
+            },
+            "description": "Still going."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/keys": {
       "post": {
         "requestBody": {

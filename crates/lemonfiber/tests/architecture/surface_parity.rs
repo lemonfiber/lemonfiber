@@ -119,9 +119,10 @@ const DASHBOARD: &str = "dashboard";
 /// Each is the web's own half of something that has no command-line form. The
 /// stream is one of the three exceptions running the other way — a live gather
 /// nothing prints. The action path is how every action is asked for, and the rows
-/// name the actions rather than the path they arrive on. The job path is the other
+/// name the actions rather than the path they arrive on. The job paths are the other
 /// end of the name a long-running action is answered with, and being answered with
-/// a name is itself the web's own arrangement. The door a password is exchanged at
+/// a name is itself the web's own arrangement, so neither asking about a name nor
+/// forgetting one has a command-line form. The door a password is exchanged at
 /// is the same kind of thing: a command line is already sitting at the machine that
 /// printed this run's token, so there is nothing for it to log in to. What the
 /// stack can do is read by a client that may be older or newer than the stack, and a
@@ -139,11 +140,12 @@ const DASHBOARD: &str = "dashboard";
 /// that run printed how it serves when it began.
 ///
 /// Anything else this surface routes belongs in a row.
-const UNREQUESTED: [&str; 12] = [
+const UNREQUESTED: [&str; 13] = [
     "/api/events",
     "/api/capabilities",
     "/api/actions/{action}",
     "/api/jobs/{job}",
+    "/api/jobs/{job}/forget",
     "/api/session",
     "/api/session/code",
     "/api/keys/claim",

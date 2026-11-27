@@ -199,6 +199,7 @@ async fn taken(
         ctx,
         job,
         audience: Audience::of(&caller),
+        by: caller.clone(),
     };
     let Some(key) = key else {
         return carrying.out(&serving).await.reply();
@@ -233,6 +234,8 @@ struct Carrying {
     job: Option<Job>,
     /// Who the answer is worded for.
     audience: Audience,
+    /// Whose request it is, which a job it is handed to is answered to.
+    by: Caller,
 }
 
 impl Carrying {
@@ -244,7 +247,7 @@ impl Carrying {
                 let ctx = said_by(serving, &self.ctx, &job);
                 serving
                     .jobs
-                    .start(&job, &self.action, self.command, ctx)
+                    .start(&job, &self.action, self.command, ctx, &self.by)
                     .await;
                 Answer::Later(job, self.action)
             }

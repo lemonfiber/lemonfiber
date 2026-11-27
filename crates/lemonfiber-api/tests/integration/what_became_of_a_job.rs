@@ -22,7 +22,7 @@ use lemonfiber_api::admission::Caller;
 use lemonfiber_api::events::live::Live;
 use lemonfiber_api::guard::Token;
 use lemonfiber_api::jobs::ended::Ending;
-use lemonfiber_api::jobs::{accepted, leased, routes, Job, Jobs, Lease, Standing};
+use lemonfiber_api::jobs::{accepted, leased, routes, Job, Jobs, Lease, Standing, A_JOB};
 use lemonfiber_api::router::Serving;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome, QualityAction};
 use lemonfiber_core::config::Settings;
@@ -31,15 +31,15 @@ use lemonfiber_fixtures::mounted::Drive;
 use lemonfiber_fixtures::ports::{Chance, Idle, Stopped};
 
 /// A name this run can hand out.
-fn minted() -> Job {
+pub(crate) fn minted() -> Job {
     let Some(job) = Job::mint(&Chance::cycling()) else {
         unreachable!("cycling letters always supply bytes");
     };
     job
 }
 
-/// The route as a run builds it, over the work a test started.
-fn routed(jobs: Jobs) -> axum::Router {
+/// The route as a run builds it, over the work a test started, asked by `caller`.
+fn routed(jobs: Jobs, caller: Caller) -> axum::Router {
     let Some(token) = Token::mint(&Chance::cycling()) else {
         unreachable!("cycling letters always supply bytes");
     };
@@ -60,25 +60,25 @@ fn routed(jobs: Jobs) -> axum::Router {
         // The subject the guard puts on every request it admits. Mounted here because a
         // test builds these routes without the layer that carries it, and a handler that
         // asks who is calling is answered by the guard in a run rather than by the route.
-        .layer(Extension(Caller::Machine))
+        .layer(Extension(caller))
 }
 
 /// How often a guard looks again, and how many looks a test moves past.
 ///
 /// The interval is the command's own; a test that wrote down its own number would
 /// pass on an interval this product does not use.
-const WATCH: Duration = lemonfiber_core::app::WATCH;
+pub(crate) const WATCH: Duration = lemonfiber_core::app::WATCH;
 
 /// Looks a test moves the clock past, enough that a guard still guarding has
 /// plainly looked more than once.
-const LOOKS: usize = 4;
+pub(crate) const LOOKS: usize = 4;
 
 /// How often a swept register is looked at, for the test that drives the beat.
 const BEAT: Duration = Duration::from_millis(5);
 
 /// A world guarding a directory that is really there, so a guard holds rather
 /// than ending before a test can do anything to it.
-fn guarding(volume: Arc<dyn Volume>) -> Ctx {
+pub(crate) fn guarding(volume: Arc<dyn Volume>) -> Ctx {
     let dir = lemonfiber_fixtures::scratch::Scratch::new("job");
     lemonfiber_testing::a_live_context()
         .runner(Arc::new(Idle))
@@ -98,12 +98,12 @@ fn guarding(volume: Arc<dyn Volume>) -> Ctx {
 }
 
 /// A location that is always there, counting how often it was looked at.
-fn there() -> Arc<Drive> {
+pub(crate) fn there() -> Arc<Drive> {
     Arc::new(Drive::settling(vec![Presence::On(9)]))
 }
 
 /// A guard started under a name, over a location that will not go away.
-async fn watching(jobs: &Jobs, volume: Arc<dyn Volume>) -> Job {
+pub(crate) async fn watching(jobs: &Jobs, volume: Arc<dyn Volume>) -> Job {
     let job = minted();
     jobs.start(
         &job,
@@ -112,6 +112,7 @@ async fn watching(jobs: &Jobs, volume: Arc<dyn Volume>) -> Job {
             forms: vec!["library".to_owned()],
         },
         Arc::new(guarding(volume)),
+        &Caller::Machine,
     )
     .await;
     job
@@ -129,14 +130,27 @@ async fn released(jobs: Jobs, job: &str) -> (u16, String) {
 
 /// What one request to the job route answered, as its status and what it said.
 async fn over(method: &str, jobs: Jobs, job: &str) -> (u16, String) {
+    at(method, A_JOB, job, jobs, Caller::Machine).await
+}
+
+/// What one request to `route`, naming `job`, answered `caller` with.
+pub(crate) async fn at(
+    method: &str,
+    route: &str,
+    job: &str,
+    jobs: Jobs,
+    caller: Caller,
+) -> (u16, String) {
     let request = axum::http::Request::builder()
         .method(method)
-        .uri(format!("/api/jobs/{job}"))
+        .uri(route.replace("{job}", job))
         .body(axum::body::Body::empty());
     let Ok(request) = request else {
         unreachable!("a request built from values that are already headers cannot fail");
     };
-    let served = tower::ServiceExt::oneshot(routed(jobs), request).await.ok();
+    let served = tower::ServiceExt::oneshot(routed(jobs, caller), request)
+        .await
+        .ok();
     let Some(response) = served else {
         unreachable!("the router is infallible; its handlers answer rather than fail");
     };
@@ -147,16 +161,22 @@ async fn over(method: &str, jobs: Jobs, job: &str) -> (u16, String) {
 }
 
 /// Where a job got to, once it has had the chance to get anywhere.
-async fn settled(jobs: &Jobs, job: &str) -> Option<Standing> {
+pub(crate) async fn settled(jobs: &Jobs, job: &str) -> Option<Standing> {
     for _ in 0..200 {
-        match jobs.about(job).await.map(|work| work.standing) {
+        match jobs
+            .about(job, &Caller::Machine)
+            .await
+            .map(|work| work.standing)
+        {
             Some(Standing::Running) | None => {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
             settled => return settled,
         }
     }
-    jobs.about(job).await.map(|work| work.standing)
+    jobs.about(job, &Caller::Machine)
+        .await
+        .map(|work| work.standing)
 }
 
 /// The envelope the command line would have rendered for this command.
@@ -235,6 +255,7 @@ async fn work_started_under_a_name_finishes_without_anything_holding_it() {
         "quality-reapply",
         Command::Quality(QualityAction::Show),
         Arc::new(ctx()),
+        &Caller::Machine,
     )
     .await;
 
@@ -251,8 +272,14 @@ async fn work_that_could_not_be_done_says_so_under_its_own_name() {
     let job = minted();
     // A stack that is not there: the command fails, and the failure is recorded
     // against the job rather than lost with the request that started it.
-    jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
-        .await;
+    jobs.start(
+        &job,
+        "up",
+        Command::Forms,
+        Arc::new(ctx()),
+        &Caller::Machine,
+    )
+    .await;
 
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
@@ -268,10 +295,19 @@ async fn the_action_a_name_was_started_under_is_kept_beside_it() {
     // rather than being asked to remember which name it gave which request.
     let jobs = Jobs::default();
     let job = minted();
-    jobs.start(&job, "pull", Command::Forms, Arc::new(ctx()))
-        .await;
+    jobs.start(
+        &job,
+        "pull",
+        Command::Forms,
+        Arc::new(ctx()),
+        &Caller::Machine,
+    )
+    .await;
 
-    let asked_for = jobs.about(job.as_str()).await.map(|work| work.action);
+    let asked_for = jobs
+        .about(job.as_str(), &Caller::Machine)
+        .await
+        .map(|work| work.action);
     assert_eq!(asked_for, Some("pull".to_owned()));
 }
 
@@ -284,8 +320,14 @@ async fn work_still_going_is_answered_with_the_name_it_was_started_under() {
     // the work is still going when it is asked about, every time.
     let jobs = Jobs::default();
     let job = minted();
-    jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
-        .await;
+    jobs.start(
+        &job,
+        "up",
+        Command::Forms,
+        Arc::new(ctx()),
+        &Caller::Machine,
+    )
+    .await;
 
     let (status, body) = asked(jobs, job.as_str()).await;
     assert_eq!(status, StatusCode::ACCEPTED.as_u16(), "{body}");
@@ -308,6 +350,7 @@ async fn work_that_finished_is_answered_with_the_envelope_the_command_renders() 
         "quality-reapply",
         Command::Quality(QualityAction::Show),
         Arc::new(ctx()),
+        &Caller::Machine,
     )
     .await;
     let standing = settled(&jobs, job.as_str()).await;
@@ -327,8 +370,14 @@ async fn work_that_finished_is_answered_with_the_envelope_the_command_renders() 
 async fn work_that_stopped_is_answered_with_the_failure_it_stopped_on() {
     let jobs = Jobs::default();
     let job = minted();
-    jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
-        .await;
+    jobs.start(
+        &job,
+        "up",
+        Command::Forms,
+        Arc::new(ctx()),
+        &Caller::Machine,
+    )
+    .await;
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
         matches!(standing, Some(Standing::Failed(..))),
@@ -347,7 +396,10 @@ async fn work_that_stopped_is_answered_with_the_failure_it_stopped_on() {
 
 #[tokio::test]
 async fn a_name_this_run_never_handed_out_stands_for_nothing() {
-    assert_eq!(Jobs::default().about("0badc0de").await, None);
+    assert_eq!(
+        Jobs::default().about("0badc0de", &Caller::Machine).await,
+        None
+    );
 }
 
 #[tokio::test]
@@ -397,7 +449,7 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
     let by_now = looked.looked();
     assert!(by_now > 1, "the guard was guarding: {by_now}");
 
-    let released = jobs.stop(job.as_str()).await;
+    let released = jobs.stop(job.as_str(), &Caller::Machine).await;
     assert_eq!(
         released.map(|work| work.standing),
         Some(Standing::Ended(Ending::Released))
@@ -413,7 +465,10 @@ async fn releasing_a_name_stops_the_work_rather_than_only_the_record_of_it() {
 
 #[tokio::test]
 async fn releasing_a_name_this_run_never_handed_out_stands_for_nothing() {
-    assert_eq!(Jobs::default().stop("0badc0de").await, None);
+    assert_eq!(
+        Jobs::default().stop("0badc0de", &Caller::Machine).await,
+        None
+    );
 }
 
 #[tokio::test]
@@ -427,13 +482,16 @@ async fn releasing_work_that_already_finished_answers_with_what_it_came_to() {
         "quality-reapply",
         Command::Quality(QualityAction::Show),
         Arc::new(ctx()),
+        &Caller::Machine,
     )
     .await;
     let standing = settled(&jobs, job.as_str()).await;
     assert!(matches!(standing, Some(Standing::Done(_))), "{standing:?}");
 
     assert_eq!(
-        jobs.stop(job.as_str()).await.map(|work| work.standing),
+        jobs.stop(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         standing
     );
 }
@@ -442,7 +500,7 @@ async fn releasing_work_that_already_finished_answers_with_what_it_came_to() {
 async fn work_that_was_released_is_answered_as_ended_and_released() {
     let jobs = Jobs::default();
     let job = watching(&jobs, there()).await;
-    let released = jobs.stop(job.as_str()).await;
+    let released = jobs.stop(job.as_str(), &Caller::Machine).await;
     assert_eq!(
         released.map(|work| work.standing),
         Some(Standing::Ended(Ending::Released))
@@ -483,7 +541,9 @@ async fn releasing_a_name_over_the_route_says_where_the_work_now_stands() {
     assert!(body.contains(r#""kind":"ended""#), "{body}");
     assert!(body.contains(r#""ended":"released""#), "{body}");
     assert_eq!(
-        jobs.about(job.as_str()).await.map(|work| work.standing),
+        jobs.about(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         Some(Standing::Ended(Ending::Released))
     );
 }
@@ -536,14 +596,18 @@ async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
 
     assert_eq!(jobs.sweep().await, 0, "it survives the first look");
     assert_eq!(
-        jobs.about(job.as_str()).await.map(|work| work.standing),
+        jobs.about(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         Some(Standing::Running)
     );
     // Asking is what renews it, so the ask above buys it another look.
     assert_eq!(jobs.sweep().await, 0, "and the ask renewed it");
     assert_eq!(jobs.sweep().await, 1, "then nothing was asking");
     assert_eq!(
-        jobs.about(job.as_str()).await.map(|work| work.standing),
+        jobs.about(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         Some(Standing::Ended(Ending::LetGo))
     );
 }
@@ -552,8 +616,14 @@ async fn a_guard_nobody_asks_about_is_let_go_on_the_second_look() {
 async fn finished_work_is_kept_while_it_is_asked_about_and_forgotten_once_it_is_not() {
     let jobs = Jobs::default();
     let job = minted();
-    jobs.start(&job, "up", Command::Forms, Arc::new(ctx()))
-        .await;
+    jobs.start(
+        &job,
+        "up",
+        Command::Forms,
+        Arc::new(ctx()),
+        &Caller::Machine,
+    )
+    .await;
     let standing = settled(&jobs, job.as_str()).await;
     assert!(
         matches!(standing, Some(Standing::Failed(..))),
@@ -566,19 +636,21 @@ async fn finished_work_is_kept_while_it_is_asked_about_and_forgotten_once_it_is_
         "a finished piece is not counted as let go"
     );
     assert_eq!(
-        jobs.about(job.as_str()).await.map(|work| work.standing),
+        jobs.about(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         standing,
         "what it came to is kept for whoever asks"
     );
     assert_eq!(jobs.sweep().await, 0);
     assert!(
-        jobs.about(job.as_str()).await.is_some(),
+        jobs.about(job.as_str(), &Caller::Machine).await.is_some(),
         "the ask renewed it"
     );
     jobs.sweep().await;
     jobs.sweep().await;
     assert!(
-        jobs.about(job.as_str()).await.is_none(),
+        jobs.about(job.as_str(), &Caller::Machine).await.is_none(),
         "nobody asked for a whole lease, so the run no longer holds it"
     );
 }
@@ -595,18 +667,27 @@ async fn the_register_holds_a_bounded_amount_of_finished_work() {
         let Some(job) = Job::mint(&Chance::exactly(Some(bytes))) else {
             unreachable!("eight bytes were given for eight asked");
         };
-        jobs.start(&job, "forms", Command::Forms, Arc::new(ctx()))
-            .await;
+        jobs.start(
+            &job,
+            "forms",
+            Command::Forms,
+            Arc::new(ctx()),
+            &Caller::Machine,
+        )
+        .await;
         settled(&jobs, job.as_str()).await;
         names.push(job);
     }
     let first = names.first().map(Job::as_str).unwrap_or_default();
     let last = names.last().map(Job::as_str).unwrap_or_default();
     assert!(
-        jobs.about(first).await.is_none(),
+        jobs.about(first, &Caller::Machine).await.is_none(),
         "the finished work that began first made room"
     );
-    assert!(jobs.about(last).await.is_some(), "the newest is held");
+    assert!(
+        jobs.about(last, &Caller::Machine).await.is_some(),
+        "the newest is held"
+    );
 }
 
 #[tokio::test]
@@ -623,7 +704,9 @@ async fn sweeping_on_the_beat_lets_go_of_what_a_sweep_asked_for_would() {
     // Ended on the second look and forgotten two looks later, nobody having asked
     // about it in between: the run holds neither the work nor its name.
     assert_eq!(
-        jobs.about(job.as_str()).await.map(|work| work.standing),
+        jobs.about(job.as_str(), &Caller::Machine)
+            .await
+            .map(|work| work.standing),
         None
     );
 }
@@ -728,6 +811,7 @@ async fn a_name_nothing_answers_to_is_absent_through_the_job_door_too() {
             word: "nothing-explains-this".to_owned(),
         },
         Arc::new(ctx()),
+        &Caller::Machine,
     )
     .await;
 

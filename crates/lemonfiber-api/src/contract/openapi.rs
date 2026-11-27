@@ -6,6 +6,7 @@ use serde_json::{json, Map, Value};
 
 use super::layout::Files;
 use super::path::INDEX;
+use crate::jobs::{A_JOB, FORGET};
 
 /// Where the `OpenAPI` document is kept, relative to the workspace root.
 pub const OPENAPI: &str = "contract/web-api.openapi.json";
@@ -96,7 +97,8 @@ pub fn rendered(files: &Files) -> Result<Value, Vec<String>> {
             paths.insert(route.to_owned(), json!({ "get": asked(route, listed) }));
         }
     }
-    paths.insert("/api/jobs/{job}".to_owned(), redeemed());
+    paths.insert(A_JOB.to_owned(), redeemed(&["get", "delete"]));
+    paths.insert(FORGET.to_owned(), redeemed(&["post"]));
     paths.insert("/api/events".to_owned(), streamed(index.get("events")));
 
     if !faults.is_empty() {
@@ -260,16 +262,20 @@ fn asked(route: &str, listed: &Value) -> Value {
     json!({ "parameters": parameters, "responses": responses })
 }
 
-/// What a name for work is redeemed and released with.
-fn redeemed() -> Value {
+/// What a name for work is redeemed, released or forgotten with, by each of `methods`.
+fn redeemed(methods: &[&str]) -> Value {
     let job =
         json!([{ "name": "job", "in": "path", "required": true, "schema": { "type": "string" } }]);
     let responses = accepted("Still going.");
-    json!({
-        "parameters": job,
-        "get": { "responses": responses.clone() },
-        "delete": { "responses": responses },
-    })
+    let mut path = Map::new();
+    path.insert("parameters".to_owned(), job);
+    for method in methods {
+        path.insert(
+            (*method).to_owned(),
+            json!({ "responses": responses.clone() }),
+        );
+    }
+    Value::Object(path)
 }
 
 /// The event stream, with its heartbeat and each kind of event it says.
