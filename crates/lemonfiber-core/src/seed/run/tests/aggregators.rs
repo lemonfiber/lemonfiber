@@ -226,8 +226,8 @@ async fn an_entry_the_curator_kept_without_a_key_is_registered_again() {
     assert_eq!(books::added(&http.requests()), vec![the_indexer()]);
 }
 
-/// Nothing to do where either end is absent, or the aggregator has not written its key
-/// yet.
+/// Nothing to do where either end is absent, and a later run's to do where lemonfiber does
+/// not hold the aggregator's key yet.
 #[tokio::test]
 async fn nothing_is_told_where_a_curator_an_aggregator_or_its_key_is_missing() {
     let http = reading(&[], books::taken());
@@ -244,7 +244,10 @@ async fn nothing_is_told_where_a_curator_an_aggregator_or_its_key_is_missing() {
 
     assert!(unmoved.is_empty(), "{unmoved:?}");
     assert!(alone.is_empty(), "{alone:?}");
-    assert!(unwritten.is_empty(), "{unwritten:?}");
+    assert!(
+        matches!(unwritten.as_slice(), [one] if is_skipped(one)),
+        "{unwritten:?}"
+    );
     assert!(books::added(&http.requests()).is_empty());
 }
 
@@ -338,6 +341,36 @@ async fn a_first_party_plugin_aggregator_is_told_on_its_own_terms() {
             .collect::<Vec<_>>(),
         vec![("http://kept:8990", KEYED)]
     );
+}
+
+/// An aggregator declaring no key of its own is never told to the moved curator with
+/// another of its secrets in the key's place: the pair is said as unpaired, naming why.
+#[tokio::test]
+async fn an_aggregator_declaring_no_key_of_its_own_is_reported_unpaired() {
+    let mut unkeyed = kept_aggregator();
+    unkeyed.declared.secrets.clear();
+    let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
+        .iter()
+        .copied()
+        .chain(first_party("kept"))
+        .collect();
+    let fillers = moved_trusting(
+        vec![indexer()],
+        vec![unkeyed],
+        "indexer.search=kept",
+        &trusted,
+    );
+    let http = reading(&[], books::taken());
+    let ctx = curator_ctx("aggregators-unkeyed", http.clone(), None);
+
+    let wirings = super::super::aggregators::seed_aggregators(&ctx, &fillers).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if matches!(&one.state,
+            crate::seed::State::Unmatched { reason } if reason.contains("declares no key"))),
+        "{wirings:?}"
+    );
+    assert!(books::added(&http.requests()).is_empty());
 }
 
 /// A third-party plugin's aggregator is never handed to the moved curator, a first-party
@@ -575,11 +608,85 @@ async fn a_curator_that_cannot_pull_from_the_indexer_is_left_unpaired() {
 }
 
 #[tokio::test]
-async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull() {
+async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull_and_is_reported_as_synced() {
     let (wirings, http) = pulled("synced", servarr_filing("tv"), Answer::reply(204, "")).await;
 
-    assert!(wirings.is_empty(), "{wirings:?}");
-    assert!(http.requests().is_empty(), "{:?}", http.requests());
+    assert!(
+        matches!(wirings.as_slice(), [one] if matches!(&one.state,
+            crate::seed::State::Unmatched { reason }
+                if reason.contains(" and syncs the media ") && reason.contains(PULLER))),
+        "{wirings:?}"
+    );
+    assert!(
+        !http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
+}
+
+/// What the pass tells [`puller`], answering in the Servarr API and filing television,
+/// where the stack's indexer answers `applications` with `synced`.
+async fn pulled_beside_an_indexer_answering(tag: &str, synced: Answer) -> (Vec<Wiring>, Arc<Fake>) {
+    let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("pulled-{tag}"));
+    let http = Fake::by_path(vec![
+        (HELD, Answer::reply(200, "[]")),
+        (ADD, Answer::reply(204, "")),
+        (
+            crate::test_support::indexer::searching("applications"),
+            synced,
+        ),
+    ]);
+    let mut ctx = contracted_ctx(&project, PULLER_ADAPTER, true, http.clone());
+    ctx.seams.engine = Arc::new(INDEXER.running().over(Arc::clone(&ctx.seams.engine)));
+    ctx.seams.confined = crate::test_support::adapted::holding_keys(
+        Arc::clone(&ctx.seams.confined),
+        &[INDEXER.adapter],
+    );
+    let fillers = beside_the_puller(&project, servarr_filing("tv"));
+    (
+        super::super::aggregators::seed_aggregators(&ctx, &fillers).await,
+        http,
+    )
+}
+
+#[tokio::test]
+async fn a_curator_an_app_sync_would_serve_is_told_an_indexer_that_has_none() {
+    let (wirings, http) = pulled_beside_an_indexer_answering(
+        "no-app-sync",
+        Answer::served(
+            500,
+            crate::ports::http::PROBLEM,
+            r#"{"type":"unsupported","detail":"it is told about no application"}"#,
+        ),
+    )
+    .await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == crate::seed::State::Wired),
+        "{wirings:?}"
+    );
+    assert!(
+        http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
+}
+
+#[tokio::test]
+async fn a_curator_an_indexers_app_sync_answers_for_is_left_to_it() {
+    let (wirings, http) =
+        pulled_beside_an_indexer_answering("app-sync", Answer::reply(200, "[]")).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if matches!(&one.state,
+            crate::seed::State::Unmatched { reason } if reason.contains(" and syncs the media "))),
+        "{wirings:?}"
+    );
+    assert!(
+        !http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
 }
 
 #[tokio::test]
@@ -629,26 +736,11 @@ fn connected(tag: &str, pulling: Pulling<'_>) -> Vec<Result<Connection, Unmade>>
 fn only_a_curator_answering_in_the_servarr_api_is_left_to_the_indexers_app_sync() {
     assert_eq!(
         connected("servarr", servarr_filing("tv")),
-        vec![Err(Unmade::Synced)]
+        vec![Ok(Connection::Aggregator { synced: true })]
     );
     assert_eq!(
         connected("own-api", filing("tv")),
-        vec![Ok(Connection::Aggregator)]
-    );
-}
-
-#[test]
-fn a_curator_the_indexers_app_sync_serves_is_reported_as_synced() {
-    let project = lemonfiber_fixtures::scratch::Scratch::new("pulled-synced-said");
-
-    let unmatched =
-        super::super::connecting::unmatched(&beside_the_puller(&project, servarr_filing("tv")));
-
-    assert!(
-        unmatched.iter().any(|one| matches!(&one.state,
-            crate::seed::State::Unmatched { reason }
-                if reason.contains(" and syncs the media ") && reason.contains(PULLER))),
-        "{unmatched:?}"
+        vec![Ok(Connection::Aggregator { synced: false })]
     );
 }
 
