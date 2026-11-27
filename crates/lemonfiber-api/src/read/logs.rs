@@ -74,7 +74,7 @@ async fn log_lines(
     };
     let (forms, services) = (asked.every(FORM), asked.every(SERVICE));
     if follow {
-        return crate::following::followed(&serving, forms, services, tail).await;
+        return crate::following::followed(&serving, &caller, forms, services, tail).await;
     }
     read_logs(&serving.ctx, forms, services, tail).await
 }

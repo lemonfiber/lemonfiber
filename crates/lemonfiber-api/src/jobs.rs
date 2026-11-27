@@ -24,6 +24,15 @@
 //! asked of the container engine goes on, exactly as it does when a terminal is
 //! closed.
 //!
+//! A name can also be let go without ending anything. A browser that stops
+//! watching work it did not mean to end forgets the name instead: the work runs
+//! on, and the name is from then on one this run never issued. What it ends with
+//! is kept for nobody, since nobody can ask for it any more.
+//!
+//! A name is answered to whoever started its work, and to the operator. Anybody
+//! else is told what a name this run never issued tells them, so holding a name
+//! somebody else was handed says nothing about whether the work exists.
+//!
 //! And a name nobody redeems is how work with no ending of its own is bounded. A
 //! guard runs until the data location is lost, which may be never, and a follow
 //! runs until the containers it is reading stop having anything to say, so both are
@@ -31,7 +40,9 @@
 //! does not leave a poll loop running until the server is stopped, and a chatty
 //! container cannot go on filling a stream nobody reads. Nothing else is leased:
 //! every other command ends by itself, and ending a fetch that nobody happened to
-//! ask about would be ending work that was going to finish.
+//! ask about would be ending work that was going to finish. A forgotten name is
+//! never asked about again, so forgetting a guard does not keep it running: it is
+//! let go as any other guard nobody asks about is.
 //!
 //! What finished work came to is held the same way: kept for whoever asks about the
 //! name, and forgotten once nobody has for a whole lease, with a ceiling on how much
@@ -42,6 +53,7 @@
 //! survive the process doing it, and a record that did would describe jobs nothing
 //! is running.
 
+mod answering;
 pub mod ended;
 pub mod started;
 
@@ -50,27 +62,26 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::Response;
-use axum::routing::get;
-use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::model::kind::{ENDED, ERROR, JOB};
+use lemonfiber_core::model::kind::ERROR;
 use lemonfiber_core::model::Envelope;
 use lemonfiber_error::Problem;
 
-use ended::{Ended, Ending};
+pub use answering::{accepted, routes};
+use ended::Ending;
 use lemonfiber_core::ports::random::Random;
-use started::Started;
 use tokio::sync::Mutex;
 use tokio::task::AbortHandle;
 
 use crate::admission::Caller;
-use crate::read::enveloped;
-use crate::refusal::Refusal;
-use crate::router::Serving;
-use crate::serve::operator_only;
+
+/// Where what became of the work one name stands for is asked, and where it is
+/// released.
+pub const A_JOB: &str = "/api/jobs/{job}";
+
+/// Where a name is let go of with the work it stands for left running.
+pub const FORGET: &str = "/api/jobs/{job}/forget";
 
 /// Bytes of name. Wide enough that two runs never mint the same one.
 const WIDTH: usize = 8;
@@ -210,6 +221,10 @@ struct Held {
     swept: u64,
     /// When it began, as a count of the work begun before it.
     begun: u64,
+    /// Whose request started it.
+    by: Caller,
+    /// Whether its name was let go of while the work runs on.
+    forgotten: bool,
 }
 
 /// The work this run started, and where each piece of it got to.
@@ -230,6 +245,25 @@ struct Register {
 }
 
 impl Register {
+    /// The work `job` names, where `asking` is to be told of it.
+    fn answering(&mut self, job: &str, asking: &Caller) -> Option<&mut Held> {
+        self.held
+            .get_mut(job)
+            .filter(|entry| !entry.forgotten && answers(&entry.by, asking))
+    }
+
+    /// Write down what the work `name` stands for came to, and let go of it at once
+    /// where its name was forgotten while it ran.
+    fn landed(&mut self, name: &str, work: Work) {
+        let forgotten = self.held.get_mut(name).map(|entry| {
+            entry.work = work;
+            entry.forgotten
+        });
+        if forgotten == Some(true) {
+            self.held.remove(name);
+        }
+    }
+
     /// Let go of the finished work that began longest ago until there is room for
     /// one more beside [`FINISHED_AT_MOST`].
     fn making_room(&mut self) {
@@ -255,10 +289,17 @@ impl Jobs {
     /// The work is handed to the runtime rather than awaited, which is the whole
     /// point: what happens to the request afterwards — answered, abandoned, a tab
     /// closed — cannot reach it.
-    pub async fn start(&self, job: &Job, action: &str, command: Command, ctx: Arc<Ctx>) {
+    pub async fn start(
+        &self,
+        job: &Job,
+        action: &str,
+        command: Command,
+        ctx: Arc<Ctx>,
+        by: &Caller,
+    ) {
         let lease = leased(&command);
         let ctx = Arc::new(Ctx::clone(&ctx).as_job(job.as_str()));
-        self.begin(job, action, lease, async move {
+        self.begin(job, action, lease, by, async move {
             // Nothing is invented for a payload that could not be rendered: an
             // outcome is plain owned values, and the empty arm is reached only by
             // being handed one, which nothing here can be.
@@ -281,8 +322,14 @@ impl Jobs {
     /// after finishing is to write down where it got to, and it cannot do that
     /// until this has written down that it began — so work that finishes at once
     /// cannot have its ending overwritten by the record of its start.
-    pub(crate) async fn begin<Doing>(&self, job: &Job, action: &str, lease: Lease, doing: Doing)
-    where
+    pub(crate) async fn begin<Doing>(
+        &self,
+        job: &Job,
+        action: &str,
+        lease: Lease,
+        by: &Caller,
+        doing: Doing,
+    ) where
         Doing: Future<Output = Standing> + Send + 'static,
     {
         let (name, held) = (job.as_str().to_owned(), Arc::clone(&self.0));
@@ -292,9 +339,7 @@ impl Jobs {
             let (name, action) = (name.clone(), action.clone());
             tokio::spawn(async move {
                 let standing = doing.await;
-                if let Some(entry) = held.lock().await.held.get_mut(&name) {
-                    entry.work = Work { action, standing };
-                }
+                held.lock().await.landed(&name, Work { action, standing });
             })
         };
         register.making_room();
@@ -315,19 +360,23 @@ impl Jobs {
                 asked: 1,
                 swept: 0,
                 begun,
+                by: by.clone(),
+                forgotten: false,
             },
         );
     }
 
-    /// The work a name stands for, or nothing for a name this run never handed out.
+    /// The work a name stands for, or nothing for a name this run never handed out,
+    /// one forgotten, and one whose work `asking` neither started nor is the operator
+    /// for.
     ///
     /// Asking is also what renews a lease. A browser watching work with no ending
     /// of its own asks what became of it anyway — that is how it learns the guard
     /// is still guarding — so interest is read from the question rather than from a
     /// second thing a client would have to remember to send.
-    pub async fn about(&self, job: &str) -> Option<Work> {
+    pub async fn about(&self, job: &str, asking: &Caller) -> Option<Work> {
         let mut register = self.0.lock().await;
-        let entry = register.held.get_mut(job)?;
+        let entry = register.answering(job, asking)?;
         entry.asked = entry.asked.saturating_add(1);
         Some(entry.work.clone())
     }
@@ -337,10 +386,30 @@ impl Jobs {
     /// Work that has already finished is left exactly as it is: releasing a name
     /// twice, or releasing one whose work landed in the moment before, answers
     /// with what it came to rather than overwriting it with an ending.
-    pub async fn stop(&self, job: &str) -> Option<Work> {
+    pub async fn stop(&self, job: &str, asking: &Caller) -> Option<Work> {
         let mut register = self.0.lock().await;
-        let entry = register.held.get_mut(job)?;
+        let entry = register.answering(job, asking)?;
         Some(ended(entry, Ending::Released))
+    }
+
+    /// Let go of a name and leave the work it stands for running, and say where that
+    /// work stood.
+    ///
+    /// The answer is the one asking would have given, because it is the last thing
+    /// anybody is told about the name. Work already finished is let go of at once;
+    /// work still running is let go of when it finishes, or by the sweep where it has
+    /// no ending of its own.
+    pub async fn forget(&self, job: &str, asking: &Caller) -> Option<Work> {
+        let mut register = self.0.lock().await;
+        let work = {
+            let entry = register.answering(job, asking)?;
+            entry.forgotten = true;
+            entry.work.clone()
+        };
+        if work.standing != Standing::Running {
+            register.held.remove(job);
+        }
+        Some(work)
     }
 
     /// End the work with no ending of its own that nobody has asked about, and let
@@ -369,6 +438,7 @@ impl Jobs {
             if entry.lease == Lease::WhileAsked && untouched {
                 ended(entry, Ending::LetGo);
                 let_go += 1;
+                return !entry.forgotten;
             }
             true
         });
@@ -387,6 +457,12 @@ impl Jobs {
     }
 }
 
+/// Whether `asking` is told of work `by` started: by whoever started it, and by the
+/// operator.
+fn answers(by: &Caller, asking: &Caller) -> bool {
+    matches!(asking, Caller::Machine | Caller::Operator) || asking == by
+}
+
 /// End one piece of running work, and say where it now stands.
 ///
 /// The task is aborted rather than asked to stop: there is nothing to ask, and a
@@ -402,94 +478,5 @@ fn ended(entry: &mut Held, why: Ending) -> Work {
     entry.work.clone()
 }
 
-/// The one thing that can be asked about work already begun, and the one thing
-/// that can be done to it.
-pub fn routes() -> Router<Serving> {
-    Router::new().route("/api/jobs/{job}", get(became).delete(released))
-}
-
-/// What became of the work one name stands for.
-///
-/// A name this run never handed out is absent rather than reported as unfinished:
-/// answering "still going" for work nothing is doing would leave a caller waiting
-/// on an outcome that is never coming.
-async fn became(
-    State(serving): State<Serving>,
-    caller: Caller,
-    Path(job): Path<String>,
-) -> Response {
-    if let Some(refusal) = operator_only(&caller) {
-        return refusal;
-    }
-    let Some(work) = serving.jobs.about(&job).await else {
-        return unknown();
-    };
-    stands(&job, &work)
-}
-
-/// The work one name stands for, ended.
-///
-/// The same answer asking would have given, because releasing a name and asking
-/// about it are two questions with one answer: where the work now stands. So a
-/// caller that released one need not ask again to find out what it released.
-async fn released(
-    State(serving): State<Serving>,
-    caller: Caller,
-    Path(job): Path<String>,
-) -> Response {
-    if let Some(refusal) = operator_only(&caller) {
-        return refusal;
-    }
-    let Some(work) = serving.jobs.stop(&job).await else {
-        return unknown();
-    };
-    stands(&job, &work)
-}
-
-/// Where a piece of work stands, as the answer a caller reads.
-fn stands(job: &str, work: &Work) -> Response {
-    match &work.standing {
-        Standing::Running => still(job, &work.action),
-        Standing::Done(rendered) => enveloped(StatusCode::OK, Some(rendered.clone())),
-        // The status the refusal itself warrants, decided where the problem was
-        // still in hand rather than again here. A form nothing declares is the same
-        // mistake whether it was named to a read or to an action redeemed by name,
-        // and answering the second `500` sends a caller on retrying what cannot
-        // succeed. The body is still the envelope, because a caller that asked for
-        // something it could parse asked about the failures most of all.
-        Standing::Failed(rendered, status) => enveloped(*status, Some(rendered.clone())),
-        Standing::Ended(why) => {
-            let ended = Ended {
-                job: job.to_owned(),
-                action: work.action.clone(),
-                ended: *why,
-            };
-            enveloped(StatusCode::OK, Envelope::new(ENDED, ended).to_json())
-        }
-    }
-}
-
-/// A job accepted, named so that what became of it can be asked.
-#[must_use]
-pub fn accepted(job: &Job, action: &str) -> Response {
-    still(job.as_str(), action)
-}
-
-/// The name and the action, under the status that means the work is not finished.
-///
-/// One body for two moments. The request that starts work and a request asking
-/// about work still going have the same thing to be told — that there is a name
-/// and what it was for — so a caller that can read the first can read the second
-/// without learning a second shape.
-fn still(job: &str, action: &str) -> Response {
-    let started = Started {
-        job: job.to_owned(),
-        action: action.to_owned(),
-    };
-    enveloped(StatusCode::ACCEPTED, Envelope::new(JOB, started).to_json())
-}
-
-/// A name this run never handed out.
-fn unknown() -> Response {
-    Refusal::NoSuchJob.answered()
-}
+#[cfg(test)]
+mod tests;

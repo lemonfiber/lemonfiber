@@ -537,10 +537,12 @@ async fn the_stream_tells_a_member_only_what_is_theirs() {
 /// Every route this surface serves, walked as a member.
 ///
 /// None answers a member with a success except the reads that are theirs, and the
-/// routes that are no command — a bundle, the logs, a job — refuse them outright. A
-/// route added later is walked by being added to the lists it is served from.
+/// routes that are no command — a bundle and the logs — refuse them outright. A name
+/// for work a member did not start is one this run never issued to them. A route
+/// added later is walked by being added to the lists it is served from.
 #[tokio::test]
 async fn a_member_is_refused_every_route_that_is_not_theirs() {
+    use lemonfiber_api::jobs::{A_JOB, FORGET};
     use lemonfiber_api::read::table::{BUNDLE, HELD, LOGS, OFFERED, REQUESTS};
 
     let named = "member-every-route";
@@ -551,14 +553,22 @@ async fn a_member_is_refused_every_route_that_is_not_theirs() {
             "GET",
             BUNDLE.replace("{name}", "lemonfiber-support-2026-01-01T00-00-00Z.tar.gz"),
         ),
-        ("GET", "/api/jobs/anything".to_owned()),
-        ("DELETE", "/api/jobs/anything".to_owned()),
     ];
     for (method, path) in &operator_only {
         let answer = asked(router.clone(), method, path, &carried, "").await;
         assert_eq!(
             answer.status,
             StatusCode::FORBIDDEN,
+            "{method} {path}: {}",
+            answer.body
+        );
+    }
+    for (method, path) in [("GET", A_JOB), ("DELETE", A_JOB), ("POST", FORGET)] {
+        let path = path.replace("{job}", "anything");
+        let answer = asked(router.clone(), method, &path, &carried, "").await;
+        assert_eq!(
+            answer.status,
+            StatusCode::NOT_FOUND,
             "{method} {path}: {}",
             answer.body
         );

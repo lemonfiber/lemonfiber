@@ -42,7 +42,9 @@ mod what_an_archive_action_means;
 mod what_an_argument_reaches;
 mod what_an_invitation_means;
 mod what_became_of_a_job;
+mod what_forgetting_a_job_means;
 mod what_guessing_costs;
+mod what_releasing_a_job_means;
 mod what_setup_answers;
 mod what_the_app_is_served_as;
 mod what_the_door_asks;
@@ -51,6 +53,7 @@ mod what_the_machine_reads_answer;
 mod what_the_settings_answer;
 mod what_the_stream_says;
 mod who_the_stack_admits;
+mod whose_job_it_is;
 
 /// The clock and the randomness a test's web surface holds of its own: the ones its
 /// context was given, so a test that fixes either for the context fixes it for both.

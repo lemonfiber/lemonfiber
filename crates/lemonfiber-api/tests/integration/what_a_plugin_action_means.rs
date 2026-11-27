@@ -128,14 +128,20 @@ async fn redeemed(ctx: Ctx, action: &str, body: &str) -> (u16, serde_json::Value
 /// Where a job got to, once it has had the chance to get anywhere.
 async fn settled(jobs: &Jobs, job: &str) -> Option<Standing> {
     for _ in 0..400 {
-        match jobs.about(job).await.map(|work| work.standing) {
+        match jobs
+            .about(job, &Caller::Machine)
+            .await
+            .map(|work| work.standing)
+        {
             Some(Standing::Running) | None => {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
             settled => return settled,
         }
     }
-    jobs.about(job).await.map(|work| work.standing)
+    jobs.about(job, &Caller::Machine)
+        .await
+        .map(|work| work.standing)
 }
 
 /// The value at `pointer` in an answer, or null where there is none.

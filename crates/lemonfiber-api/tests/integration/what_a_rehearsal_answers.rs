@@ -104,14 +104,20 @@ fn named(answered: &str) -> String {
 /// What the work came to, once it has had the chance to come to anything.
 async fn settled(jobs: &Jobs, job: &str) -> Option<Standing> {
     for _ in 0..200 {
-        match jobs.about(job).await.map(|work| work.standing) {
+        match jobs
+            .about(job, &Caller::Machine)
+            .await
+            .map(|work| work.standing)
+        {
             Some(Standing::Running) | None => {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
             settled => return settled,
         }
     }
-    jobs.about(job).await.map(|work| work.standing)
+    jobs.about(job, &Caller::Machine)
+        .await
+        .map(|work| work.standing)
 }
 
 /// What an action's work came to, as the envelope it settled with.
