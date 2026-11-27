@@ -8,8 +8,10 @@
 //! in is then paused and resumed with every other one.
 
 pub mod core;
+mod fixture;
 mod http;
 mod member;
+pub mod serving;
 mod site;
 pub mod solving;
 mod substitute;
@@ -87,6 +89,9 @@ const TRUSTED: &str = "trusted";
 
 /// The member who asks.
 const MEMBER: &str = "arm";
+
+/// The capability the household's members are held in.
+pub const IDENTIFIES: &str = lemonfiber_contract::capabilities::identity::source::CAPABILITY;
 
 /// How long the request may take to reach a grab, and the grab the queue.
 const GRAB_WITHIN: Duration = Duration::from_secs(20 * 60);
@@ -466,10 +471,21 @@ fn paused_and_resumed(core: &Core, client: &str, passed_over: &[String]) {
     }
 }
 
-/// A stack this build sets up beneath `root` and starts with `forms`, downloading as
-/// `downloads` says, seeded, and `substitution` put in place once it is first seeded,
-/// seeded again and its adapters proved. Nothing where the household has no address to
-/// reach it at.
+/// Where a stack beneath `root` keeps its library and downloads.
+fn data_location(root: &std::path::Path) -> std::path::PathBuf {
+    root.join("media")
+}
+
+/// The folder of the library for `media` of a stack beneath `root`, as the seed furnishes
+/// it.
+fn library(root: &std::path::Path, media: &str) -> std::path::PathBuf {
+    data_location(root).join("media").join(media)
+}
+
+/// A stack this build sets up beneath `root` and starts with `forms`, given the protocol
+/// it fetches over and that protocol's login, seeded, and `substitution` put in place once
+/// it is first seeded, seeded again and its adapters proved. Nothing where the household
+/// has no address to reach it at.
 ///
 /// # Panics
 ///
@@ -477,17 +493,17 @@ fn paused_and_resumed(core: &Core, client: &str, passed_over: &[String]) {
 fn started(
     root: &std::path::Path,
     forms: &[&str],
-    downloads: &Downloads,
+    (protocol, login): (&str, &[&str]),
     substitution: Option<&Substitution>,
 ) -> Option<Core> {
     let core = Core::beneath(root);
-    let media = root.join("media");
+    let media = data_location(root);
     let media = media.to_string_lossy();
     let mut setup = vec![
         "setup",
         "--yes",
         "--protocols",
-        downloads.protocol,
+        protocol,
         "--data-location",
         &media,
         "--library",
@@ -499,7 +515,7 @@ fn started(
         "--autostart",
         "false",
     ];
-    setup.extend(downloads.login);
+    setup.extend(login);
     let set_up = core.run(&setup, "");
     assert!(
         strings_under(&set_up.said, "outcome")
@@ -585,7 +601,12 @@ pub fn run(
         size: asked.size,
         carried: downloads.carried,
     });
-    let Some(core) = started(root, asked.forms, downloads, substitution) else {
+    let Some(core) = started(
+        root,
+        asked.forms,
+        (downloads.protocol, downloads.login),
+        substitution,
+    ) else {
         return;
     };
     let Some((key, port)) = indexer(&core) else {

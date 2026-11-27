@@ -80,8 +80,9 @@ fn filed(fillers: &Fillers) -> (Folders, Vec<Wiring>) {
     (folders, refused)
 }
 
-/// Give every media server here a library for each media type the stack files or it
-/// serves, making each one's folder beneath `data_root` first.
+/// Give every media server here that the operator's choices leave in its form a library
+/// for each media type the stack files or it serves, making each one's folder beneath
+/// `data_root` first.
 pub(super) async fn seed_furnishing(
     ctx: &Ctx,
     fillers: &Fillers,
@@ -93,7 +94,7 @@ pub(super) async fn seed_furnishing(
     let mut asking: Vec<Asked<'_>> = Vec::new();
     for speaker in fillers
         .services()
-        .filter(|one| one.contracted(serve::CAPABILITY, serve::MAJOR))
+        .filter(|one| one.contracted(serve::CAPABILITY, serve::MAJOR) && !fillers.passed_over(one))
     {
         let part = fillers.fronted_by(speaker).unwrap_or(speaker);
         if super::owning::off(fillers, speaker, kept_off) || !held(speaker, part, baseline) {

@@ -19,7 +19,7 @@ const ARM: &str = "SUBSTITUTE_ARM";
 const TREE: &str = "SUBSTITUTE_TREE";
 
 /// The capabilities a substitute proves.
-const NAMED: [&str; 4] = ["media.serve", "indexer.search", CURATES, IDENTIFIES];
+const NAMED: [&str; 4] = [SERVES, "indexer.search", CURATES, live::IDENTIFIES];
 
 /// The further capabilities an arm proves, each as those [`NAMED`] are proved.
 const FURTHER: [&str; 1] = [SOLVES];
@@ -37,8 +37,11 @@ const DOWNLOADS: [(&str, &live::Downloads); 2] = [
 /// The workflow that runs every arm, from the workspace's root.
 const WORKFLOW: &str = ".github/workflows/substitutes.yml";
 
+/// The capability a media server fills.
+const SERVES: &str = lemonfiber_manifest::container::MEDIA_SERVE;
+
 /// The capability whose substitute may run unclaimed.
-const CLAIMABLE: &str = "media.serve";
+const CLAIMABLE: &str = SERVES;
 
 /// Where every first-party plugin's repository lives, before its id.
 const ORIGINS: &str = "https://github.com/lemonfiber/plugin-";
@@ -92,15 +95,13 @@ impl Pinned {
 /// The capability a curator arm proves.
 const CURATES: &str = "library.curate";
 
-/// The capability the household's members are held in.
-const IDENTIFIES: &str = lemonfiber_contract::capabilities::identity::source::CAPABILITY;
-
 impl Substitute {
     /// It put in place, given `settings`.
     fn substitution(&self, settings: Vec<(String, String)>) -> live::Substitution {
         live::Substitution {
             plugin: self.plugin.clone(),
             capability: self.capability.clone(),
+            also: Vec::new(),
             stands_in_for: self.stands_in_for.clone(),
             settings,
         }
@@ -444,8 +445,37 @@ fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
 }
 
 #[test]
+fn a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furnished_and_undoes_it(
+) {
+    let Ok(arm) = std::env::var(ARM) else {
+        return;
+    };
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    assert!(pinned.is_ok(), "{pinned:?}");
+    let Some(one) = pinned.ok().and_then(|pinned| {
+        pinned
+            .substitute
+            .into_iter()
+            .find(|one| one.arm == arm && one.capability == SERVES && one.claimed)
+    }) else {
+        return;
+    };
+    let Some(asked) = live::ASKED
+        .iter()
+        .find(|asked| Some(asked.media) == one.media_type.as_deref())
+    else {
+        println!(
+            "{arm} does not run: no stack is started for {:?}, so the seed furnishes it no library",
+            one.media_type
+        );
+        return;
+    };
+    live::serving::run(&scratch(&arm), asked, &one.substitution(Vec::new()));
+}
+
+#[test]
 fn an_identity_source_standing_in_holds_the_member_whose_request_reaches_a_grab_and_undoes_it() {
-    let Some((arm, one, asked)) = standing_in(&[IDENTIFIES]) else {
+    let Some((arm, one, asked)) = standing_in(&[live::IDENTIFIES]) else {
         return;
     };
     let substitution = one.substitution(Vec::new());

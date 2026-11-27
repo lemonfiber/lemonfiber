@@ -55,8 +55,9 @@ pub(crate) struct Claimable<'f> {
     pub(crate) speaker: &'f Filler,
 }
 
-/// Every part here claimed over `owner.claim`, each with the speaker as asked over the
-/// contract, or nothing where it cannot be asked.
+/// Every part here claimed over `owner.claim` that the operator's choices leave in its
+/// form, each with the speaker as asked over the contract, or nothing where it cannot be
+/// asked.
 pub(crate) async fn parts<'f>(
     ctx: &Ctx,
     fillers: &'f Fillers,
@@ -64,7 +65,7 @@ pub(crate) async fn parts<'f>(
     let mut found = Vec::new();
     for speaker in fillers
         .services()
-        .filter(|one| one.contracted(claim::CAPABILITY, claim::MAJOR))
+        .filter(|one| one.contracted(claim::CAPABILITY, claim::MAJOR) && !fillers.passed_over(one))
     {
         let asked = match spoken(ctx, speaker, claim::CAPABILITY, claim::MAJOR).await {
             Spoken::Over(adapter) => Some(claim::Adapter(adapter)),

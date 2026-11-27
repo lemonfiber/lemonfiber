@@ -191,7 +191,12 @@ fn adapter(core: &Core, plugin: &str, capability: &str) -> Result<proxy::Adapter
 ///
 /// At the first step that does not come to what it should, naming it and what was said.
 pub fn run(root: &std::path::Path, substitution: &Substitution) {
-    let Some(core) = super::started(root, &FORMS, &USENET, Some(substitution)) else {
+    let Some(core) = super::started(
+        root,
+        &FORMS,
+        (USENET.protocol, USENET.login),
+        Some(substitution),
+    ) else {
         return;
     };
     let Some((key, port)) = super::indexer(&core) else {
