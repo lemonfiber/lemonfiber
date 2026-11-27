@@ -44,6 +44,7 @@ mod what_an_invitation_means;
 mod what_became_of_a_job;
 mod what_forgetting_a_job_means;
 mod what_guessing_costs;
+mod what_releasing_a_job_means;
 mod what_setup_answers;
 mod what_the_app_is_served_as;
 mod what_the_door_asks;

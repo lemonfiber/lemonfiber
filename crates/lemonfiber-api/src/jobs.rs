@@ -53,6 +53,7 @@
 //! survive the process doing it, and a record that did would describe jobs nothing
 //! is running.
 
+mod answering;
 pub mod ended;
 pub mod started;
 
@@ -61,26 +62,19 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::Response;
-use axum::routing::{get, post};
-use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Ctx};
-use lemonfiber_core::model::kind::{ENDED, ERROR, JOB};
+use lemonfiber_core::model::kind::ERROR;
 use lemonfiber_core::model::Envelope;
 use lemonfiber_error::Problem;
 
-use ended::{Ended, Ending};
+pub use answering::{accepted, routes};
+use ended::Ending;
 use lemonfiber_core::ports::random::Random;
-use started::Started;
 use tokio::sync::Mutex;
 use tokio::task::AbortHandle;
 
 use crate::admission::Caller;
-use crate::read::enveloped;
-use crate::refusal::Refusal;
-use crate::router::Serving;
 
 /// Where what became of the work one name stands for is asked, and where it is
 /// released.
@@ -258,6 +252,18 @@ impl Register {
             .filter(|entry| !entry.forgotten && answers(&entry.by, asking))
     }
 
+    /// Write down what the work `name` stands for came to, and let go of it at once
+    /// where its name was forgotten while it ran.
+    fn landed(&mut self, name: &str, work: Work) {
+        let forgotten = self.held.get_mut(name).map(|entry| {
+            entry.work = work;
+            entry.forgotten
+        });
+        if forgotten == Some(true) {
+            self.held.remove(name);
+        }
+    }
+
     /// Let go of the finished work that began longest ago until there is room for
     /// one more beside [`FINISHED_AT_MOST`].
     fn making_room(&mut self) {
@@ -333,14 +339,7 @@ impl Jobs {
             let (name, action) = (name.clone(), action.clone());
             tokio::spawn(async move {
                 let standing = doing.await;
-                let mut register = held.lock().await;
-                if let Some(entry) = register.held.get_mut(&name) {
-                    if entry.forgotten {
-                        register.held.remove(&name);
-                    } else {
-                        entry.work = Work { action, standing };
-                    }
-                }
+                held.lock().await.landed(&name, Work { action, standing });
             })
         };
         register.making_room();
@@ -477,103 +476,6 @@ fn ended(entry: &mut Held, why: Ending) -> Work {
         entry.work.standing = Standing::Ended(why);
     }
     entry.work.clone()
-}
-
-/// What can be asked about work already begun, and the two things that can be done
-/// to it.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(A_JOB, get(became).delete(released))
-        .route(FORGET, post(forgotten))
-}
-
-/// What became of the work one name stands for.
-///
-/// A name this run never handed out is absent rather than reported as unfinished:
-/// answering "still going" for work nothing is doing would leave a caller waiting
-/// on an outcome that is never coming.
-async fn became(
-    State(serving): State<Serving>,
-    caller: Caller,
-    Path(job): Path<String>,
-) -> Response {
-    answered(&job, serving.jobs.about(&job, &caller).await)
-}
-
-/// The work one name stands for, ended.
-///
-/// The same answer asking would have given, because releasing a name and asking
-/// about it are two questions with one answer: where the work now stands. So a
-/// caller that released one need not ask again to find out what it released.
-async fn released(
-    State(serving): State<Serving>,
-    caller: Caller,
-    Path(job): Path<String>,
-) -> Response {
-    answered(&job, serving.jobs.stop(&job, &caller).await)
-}
-
-/// One name let go of, the work it stands for left running.
-async fn forgotten(
-    State(serving): State<Serving>,
-    caller: Caller,
-    Path(job): Path<String>,
-) -> Response {
-    answered(&job, serving.jobs.forget(&job, &caller).await)
-}
-
-/// Where the work a name stands for stands, or the refusal of a name with nothing
-/// this caller may be told of behind it.
-fn answered(job: &str, work: Option<Work>) -> Response {
-    work.map_or_else(unknown, |work| stands(job, &work))
-}
-
-/// Where a piece of work stands, as the answer a caller reads.
-fn stands(job: &str, work: &Work) -> Response {
-    match &work.standing {
-        Standing::Running => still(job, &work.action),
-        Standing::Done(rendered) => enveloped(StatusCode::OK, Some(rendered.clone())),
-        // The status the refusal itself warrants, decided where the problem was
-        // still in hand rather than again here. A form nothing declares is the same
-        // mistake whether it was named to a read or to an action redeemed by name,
-        // and answering the second `500` sends a caller on retrying what cannot
-        // succeed. The body is still the envelope, because a caller that asked for
-        // something it could parse asked about the failures most of all.
-        Standing::Failed(rendered, status) => enveloped(*status, Some(rendered.clone())),
-        Standing::Ended(why) => {
-            let ended = Ended {
-                job: job.to_owned(),
-                action: work.action.clone(),
-                ended: *why,
-            };
-            enveloped(StatusCode::OK, Envelope::new(ENDED, ended).to_json())
-        }
-    }
-}
-
-/// A job accepted, named so that what became of it can be asked.
-#[must_use]
-pub fn accepted(job: &Job, action: &str) -> Response {
-    still(job.as_str(), action)
-}
-
-/// The name and the action, under the status that means the work is not finished.
-///
-/// One body for two moments. The request that starts work and a request asking
-/// about work still going have the same thing to be told — that there is a name
-/// and what it was for — so a caller that can read the first can read the second
-/// without learning a second shape.
-fn still(job: &str, action: &str) -> Response {
-    let started = Started {
-        job: job.to_owned(),
-        action: action.to_owned(),
-    };
-    enveloped(StatusCode::ACCEPTED, Envelope::new(JOB, started).to_json())
-}
-
-/// A name this run never handed out.
-fn unknown() -> Response {
-    Refusal::NoSuchJob.answered()
 }
 
 #[cfg(test)]
