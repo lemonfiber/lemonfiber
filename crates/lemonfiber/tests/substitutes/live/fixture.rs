@@ -1,6 +1,6 @@
 //! A title written into a library as a household keeps one on disk, generated here: a
-//! tagged track of silence for music, and a film's container holding no pictures for
-//! movies.
+//! tagged track of silence for music and for an audiobook, and a film's container holding no
+//! pictures for movies.
 
 use std::path::{Path, PathBuf};
 
@@ -26,7 +26,7 @@ const FRAME_LENGTH: usize = 417;
 /// Where no fixture is written for `media`, or the file cannot be written.
 pub fn written(folder: &Path, media: &str) -> Result<PathBuf, String> {
     let (at, bytes) = match media {
-        "music" => (
+        "music" | "audiobooks" => (
             folder
                 .join(TITLE)
                 .join(TITLE)

@@ -43,6 +43,10 @@ const SERVES: &str = lemonfiber_manifest::container::MEDIA_SERVE;
 /// The capability whose substitute may run unclaimed.
 const CLAIMABLE: &str = SERVES;
 
+/// The forms a media server standing in is started with where no household request is run
+/// for its media type: the library alone.
+const SERVING_ALONE: [&str; 1] = ["library"];
+
 /// Where every first-party plugin's repository lives, before its id.
 const ORIGINS: &str = "https://github.com/lemonfiber/plugin-";
 
@@ -460,17 +464,15 @@ fn a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furn
     }) else {
         return;
     };
-    let Some(asked) = live::ASKED
-        .iter()
-        .find(|asked| Some(asked.media) == one.media_type.as_deref())
-    else {
-        println!(
-            "{arm} does not run: no stack is started for {:?}, so the seed furnishes it no library",
-            one.media_type
-        );
+    assert!(one.media_type.is_some(), "{one:?}");
+    let Some(media) = one.media_type.as_deref() else {
         return;
     };
-    live::serving::run(&scratch(&arm), asked, &one.substitution(Vec::new()));
+    let forms = live::ASKED
+        .iter()
+        .find(|asked| asked.media == media)
+        .map_or(&SERVING_ALONE[..], |asked| asked.forms);
+    live::serving::run(&scratch(&arm), media, forms, &one.substitution(Vec::new()));
 }
 
 #[test]
