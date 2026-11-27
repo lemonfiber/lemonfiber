@@ -7,7 +7,7 @@
 //! again where the core's own trace of the title reaches a grab. A download client standing
 //! in is then paused and resumed with every other one.
 
-mod core;
+pub mod core;
 mod http;
 mod member;
 mod site;

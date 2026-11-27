@@ -6,8 +6,18 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use lemonfiber_core::model::kind;
+
 /// What a withheld value is printed as.
-const WITHHELD: &str = "<withheld>";
+pub const WITHHELD: &str = "<withheld>";
+
+/// Where an answer of each kind holds a secret, as a JSON pointer into the answer.
+pub const SECRETS: [(&str, &str); 4] = [
+    (kind::MINTED_KEY.as_str(), "/data/secret"),
+    (kind::CREDENTIALS.as_str(), "/data/revealed/value"),
+    (kind::INVITATION.as_str(), "/data/decline"),
+    (kind::INVITATION.as_str(), "/data/join"),
+];
 
 /// The keys an answer names the offer it is read with under.
 const OFFERS: [&str; 2] = ["offer", "agreement"];
@@ -20,8 +30,7 @@ pub struct Core {
     data: PathBuf,
 }
 
-/// What one run of it said.
-#[derive(Debug)]
+/// What one run of it said, debugged as it is printed.
 pub struct Ran {
     /// Whether it exited zero.
     pub succeeded: bool,
@@ -30,6 +39,15 @@ pub struct Ran {
     pub said: serde_json::Value,
     /// What it printed on standard output and on standard error, as written.
     pub printed: String,
+}
+
+impl std::fmt::Debug for Ran {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Ran")
+            .field("succeeded", &self.succeeded)
+            .field("printed", &self.printed)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Core {
@@ -49,15 +67,10 @@ impl Core {
     }
 
     /// As [`Self::run`], with each of `withheld` written as `<withheld>` wherever what
-    /// was run and what it said are printed.
+    /// was run and what it said are printed, as is every secret [`SECRETS`] finds in
+    /// what it said.
     #[must_use]
     pub fn withholding(&self, args: &[&str], typed: &str, withheld: &[&str]) -> Ran {
-        let shown = |printed: String| {
-            withheld
-                .iter()
-                .filter(|secret| !secret.is_empty())
-                .fold(printed, |printed, secret| printed.replace(secret, WITHHELD))
-        };
         let child = Command::new(env!("CARGO_BIN_EXE_lemonfiber"))
             .arg("--json")
             .args(self.dirs())
@@ -70,7 +83,7 @@ impl Core {
             return Ran {
                 succeeded: false,
                 said: serde_json::Value::Null,
-                printed: shown(format!("{args:?}: {child:?}")),
+                printed: shown(format!("{args:?}: {child:?}"), withheld),
             };
         };
         if let Some(mut stdin) = child.stdin.take() {
@@ -80,19 +93,25 @@ impl Core {
             return Ran {
                 succeeded: false,
                 said: serde_json::Value::Null,
-                printed: shown(format!("{args:?}: no output")),
+                printed: shown(format!("{args:?}: no output"), withheld),
             };
         };
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
         let said = serde_json::from_str(stdout.trim()).unwrap_or_else(|_| documents(&stdout));
+        let held = secrets_in(&said);
+        let every: Vec<&str> = withheld
+            .iter()
+            .copied()
+            .chain(held.iter().map(String::as_str))
+            .collect();
         let ran = Ran {
             succeeded: output.status.success(),
+            printed: shown(
+                format!("$ lemonfiber {}\n{stdout}\n{stderr}", args.join(" ")),
+                &every,
+            ),
             said,
-            printed: shown(format!(
-                "$ lemonfiber {}\n{stdout}\n{stderr}",
-                args.join(" ")
-            )),
         };
         println!("{}", ran.printed);
         ran
@@ -125,6 +144,43 @@ impl Core {
         let mut answered: Vec<&str> = args.to_vec();
         answered.extend(["--offer", offer.as_str()]);
         self.run(&answered, "")
+    }
+}
+
+/// `printed`, with each of `withheld` written as [`WITHHELD`], as it is and as JSON
+/// writes it inside a string.
+#[must_use]
+pub fn shown(printed: String, withheld: &[&str]) -> String {
+    withheld
+        .iter()
+        .filter(|secret| !secret.is_empty())
+        .flat_map(|secret| [(*secret).to_owned(), escaped(secret)])
+        .fold(printed, |printed, secret| {
+            printed.replace(&secret, WITHHELD)
+        })
+}
+
+/// `secret` as JSON writes it inside a string.
+fn escaped(secret: &str) -> String {
+    let quoted = serde_json::Value::from(secret).to_string();
+    quoted
+        .strip_prefix('"')
+        .and_then(|inner| inner.strip_suffix('"'))
+        .unwrap_or(&quoted)
+        .to_owned()
+}
+
+/// Every secret [`SECRETS`] finds in `said`, in each document where it holds several.
+#[must_use]
+pub fn secrets_in(said: &serde_json::Value) -> Vec<String> {
+    match said {
+        serde_json::Value::Array(documents) => documents.iter().flat_map(secrets_in).collect(),
+        one => SECRETS
+            .iter()
+            .filter(|(of, _)| one.get("kind").and_then(serde_json::Value::as_str) == Some(*of))
+            .filter_map(|(_, at)| one.pointer(at).and_then(serde_json::Value::as_str))
+            .map(str::to_owned)
+            .collect(),
     }
 }
 

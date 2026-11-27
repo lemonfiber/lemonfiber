@@ -167,8 +167,10 @@ jobs:
           SUBSTITUTES_THETVDB_PIN: ${{ secrets.SUBSTITUTES_THETVDB_PIN }}
           SUBSTITUTES_CHALLENGE_SITE: ${{ vars.SUBSTITUTES_CHALLENGE_SITE }}
         run: cargo test -p lemonfiber --test substitutes -- --nocapture
-      - name: What every container said, where the arm failed
+      - name: What every container said, where the arm failed, anything token-like withheld
         if: failure()
+        env:
+          WITHHELD: 's/((?i:key|token|secret|password)\W{0,3}[=:]\W{0,3})\w+/$1<withheld>/g; s/(?=\w*\d)\w{20,}/<withheld>/g'
         run: |
           docker ps -a
           for container in $(docker ps -aq); do
@@ -179,7 +181,7 @@ jobs:
               echo "Not shown: Medusa and its adapter hold the operator's TheTVDB key."
               ;;
             *)
-              docker logs --tail 300 "${container}" 2>&1 || true
+              docker logs --tail 300 "${container}" 2>&1 | perl -pe "${WITHHELD}" || true
               ;;
             esac
             echo "::endgroup::"
