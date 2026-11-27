@@ -167,7 +167,7 @@ pub(crate) async fn update(
         // still sees the version being replaced, which is what keeps the machine on
         // one version or the other at every moment of the run.
         Came::Held => match recorded(ctx, &held, &was, &coming, &mut account).await {
-            Ok(after) => return Ok(answering(after.installed().to_vec(), account, offer)),
+            Ok(after) => return claimed(ctx, &coming, account, &after, offer).await,
             Err(why) => Came::Stopped(why),
         },
         // A recipe that did not hold ends the update with a problem, once the new
@@ -235,6 +235,25 @@ async fn recorded(
     account.install.awaits =
         super::proving::waiting(ctx, coming.stack_manifest, would, coming.stack).await;
     Ok(after)
+}
+
+/// What the update recorded comes to once the claim recipes of the new version have run,
+/// where its claim made its part `Ours`.
+///
+/// # Errors
+///
+/// The problem a claim recipe that did not hold is said as; the record stays as it is.
+async fn claimed(
+    ctx: &Ctx,
+    coming: &Coming<'_>,
+    mut account: Update,
+    after: &Register,
+    offer: String,
+) -> Result<Installs, Box<Problem>> {
+    let (manifest, stack) = (coming.manifest, coming.stack_manifest);
+    let ran = super::claimed::recorded(ctx, manifest, coming.would, stack).await?;
+    account.install.recipes_ran.extend(ran);
+    Ok(answering(after.installed().to_vec(), account, offer))
 }
 
 /// The account as it stands before anything is done: what would go back is not yet

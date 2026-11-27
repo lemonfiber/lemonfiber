@@ -78,6 +78,7 @@ mod listing;
 // The newest catalogue index this machine verified, and the refusal of any older.
 mod newest;
 // The install recipes an install or an update runs, and the values they are given.
+pub(crate) mod claimed;
 mod following;
 pub(crate) use browsing::routed;
 pub(crate) use embedding::{from_this_build, read_after};

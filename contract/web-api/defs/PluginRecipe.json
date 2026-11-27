@@ -16,7 +16,7 @@
       }
     },
     "on": {
-      "description": "When it runs: as part of an install and an update, or only when asked for by name.",
+      "description": "When it runs: as part of an install and an update, only when asked for by name, or\nonce the part its plugin claims is lemonfiber's.",
       "$ref": "PluginRecipeOn.json",
       "default": "install"
     },

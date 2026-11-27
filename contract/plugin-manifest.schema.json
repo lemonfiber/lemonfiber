@@ -532,7 +532,8 @@
       "description": "When a recipe runs.",
       "oneOf": [
         {"description": "During an install and an update, after the plugin's proofs and the stack's checks\nhold and before the install is recorded. What a recipe that says nothing does,\nbecause a first-run flow is what a recipe is for.", "type": "string", "const": "install"},
-        {"description": "Only when the operator asks for it by name, with approvals of its own.", "type": "string", "const": "demand"}
+        {"description": "Only when the operator asks for it by name, with approvals of its own.", "type": "string", "const": "demand"},
+        {"description": "Once the part its plugin claims over `owner.claim@1` answers that it is\nlemonfiber's, under the approvals of the plugin's last install or update, until it\nhas held once. It asks the operator for nothing.", "type": "string", "const": "claim"}
       ]
     },
     "PluginRecipeRetry": {
@@ -880,7 +881,7 @@
           "type": "array",
           "items": {"$ref": "#/$defs/Input"}
         },
-        "on": {"description": "When it runs: as part of installing the plugin, or when it is asked for.", "$ref": "#/$defs/PluginRecipeOn", "default": "install"},
+        "on": {"description": "When it runs: as part of installing the plugin, when it is asked for, or once the\npart its plugin claims is lemonfiber's.", "$ref": "#/$defs/PluginRecipeOn", "default": "install"},
         "pair": {
           "description": "Every value this flow could carry to every destination it could reach.\n\nA flow with no pair behind it fails validation before a call is made, which is\nwhat makes \"what does this plugin tell whom\" answerable from the manifest.",
           "type": "array",

@@ -457,7 +457,7 @@ async fn an_adapter_speaking_owner_claim_is_installed_only_where_its_part_is_cla
 }
 
 /// The claiming manifest, its adapter handing its part a claim code that lapses.
-fn coded() -> String {
+pub(super) fn coded() -> String {
     claiming().replace(
         r#"fronts      = "komga""#,
         r#"fronts      = "komga"

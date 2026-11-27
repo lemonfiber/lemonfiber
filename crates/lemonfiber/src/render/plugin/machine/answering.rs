@@ -9,7 +9,7 @@
 //! The manifest's own rules refuse such a word before an install reads it; this is the
 //! second wall, not the first.
 
-use lemonfiber_core::plugin::{Installed, Recipe, Sharing, Taking};
+use lemonfiber_core::plugin::{Installed, On, Recipe, Sharing, Taking};
 use lemonfiber_words::text::plain;
 
 use super::super::super::Lines;
@@ -28,8 +28,12 @@ pub(super) fn recipes(declared: &[Recipe]) -> Lines {
             plain(&recipe.title)
         ));
         lines.put(format!("      {}", plain(&recipe.why)));
-        if recipe.on == lemonfiber_core::plugin::On::Demand {
-            lines.put("      runs only when asked for by name");
+        match recipe.on {
+            On::Install => {}
+            On::Demand => lines.put("      runs only when asked for by name"),
+            On::Claim => {
+                lines.put("      runs once the part it claims is lemonfiber's, asking for nothing");
+            }
         }
         for input in &recipe.inputs {
             lines.put(format!(

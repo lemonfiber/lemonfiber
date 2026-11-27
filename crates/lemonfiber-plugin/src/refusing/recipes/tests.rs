@@ -403,3 +403,25 @@ fn a_destination_is_outside_where_it_is_a_host_and_inside_where_it_is_a_service(
     assert!(!super::outside(&manifest, "sonarr"));
     assert!(!super::outside(&manifest, "elsewhere"));
 }
+
+/// A recipe that runs on claim may run at a seed, which takes no input, so one asking the
+/// operator for a value is refused naming it.
+#[test]
+fn a_claim_recipe_asking_the_operator_for_an_input_is_refused_naming_it() {
+    let claiming = without(r#"on    = "install""#, r#"on    = "claim""#);
+    assert!(
+        names(
+            &claiming,
+            &[
+                "recipe adopt-existing-library.input library-name.origin",
+                "on claim"
+            ]
+        ),
+        "got: {claiming:?}"
+    );
+    let installing = said(WHOLE);
+    assert!(
+        !names(&installing, &["on claim"]),
+        "an install recipe may ask: {installing:?}"
+    );
+}

@@ -99,10 +99,16 @@ pub(crate) async fn reinstalled(ctx: &Ctx) {
 
 /// Wire the stack, and try each connection the pass found not answering again after the
 /// rest of it, as [`again::UNANSWERED`] allows: a service still starting when it was
-/// reached answers within it.
+/// reached answers within it. Once the passes are done, each claim recipe whose part
+/// answers `Ours` and that has not held since its plugin was installed or updated runs.
 pub(crate) async fn seed(ctx: &Ctx, adopt: bool) -> Result<crate::seed::Report, Box<Problem>> {
     let first = Box::pin(pass(ctx, adopt)).await?;
-    again::settled(first, again::UNANSWERED, || Box::pin(pass(ctx, adopt))).await
+    let mut report =
+        again::settled(first, again::UNANSWERED, || Box::pin(pass(ctx, adopt))).await?;
+    report
+        .wirings
+        .extend(crate::app::plugins::claimed::seeded(ctx).await);
+    Ok(report)
 }
 
 /// Wire the stack's services to each other, idempotently, and report what was

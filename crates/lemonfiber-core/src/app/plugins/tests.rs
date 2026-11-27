@@ -563,6 +563,7 @@ fn entry_in(text: &str) -> String {
 mod browsing;
 mod building;
 mod cataloguing;
+mod claiming;
 mod crediting;
 mod demanding;
 mod embedding;

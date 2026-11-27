@@ -304,3 +304,17 @@ fn each_grant_names_its_credential_whose_it_is_and_what_it_is_for_and_how_to_app
     );
     assert!(granting(&would, false).text().is_empty());
 }
+
+#[test]
+fn a_claim_recipe_is_said_to_run_once_the_part_is_claimed() {
+    let claiming = Recipe {
+        on: lemonfiber_core::plugin::On::Claim,
+        ..recipe()
+    };
+    let said = recipes(&[claiming]).text();
+    assert!(
+        said.contains("runs once the part it claims is lemonfiber's, asking for nothing"),
+        "{said}"
+    );
+    assert!(!said.contains("asked for by name"), "{said}");
+}
