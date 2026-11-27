@@ -60,6 +60,28 @@ const REVOCATIONS: [&str; 3] = [
     crate::push_endpoints::A_PUSH_ENDPOINT,
 ];
 
+/// A capability is named by a path alone, so a revocation must be served at a path no read
+/// or action is served at: were one path both, the two would be one capability and a client
+/// could not tell which it may use.
+#[test]
+fn no_revocation_shares_its_path_with_a_read_or_an_action() {
+    let every = every_path();
+    for revocation in REVOCATIONS {
+        let named = every.iter().filter(|path| *path == revocation).count();
+        assert_eq!(
+            named, 1,
+            "{revocation} is named by more than the revocation"
+        );
+        let served_otherwise = crate::router::served()
+            .into_iter()
+            .any(|route| route.path == revocation && route.method != "DELETE");
+        assert!(
+            !served_otherwise,
+            "{revocation} is served at another method too"
+        );
+    }
+}
+
 /// Each revocation is offered exactly where its route would carry it out: every one to
 /// the operator, a member's own keys and phones to a member, and none to a key.
 #[test]
