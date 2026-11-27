@@ -21181,7 +21181,7 @@
         "type": "object"
       },
       "TitleKind": {
-        "description": "What kind of title a curator files, a member asks for and a media server holds: a\nseries, a film, music or books.",
+        "description": "What kind of title a curator files, a member asks for and a media server holds: a\nseries, a film, music, books, an audiobook or a podcast.",
         "oneOf": [
           {
             "const": "tv",
@@ -21201,6 +21201,16 @@
           {
             "const": "books",
             "description": "A book, or a whole author or series of books asked for.",
+            "type": "string"
+          },
+          {
+            "const": "audiobooks",
+            "description": "An audiobook.",
+            "type": "string"
+          },
+          {
+            "const": "podcasts",
+            "description": "A podcast.",
             "type": "string"
           }
         ]

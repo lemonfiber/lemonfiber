@@ -9,6 +9,7 @@ use crate::app::Ctx;
 use crate::instant::Instant;
 use crate::plugin::Installed;
 use crate::ports::docker::{Health, Lifecycle};
+use crate::ports::media::TitleKind;
 use crate::test_support::media as moved_in;
 use crate::test_support::{a_context, a_placed, an_installed, Reporting};
 use crate::wiring::{Chosen, Fillers};
@@ -284,6 +285,18 @@ fn the_shipped_stack_fills_both_of_the_media_servers_capabilities_with_one_servi
     assert_eq!(
         super::filling_serve_named(&ctx, &manifest),
         super::server_named(&ctx, &manifest)
+    );
+}
+
+#[test]
+fn the_shipped_stacks_media_server_is_asked_for_films_and_series_alone() {
+    let ctx = moved("declared-kinds", true);
+    let Ok(manifest) = ctx.stack.checked_manifest(ctx.today()) else {
+        unreachable!("the repository's stack reads")
+    };
+    assert_eq!(
+        super::filling_serve_kinds(&ctx, &manifest),
+        [TitleKind::Tv, TitleKind::Movies]
     );
 }
 

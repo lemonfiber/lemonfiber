@@ -39,7 +39,7 @@
     },
     {
       "path": "media.serve/v1/operations/has_item.json",
-      "sha256": "5cedf6e57590d8a0e12f2c04d3d48271a1201abed99e1a54c2d717d21885021e"
+      "sha256": "ba5f38deb8d17bd85e89e401b1a7a186044492db7c65037b876884d1ce5de81b"
     },
     {
       "path": "media.serve/v1/operations/rescan.json",
@@ -147,7 +147,7 @@
     },
     {
       "path": "media.serve/v1/conformance.json",
-      "sha256": "5e478cb355ec994c158cb493453b4358f7fd6b4435276b0cb361073ce1e75904"
+      "sha256": "1bf6279b2153ff803ea80fbe1a68cc41a611c6350a168a515afde9dda1e65e78"
     }
   ],
   "major": 1

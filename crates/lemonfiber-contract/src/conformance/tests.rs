@@ -366,3 +366,59 @@ fn a_curator_is_asked_to_forget_a_download_client_it_does_not_hold_at_minor_five
         .map(|one| (one.since, one.asks));
     assert_eq!(case, Some((5, serde_json::json!({ "id": "0" }))));
 }
+
+#[test]
+fn a_media_server_keeps_its_own_held_case_and_is_asked_for_each_other_kind_at_minor_six() {
+    let serve = crate::capabilities::media::capability();
+    let listed = cases(&serve);
+    let case = |name: &str| {
+        listed.iter().find(|one| one.case == name).map(|one| {
+            (
+                one.since,
+                one.media_type,
+                one.asks.pointer("/kind").cloned(),
+            )
+        })
+    };
+    assert_eq!(
+        case("has_item-answers"),
+        Some((0, None, Some(Value::from("movies"))))
+    );
+    for kind in ["tv", "music", "books", "audiobooks", "podcasts"] {
+        assert_eq!(
+            case(&format!("has_item-answers-{kind}")),
+            Some((6, Some(kind), Some(Value::from(kind)))),
+            "{kind}"
+        );
+    }
+    for kind in ["movies", "comics"] {
+        assert_eq!(case(&format!("has_item-answers-{kind}")), None, "{kind}");
+    }
+}
+
+#[test]
+fn a_listening_server_is_asked_whether_it_holds_audiobooks_and_podcasts_and_no_other_kind() {
+    let serve = crate::capabilities::media::capability();
+    let asked: Vec<String> =
+        super::filed(&serve, &["audiobooks".to_owned(), "podcasts".to_owned()])
+            .into_iter()
+            .filter(|one| one.operation.name == "has_item")
+            .map(|one| one.case)
+            .collect();
+    assert_eq!(
+        asked,
+        [
+            "has_item-answers",
+            "has_item-answers-audiobooks",
+            "has_item-answers-podcasts"
+        ]
+    );
+}
+
+#[test]
+fn a_curator_is_asked_no_case_for_audiobooks_or_podcasts() {
+    let curate = crate::capabilities::library::capability();
+    assert!(cases(&curate)
+        .iter()
+        .all(|one| !matches!(one.media_type, Some("audiobooks" | "podcasts"))));
+}

@@ -12,8 +12,26 @@ fn a_library_only_stack_is_asked_a_different_question_entirely() {
 }
 
 #[tokio::test]
-async fn a_library_holding_one_kind_of_title_is_found_holding_it_whichever_kind_it_is() {
+async fn a_library_holding_one_kind_of_title_it_serves_is_found_holding_it_whichever_kind_it_is() {
     for kind in TitleKind::ALL {
-        assert!(holds(&Shelf::holding_only(kind), "").await, "{kind:?}");
+        assert!(
+            holds(&Shelf::holding_only(kind), &TitleKind::ALL, "").await,
+            "{kind:?}"
+        );
+        assert!(
+            holds(&Shelf::holding_only(kind), &[kind], "").await,
+            "{kind:?}"
+        );
     }
+}
+
+#[tokio::test]
+async fn a_server_is_not_asked_for_a_kind_it_does_not_serve() {
+    let books = Shelf::holding_only(TitleKind::Books);
+    assert!(!holds(&books, &[TitleKind::Audiobooks, TitleKind::Podcasts], "").await);
+}
+
+#[tokio::test]
+async fn a_server_serving_no_kind_of_title_is_found_holding_nothing() {
+    assert!(!holds(&Shelf::holding(Some(true)), &[], "").await);
 }

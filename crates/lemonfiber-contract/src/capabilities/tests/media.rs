@@ -50,6 +50,11 @@ async fn script<
         format!("{:?}", server.has_item(TitleKind::Movies, "sintel").await),
         format!("{:?}", server.has_item(TitleKind::Music, "sintel").await),
         format!("{:?}", server.has_item(TitleKind::Books, "sintel").await),
+        format!(
+            "{:?}",
+            server.has_item(TitleKind::Audiobooks, "sintel").await
+        ),
+        format!("{:?}", server.has_item(TitleKind::Podcasts, "sintel").await),
         format!("{:?}", server.rescan().await),
         format!("{:?}", server.series_held(2).await),
         format!("{:?}", server.refresh("s0").await),

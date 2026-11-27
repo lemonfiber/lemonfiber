@@ -24,8 +24,8 @@ mod secrets;
 pub(crate) use curators::*;
 pub(crate) use downloads::*;
 pub(crate) use filled::{
-    filling_serve, filling_serve_named, identity, media, served_by, server_named, serving, spoken,
-    Media, Spoken,
+    filling_serve, filling_serve_kinds, filling_serve_named, identity, media, served_by,
+    server_named, serving, spoken, Media, Spoken,
 };
 pub(crate) use layout::*;
 pub(crate) use media::*;

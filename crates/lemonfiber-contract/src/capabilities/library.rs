@@ -19,7 +19,9 @@ use lemonfiber_ports::serving::Said;
 use lemonfiber_ports::Client;
 use serde_json::Value;
 
-use super::{FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH};
+use super::{
+    media_case, wire, FOLDER, NAMED, PROFILE, TOLD_AT, TOLD_EVERY, TOLD_PINNED, TOLD_WITH,
+};
 use crate::conformance::Placeholder;
 
 /// The host the conformance cases name a download client on.
@@ -366,17 +368,7 @@ pub fn capability() -> crate::Capability {
 fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
     let each = |pointer: &str, by: Vec<(&'static str, Value, u32)>| {
         by.into_iter()
-            .map(|(media_type, value, since)| {
-                let mut asked = asks.clone();
-                if let Some(at) = asked.pointer_mut(pointer) {
-                    *at = value;
-                }
-                crate::MediaCase {
-                    media_type,
-                    asks: asked,
-                    since,
-                }
-            })
+            .map(|(media_type, value, since)| media_case(asks, pointer, media_type, value, since))
             .collect()
     };
     if BY_KIND.contains(&operation) {
@@ -391,7 +383,7 @@ fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
     if BY_UPGRADED_KIND.contains(&operation) {
         return each(
             "/kind",
-            TitleKind::ALL
+            TitleKind::CURATED
                 .iter()
                 .filter(|kind| **kind != TitleKind::Books)
                 .map(|kind| {
@@ -408,7 +400,7 @@ fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
     if BY_TITLE_KIND.contains(&operation) {
         return each(
             "/kind",
-            TitleKind::ALL
+            TitleKind::CURATED
                 .iter()
                 .map(|kind| {
                     let since = if kind.video().is_some() {
@@ -433,7 +425,7 @@ fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
     if operation == BY_FOLDER {
         return each(
             "/folder/media_type",
-            TitleKind::ALL
+            TitleKind::CURATED
                 .into_iter()
                 .map(|kind| {
                     let media_type = kind.media_type();
@@ -443,9 +435,4 @@ fn filed(operation: &str, asks: &Value) -> Vec<crate::MediaCase> {
         );
     }
     Vec::new()
-}
-
-/// `value` as the wire writes it.
-fn wire<T: serde::Serialize>(value: &T) -> Value {
-    serde_json::to_value(value).unwrap_or(Value::Null)
 }

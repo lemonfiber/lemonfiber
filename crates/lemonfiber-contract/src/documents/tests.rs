@@ -80,7 +80,7 @@ fn every_operation_has_a_case_and_every_adapter_refuses_a_call_without_its_key()
         let asked: usize = capability
             .operations
             .iter()
-            .map(|operation| operation.filed.len().max(1))
+            .map(|operation| operation.filed.len() + usize::from(operation.asks_its_own_case()))
             .sum();
         assert_eq!(cases.len(), asked + 1);
         assert!(cases

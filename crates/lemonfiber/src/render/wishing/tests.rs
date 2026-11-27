@@ -5,7 +5,7 @@ use lemonfiber_core::model::{
     LeftAfter, MemberAsking, Stands, TitleKind, TitleUnit,
 };
 
-use super::{askable, asked, kinds};
+use super::{askable, asked, called, kinds};
 
 /// What a member's period allows of one kind: `limit` of it, `used` spent.
 fn counted(limit: Option<u32>, used: u32) -> Counted {
@@ -230,4 +230,12 @@ fn the_kinds_a_member_may_ask_for_are_a_kind_a_line_with_its_units() {
         crate::render::shaped(&Outcome::AskableKinds(nothing)).text(),
         "ana may ask for\n  Nothing right now."
     );
+}
+
+#[test]
+fn every_kind_of_title_is_called_by_a_word_of_its_own() {
+    let words: std::collections::BTreeSet<&str> = TitleKind::ALL.into_iter().map(called).collect();
+    assert_eq!(words.len(), TitleKind::ALL.len());
+    assert_eq!(called(TitleKind::Audiobooks), "audiobooks");
+    assert_eq!(called(TitleKind::Podcasts), "podcasts");
 }
