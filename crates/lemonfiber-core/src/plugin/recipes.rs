@@ -98,7 +98,8 @@ pub struct Recipe {
     pub title: String,
     /// Why it is worth running.
     pub why: String,
-    /// When it runs: as part of an install and an update, or only when asked for by name.
+    /// When it runs: as part of an install and an update, only when asked for by name, or
+    /// once the part its plugin claims is lemonfiber's.
     #[serde(default)]
     pub on: On,
     /// Every value it asks the operator for when it runs, in the order it declares them.

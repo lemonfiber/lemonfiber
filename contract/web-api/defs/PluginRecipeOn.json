@@ -11,6 +11,11 @@
       "description": "Only when the operator asks for it by name, with approvals of its own.",
       "type": "string",
       "const": "demand"
+    },
+    {
+      "description": "Once the part its plugin claims over `owner.claim@1` answers that it is\nlemonfiber's, under the approvals of the plugin's last install or update, until it\nhas held once. It asks the operator for nothing.",
+      "type": "string",
+      "const": "claim"
     }
   ]
 }

@@ -13431,7 +13431,7 @@
           "on": {
             "$ref": "#/components/schemas/PluginRecipeOn",
             "default": "install",
-            "description": "When it runs: as part of an install and an update, or only when asked for by name."
+            "description": "When it runs: as part of an install and an update, only when asked for by name, or\nonce the part its plugin claims is lemonfiber's."
           },
           "pairs": {
             "description": "Every value it could carry, and where to.",
@@ -13500,6 +13500,11 @@
           {
             "const": "demand",
             "description": "Only when the operator asks for it by name, with approvals of its own.",
+            "type": "string"
+          },
+          {
+            "const": "claim",
+            "description": "Once the part its plugin claims over `owner.claim@1` answers that it is\nlemonfiber's, under the approvals of the plugin's last install or update, until it\nhas held once. It asks the operator for nothing.",
             "type": "string"
           }
         ]

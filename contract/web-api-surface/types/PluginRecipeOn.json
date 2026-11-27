@@ -1,6 +1,7 @@
 {
   "fields": {},
   "variants": [
+    "\"claim\"",
     "\"demand\"",
     "\"install\""
   ]

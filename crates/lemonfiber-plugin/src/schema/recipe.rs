@@ -53,7 +53,8 @@ pub struct Recipe {
     pub title: String,
     /// Why it is worth running.
     pub why: String,
-    /// When it runs: as part of installing the plugin, or when it is asked for.
+    /// When it runs: as part of installing the plugin, when it is asked for, or once the
+    /// part its plugin claims is lemonfiber's.
     #[serde(default)]
     pub on: On,
     /// The values it brings in from outside an answer: a credential lemonfiber holds,
@@ -85,6 +86,10 @@ pub enum On {
     Install,
     /// Only when the operator asks for it by name, with approvals of its own.
     Demand,
+    /// Once the part its plugin claims over `owner.claim@1` answers that it is
+    /// lemonfiber's, under the approvals of the plugin's last install or update, until it
+    /// has held once. It asks the operator for nothing.
+    Claim,
 }
 
 /// Where a value a recipe carries comes from.

@@ -19,8 +19,8 @@ use super::offering::{self, Consent};
 use super::twice::already;
 use super::writing::{carry_out, nowhere_to_write};
 use super::{
-    kept_at, proving, refused, reversing, standing, unreadable_source, unrecordable, verifying,
-    writing,
+    claimed, kept_at, proving, refused, reversing, standing, unreadable_source, unrecordable,
+    verifying, writing,
 };
 
 /// Settle what installing this source decides, write the plugin's wiring, and record
@@ -190,6 +190,8 @@ pub(super) async fn install(
             let _ = super::conformance::cleared(ctx, &would.plugin);
             crate::seed::run::reinstalled(ctx).await;
             awaits = proving::waiting(ctx, &stack_manifest, &would, stack).await;
+            recipes_ran
+                .extend(claimed::recorded(ctx, &read.manifest, &would, &stack_manifest).await?);
         } else {
             put_back = Some(reversing(ctx, &would, stack, stamp).await);
         }

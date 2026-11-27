@@ -26,7 +26,7 @@
 use std::collections::BTreeMap;
 
 use crate::addressing::Toward;
-use crate::schema::{Input, Manifest, Origin, Recipe, Step};
+use crate::schema::{Input, Manifest, On, Origin, Recipe, Step};
 use crate::Violation;
 
 use super::super::bundled;
@@ -141,7 +141,7 @@ pub(super) fn inputs(manifest: &Manifest, recipe: &Recipe, at: &str, found: &mut
         let here = format!("{at}.input {}", input.name);
         match input.origin {
             Origin::CredentialStore => held(manifest, input, &here, found),
-            Origin::Operator => asked(input, &here, found),
+            Origin::Operator => asked(recipe, input, &here, found),
             Origin::StackService | Origin::ExternalResponse => found.push(Violation {
                 location: format!("{here}.origin"),
                 message: format!(
@@ -411,8 +411,17 @@ fn held(manifest: &Manifest, input: &Input, at: &str, found: &mut Vec<Violation>
     }
 }
 
-/// An input the operator supplies says what they are asked, and names no service.
-fn asked(input: &Input, at: &str, found: &mut Vec<Violation>) {
+/// An input the operator supplies says what they are asked, names no service, and is not
+/// one a recipe that runs on claim brings in.
+fn asked(recipe: &Recipe, input: &Input, at: &str, found: &mut Vec<Violation>) {
+    if recipe.on == On::Claim {
+        found.push(Violation {
+            location: format!("{at}.origin"),
+            message: "comes from the operator, and a recipe that runs on claim may run at a \
+                      seed, which takes no input"
+                .to_owned(),
+        });
+    }
     if input.ask.as_deref().is_none_or(str::is_empty) {
         found.push(Violation {
             location: at.to_owned(),
