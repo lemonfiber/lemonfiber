@@ -160,7 +160,8 @@ fn register(ctx: &Ctx, record: &Record) -> Result<Registered, Box<Problem>> {
     let path = at(ctx).ok_or_else(nowhere)?;
     let answer = Registered {
         name: record.name.clone(),
-        endpoint: record.endpoint.clone(),
+        host: super::host_of(&record.endpoint),
+        fingerprint: super::fingerprint_of(&record.endpoint),
         registered: record.registered,
         rehearsed: ctx.dry_run,
     };

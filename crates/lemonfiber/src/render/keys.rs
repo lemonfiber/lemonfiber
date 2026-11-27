@@ -207,7 +207,7 @@ pub(super) fn pushes(report: &lemonfiber_core::push::Listing) -> Lines {
         lines.put(format!(
             "  {}  {}  registered {}",
             one.name,
-            one.endpoint,
+            one.address(),
             one.registered.said()
         ));
     }

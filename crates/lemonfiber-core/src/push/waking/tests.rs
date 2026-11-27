@@ -66,6 +66,25 @@ async fn a_distributor_that_cannot_be_reached_is_a_failure_and_not_gone() {
 }
 
 #[tokio::test]
+async fn a_distributor_that_cannot_be_reached_is_named_by_its_host_and_fingerprint() {
+    let http = Fake::silent();
+
+    let outcome = woke(&reaching(&http), &readable(), "w1").await;
+
+    let DeliveryOutcome::Failed(said) = outcome.0 else {
+        unreachable!("an unreachable distributor is a failure: {outcome:?}");
+    };
+    let fingerprint = crate::push::fingerprint_of("https://push.example/a");
+    assert!(
+        said.starts_with(&format!(
+            "push.example ({fingerprint}) could not be reached"
+        )),
+        "{said}"
+    );
+    assert!(!said.contains("push.example/a"), "{said}");
+}
+
+#[tokio::test]
 async fn nothing_is_sent_where_no_id_can_be_drawn_for_a_wake() {
     let dir_scratch = lemonfiber_fixtures::scratch::Scratch::named("push-undrawn");
     let dir = dir_scratch.to_path_buf();

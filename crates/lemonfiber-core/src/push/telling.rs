@@ -47,10 +47,7 @@ fn as_backend(record: &Record) -> crate::model::BackendReport {
     crate::model::BackendReport {
         id: record.name.clone(),
         kind: crate::model::BackendKind::Unifiedpush,
-        reaches: url::Url::parse(&record.endpoint)
-            .ok()
-            .and_then(|url| url.host_str().map(str::to_owned))
-            .unwrap_or_default(),
+        reaches: super::host_of(&record.endpoint),
         chosen_by: record.owner.clone().map_or(
             crate::model::ChosenBy::Operator,
             crate::model::ChosenBy::Member,

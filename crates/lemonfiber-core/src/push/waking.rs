@@ -153,8 +153,13 @@ async fn woke(ctx: &Ctx, record: &Record, id: &str) -> (DeliveryOutcome, bool) {
         ),
         Ok(Ok(answered)) => (DeliveryOutcome::Failed(answered.status.to_string()), false),
         Ok(Err(why)) => (
-            DeliveryOutcome::Failed(crate::error::withheld::without_credentials(
-                &why.to_string(),
+            DeliveryOutcome::Failed(format!(
+                "{} could not be reached: {}",
+                super::named(
+                    &super::host_of(&record.endpoint),
+                    &super::fingerprint_of(&record.endpoint)
+                ),
+                crate::error::withheld::without_credentials(&why.reason)
             )),
             false,
         ),

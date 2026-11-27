@@ -243,7 +243,8 @@ fn the_device_keys_are_listed_with_where_each_stands_and_what_a_revoke_did() {
 fn a_push_endpoint() -> lemonfiber_core::push::Listed {
     lemonfiber_core::push::Listed {
         name: "pixel".to_owned(),
-        endpoint: "https://push.example/abc".to_owned(),
+        host: "push.example".to_owned(),
+        fingerprint: "f7a263f8786e9f95".to_owned(),
         registered: Instant::from_seconds(1_794_009_600),
     }
 }
@@ -252,7 +253,8 @@ fn a_push_endpoint() -> lemonfiber_core::push::Listed {
 fn a_push_endpoint_registered_says_it_is_woken_or_would_be() {
     let mut report = lemonfiber_core::push::Registered {
         name: "pixel".to_owned(),
-        endpoint: "https://push.example/abc".to_owned(),
+        host: "push.example".to_owned(),
+        fingerprint: "f7a263f8786e9f95".to_owned(),
         registered: Instant::from_seconds(1_794_009_600),
         rehearsed: false,
     };
@@ -281,7 +283,11 @@ fn the_push_endpoints_are_listed_and_a_removal_is_said() {
 
     report.endpoints.push(a_push_endpoint());
     let said = super::pushes(&report).text();
-    assert!(said.contains("pixel  https://push.example/abc"), "{said}");
+    assert!(
+        said.contains("pixel  push.example (f7a263f8786e9f95)"),
+        "{said}"
+    );
+    assert!(!said.contains("https://"), "{said}");
 
     report.removed = Some("tablet".to_owned());
     let said = super::pushes(&report).text();
