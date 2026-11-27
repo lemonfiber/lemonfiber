@@ -146,11 +146,5 @@ fn spelled<W: Serializer>(method: &Method, writer: W) -> Result<W::Ok, W::Error>
     writer.serialize_str(method.as_str())
 }
 
-impl<S: Clone + Send + Sync + 'static> From<Serves<S>> for Router<S> {
-    fn from(serves: Serves<S>) -> Self {
-        serves.router
-    }
-}
-
 #[cfg(test)]
 mod tests;

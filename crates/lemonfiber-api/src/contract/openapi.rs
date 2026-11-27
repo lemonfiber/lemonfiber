@@ -25,8 +25,9 @@ const ANY_KIND: &str = "envelope";
 ///
 /// # Errors
 ///
-/// Every file the index names that is missing or is not JSON, since a document
-/// rendered without it would describe less than the artefact does.
+/// Every file the index names that is missing or is not JSON, and every listed route
+/// naming no method or no path, since a document rendered without it would describe
+/// less than the artefact does.
 pub fn rendered(files: &Files) -> Result<Value, Vec<String>> {
     let mut faults = Vec::new();
     let mut read = |path: &str| -> Value {
@@ -98,7 +99,7 @@ pub fn rendered(files: &Files) -> Result<Value, Vec<String>> {
         }
     }
     paths.insert(STREAM.to_owned(), streamed(index.get("events")));
-    routed(&mut paths, &routes, &bodies);
+    routed(&mut paths, &routes, &bodies, &mut faults);
 
     if !faults.is_empty() {
         return Err(faults);
@@ -270,13 +271,22 @@ fn asked(route: &str, listed: &Value) -> Value {
 }
 
 /// Every route `routes` lists that no read, action or stream already describes, added to
-/// `paths` as the operation serving it.
-fn routed(paths: &mut Map<String, Value>, routes: &Value, bodies: &BTreeMap<String, String>) {
+/// `paths` as the operation serving it; a listed route naming no method or no path is a
+/// fault in `faults`.
+fn routed(
+    paths: &mut Map<String, Value>,
+    routes: &Value,
+    bodies: &BTreeMap<String, String>,
+    faults: &mut Vec<String>,
+) {
     for listed in routes.as_array().into_iter().flatten() {
         let (Some(method), Some(route)) = (
             listed.get("method").and_then(Value::as_str),
             listed.get("path").and_then(Value::as_str),
         ) else {
+            faults.push(format!(
+                "the artefact lists a route by no method or no path: {listed}"
+            ));
             continue;
         };
         let method = method.to_ascii_lowercase();

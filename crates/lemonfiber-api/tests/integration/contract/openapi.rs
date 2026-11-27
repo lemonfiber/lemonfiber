@@ -114,3 +114,17 @@ fn a_file_the_index_names_that_cannot_be_read_is_refused_by_name() {
         vec!["kinds/version.json is named by the artefact and cannot be read".to_owned()]
     );
 }
+
+#[test]
+fn a_route_listed_by_no_method_is_refused() {
+    let mut files = fresh();
+    let route = json!({ "path": "/api/keys/{name}", "body": true, "kinds": [] });
+    files.insert("routes.json".to_owned(), json!([route]).to_string());
+    let faults = rendered(&files).err().unwrap_or_default();
+    assert_eq!(
+        faults,
+        vec![format!(
+            "the artefact lists a route by no method or no path: {route}"
+        )]
+    );
+}
