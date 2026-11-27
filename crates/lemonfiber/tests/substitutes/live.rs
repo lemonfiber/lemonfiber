@@ -10,6 +10,7 @@
 pub mod core;
 mod fixture;
 mod http;
+mod hydra;
 mod member;
 pub mod serving;
 mod site;
@@ -294,14 +295,15 @@ fn container(service: &str) -> String {
     format!("lemonfiber-{service}-1")
 }
 
-/// The gateway of the network the indexer's container sits on, which reaches this machine.
-fn gateway() -> Option<String> {
+/// The gateway of the network the container of the indexer `searching` sits on, which
+/// reaches this machine.
+fn gateway(searching: &str) -> Option<String> {
     let output = std::process::Command::new("docker")
         .args([
             "inspect",
             "--format",
             "{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}",
-            &container(INDEXER),
+            &container(searching),
         ])
         .output()
         .ok()?;
@@ -609,23 +611,26 @@ pub fn run(
     ) else {
         return;
     };
-    let Some((key, port)) = indexer(&core) else {
-        return;
-    };
-    let gateway = gateway();
+    let searching = substitution
+        .filter(|one| one.plugin == hydra::PLUGIN)
+        .map_or(INDEXER, |_| hydra::PLUGIN);
+    let gateway = gateway(searching);
     assert!(
         gateway.is_some(),
-        "no gateway reaches this machine from {INDEXER}"
+        "no gateway reaches this machine from {searching}"
     );
     let Some(gateway) = gateway else {
         return;
     };
-    let added = site_added(
-        &key,
-        port,
-        &format!("http://{gateway}:{}", site.port),
-        (downloads, &[]),
-    );
+    let at = format!("http://{gateway}:{}", site.port);
+    let added = if searching == hydra::PLUGIN {
+        hydra::site_added(&core, &at, site::KEY)
+    } else {
+        let Some((key, port)) = indexer(&core) else {
+            return;
+        };
+        site_added(&key, port, &at, (downloads, &[])).map(|_| ())
+    };
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 

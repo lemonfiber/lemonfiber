@@ -45,13 +45,59 @@ pub fn call_within(
     body: Option<&str>,
     patience: Duration,
 ) -> Result<Answered, String> {
+    sent(
+        method,
+        port,
+        path,
+        &format!("X-Api-Key: {key}"),
+        body,
+        patience,
+    )
+}
+
+/// `method` on `path` of the service on loopback at `port`, signed in as the account
+/// `name` with `password` over HTTP basic authentication, and sending `body` as JSON
+/// where there is one.
+///
+/// # Errors
+///
+/// Where the service cannot be reached or answers nothing HTTP.
+pub fn call_as(
+    method: &str,
+    port: u16,
+    path: &str,
+    (name, password): (&str, &str),
+    body: Option<&str>,
+) -> Result<Answered, String> {
+    use base64::Engine as _;
+    let account = base64::engine::general_purpose::STANDARD.encode(format!("{name}:{password}"));
+    sent(
+        method,
+        port,
+        path,
+        &format!("Authorization: Basic {account}"),
+        body,
+        PATIENCE,
+    )
+}
+
+/// `method` on `path` of the service on loopback at `port`, presenting `presented` as a
+/// header, waiting up to `patience` for the answer.
+fn sent(
+    method: &str,
+    port: u16,
+    path: &str,
+    presented: &str,
+    body: Option<&str>,
+    patience: Duration,
+) -> Result<Answered, String> {
     let mut stream = TcpStream::connect(("127.0.0.1", port))
         .map_err(|why| format!("127.0.0.1:{port}: {why}"))?;
     let _ = stream.set_read_timeout(Some(patience));
     let sent = body.unwrap_or_default();
     write!(
         stream,
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-Api-Key: {key}\r\n\
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{presented}\r\n\
          Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{sent}",
         sent.len()
     )
