@@ -38,10 +38,10 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router};
+use axum::Json;
 use lemonfiber_core::app::restore::Consent as RestoreConsent;
 use lemonfiber_core::app::{Command, Ctx, Restoring, Setting, Waiting};
+use lemonfiber_core::model::kind::{Kind, JOB};
 use lemonfiber_core::notify::configuring::Asked as Notifying;
 use lemonfiber_core::push::run::Asked as Pushing;
 
@@ -53,6 +53,7 @@ use crate::jobs::Job;
 use crate::read::rendered;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 use crate::spoken::Audience;
 use again::{Answer, Asked, Claim, Key};
 
@@ -145,8 +146,23 @@ pub const ACTION: &str = "/api/actions/{action}";
 /// Admission is not applied here. Whether a request may be answered at all is one
 /// question for the whole surface, asked once above the whole tree, which is what
 /// keeps an endpoint added later from arriving unguarded.
-pub fn routes() -> Router<Serving> {
-    Router::new().route(ACTION, post(taken))
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    Serves::new().post(ACTION, taken, Taking::Body, &answered_under())
+}
+
+/// Every kind an action may answer under: what each action's command answers with, and
+/// the name of the work an action that outlives its request is started under.
+pub(crate) fn answered_under() -> Vec<Kind> {
+    let mut kinds: Vec<Kind> = OFFERED
+        .iter()
+        .filter_map(|action| reached(action, Arguments::naming_everything()).ok())
+        .flat_map(|command| command.answered_under().iter().copied())
+        .chain([JOB])
+        .collect();
+    kinds.sort_by_key(|kind| kind.as_str());
+    kinds.dedup();
+    kinds
 }
 
 /// One action, carried out or refused.
@@ -261,7 +277,7 @@ impl Carrying {
 /// surface's context rather than a second one built beside it: every port is shared,
 /// and what the command reports and what it refuses to rehearse is decided by the
 /// core exactly as it is for the command line's `--dry-run`.
-fn asked_of(serving: &Arc<Ctx>, rehearsing: bool) -> Arc<Ctx> {
+pub(crate) fn asked_of(serving: &Arc<Ctx>, rehearsing: bool) -> Arc<Ctx> {
     if rehearsing {
         Arc::new(serving.as_ref().clone().rehearsing())
     } else {

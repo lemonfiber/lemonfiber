@@ -28,13 +28,14 @@ use std::time::Duration;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Response, StatusCode};
-use axum::routing::get;
 use axum::Router;
+use lemonfiber_core::model::kind::Kind;
 
 use lemonfiber_core::app::{dispatch, Command, Ctx, Polled, Surfacing};
 
 use crate::admission::Knocking;
 use crate::guard::{Arrived, Binding, Token};
+use crate::routing::Serves;
 use crate::serve::{admitted, carrying, STREAM};
 
 use self::live::{Gathering, Listening, Live};
@@ -88,7 +89,18 @@ pub(crate) async fn read(
 /// because what it needs is what is being said and not the world a command runs
 /// against. So it arrives already stated and merges at the top of the tree.
 pub fn routes(streaming: Arc<Streaming>) -> Router {
-    Router::new().route(PATH, get(stream)).with_state(streaming)
+    served().with_state(streaming)
+}
+
+/// The stream's route as [`routes`] serves it and the contract lists it, answering
+/// under every kind of event it says.
+#[must_use]
+pub fn served() -> Serves<Arc<Streaming>> {
+    let said: Vec<Kind> = wire::EventKind::ALL
+        .iter()
+        .map(|event| event.kind())
+        .collect();
+    Serves::new().get(PATH, stream, &said)
 }
 
 /// Answer a request to listen.

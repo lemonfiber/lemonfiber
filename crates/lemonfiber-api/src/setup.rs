@@ -31,8 +31,7 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
 use lemonfiber_core::app::{dispatch, Command, SetupAction};
 use lemonfiber_core::wizard::{Answer, Choice};
 use serde::Deserialize;
@@ -42,6 +41,7 @@ use crate::entitled::{may, Door};
 use crate::read::{enveloped, refusing};
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// Where one answer to a question setup asks is given.
 pub const ANSWER: &str = "/api/setup/answer";
@@ -50,14 +50,19 @@ pub const ANSWER: &str = "/api/setup/answer";
 pub const RECOVER: &str = "/api/setup/recover";
 
 /// The six requests setup is walked with.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route("/api/setup", get(standing))
-        .route(ANSWER, post(answered))
-        .route("/api/setup/next", post(onward))
-        .route("/api/setup/back", post(backward))
-        .route("/api/setup/apply", post(applied))
-        .route(RECOVER, post(recovered))
+///
+/// Each answers with where the walk left setup, as the command it reaches does.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let answering = |action| Command::Setup(action).answered_under();
+    let walked = answering(SetupAction::Next);
+    Serves::new()
+        .get("/api/setup", standing, answering(SetupAction::Where))
+        .post(ANSWER, answered, Taking::Body, walked)
+        .post("/api/setup/next", onward, Taking::Nothing, walked)
+        .post("/api/setup/back", backward, Taking::Nothing, walked)
+        .post("/api/setup/apply", applied, Taking::Nothing, walked)
+        .post(RECOVER, recovered, Taking::Body, walked)
 }
 
 /// Where setup stands, and what it is still asking for.

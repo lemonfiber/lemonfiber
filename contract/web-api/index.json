@@ -66,10 +66,13 @@
   },
   "bodies": {
     "/api/device-keys": "bodies/device-keys.json",
+    "/api/device-keys/{name}": "bodies/device-keys-name.json",
     "/api/keys": "bodies/keys.json",
     "/api/keys/claim": "bodies/keys-claim.json",
+    "/api/keys/{name}": "bodies/keys-name.json",
     "/api/notify/events": "bodies/notify-events.json",
     "/api/push-endpoints": "bodies/push-endpoints.json",
+    "/api/push-endpoints/{name}": "bodies/push-endpoints-name.json",
     "/api/session": "bodies/session.json",
     "/api/session/code": "bodies/session-code.json",
     "/api/setup/answer": "bodies/setup-answer.json",
@@ -278,6 +281,7 @@
     "word": "kinds/word.json"
   },
   "reads": "reads.json",
+  "routes": "routes.json",
   "refusals": {
     "ADMIT": "refusals/ADMIT.json",
     "ASK": "refusals/ASK.json",

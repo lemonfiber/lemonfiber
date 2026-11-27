@@ -29,6 +29,7 @@ fn holding(kinds: &[(&str, Value)]) -> Contract {
             })
             .collect(),
         reads: Vec::new(),
+        routes: Vec::new(),
         refusals: [("ADMIT-4", 403), ("ADMIT-10", 400), ("LIFE-13", 409)]
             .into_iter()
             .map(|(code, status)| {
@@ -143,6 +144,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
             "key_callable": "key-callable.json",
             "kinds": { "doctor": "kinds/doctor.json" },
             "reads": "reads.json",
+            "routes": "routes.json",
             "refusals": {
                 "ADMIT": "refusals/ADMIT.json",
                 "LIFE": "refusals/LIFE.json"
@@ -152,6 +154,7 @@ fn the_index_carries_the_version_and_names_every_other_file() {
     for named in [
         "key-callable.json",
         "reads.json",
+        "routes.json",
         "refusals/ADMIT.json",
         "refusals/LIFE.json",
         "kinds/doctor.json",

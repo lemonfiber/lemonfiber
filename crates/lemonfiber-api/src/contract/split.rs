@@ -38,6 +38,9 @@ const ACTIONS: &str = "actions";
 /// The reads the surface serves, inside the contract's directory.
 const READS: &str = "reads.json";
 
+/// Every route the surface serves, inside the contract's directory.
+const ROUTES: &str = "routes.json";
+
 /// What a member's surface may not show, inside the contract's directory.
 const HOUSEHOLD_WORDS: &str = "household-words.json";
 
@@ -85,6 +88,8 @@ struct Index {
     kinds: BTreeMap<String, String>,
     /// The file listing every read the surface serves.
     reads: &'static str,
+    /// The file listing every route the surface serves.
+    routes: &'static str,
     /// Each code family, to the file listing the codes of it a refusal may carry.
     refusals: BTreeMap<String, String>,
     /// Each kind and each action, to the file holding its example.
@@ -162,6 +167,7 @@ impl Contract {
 
         put(&mut files, KEY_CALLABLE, &self.key_callable);
         put(&mut files, READS, &self.reads);
+        put(&mut files, ROUTES, &self.routes);
         let mut refusals = BTreeMap::new();
         for (family, listed) in by_family(&self.refusals) {
             let path = format!("{REFUSALS}/{family}.json");
@@ -190,6 +196,7 @@ impl Contract {
             key_callable: KEY_CALLABLE,
             kinds,
             reads: READS,
+            routes: ROUTES,
             refusals,
             examples,
             household_words: self.household_words.as_ref().map(|_| HOUSEHOLD_WORDS),
@@ -248,7 +255,10 @@ fn by_family<T>(refusals: &BTreeMap<String, T>) -> BTreeMap<&str, BTreeMap<&str,
 /// A route as the name of the file its body is described in: the path past `/api/`,
 /// its segments joined by a dash.
 fn slug(route: &str) -> String {
-    route.trim_start_matches("/api/").replace('/', "-")
+    route
+        .trim_start_matches("/api/")
+        .replace('/', "-")
+        .replace(['{', '}'], "")
 }
 
 /// What every schema written into the directory shares while it is written: the

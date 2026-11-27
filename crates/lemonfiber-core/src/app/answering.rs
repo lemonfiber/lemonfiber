@@ -16,6 +16,7 @@ use super::command::{
     Asking, Keeping, Linking, MigrateAction, Polled, Queueing, Settling, Shelf, Surfacing, Whom,
     Wishing,
 };
+use super::setup::SetupAction;
 use super::Command;
 use super::{authoring, plugins};
 
@@ -85,6 +86,14 @@ const fn read(command: &Command) -> &'static [Kind] {
         Command::DeviceKeys(crate::device_keys::run::Asked::Challenge { .. }) => {
             &[kind::DEVICE_CHALLENGE]
         }
+        Command::Setup(SetupAction::Where) => &[kind::WIZARD],
+        Command::Keys(crate::keys::run::Asked::List { .. }) => &[kind::KEYS],
+        Command::Keys(
+            crate::keys::run::Asked::Mint { .. } | crate::keys::run::Asked::Collect { .. },
+        ) => &[kind::MINTED_KEY],
+        Command::DeviceKeys(crate::device_keys::run::Asked::List) => &[kind::DEVICE_KEYS],
+        Command::DeviceKeys(crate::device_keys::run::Asked::Register { .. }) => &[kind::DEVICE_KEY],
+        Command::PushEndpoints(crate::push::run::Asked::List { .. }) => &[kind::PUSH_ENDPOINTS],
         Command::Logs(_) => &[kind::LOGS],
         Command::InFlight { .. } => &[kind::IN_FLIGHT],
         Command::Served(_) | Command::Serving => &[kind::SERVED],

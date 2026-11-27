@@ -6,7 +6,8 @@ use serde_json::{json, Map, Value};
 
 use super::layout::Files;
 use super::path::INDEX;
-use crate::jobs::{A_JOB, FORGET};
+use crate::actions::ACTION;
+use crate::events::PATH as STREAM;
 
 /// Where the `OpenAPI` document is kept, relative to the workspace root.
 pub const OPENAPI: &str = "contract/web-api.openapi.json";
@@ -68,18 +69,13 @@ pub fn rendered(files: &Files) -> Result<Value, Vec<String>> {
         json!({ "oneOf": kinds.keys().map(|kind| reference(&kind_name(kind))).collect::<Vec<_>>() }),
     );
     let mut paths = Map::new();
+    let mut bodies = BTreeMap::new();
     for (route, path) in named("bodies") {
         let mut schema = read(&path);
         undeclared(&mut schema);
         let name = format!("body-{}", stem(&path));
         schemas.insert(name.clone(), inlined(schema));
-        paths.insert(
-            route,
-            json!({ "post": {
-                "requestBody": { "required": true, "content": { "application/json": { "schema": reference(&name) } } },
-                "responses": answered(&[ANY_KIND.to_owned()]),
-            } }),
-        );
+        bodies.insert(route, name);
     }
     for (action, path) in named("actions") {
         let listed = read(&path);
@@ -88,18 +84,21 @@ pub fn rendered(files: &Files) -> Result<Value, Vec<String>> {
             json!({ "post": acted(&listed) }),
         );
     }
-    let reads = index
-        .get("reads")
-        .and_then(Value::as_str)
-        .map_or(Value::Null, &mut read);
+    let mut listed_in = |key: &str| {
+        index
+            .get(key)
+            .and_then(Value::as_str)
+            .map_or(Value::Null, &mut read)
+    };
+    let reads = listed_in("reads");
+    let routes = listed_in("routes");
     for listed in reads.as_array().into_iter().flatten() {
         if let Some(route) = listed.get("path").and_then(Value::as_str) {
             paths.insert(route.to_owned(), json!({ "get": asked(route, listed) }));
         }
     }
-    paths.insert(A_JOB.to_owned(), redeemed(&["get", "delete"]));
-    paths.insert(FORGET.to_owned(), redeemed(&["post"]));
-    paths.insert("/api/events".to_owned(), streamed(index.get("events")));
+    paths.insert(STREAM.to_owned(), streamed(index.get("events")));
+    routed(&mut paths, &routes, &bodies);
 
     if !faults.is_empty() {
         return Err(faults);
@@ -175,10 +174,10 @@ fn answered(kinds: &[String]) -> Value {
     })
 }
 
-/// Any kind answered, and work still going answered `202` with its name, described as
-/// `going`.
-fn accepted(going: &str) -> Value {
-    let mut responses = answered(&[ANY_KIND.to_owned()]);
+/// One of `kinds` answered, and work still going answered `202` with its name, described
+/// as `going`.
+fn accepted(kinds: &[String], going: &str) -> Value {
+    let mut responses = answered(kinds);
     if let Some(each) = responses.as_object_mut() {
         each.insert(
             "202".to_owned(),
@@ -211,7 +210,10 @@ fn acted(listed: &Value) -> Value {
             Some((name.to_owned(), inlined(argument.get("type")?.clone())))
         })
         .collect();
-    let responses = accepted("Accepted, and named so that what became of it can be asked.");
+    let responses = accepted(
+        &[ANY_KIND.to_owned()],
+        "Accepted, and named so that what became of it can be asked.",
+    );
     json!({
         "requestBody": {
             "content": { "application/json": { "schema": { "type": "object", "properties": properties } } },
@@ -220,13 +222,18 @@ fn acted(listed: &Value) -> Value {
     })
 }
 
-/// One read, as the operation that asks it.
-fn asked(route: &str, listed: &Value) -> Value {
-    let mut parameters: Vec<Value> = route
+/// Each parameter `route` names in its path, as the operation declares it.
+fn in_path(route: &str) -> Vec<Value> {
+    route
         .split('/')
         .filter_map(|segment| segment.strip_prefix('{')?.strip_suffix('}'))
         .map(|name| json!({ "name": name, "in": "path", "required": true, "schema": { "type": "string" } }))
-        .collect();
+        .collect()
+}
+
+/// One read, as the operation that asks it.
+fn asked(route: &str, listed: &Value) -> Value {
+    let mut parameters = in_path(route);
     parameters.extend(
         listed
             .get("parameters")
@@ -262,20 +269,62 @@ fn asked(route: &str, listed: &Value) -> Value {
     json!({ "parameters": parameters, "responses": responses })
 }
 
-/// What a name for work is redeemed, released or forgotten with, by each of `methods`.
-fn redeemed(methods: &[&str]) -> Value {
-    let job =
-        json!([{ "name": "job", "in": "path", "required": true, "schema": { "type": "string" } }]);
-    let responses = accepted("Still going.");
-    let mut path = Map::new();
-    path.insert("parameters".to_owned(), job);
-    for method in methods {
-        path.insert(
-            (*method).to_owned(),
-            json!({ "responses": responses.clone() }),
-        );
+/// Every route `routes` lists that no read, action or stream already describes, added to
+/// `paths` as the operation serving it.
+fn routed(paths: &mut Map<String, Value>, routes: &Value, bodies: &BTreeMap<String, String>) {
+    for listed in routes.as_array().into_iter().flatten() {
+        let (Some(method), Some(route)) = (
+            listed.get("method").and_then(Value::as_str),
+            listed.get("path").and_then(Value::as_str),
+        ) else {
+            continue;
+        };
+        let method = method.to_ascii_lowercase();
+        let described = paths
+            .get(route)
+            .is_some_and(|path| path.get(&method).is_some());
+        if route == ACTION || described {
+            continue;
+        }
+        let operation = served(route, &method, listed, bodies.get(route));
+        if let Some(path) = paths
+            .entry(route)
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+        {
+            path.insert(method, operation);
+        }
     }
-    Value::Object(path)
+}
+
+/// One route neither a read, an action nor the stream, as the operation serving it: its
+/// path's parameters, the body it takes where it takes one, and the kinds it answers with,
+/// work still going answered `202` with its name where it may be.
+fn served(route: &str, method: &str, listed: &Value, body: Option<&String>) -> Value {
+    let kinds: Vec<String> = listed
+        .get("kinds")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(kind_name)
+        .collect();
+    let responses = if kinds.contains(&kind_name("job")) {
+        accepted(&kinds, "Still going.")
+    } else {
+        answered(&kinds)
+    };
+    let mut operation = Map::new();
+    operation.insert("parameters".to_owned(), Value::Array(in_path(route)));
+    operation.insert("responses".to_owned(), responses);
+    if let Some(body) = body {
+        let taken = json!({
+            "required": method != "delete",
+            "content": { "application/json": { "schema": reference(body) } },
+        });
+        operation.insert("requestBody".to_owned(), taken);
+    }
+    Value::Object(operation)
 }
 
 /// The event stream, with its heartbeat and each kind of event it says.

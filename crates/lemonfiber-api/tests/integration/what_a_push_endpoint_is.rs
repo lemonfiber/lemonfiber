@@ -15,7 +15,7 @@ use crate::door::*;
 use crate::what_a_key_admits::{code, presented, sent, HERE, NEXT_DOOR};
 
 /// A machine keeping its files beneath a directory named for `named`, and its own token.
-fn a_machine(named: &str) -> (axum::Router, String) {
+pub(crate) fn a_machine(named: &str) -> (axum::Router, String) {
     let admission = keeping(&format!("push-{named}"));
     let mut ctx = world(Some(admission.to_path_buf()), Chance::exactly(None));
     let env = a_directory(&format!("push-env-{named}")).within(".env");
@@ -30,7 +30,7 @@ fn a_machine(named: &str) -> (axum::Router, String) {
 }
 
 /// A registration under `name` at `endpoint`, as a phone asks it.
-fn registering(name: &str, endpoint: &str) -> String {
+pub(crate) fn registering(name: &str, endpoint: &str) -> String {
     serde_json::json!({
         "name": name,
         "endpoint": endpoint,
@@ -41,7 +41,7 @@ fn registering(name: &str, endpoint: &str) -> String {
 }
 
 /// The value at `pointer` in an answer's body.
-fn read(body: &str, pointer: &str) -> String {
+pub(crate) fn read(body: &str, pointer: &str) -> String {
     serde_json::from_str::<serde_json::Value>(body)
         .ok()
         .and_then(|reply| {

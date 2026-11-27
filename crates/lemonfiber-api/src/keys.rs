@@ -23,9 +23,9 @@
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 
+use axum::body::Bytes;
 use axum::response::Response;
-use axum::routing::{delete, get, post};
-use axum::{Extension, Json, Router};
+use axum::{Extension, Json};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::keys::run::{Asked, Proof, Proving};
 use lemonfiber_core::keys::Minter;
@@ -36,6 +36,7 @@ use crate::guard::{Arrived, Presented};
 use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// Where keys are listed and minted.
 pub const KEYS: &str = "/api/keys";
@@ -123,12 +124,50 @@ impl std::fmt::Debug for Minting {
     }
 }
 
-/// The three routes keys are kept through.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(KEYS, get(listed).post(minted))
-        .route(COLLECTING, post(collected))
-        .route(A_KEY, delete(revoked))
+/// The routes keys are kept through, each answering as the command it reaches does.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let by = || Minter::Operator;
+    let minting = Asked::Mint {
+        name: String::new(),
+        scope: String::new(),
+        purpose: String::new(),
+        by: by(),
+        claim: false,
+        proving: None,
+    };
+    let collecting = Asked::Collect {
+        claim: String::new(),
+        from: None,
+    };
+    let revoking = Asked::Revoke {
+        name: String::new(),
+        by: by(),
+    };
+    Serves::new()
+        .get(
+            KEYS,
+            listed,
+            Command::Keys(Asked::List { by: by() }).answered_under(),
+        )
+        .post(
+            KEYS,
+            minted,
+            Taking::Body,
+            Command::Keys(minting).answered_under(),
+        )
+        .post(
+            COLLECTING,
+            collected,
+            Taking::Body,
+            Command::Keys(collecting).answered_under(),
+        )
+        .delete(
+            A_KEY,
+            revoked,
+            Taking::Body,
+            Command::Keys(revoking).answered_under(),
+        )
 }
 
 /// Every key, without its secret.
@@ -224,14 +263,17 @@ async fn collected(
     carried_out(&serving.ctx, Command::Keys(asked)).await
 }
 
-/// A key revoked, by its name.
+/// A key revoked, by its name, or that revocation rehearsed where the body asks for it.
 async fn revoked(
     State(serving): State<Serving>,
     caller: Caller,
     Path(name): Path<String>,
+    body: Bytes,
 ) -> Response {
-    match keeper(&caller) {
-        Ok(by) => carried_out(&serving.ctx, Command::Keys(Asked::Revoke { name, by })).await,
+    let asked = keeper(&caller)
+        .and_then(|by| crate::revoking::carried_in(&serving.ctx, &body).map(|ctx| (ctx, by)));
+    match asked {
+        Ok((ctx, by)) => carried_out(&ctx, Command::Keys(Asked::Revoke { name, by })).await,
         Err(refused) => *refused,
     }
 }
@@ -241,7 +283,7 @@ async fn revoked(
 /// The operator, by a session or by this run's own token, keeps every key; a member keeps
 /// their own, as far as the core allows. A key is refused naming what it is, so a program
 /// told no knows that no key of any scope will do.
-fn keeper(caller: &Caller) -> Result<Minter, Box<Response>> {
+pub(crate) fn keeper(caller: &Caller) -> Result<Minter, Box<Response>> {
     match caller {
         Caller::Operator | Caller::Machine => Ok(Minter::Operator),
         Caller::Member(id) => Ok(Minter::Member { id: id.clone() }),

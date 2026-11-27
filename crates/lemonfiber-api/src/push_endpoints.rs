@@ -7,11 +7,11 @@
 //!
 //! **A registration carries a secret**, so it takes the connection a key may cross.
 
+use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::response::Response;
-use axum::routing::{delete, get};
-use axum::{Extension, Json, Router};
+use axum::{Extension, Json};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::push::run::Asked;
 use serde::Deserialize;
@@ -21,6 +21,7 @@ use crate::guard::Arrived;
 use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// Where push endpoints are listed and registered.
 pub const PUSH_ENDPOINTS: &str = "/api/push-endpoints";
@@ -57,11 +58,35 @@ pub(crate) fn body() -> (&'static str, schemars::Schema) {
     (PUSH_ENDPOINTS, schemars::schema_for!(Registering))
 }
 
-/// The three routes push endpoints are kept through.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(PUSH_ENDPOINTS, get(listed).post(registered))
-        .route(A_PUSH_ENDPOINT, delete(removed))
+/// The three routes push endpoints are kept through, each answering as the command it
+/// reaches does.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let registering = Asked::Register {
+        name: String::new(),
+        endpoint: String::new(),
+        p256dh: String::new(),
+        auth: String::new(),
+        owner: None,
+    };
+    let removing = Asked::Remove {
+        name: String::new(),
+        owner: None,
+    };
+    let answered = |asked| Command::PushEndpoints(asked).answered_under();
+    Serves::new()
+        .get(
+            PUSH_ENDPOINTS,
+            listed,
+            answered(Asked::List { owner: None }),
+        )
+        .post(
+            PUSH_ENDPOINTS,
+            registered,
+            Taking::Body,
+            answered(registering),
+        )
+        .delete(A_PUSH_ENDPOINT, removed, Taking::Body, answered(removing))
 }
 
 /// Every push endpoint.
@@ -101,19 +126,19 @@ async fn registered(
     answer
 }
 
-/// A push endpoint removed, by its name.
+/// A push endpoint removed, by its name, or that removal rehearsed where the body asks
+/// for it.
 async fn removed(
     State(serving): State<Serving>,
     caller: Caller,
     Path(name): Path<String>,
+    body: Bytes,
 ) -> Response {
-    match owner(&caller) {
-        Ok(owner) => {
-            carried_out(
-                &serving.ctx,
-                Command::PushEndpoints(Asked::Remove { name, owner }),
-            )
-            .await
+    let asked = owner(&caller)
+        .and_then(|owner| crate::revoking::carried_in(&serving.ctx, &body).map(|ctx| (ctx, owner)));
+    match asked {
+        Ok((ctx, owner)) => {
+            carried_out(&ctx, Command::PushEndpoints(Asked::Remove { name, owner })).await
         }
         Err(refused) => *refused,
     }
@@ -122,7 +147,7 @@ async fn removed(
 /// Whose phones this caller reaches: every one for the operator, by a session or by this
 /// run's own token, a member's own for a member session, and the refusal a key is answered
 /// with.
-fn owner(caller: &Caller) -> Result<Option<String>, Box<Response>> {
+pub(crate) fn owner(caller: &Caller) -> Result<Option<String>, Box<Response>> {
     match caller {
         Caller::Operator | Caller::Machine => Ok(None),
         Caller::Member(id) => Ok(Some(id.clone())),
