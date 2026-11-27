@@ -627,6 +627,15 @@ async fn a_curator_the_indexers_app_sync_serves_is_never_told_to_pull_and_is_rep
 /// What the pass tells [`puller`], answering in the Servarr API and filing television,
 /// where the stack's indexer answers `applications` with `synced`.
 async fn pulled_beside_an_indexer_answering(tag: &str, synced: Answer) -> (Vec<Wiring>, Arc<Fake>) {
+    pulled_beside_an_indexer(tag, synced, &[]).await
+}
+
+/// The same, with [`puller`]'s curator filling `filling`.
+async fn pulled_beside_an_indexer(
+    tag: &str,
+    synced: Answer,
+    filling: &[&str],
+) -> (Vec<Wiring>, Arc<Fake>) {
     let project = lemonfiber_fixtures::scratch::Scratch::new(&format!("pulled-{tag}"));
     let http = Fake::by_path(vec![
         (HELD, Answer::reply(200, "[]")),
@@ -642,11 +651,59 @@ async fn pulled_beside_an_indexer_answering(tag: &str, synced: Answer) -> (Vec<W
         Arc::clone(&ctx.seams.confined),
         &[INDEXER.adapter],
     );
-    let fillers = beside_the_puller(&project, servarr_filing("tv"));
+    let mut pulling = puller(servarr_filing("tv"));
+    if let Some(curator) = pulling.services.first_mut() {
+        curator.provides = filling.iter().map(|one| (*one).to_owned()).collect();
+    }
+    let trusted: Vec<crate::plugin::first_party::FirstParty> = crate::plugin::first_party::EMBEDDED
+        .iter()
+        .copied()
+        .chain(crate::test_support::first_party(PULLER))
+        .collect();
+    let installed: Vec<crate::plugin::Installed> =
+        INDEXER.installed().into_iter().chain([pulling]).collect();
+    let fillers = fillers_trusting(vec![indexer()], &installed, &project, &trusted);
     (
         super::super::aggregators::seed_aggregators(&ctx, &fillers).await,
         http,
     )
+}
+
+#[tokio::test]
+async fn a_curator_an_indexer_registers_itself_is_left_to_it_and_said_nothing_of() {
+    let (wirings, http) =
+        pulled_beside_an_indexer("registered", Answer::reply(200, "[]"), &["library.curate"]).await;
+
+    assert!(wirings.is_empty(), "{wirings:?}");
+    assert!(
+        !http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
+}
+
+#[tokio::test]
+async fn a_curator_whose_indexer_cannot_say_whether_it_syncs_is_reported_and_told_nothing() {
+    let (wirings, http) = pulled_beside_an_indexer_answering(
+        "app-sync-refused",
+        Answer::served(
+            500,
+            crate::ports::http::PROBLEM,
+            r#"{"type":"refused","detail":"the indexer refused the read"}"#,
+        ),
+    )
+    .await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if matches!(one.state,
+            crate::seed::State::Failed { .. } | crate::seed::State::Skipped { .. })),
+        "{wirings:?}"
+    );
+    assert!(
+        !http.requests().iter().any(|asked| asked.url.ends_with(ADD)),
+        "{:?}",
+        http.requests()
+    );
 }
 
 #[tokio::test]
