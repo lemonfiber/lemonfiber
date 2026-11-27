@@ -154,7 +154,7 @@ pub fn unclaimed(root: &Path, forms: &[&str], tree: &Path) {
         return;
     };
     step(
-        &core.agreed(&["plugin", "install", &tree.to_string_lossy()]),
+        &core.approved(&["plugin", "install", &tree.to_string_lossy()]),
         "install",
     );
     let seeded = core.run(&["seed"], "");
