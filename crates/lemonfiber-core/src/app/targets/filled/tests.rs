@@ -105,6 +105,14 @@ async fn an_adapter_that_cannot_be_reached_is_asked_nothing_and_nothing_else_is_
     );
 
     assert!(identified(&ctx, &fillers).await.is_none());
+    let named = |capability: &str| {
+        fillers
+            .filling(capability)
+            .map(|(filler, _)| super::named(&fillers, filler))
+    };
+    assert!(named("media.serve").is_some());
+    assert_ne!(named("media.serve"), named("identity.source"));
+
     assert!(served(&ctx, &fillers).await.is_none());
     assert!(fake.request().is_none());
 }
@@ -272,6 +280,11 @@ fn the_shipped_stack_fills_both_of_the_media_servers_capabilities_with_one_servi
 
     assert!(serving.is_some());
     assert_eq!(serving, identifying);
+    assert!(super::filling_serve_named(&ctx, &manifest).is_some());
+    assert_eq!(
+        super::filling_serve_named(&ctx, &manifest),
+        super::server_named(&ctx, &manifest)
+    );
 }
 
 #[tokio::test]

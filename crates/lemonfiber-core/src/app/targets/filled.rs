@@ -72,7 +72,20 @@ pub(crate) fn served_by(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
 pub(crate) fn server_named(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
     let fillers = fillers_here(ctx, manifest);
     let filler = provider(&fillers, serve::CAPABILITY)?;
-    Some(fillers.fronted_by(filler).unwrap_or(filler).name.clone())
+    Some(named(&fillers, filler))
+}
+
+/// What the service [`filling_serve`] asks is called in front of an operator.
+pub(crate) fn filling_serve_named(ctx: &Ctx, manifest: &Manifest) -> Option<String> {
+    let fillers = fillers_here(ctx, manifest);
+    let (filler, _) = fillers.filling(serve::CAPABILITY)?;
+    Some(named(&fillers, filler))
+}
+
+/// What `filler` is called in front of an operator: the service it fronts, where it
+/// fronts one.
+fn named(fillers: &Fillers, filler: &Filler) -> String {
+    fillers.fronted_by(filler).unwrap_or(filler).name.clone()
 }
 
 /// The media server, where it provides `capability`.
