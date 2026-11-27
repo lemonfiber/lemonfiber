@@ -8,6 +8,10 @@
 //!
 //! **The record holds a secret.** `auth` is kept private beside the configuration, and is
 //! never answered with, journaled or printed.
+//!
+//! **So does the address.** Whoever holds the whole address can wake the phone, so once it
+//! is registered no answer carries it: an endpoint is named by the host it reaches and a
+//! fingerprint of the whole, which tells two phones woken through one distributor apart.
 
 pub mod run;
 mod sealing;
@@ -32,6 +36,33 @@ pub const REFUSALS: [Code; 5] = [
     PUSH_KEYS_UNREADABLE,
     PUSH_NOT_REGISTERED,
 ];
+
+/// How many bytes of the SHA-256 of an address its fingerprint is: sixteen hexadecimal
+/// digits.
+const FINGERPRINT_BYTES: usize = 8;
+
+/// The host an address reaches, which is all an answer says of where it is.
+#[must_use]
+pub fn host_of(endpoint: &str) -> String {
+    url::Url::parse(endpoint)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
+/// An address as every answer that names it says it: its host, and its fingerprint
+/// beside it.
+#[must_use]
+pub fn named(host: &str, fingerprint: &str) -> String {
+    format!("{host} ({fingerprint})")
+}
+
+/// The first bytes of the SHA-256 of the whole address, in lower-case hex.
+#[must_use]
+pub fn fingerprint_of(endpoint: &str) -> String {
+    let digest = ring::digest::digest(&ring::digest::SHA256, endpoint.as_bytes());
+    crate::secret::render(digest.as_ref().get(..FINGERPRINT_BYTES).unwrap_or_default())
+}
 
 /// One endpoint as it is kept.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -85,8 +116,10 @@ pub struct Kept {
 pub struct Registered {
     /// The name it was registered under.
     pub name: String,
-    /// The `https` address its distributor gave.
-    pub endpoint: String,
+    /// The host the address its distributor gave reaches.
+    pub host: String,
+    /// The first sixteen lower-case hexadecimal digits of the SHA-256 of that address.
+    pub fingerprint: String,
     /// When it was registered.
     pub registered: crate::instant::Instant,
     /// Whether this was a rehearsal: what registering would come to, with nothing kept.
@@ -99,8 +132,10 @@ pub struct Registered {
 pub struct Listed {
     /// The name it was registered under.
     pub name: String,
-    /// The `https` address its distributor gave.
-    pub endpoint: String,
+    /// The host the address its distributor gave reaches.
+    pub host: String,
+    /// The first sixteen lower-case hexadecimal digits of the SHA-256 of that address.
+    pub fingerprint: String,
     /// When it was registered.
     pub registered: crate::instant::Instant,
 }
@@ -117,11 +152,21 @@ pub struct Listing {
     pub rehearsed: bool,
 }
 
+impl Listed {
+    /// Its address as every answer that names it says it: the host, and the fingerprint
+    /// beside it.
+    #[must_use]
+    pub fn address(&self) -> String {
+        named(&self.host, &self.fingerprint)
+    }
+}
+
 impl From<&Record> for Listed {
     fn from(record: &Record) -> Self {
         Self {
             name: record.name.clone(),
-            endpoint: record.endpoint.clone(),
+            host: host_of(&record.endpoint),
+            fingerprint: fingerprint_of(&record.endpoint),
             registered: record.registered,
         }
     }

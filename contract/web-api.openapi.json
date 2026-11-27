@@ -8655,8 +8655,12 @@
       "ListedPushEndpoint": {
         "description": "One push endpoint as the listing shows it.",
         "properties": {
-          "endpoint": {
-            "description": "The `https` address its distributor gave.",
+          "fingerprint": {
+            "description": "The first sixteen lower-case hexadecimal digits of the SHA-256 of that address.",
+            "type": "string"
+          },
+          "host": {
+            "description": "The host the address its distributor gave reaches.",
             "type": "string"
           },
           "name": {
@@ -8670,7 +8674,8 @@
         },
         "required": [
           "name",
-          "endpoint",
+          "host",
+          "fingerprint",
           "registered"
         ],
         "type": "object"
@@ -15746,8 +15751,12 @@
       "RegisteredPushEndpoint": {
         "description": "A push endpoint registered.",
         "properties": {
-          "endpoint": {
-            "description": "The `https` address its distributor gave.",
+          "fingerprint": {
+            "description": "The first sixteen lower-case hexadecimal digits of the SHA-256 of that address.",
+            "type": "string"
+          },
+          "host": {
+            "description": "The host the address its distributor gave reaches.",
             "type": "string"
           },
           "name": {
@@ -15765,7 +15774,8 @@
         },
         "required": [
           "name",
-          "endpoint",
+          "host",
+          "fingerprint",
           "registered",
           "rehearsed"
         ],

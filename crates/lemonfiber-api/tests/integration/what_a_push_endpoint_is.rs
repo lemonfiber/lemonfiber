@@ -84,6 +84,14 @@ async fn an_endpoint_is_registered_listed_and_removed() {
     .await;
     assert_eq!(read(&listed.body, "/kind"), "push-endpoints");
     assert_eq!(read(&listed.body, "/data/endpoints/0/name"), "pixel");
+    assert_eq!(read(&listed.body, "/data/endpoints/0/host"), "push.example");
+    assert_eq!(
+        read(&listed.body, "/data/endpoints/0/fingerprint"),
+        "f7a263f8786e9f95"
+    );
+    for answer in [&registered.body, &listed.body] {
+        assert!(!answer.contains("push.example/abc"), "{answer}");
+    }
     assert!(!listed.body.contains("auth"), "{}", listed.body);
     assert!(!listed.body.contains("p256dh"), "{}", listed.body);
 

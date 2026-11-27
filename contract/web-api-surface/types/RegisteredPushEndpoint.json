@@ -1,6 +1,12 @@
 {
   "fields": {
-    "endpoint": {
+    "fingerprint": {
+      "type": [
+        "string"
+      ],
+      "required": true
+    },
+    "host": {
       "type": [
         "string"
       ],

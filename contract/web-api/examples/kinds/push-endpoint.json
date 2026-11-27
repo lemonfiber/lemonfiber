@@ -1,7 +1,8 @@
 {
   "api_version": 1,
   "data": {
-    "endpoint": "https://push.example/send/a-phone",
+    "fingerprint": "2fb15b007051cfa9",
+    "host": "push.example",
     "name": "a-phone",
     "registered": 1893456000,
     "rehearsed": false
