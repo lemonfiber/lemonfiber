@@ -354,3 +354,11 @@ async fn a_seed_that_only_says_what_it_would_do_or_cannot_read_its_record_runs_n
     );
     assert_eq!(asked(&held, FURNISHED), 0);
 }
+
+#[tokio::test]
+async fn a_seed_whose_record_of_what_is_installed_will_not_read_runs_no_claim_recipe() {
+    let ctx = ctx("claim-recipe-unread");
+    let _ = std::fs::write(record_of(&ctx), "not a record");
+
+    assert!(seeded(&ctx).await.is_empty());
+}
