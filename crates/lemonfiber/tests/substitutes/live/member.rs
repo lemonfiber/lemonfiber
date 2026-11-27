@@ -40,7 +40,8 @@ impl Drop for Served {
 }
 
 impl Served {
-    /// The web surface of `core`, served on a free loopback port.
+    /// The web surface of `core`, served on a free loopback port, with nothing it prints
+    /// on standard output, where it names the run's token, printed.
     ///
     /// # Errors
     ///
@@ -54,7 +55,7 @@ impl Served {
             .args(core.dirs())
             .args(["ui", "--no-browser", "--port", &port.to_string()])
             .stdin(Stdio::null())
-            .stdout(Stdio::inherit())
+            .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
             .map_err(|why| why.to_string())?;

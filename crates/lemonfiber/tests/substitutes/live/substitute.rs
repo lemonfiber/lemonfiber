@@ -2,7 +2,7 @@
 //! one in its place: installed from what this build offers, chosen to fill the capability,
 //! and given the settings it is asked with.
 
-use super::core::{Core, Ran};
+use super::core::{Core, Ran, WITHHELD};
 
 /// What every download capability is named under.
 const DOWNLOADS: &str = "download.";
@@ -10,8 +10,9 @@ const DOWNLOADS: &str = "download.";
 /// Why the arm chooses the substitute, as the choice records it.
 const BECAUSE: &str = "the substitutes arm proves it stands in";
 
-/// A substitute put in place of the bundle's choice.
-#[derive(Debug, Clone)]
+/// A substitute put in place of the bundle's choice, debugged with each setting's value
+/// withheld.
+#[derive(Clone)]
 pub struct Substitution {
     /// The substitute's `[plugin].id`.
     pub plugin: String,
@@ -21,6 +22,22 @@ pub struct Substitution {
     pub stands_in_for: String,
     /// Each setting it is given, as `config set` names it, with its value.
     pub settings: Vec<(String, String)>,
+}
+
+impl std::fmt::Debug for Substitution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let settings: Vec<(&str, &str)> = self
+            .settings
+            .iter()
+            .map(|(setting, _)| (setting.as_str(), WITHHELD))
+            .collect();
+        f.debug_struct("Substitution")
+            .field("plugin", &self.plugin)
+            .field("capability", &self.capability)
+            .field("stands_in_for", &self.stands_in_for)
+            .field("settings", &settings)
+            .finish()
+    }
 }
 
 impl Substitution {

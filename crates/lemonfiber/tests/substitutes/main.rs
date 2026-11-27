@@ -7,6 +7,7 @@
 //! checkout to what the arm says the substitute is.
 
 mod live;
+mod withheld;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -32,6 +33,9 @@ const DOWNLOADS: [(&str, &live::Downloads); 2] = [
     ("download.usenet", &live::USENET),
     ("download.torrent", &live::TORRENT),
 ];
+
+/// The workflow that runs every arm, from the workspace's root.
+const WORKFLOW: &str = ".github/workflows/substitutes.yml";
 
 /// The capability whose substitute may run unclaimed.
 const CLAIMABLE: &str = "media.serve";
@@ -342,7 +346,7 @@ fn the_arm_the_job_runs_is_the_substitute_its_checkout_holds() {
 #[test]
 fn the_workflow_runs_one_job_for_every_arm_and_no_other() {
     let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    let written = std::fs::read_to_string(root().join(".github/workflows/substitutes.yml"));
+    let written = std::fs::read_to_string(root().join(WORKFLOW));
     assert!(pinned.is_ok() && written.is_ok(), "{pinned:?} {written:?}");
     let (Ok(pinned), Ok(written)) = (pinned, written) else {
         return;
