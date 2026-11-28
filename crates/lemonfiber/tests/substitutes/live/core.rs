@@ -5,6 +5,7 @@ use std::ffi::OsStr;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
 use lemonfiber_core::model::kind;
 
@@ -24,6 +25,29 @@ const OFFERS: [&str; 2] = ["offer", "agreement"];
 
 /// The key a reading names a value it lists for approval as itself under.
 const APPROVAL: &str = "approval";
+
+/// What the container engine prints before the wait a registry that refused a pull for
+/// its rate limit asks for.
+const RATE_LIMITED: &str = "error from registry: retry-after:";
+
+/// How long before each run again of a step a registry refused a pull for its rate limit,
+/// where the registry asks for no longer.
+const THROTTLED: [Duration; 3] = [
+    Duration::from_secs(30),
+    Duration::from_secs(60),
+    Duration::from_secs(120),
+];
+
+/// Each unit the container engine writes a wait in, with how many seconds it is.
+const UNITS: [(&str, f64); 7] = [
+    ("ns", 1e-9),
+    ("µs", 1e-6),
+    ("us", 1e-6),
+    ("ms", 1e-3),
+    ("s", 1.0),
+    ("m", 60.0),
+    ("h", 3600.0),
+];
 
 /// One lemonfiber, kept beneath a directory of its own.
 pub struct Core {
@@ -155,12 +179,33 @@ impl Core {
         })
     }
 
-    /// Run `args`, and where it names an offer, run it again answering that offer with
-    /// each value `approving` reads from the reading approved.
+    /// [`Self::answering`], run again after each of [`THROTTLED`], or the longer wait the
+    /// registry asks for, while a registry refuses a pull it makes for its rate limit.
     fn answered(
         &self,
         args: &[&str],
-        approving: impl FnOnce(&serde_json::Value) -> Vec<String>,
+        approving: impl Fn(&serde_json::Value) -> Vec<String>,
+    ) -> Ran {
+        let mut ran = self.answering(args, &approving);
+        for step in THROTTLED {
+            if ran.succeeded {
+                break;
+            }
+            let Some(asked) = throttled(&ran.printed) else {
+                break;
+            };
+            std::thread::sleep(step.max(asked));
+            ran = self.answering(args, &approving);
+        }
+        ran
+    }
+
+    /// Run `args`, and where it names an offer, run it again answering that offer with
+    /// each value `approving` reads from the reading approved.
+    fn answering(
+        &self,
+        args: &[&str],
+        approving: &impl Fn(&serde_json::Value) -> Vec<String>,
     ) -> Ran {
         let read = self.run(args, "");
         let Some(offer) = offer_in(&read.said) else {
@@ -176,6 +221,21 @@ impl Core {
         );
         self.run(&answered, "")
     }
+}
+
+/// The wait a registry that refused a pull for its rate limit in `printed` asked for,
+/// nothing where none refused one, and no wait where it named one in no unit of [`UNITS`].
+fn throttled(printed: &str) -> Option<Duration> {
+    let (_, after) = printed.split_once(RATE_LIMITED)?;
+    Some(wait(after.trim_start()).unwrap_or(Duration::ZERO))
+}
+
+/// The wait `said` starts with, written as the container engine writes one.
+fn wait(said: &str) -> Option<Duration> {
+    let said = said.split([',', ' ', '"', '\\']).next()?;
+    let (amount, unit) = said.split_at(said.find(|c: char| !(c.is_ascii_digit() || c == '.'))?);
+    let seconds = UNITS.iter().find(|(named, _)| *named == unit)?.1;
+    Duration::try_from_secs_f64(amount.parse::<f64>().ok()? * seconds).ok()
 }
 
 /// `printed`, with each of `withheld` written as [`WITHHELD`], as it is and as JSON
@@ -258,4 +318,25 @@ pub fn strings_under(said: &serde_json::Value, key: &str) -> Vec<String> {
             .collect(),
         _ => Vec::new(),
     }
+}
+
+#[test]
+fn a_pull_a_registry_refused_for_its_rate_limit_is_waited_for_as_long_as_it_asks() {
+    let printed = r#"{"detail":"Image x Pulled \nerror from registry: retry-after: 871.419µs, allowed: 44000/minute","cause":null}"#;
+    let asked = throttled(printed);
+    assert!(
+        asked.is_some_and(
+            |asked| asked > Duration::from_micros(871) && asked < Duration::from_micros(872)
+        ),
+        "{asked:?}"
+    );
+    assert_eq!(
+        throttled("error from registry: retry-after: 2s, allowed: 44000/minute"),
+        Some(Duration::from_secs(2))
+    );
+    assert_eq!(
+        throttled("error from registry: retry-after: 1m30s, allowed: 44000/minute"),
+        Some(Duration::ZERO)
+    );
+    assert_eq!(throttled("error from registry: manifest unknown"), None);
 }

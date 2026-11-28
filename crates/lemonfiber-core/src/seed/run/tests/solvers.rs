@@ -285,3 +285,54 @@ async fn a_solver_asked_over_no_contract_is_told_without_waiting() {
     );
     assert_eq!(asked_whether(&http.requests()), 0);
 }
+
+/// The moved indexer answering what it holds with each of `holding` in turn, the last
+/// repeating, and an added solver with `added`, beside a solver that answers.
+fn holding_in_turn(holding: Vec<Answer>, added: Answer) -> Arc<Fake> {
+    Fake::by_path_in_turn(vec![
+        (searching("proxies"), holding),
+        (searching("add_proxy"), vec![added]),
+        (answers(), vec![answered(&true)]),
+    ])
+}
+
+/// An indexer that did not answer being told about the solver is still trying it, so it is
+/// read until it holds the solver, reported wired, and never told about it again.
+#[tokio::test(start_paused = true)]
+async fn an_indexer_that_did_not_answer_being_told_is_read_until_it_holds_the_solver() {
+    let none: &[KnownSolver] = &[];
+    let http = holding_in_turn(
+        vec![
+            answered(&none),
+            answered(&none),
+            answered(&[known(AT, &["lemonfiber-solver"])]),
+        ],
+        unavailable(),
+    );
+
+    let wirings = told("solvers-trying", http.clone(), false).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == State::Wired),
+        "{wirings:?}"
+    );
+    assert_eq!(added(&http.requests()), vec![the_solver()]);
+}
+
+/// An indexer that did not answer being told about the solver and never comes to hold it
+/// is reported not answering, so a later pass tells it again, and it is told once here.
+#[tokio::test(start_paused = true)]
+async fn an_indexer_that_never_holds_a_solver_it_did_not_answer_for_is_not_answering() {
+    let none: &[KnownSolver] = &[];
+    let http = holding_in_turn(vec![answered(&none)], unavailable());
+
+    let wirings = told("solvers-never-held", http.clone(), false).await;
+
+    assert!(
+        matches!(wirings.as_slice(), [one] if one.state == State::Skipped {
+            reason: crate::seed::NOT_ANSWERING.to_owned(),
+        }),
+        "{wirings:?}"
+    );
+    assert_eq!(added(&http.requests()), vec![the_solver()]);
+}
