@@ -30,7 +30,8 @@ pub use conforming::Violation;
 pub use declining::declined;
 pub use error::Failure;
 pub use refusing::{
-    names_a_header_by_substitution, names_a_path_not_plain, outside, refusals, uninstallable,
+    claims_for_nobody, names_a_header_by_substitution, names_a_path_not_plain, outside, refusals,
+    uninstallable,
 };
 pub use schema::{
     Ask, Bind, BuiltOn, Capture, Claim, ClaimProbe, Condition, Contribution, Criticality,

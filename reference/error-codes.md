@@ -394,6 +394,7 @@ that it is a fault of the stack.
 | `PLUGIN-50` | `UNCONFORMING` | error | 1 | 400 | 0.18.0 | Raised when a case of a contract a plugin's adapter speaks fails, or no recording the plugin ships answers it. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `PLUGIN-51` | `KEY_UNREADABLE` | error | 1 | 400 | 0.18.0 | Raised when a key an author names to verify a plugin's images against cannot be read, or is not a PEM public key on the P-256 curve. | A fault of the stack: not working right now, with whoever runs the house told. |
 | `PLUGIN-52` | `UNDECLARED_FORM` | error | 1 | 400 | 0.18.0 | Raised when a plugin's manifest names a form the stack does not declare. | A fault of the stack: not working right now, with whoever runs the house told. |
+| `PLUGIN-53` | `UNCLAIMED_RECIPE` | error | 1 | 400 | 0.18.0 | Raised when a recipe runs on claim in a plugin none of whose services speaks `owner.claim@1`; the manifest's every other fault is listed beside it. | A fault of the stack: not working right now, with whoever runs the house told. |
 
 ## `PROC` — the program underneath
 

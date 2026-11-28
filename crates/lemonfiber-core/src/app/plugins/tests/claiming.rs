@@ -3,9 +3,9 @@
 //! approvals, once per install or update, and again at the next seed where one did not
 //! hold.
 
-use super::speaking::{about, claiming, coded, declares, UNKEYED, UPSTREAM};
+use super::speaking::{about, claiming, coded, declares, speaking, UNKEYED, UPSTREAM};
 use super::*;
-use crate::error::codes::plugin::STEP_FAILED;
+use crate::error::codes::plugin::{STEP_FAILED, UNCLAIMED_RECIPE};
 use crate::ports::docker::{Health, Lifecycle};
 use crate::seed::{State, Wiring};
 use lemonfiber_fixtures::http::Answer;
@@ -361,4 +361,68 @@ async fn a_seed_whose_record_of_what_is_installed_will_not_read_runs_no_claim_re
     let _ = std::fs::write(record_of(&ctx), "not a record");
 
     assert!(seeded(&ctx).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_claim_recipe_in_a_plugin_none_of_whose_services_claims_is_refused_at_validation() {
+    let http = answering_claims(&["", "ours"], "ours", 200);
+    let ctx = claimed_over("claim-recipe-unclaimed", &http);
+
+    let refused = installing(
+        &ctx,
+        &source("claim-unclaimed", &format!("{}{FURNISH}", speaking())),
+    )
+    .await
+    .err();
+
+    assert_eq!(refused.as_ref().map(|one| one.code), Some(UNCLAIMED_RECIPE));
+    let detail = refused.and_then(|one| one.detail).unwrap_or_default();
+    assert!(
+        detail.contains("recipe furnish.on: runs on claim"),
+        "{detail}"
+    );
+    assert_eq!(
+        counted(reading(&ctx).await),
+        Some(0),
+        "nothing is installed"
+    );
+    assert_eq!(asked(&http, FURNISHED), 0);
+}
+
+#[tokio::test]
+async fn a_claim_recipe_that_held_over_an_unreadable_record_runs_again_in_the_seed_adopt_makes() {
+    let http = answering_claims(&["", "ours", "ours"], "ours", 200);
+    let ctx = claimed_over("claim-recipe-adopted", &http);
+    let _ = std::fs::write(baseline_of(&ctx), "not a baseline");
+
+    let installed = report(
+        installing(
+            &ctx,
+            &source("claim-adopted", &format!("{}{FURNISH}", claiming())),
+        )
+        .await,
+    );
+    assert_eq!(claim_recipes(installed), [("furnish".to_owned(), true)]);
+    assert_eq!(
+        read(&baseline_of(&ctx)),
+        "not a baseline",
+        "that it held is not recorded"
+    );
+
+    let said = match crate::app::dispatch(crate::app::Command::Adopt, &ctx).await {
+        Ok(crate::app::Outcome::Seed(report)) => report.wirings,
+        _ => Vec::new(),
+    };
+    assert!(
+        said.iter()
+            .any(|wiring| wiring.connection == "komga's furnish recipe"
+                && wiring.state == State::Wired),
+        "{said:?}"
+    );
+    assert_eq!(asked(&http, FURNISHED), 2, "it ran once more");
+    assert!(
+        seeded(&ctx).await.is_empty(),
+        "and once recorded it does not run again"
+    );
+    assert_eq!(asked(&http, FURNISHED), 2);
 }

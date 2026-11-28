@@ -55,7 +55,9 @@ mod starting;
 mod stopping;
 
 pub use installing::uninstallable;
-pub use recipes::{names_a_header_by_substitution, names_a_path_not_plain, outside};
+pub use recipes::{
+    claims_for_nobody, names_a_header_by_substitution, names_a_path_not_plain, outside,
+};
 
 use std::collections::BTreeSet;
 
