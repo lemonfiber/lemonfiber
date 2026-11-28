@@ -8,14 +8,28 @@
 //! fetch through a solver of that API is left unpaired. The indexer tries a solver it is
 //! told about at once, so a solver asked over `indexer.proxy` is given until it answers,
 //! as a service coming up from its first start is, before the indexer is told about it.
+//! An indexer told about a solver holds it only once its own try of the solver is done,
+//! and a try that outlasts the call leaves the call unanswered, so an indexer that did not
+//! answer being told is read until it holds the solver rather than told again.
+
+use std::time::Duration;
 
 use lemonfiber_contract::capabilities::indexer::{proxy, search, SOLVER_TAG};
 
 use super::connecting::{pairings, Connection};
 use super::Ctx;
 use crate::app::targets::{spoken, Spoken};
-use crate::ports::service::{Failure, Protocol, SolverAt, Solvers as _, Solving as _};
+use crate::patience::Patience;
+use crate::ports::service::{Failure, KnownSolver, Protocol, SolverAt, Solvers as _, Solving as _};
 use crate::wiring::{Filler, Fillers};
+
+/// How long an indexer that did not answer being told about a solver is read until it
+/// holds it: past its own try of the solver, whose first answer waits on the solver's
+/// browser starting.
+const HOLDING: Patience = Patience {
+    between: Duration::from_secs(5),
+    asks: 24,
+};
 
 /// What this connection is called where it is reported.
 fn connection(solver: &str, indexer: &str) -> String {
@@ -103,10 +117,7 @@ async fn told(
         Ok(held) => held,
         Err(failure) => return unreached(asker, solver, &failure),
     };
-    if held
-        .iter()
-        .any(|known| known.url == solver.url && known.tags.contains(&solver.tag))
-    {
+    if holds(&held, solver) {
         return crate::seed::State::AlreadyWired;
     }
     if rehearsing {
@@ -117,7 +128,34 @@ async fn told(
     }
     match indexer.add_proxy(solver).await {
         Ok(()) => crate::seed::State::Wired,
+        Err(failure @ Failure::Unavailable { .. }) => {
+            held_later(indexer, asker, solver, &failure).await
+        }
         Err(failure) => unreached(asker, solver, &failure),
+    }
+}
+
+/// Whether `held` lists a solver at the address of `solver` under its tag.
+fn holds(held: &[KnownSolver], solver: &SolverAt) -> bool {
+    held.iter()
+        .any(|known| known.url == solver.url && known.tags.contains(&solver.tag))
+}
+
+/// What an indexer that did not answer being told about `solver` comes to: wired once it
+/// holds the solver, read as [`HOLDING`] allows, and `failure` where it never does.
+async fn held_later(
+    indexer: &search::Adapter,
+    asker: &str,
+    solver: &SolverAt,
+    failure: &Failure,
+) -> crate::seed::State {
+    let listing = |read: &Result<Vec<KnownSolver>, Failure>| {
+        read.as_ref().is_ok_and(|held| holds(held, solver))
+    };
+    if listing(&HOLDING.until(|| indexer.proxies(), listing).await) {
+        crate::seed::State::Wired
+    } else {
+        unreached(asker, solver, failure)
     }
 }
 
