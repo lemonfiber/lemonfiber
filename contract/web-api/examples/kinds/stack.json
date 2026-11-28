@@ -29,10 +29,6 @@
       },
       {
         "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
-        "part": "lidarr"
-      },
-      {
-        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
         "part": "navidrome"
       },
       {
@@ -46,6 +42,10 @@
       {
         "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
         "part": "bindery"
+      },
+      {
+        "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",
+        "part": "lidarr"
       },
       {
         "because": "lemonfiber installs it from this build before the stack first starts, and plain Compose installs nothing",

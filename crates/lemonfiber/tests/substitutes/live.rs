@@ -110,8 +110,12 @@ const GRABBED: [&str; 6] = [
 /// How often a wait looks again.
 const LOOKING: Duration = Duration::from_secs(15);
 
-/// The size of a film's or a series' release, which its curator takes.
-const VIDEO: u64 = 1_073_741_824;
+/// The size of a film's release, which its curator takes.
+const FILM: u64 = 1_073_741_824;
+
+/// The size of a season's release, above the least its curator takes for a 1080p Blu-ray of
+/// ten hour-long episodes.
+const SEASON: u64 = 4_294_967_296;
 
 /// The size of an album's release, which its curator takes.
 const ALBUM: u64 = 314_572_800;
@@ -169,7 +173,7 @@ pub const ASKED: [Asked; 4] = [
         traced: "Big Buck Bunny",
         release: "Big.Buck.Bunny.2008.1080p.BluRay.x264-LEMONFIBER",
         category: "2000",
-        size: VIDEO,
+        size: FILM,
     },
     Asked {
         media: "tv",
@@ -180,7 +184,7 @@ pub const ASKED: [Asked; 4] = [
         traced: "Game of Thrones",
         release: "Game.of.Thrones.S01.1080p.BluRay.x264-LEMONFIBER",
         category: "5000",
-        size: VIDEO,
+        size: SEASON,
     },
     Asked {
         media: "music",

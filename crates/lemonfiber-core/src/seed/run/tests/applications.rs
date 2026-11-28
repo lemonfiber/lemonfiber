@@ -442,7 +442,12 @@ async fn an_indexer_on_no_address_is_told_about_nobody() {
         &beside_the_bundle(&first_party("indexing")),
     );
 
-    let paired = super::super::connecting::pairings(&fillers).len();
+    let paired = super::super::connecting::pairings(&fillers)
+        .iter()
+        .filter(|pairing| {
+            pairing.ask.capability == lemonfiber_contract::capabilities::library::curate::CAPABILITY
+        })
+        .count();
     let wirings = super::super::seed_applications(&ctx, &fillers).await;
 
     assert_eq!(paired, 1);
@@ -510,8 +515,9 @@ fn an_indexer_granted_a_plugin_curators_key_is_never_registered_it() {
 }
 
 /// A plugin's indexer granted a moved curator's key is never registered the curator either,
-/// since the indexer would hand the curator its own key: the pair is said, naming the
-/// indexer as the plugin's.
+/// since the indexer would hand the curator its own key, and the curator pulling from it is
+/// never handed the indexer's: the pair is said from both ends, naming the indexer as the
+/// plugin's.
 #[test]
 fn a_plugin_indexer_granted_a_moved_curators_key_is_never_registered_it() {
     let indexing = asking_every_curator(contracted("indexing", "finder", "indexer.search"));
@@ -526,11 +532,22 @@ fn a_plugin_indexer_granted_a_moved_curators_key_is_never_registered_it() {
         "sonarr",
     );
 
+    let reasons: Vec<(&str, &str)> = said
+        .iter()
+        .filter_map(|wiring| match &wiring.state {
+            crate::seed::State::Unmatched { reason } => {
+                Some((wiring.connection.as_str(), reason.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
     assert!(
-        matches!(said.as_slice(), [wiring]
-            if wiring.connection == "Sonarr into finder the stand-in"
-                && matches!(&wiring.state, crate::seed::State::Unmatched { reason }
-                    if reason.contains("finder the stand-in is a third-party plugin's service"))),
+        matches!(reasons.as_slice(), [(pulled, unhanded), (registered, withheld)]
+            if *registered == "Sonarr into finder the stand-in"
+                && withheld.contains("finder the stand-in is a third-party plugin's service")
+                && *pulled == "finder the stand-in into Sonarr"
+                && unhanded.contains("is a third-party plugin's service, whose credential is \
+                    handed only to the stack's own services")),
         "{said:?}"
     );
 }
