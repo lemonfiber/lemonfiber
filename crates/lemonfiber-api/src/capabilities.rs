@@ -21,8 +21,6 @@ use std::collections::BTreeMap;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::routing::get;
-use axum::Router;
 use lemonfiber_core::app::standing::StackStanding;
 use lemonfiber_core::app::{Command, Ctx};
 use lemonfiber_core::keys::Scope as KeyScope;
@@ -37,6 +35,7 @@ use crate::read::enveloped;
 use crate::read::published::{Ruled, BESIDE};
 use crate::read::table::{self, Wanted};
 use crate::router::Serving;
+use crate::routing::Serves;
 use crate::serve::operator_only;
 
 /// Where what this stack can do is read.
@@ -107,14 +106,14 @@ pub struct Capabilities {
 }
 
 /// The route the capabilities are read at.
-pub fn routes() -> Router<Serving> {
-    Router::new().route(
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    Serves::new().get(
         CAPABILITIES,
-        get(
-            |State(serving): State<Serving>, caller: Caller| async move {
-                answered(&serving.ctx, &caller).await
-            },
-        ),
+        |State(serving): State<Serving>, caller: Caller| async move {
+            answered(&serving.ctx, &caller).await
+        },
+        &[ANSWERED_UNDER],
     )
 }
 
@@ -160,6 +159,18 @@ pub fn declared(standing: &StackStanding, caller: &Caller) -> Capabilities {
         })
         .collect();
     capabilities.extend(beside);
+    capabilities.extend(
+        crate::revoking::permitted(caller)
+            .into_iter()
+            .map(|(path, permitted)| {
+                let standing = if permitted {
+                    Standing::Available
+                } else {
+                    Standing::Unpermitted
+                };
+                (path.to_owned(), standing)
+            }),
+    );
     Capabilities {
         stack: standing.stack.clone(),
         scope: Scope::of(caller),

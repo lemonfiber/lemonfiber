@@ -30,6 +30,7 @@ mod what_a_push_endpoint_is;
 mod what_a_read_answers;
 mod what_a_read_refuses;
 mod what_a_rehearsal_answers;
+mod what_a_rehearsed_revocation_answers;
 mod what_a_repair_action_means;
 mod what_a_request_meets;
 mod what_a_running_copy_answers;

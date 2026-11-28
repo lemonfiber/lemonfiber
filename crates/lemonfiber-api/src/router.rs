@@ -27,6 +27,7 @@ use crate::guard::{Arrived, Binding, Presented, Token, TOKEN_HEADER};
 use crate::jobs::Jobs;
 use crate::read::kept::Kept;
 use crate::refusal::Refusal;
+use crate::routing::{Route, Serves};
 use crate::serve::admitted;
 use crate::spoken::{for_audience, Audience};
 
@@ -132,8 +133,19 @@ impl Serving {
 /// change. The other half of the guard still applies to it, and a test holds the
 /// whole surface to exactly one path being reachable without a token.
 pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
-    let endpoints = Router::new()
-        .merge(crate::read::routes())
+    let endpoints = endpoints()
+        .with_state(serving.clone())
+        .merge(crate::events::routes(streaming))
+        // Set after every route is merged, because it reaches only the routes already
+        // declared: a path this surface answers, asked with a method it does not, is a
+        // refusal like any other and carries its code rather than an empty body.
+        .method_not_allowed_fallback(|| async { Refusal::WrongMethod.answered() });
+    endpoints.layer(middleware::from_fn_with_state(serving, guarded))
+}
+
+/// Every endpoint but the stream, each routed and listed by the one declaration.
+fn endpoints() -> Serves<Serving> {
+    crate::read::routes()
         .merge(crate::actions::routes())
         .merge(crate::jobs::routes())
         .merge(crate::setup::routes())
@@ -143,13 +155,21 @@ pub fn routes(serving: Serving, streaming: Arc<Streaming>) -> Router {
         .merge(crate::push_endpoints::routes())
         .merge(crate::notify_events::routes())
         .merge(crate::capabilities::routes())
-        .with_state(serving.clone())
-        .merge(crate::events::routes(streaming))
-        // Set after every route is merged, because it reaches only the routes already
-        // declared: a path this surface answers, asked with a method it does not, is a
-        // refusal like any other and carries its code rather than an empty body.
-        .method_not_allowed_fallback(|| async { Refusal::WrongMethod.answered() });
-    endpoints.layer(middleware::from_fn_with_state(serving, guarded))
+}
+
+/// Every route [`routes`] serves, the stream's included, by path and then by method.
+#[must_use]
+pub fn served() -> Vec<Route> {
+    let mut every: Vec<Route> = endpoints()
+        .routes()
+        .iter()
+        .chain(crate::events::served().routes())
+        .cloned()
+        .collect();
+    every.sort_by(|one, other| {
+        (one.path, one.method.as_str()).cmp(&(other.path, other.method.as_str()))
+    });
+    every
 }
 
 /// The paths that open without a credential: the sign-in door, where a caller holding a

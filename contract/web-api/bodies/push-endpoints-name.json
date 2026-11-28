@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Revoking",
+  "description": "The body a revocation takes.",
+  "type": "object",
+  "properties": {
+    "dry_run": {
+      "description": "Whether to answer with what revoking would come to, and revoke nothing.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

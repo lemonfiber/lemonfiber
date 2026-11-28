@@ -15,9 +15,9 @@
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 
+use axum::body::Bytes;
 use axum::response::Response;
-use axum::routing::{delete, get, post};
-use axum::{Extension, Json, Router};
+use axum::{Extension, Json};
 use lemonfiber_core::app::Command;
 use lemonfiber_core::device_keys::run::Asked;
 use lemonfiber_core::device_keys::Attestation;
@@ -28,6 +28,7 @@ use crate::guard::{Arrived, Presented};
 use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// Where device keys are listed and registered.
 pub const DEVICE_KEYS: &str = "/api/device-keys";
@@ -70,12 +71,38 @@ pub(crate) fn body() -> (&'static str, schemars::Schema) {
     (DEVICE_KEYS, schemars::schema_for!(Registering))
 }
 
-/// The four routes device keys are kept through.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(DEVICE_KEYS, get(listed).post(registered))
-        .route(A_DEVICE_KEY, delete(revoked))
-        .route(CHALLENGE, post(challenged))
+/// The four routes device keys are kept through, each answering as the command it
+/// reaches does.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let registering = Asked::Register {
+        name: String::new(),
+        public_key: String::new(),
+        attestation: None,
+        from: None,
+    };
+    let challenging = Asked::Challenge {
+        name: String::new(),
+        session: String::new(),
+    };
+    let answered = |asked| Command::DeviceKeys(asked).answered_under();
+    Serves::new()
+        .get(DEVICE_KEYS, listed, answered(Asked::List))
+        .post(DEVICE_KEYS, registered, Taking::Body, answered(registering))
+        .delete(
+            A_DEVICE_KEY,
+            revoked,
+            Taking::Body,
+            answered(Asked::Revoke {
+                name: String::new(),
+            }),
+        )
+        .post(
+            CHALLENGE,
+            challenged,
+            Taking::Nothing,
+            answered(challenging),
+        )
 }
 
 /// Every device key.
@@ -113,16 +140,19 @@ async fn registered(
     carried_out(&ctx, Command::DeviceKeys(asked)).await
 }
 
-/// A device key revoked, by its name, and every challenge standing for it spent.
+/// A device key revoked, by its name, and every challenge standing for it spent, or that
+/// revocation rehearsed where the body asks for it.
 async fn revoked(
     State(serving): State<Serving>,
     caller: Caller,
     Path(name): Path<String>,
+    body: Bytes,
 ) -> Response {
-    if let Err(refused) = operator(&caller) {
-        return *refused;
+    let asked = operator(&caller).and_then(|()| crate::revoking::carried_in(&serving.ctx, &body));
+    match asked {
+        Ok(ctx) => carried_out(&ctx, Command::DeviceKeys(Asked::Revoke { name })).await,
+        Err(refused) => *refused,
     }
-    carried_out(&serving.ctx, Command::DeviceKeys(Asked::Revoke { name })).await
 }
 
 /// A challenge for one registered device key, bound to the token that asked.

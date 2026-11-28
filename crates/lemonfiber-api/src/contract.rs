@@ -76,6 +76,7 @@ use crate::jobs::started::Started;
 
 use crate::read::published::{self, Read};
 use crate::refusal::Refusal;
+use crate::routing::Route;
 use lemonfiber_core::app::rehearsal::Rehearsal;
 use lemonfiber_core::logs::Line as LogLine;
 use lemonfiber_core::news::Newest;
@@ -124,6 +125,13 @@ pub struct Contract {
     /// a document is asked for rather than a document, and a client generating a
     /// method per read reads this before it asks anything.
     pub reads: Vec<Read>,
+    /// Every route the surface serves, by its method and its path, with whether it takes
+    /// a body and the kinds it answers with.
+    ///
+    /// Beside the reads rather than in place of them: a read's parameters and whether it
+    /// answers with a file are said there, and a revocation, a job or a step of setup is
+    /// no read.
+    pub routes: Vec<Route>,
     /// Every code a refusal may carry, to what the registry says of it.
     ///
     /// Beside the kinds rather than inside one, because a refusal is the `error` kind
@@ -229,6 +237,7 @@ impl Contract {
             key_callable: key_callable(),
             kinds,
             reads: published::every(),
+            routes: crate::router::served(),
             refusals: refusals(),
             examples: example::Examples::default(),
             household_words: None,
@@ -354,6 +363,7 @@ fn refusals() -> BTreeMap<String, Listed> {
 fn bodies() -> BTreeMap<String, Schema> {
     crate::setup::bodies()
         .into_iter()
+        .chain(crate::revoking::bodies())
         .chain([
             crate::keys::body(),
             crate::keys::collecting_body(),

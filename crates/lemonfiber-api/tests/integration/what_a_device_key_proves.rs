@@ -296,6 +296,31 @@ async fn a_challenge_issued_before_its_device_key_was_revoked_proves_nothing() {
 }
 
 #[tokio::test]
+async fn a_rehearsed_revocation_leaves_the_device_key_proving() {
+    let phone = a_phone();
+    let (router, token, _) = a_machine("revoke-rehearsed", Some(&phone));
+    let (rehearsal, _) = sent(
+        router.clone(),
+        "DELETE",
+        "/api/device-keys/pixel",
+        &token,
+        Some((HERE, false)),
+        r#"{"dry_run":true}"#,
+    )
+    .await;
+    assert_eq!(rehearsal.status, StatusCode::OK, "{}", rehearsal.body);
+    assert_eq!(read(&rehearsal.body, "/kind"), "device-keys");
+    assert!(
+        rehearsal.body.contains(r#""rehearsed":true"#),
+        "{}",
+        rehearsal.body
+    );
+    let issued = challenge(&router, &token).await;
+    let body = proved_mint("ha", &issued, &signed_for(&phone, "ha", &issued));
+    assert_eq!(minting(&router, &token, &body).await.status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn a_password_changed_elsewhere_cuts_off_a_challenge_already_issued() {
     let phone = a_phone();
     let (router, token, env, admission) = a_machine_keeping("password-between", Some(&phone));

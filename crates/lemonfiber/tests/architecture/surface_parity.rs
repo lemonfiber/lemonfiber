@@ -59,9 +59,6 @@ use lemonfiber_api::actions::OFFERED;
 /// The table, relative to this crate.
 const TABLE: &str = "../../.docs/architecture/surface-parity.md";
 
-/// Where the web surface declares the routes it serves.
-const API: &str = "../lemonfiber-api/src";
-
 /// The heading the parity table sits under.
 const HEADING: &str = "## The table";
 
@@ -221,26 +218,6 @@ fn requests() -> BTreeSet<String> {
         .map(|command| command.get_name().to_owned())
         .filter(|name| name != "help")
         .collect()
-}
-
-/// Every `.rs` file the web surface is declared in, read as one text.
-fn api() -> String {
-    let mut read = String::new();
-    let mut looking = vec![std::path::PathBuf::from(API)];
-    while let Some(here) = looking.pop() {
-        let Ok(entries) = fs::read_dir(&here) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                looking.push(path);
-            } else if path.extension().is_some_and(|ext| ext == "rs") {
-                read.push_str(&fs::read_to_string(&path).unwrap_or_default());
-            }
-        }
-    }
-    read
 }
 
 /// Every request has exactly one row, and every row names a request.
@@ -552,79 +529,17 @@ fn every_route_declared_as_answering_none_is_one_the_web_still_serves() {
     );
 }
 
-/// Every path the web surface routes, read from the calls that declare them.
+/// Every path the web surface routes, as the router lists the routes it serves.
 ///
-/// A route is declared either with its path written out or with the constant that
-/// holds it, so both are read. Only the literals matter in the end — a constant is
-/// resolved against the same text, which is the only place a path can be written.
-///
-/// A route this cannot read is **reported**, never skipped. Dropped quietly it
-/// would leave the tests below passing about a route they cannot see, which is the
-/// one way this whole file could be green and wrong; the Python gate over the same
-/// declarations refuses one for the same reason, and this agrees with it rather
-/// than being the softer of the two.
+/// Read from the list the routes are declared into rather than from their source: the
+/// router and the contract's `routes` are built by the same declarations, so a route
+/// the surface serves is a path here, and the crate's own test refuses a route declared
+/// any other way.
 fn served() -> BTreeSet<String> {
-    let (paths, unreadable) = routing();
-    assert!(
-        unreadable.is_empty(),
-        "these route calls declare a path this cannot read, so nothing below holds \
-         them to anything — write the path out, or hold it in a `const` in the same \
-         crate: {unreadable:?}"
-    );
-    paths
-}
-
-/// The paths, and the route calls whose path could not be read.
-fn routing() -> (BTreeSet<String>, Vec<String>) {
-    let source = api();
-    let mut paths: BTreeSet<String> = lemonfiber_api::read::table::OFFERED
-        .iter()
-        .map(|path| (*path).to_owned())
-        .collect();
-    let mut unreadable = Vec::new();
-    for rest in source.split(".route(").skip(1) {
-        let Some((argument, _)) = rest.split_once(',') else {
-            unreadable.push(named(rest));
-            continue;
-        };
-        // The reads are routed from their table, one route per name it offers, and
-        // the table is read above rather than the call that walks it.
-        if argument.trim() == "read" {
-            continue;
-        }
-        match path_of(argument.trim(), &source) {
-            Some(path) => {
-                paths.insert(path);
-            }
-            None => unreadable.push(named(argument)),
-        }
-    }
-    (paths, unreadable)
-}
-
-/// As much of a route call as names it in a failure.
-fn named(rest: &str) -> String {
-    rest.split_whitespace()
-        .take(3)
-        .collect::<Vec<&str>>()
-        .join(" ")
-}
-
-/// The path one route call names, written out or held in a constant.
-fn path_of(argument: &str, source: &str) -> Option<String> {
-    if let Some(quoted) = argument.strip_prefix('"') {
-        return quoted.split_once('"').map(|(path, _)| path.to_owned());
-    }
-    // A name declared twice is a name this cannot resolve, and resolving it to
-    // whichever declaration comes first is how a route hides behind another one's
-    // path: the check then holds a path something else already serves, and the route
-    // in front of it is never held to anything. Two modules calling their own path
-    // `PATH` did exactly that.
-    let declared = format!("const {argument}: &str = \"");
-    let mut found = source.split(&declared).skip(1);
-    let first = found.next()?;
-    found.next().is_none().then_some(first)?;
-    first.split_once('"').map(|(path, _)| path.to_owned())
+    lemonfiber_api::router::served()
+        .into_iter()
+        .map(|route| route.path.to_owned())
+        .collect()
 }
 
 /// Every cell says one of the things a cell may say, and says why where it must.

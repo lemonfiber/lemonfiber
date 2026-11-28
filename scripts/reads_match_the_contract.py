@@ -64,11 +64,13 @@ ARTEFACT = pathlib.Path("contract/web-api/index.json")
 PAGE = pathlib.Path("20-architecture/contracts/web-api.md")
 HEADING = "## Reading"
 
-# A route call, and the path it names. A literal is read as written; a constant
-# is looked up where the crate declares it, and one that is declared nowhere is
-# reported rather than skipped, because a route this cannot read is a route that
-# is invisible to the whole check.
-ROUTE = re.compile(r"\.route\(\s*([^,]+),")
+# A route declaration, and the path it names: `Serves::get` with a path written out
+# or held in a constant, the only way a read module declares a route. A literal is
+# read as written; a constant is looked up where the crate declares it, and one that
+# is declared nowhere is reported rather than skipped, because a route this cannot
+# read is a route that is invisible to the whole check. Any other way of routing is
+# refused by the crate's own test that every route goes through `Serves`.
+ROUTE = re.compile(r'\.get\(\s*([A-Z][A-Z0-9_]*|"[^"]+")\s*,')
 LITERAL = re.compile(r'^"([^"]+)"$')
 NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

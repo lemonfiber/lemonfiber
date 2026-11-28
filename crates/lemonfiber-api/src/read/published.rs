@@ -92,7 +92,7 @@ const FILES: [&str; 5] = [BUNDLE, POSTER, BACKDROP, ASKABLE_POSTER, REQUEST_POST
 /// The logs read reaches no command, and says what it answers with itself; the bundle
 /// answers with a file. Every other read is asked once for each way it forks, and
 /// answers under whatever the commands those reach answer under.
-fn answering(read: &str) -> Vec<Kind> {
+pub(crate) fn answering(read: &str) -> Vec<Kind> {
     let mut kinds: Vec<Kind> = if read == LOGS {
         logs::ANSWERED_UNDER.to_vec()
     } else {

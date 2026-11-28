@@ -32,8 +32,7 @@ use axum::body::Body;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::routing::get;
-use axum::{Extension, Router};
+use axum::Extension;
 use lemonfiber_core::app::{dispatch, Command, Ctx, Doorway};
 use lemonfiber_core::model::kind::ERROR;
 use lemonfiber_core::model::Envelope;
@@ -45,6 +44,7 @@ use crate::guard::Arrived;
 use crate::read::table::{named, wanted, Wanted, OFFERED, TITLE};
 use crate::refusal::{Refusal, UNRENDERED};
 use crate::router::Serving;
+use crate::routing::Serves;
 use crate::serve::{answered, carrying, JSON};
 use crate::spoken::Audience;
 
@@ -57,25 +57,25 @@ const FAILED: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 /// The reads this surface answers: every read [`OFFERED`] names, each carried out by
 /// [`reading`] under its own name, and the ones that answer with something other than
 /// an envelope.
-pub fn routes() -> Router<Serving> {
+#[must_use]
+pub fn routes() -> Serves<Serving> {
     OFFERED
         .iter()
         .filter(|read| **read != TITLE)
-        .fold(Router::new(), |router, &read| {
-            router.route(
+        .fold(Serves::new(), |serves, &read| {
+            serves.get(
                 read,
-                get(
-                    move |State(serving): State<Serving>,
-                          caller: Caller,
-                          arrived: Option<Extension<Arrived>>,
-                          RawQuery(query): RawQuery| async move {
-                        let from = arrived.map(|Extension(arrived)| arrived.from);
-                        reading(&serving, &caller, read, query.as_deref(), from).await
-                    },
-                ),
+                move |State(serving): State<Serving>,
+                      caller: Caller,
+                      arrived: Option<Extension<Arrived>>,
+                      RawQuery(query): RawQuery| async move {
+                    let from = arrived.map(|Extension(arrived)| arrived.from);
+                    reading(&serving, &caller, read, query.as_deref(), from).await
+                },
+                &published::answering(read),
             )
         })
-        .route(TITLE, get(title))
+        .get(TITLE, title, &published::answering(TITLE))
         .merge(logs::routes())
         .merge(bundle::routes())
         .merge(pictures::routes())

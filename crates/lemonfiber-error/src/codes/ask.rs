@@ -180,4 +180,17 @@ codes! {
             remedy: "Try again, and tell whoever runs the house if it keeps happening.",
         },
     }
+    /// Raised where the body of a revocation is not `dry_run` alone.
+    NOT_A_REVOCATION = "ASK-14" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "The body of a request to revoke a key, remove a device key or remove a push \
+            endpoint is not dry_run alone, so nothing was revoked or removed.",
+        remedy: "Send no body, or dry_run alone.",
+        household: {
+            said: "The house didn't understand what was asked.",
+            remedy: "Try again, and tell whoever runs the house if it keeps happening.",
+        },
+    }
 }

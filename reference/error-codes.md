@@ -57,6 +57,7 @@ that it is a fault of the stack.
 | `ASK-11` | `NOT_A_KEY_REQUEST` | error | 1 | 400 | 0.17.0 | Raised where the body of a mint is not a key's name, scope, purpose and the password, or the body of a collection is not a claim alone. | The house didn't understand what was asked. Try again, and tell whoever runs the house if it keeps happening. |
 | `ASK-12` | `NOT_AN_IDEMPOTENCY_KEY` | error | 1 | 400 | 0.18.0 | Raised where an action's `Idempotency-Key` is not one to 255 visible characters, or is given more than once. | The house didn't understand what was asked. Try again, and tell whoever runs the house if it keeps happening. |
 | `ASK-13` | `IDEMPOTENCY_KEY_REUSED` | error | 1 | 400 | 0.18.0 | Raised where an `Idempotency-Key` already sent with one action and its arguments is sent with another. | The house didn't understand what was asked. Try again, and tell whoever runs the house if it keeps happening. |
+| `ASK-14` | `NOT_A_REVOCATION` | error | 1 | 400 | 0.18.0 | Raised where the body of a revocation is not `dry_run` alone. | The house didn't understand what was asked. Try again, and tell whoever runs the house if it keeps happening. |
 
 ## `BACKUP` — capturing your configuration
 

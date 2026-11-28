@@ -93,6 +93,8 @@ pub enum Refusal {
     NotAnAnswer,
     /// The body of a mint is not what a key is minted with.
     NotAKeyRequest,
+    /// The body of a revocation is not `dry_run` alone.
+    NotARevocation,
     /// An action's idempotency key is not one this surface reads as a key.
     NotAnIdempotencyKey,
     /// An idempotency key already named an attempt that asked for something else.
@@ -122,7 +124,7 @@ impl Refusal {
     ///
     /// What the contract lists, so a variant added above and not here is a code no
     /// client can name. A test holds the two together.
-    pub const EVERY: [Self; 38] = [
+    pub const EVERY: [Self; 39] = [
         Self::NotAdmitted,
         Self::Elsewhere,
         Self::NotAPassword,
@@ -154,6 +156,7 @@ impl Refusal {
         Self::NoSuchJob,
         Self::NotAnAnswer,
         Self::NotAKeyRequest,
+        Self::NotARevocation,
         Self::NotAnIdempotencyKey,
         Self::IdempotencyKeyReused,
         Self::NoEndpoint,
@@ -198,6 +201,7 @@ impl Refusal {
             Self::NoSuchJob => ask::NO_SUCH_JOB,
             Self::NotAnAnswer => ask::NOT_AN_ANSWER,
             Self::NotAKeyRequest => ask::NOT_A_KEY_REQUEST,
+            Self::NotARevocation => ask::NOT_A_REVOCATION,
             Self::NotAnIdempotencyKey => ask::NOT_AN_IDEMPOTENCY_KEY,
             Self::IdempotencyKeyReused => ask::IDEMPOTENCY_KEY_REUSED,
             Self::NoEndpoint => ask::NO_ENDPOINT,
@@ -293,6 +297,10 @@ impl Refusal {
                 "The body of this request is not a key's name, scope and purpose with the \
                  password, nor a claim alone."
             }
+            Self::NotARevocation => {
+                "The body of this request is not dry_run alone, so nothing was revoked or \
+                 removed."
+            }
             Self::NotAnIdempotencyKey => {
                 "An Idempotency-Key is one to 255 visible characters, given once, and this \
                  request's is not."
@@ -361,6 +369,7 @@ impl Refusal {
                 "Send a mint the name, scope, purpose and password, and a collection the claim \
                  alone",
             ),
+            Self::NotARevocation => Remedy::new("Send no body, or dry_run alone"),
             Self::WrongMethod => Remedy::new("Ask again with the method the contract names"),
             Self::NotAnIdempotencyKey => {
                 Remedy::new("Send the key once, as up to 255 visible characters with no spaces")

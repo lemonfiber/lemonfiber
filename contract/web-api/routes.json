@@ -1,0 +1,842 @@
+[
+  {
+    "method": "POST",
+    "path": "/api/actions/{action}",
+    "body": true,
+    "kinds": [
+      "adoption",
+      "asked",
+      "backup",
+      "bandwidth",
+      "beside",
+      "config",
+      "credentials",
+      "doctor",
+      "grant",
+      "handoff",
+      "hosting",
+      "household",
+      "import",
+      "invitation",
+      "job",
+      "lifecycle",
+      "notify-mine",
+      "pausing",
+      "play",
+      "plugins",
+      "push-endpoints",
+      "quality",
+      "ran",
+      "removal",
+      "repair",
+      "replacement",
+      "reset",
+      "restore",
+      "seed",
+      "settings",
+      "space",
+      "stop-seeding",
+      "stored",
+      "substitution",
+      "trace",
+      "tuned",
+      "undo",
+      "uninstall",
+      "update",
+      "upgrade",
+      "watch",
+      "watched"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/alerts",
+    "body": false,
+    "kinds": [
+      "alerts"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/askable",
+    "body": false,
+    "kinds": [
+      "askable"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/askable/kinds",
+    "body": false,
+    "kinds": [
+      "askable-kinds"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/askable/{id}/poster",
+    "body": false,
+    "kinds": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/backups",
+    "body": false,
+    "kinds": [
+      "archives"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/bandwidth",
+    "body": false,
+    "kinds": [
+      "bandwidth"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/boot",
+    "body": false,
+    "kinds": [
+      "boot"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/bundle/{name}",
+    "body": false,
+    "kinds": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/capabilities",
+    "body": false,
+    "kinds": [
+      "capabilities"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/catalogue",
+    "body": false,
+    "kinds": [
+      "catalogue"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/channels",
+    "body": false,
+    "kinds": [
+      "channels"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/checks",
+    "body": false,
+    "kinds": [
+      "doctor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/clients",
+    "body": false,
+    "kinds": [
+      "clients"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/config",
+    "body": false,
+    "kinds": [
+      "config"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/copying",
+    "body": false,
+    "kinds": [
+      "copying"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/credentials",
+    "body": false,
+    "kinds": [
+      "credentials"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/device-keys",
+    "body": false,
+    "kinds": [
+      "device-keys"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/device-keys",
+    "body": true,
+    "kinds": [
+      "device-key"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/device-keys/{name}",
+    "body": true,
+    "kinds": [
+      "device-keys"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/device-keys/{name}/challenge",
+    "body": false,
+    "kinds": [
+      "device-challenge"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/events",
+    "body": false,
+    "kinds": [
+      "alert",
+      "copying",
+      "dashboard",
+      "held",
+      "household",
+      "log",
+      "news",
+      "playing",
+      "plugins",
+      "pull",
+      "replay",
+      "settings",
+      "start",
+      "step",
+      "wiring"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/explain",
+    "body": false,
+    "kinds": [
+      "glossary",
+      "word"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/forms",
+    "body": false,
+    "kinds": [
+      "forms",
+      "preview"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/front-door",
+    "body": false,
+    "kinds": [
+      "front-door"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guide",
+    "body": false,
+    "kinds": [
+      "guide"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/held",
+    "body": false,
+    "kinds": [
+      "held"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/held/{id}",
+    "body": false,
+    "kinds": [
+      "title"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/held/{id}/backdrop",
+    "body": false,
+    "kinds": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/held/{id}/poster",
+    "body": false,
+    "kinds": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/history",
+    "body": false,
+    "kinds": [
+      "history"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hosting",
+    "body": false,
+    "kinds": [
+      "hosting"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/in-flight",
+    "body": false,
+    "kinds": [
+      "in-flight"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/jobs/{job}",
+    "body": false,
+    "kinds": [
+      "adoption",
+      "asked",
+      "backup",
+      "bandwidth",
+      "beside",
+      "config",
+      "credentials",
+      "doctor",
+      "ended",
+      "grant",
+      "handoff",
+      "hosting",
+      "household",
+      "import",
+      "invitation",
+      "job",
+      "lifecycle",
+      "notify-mine",
+      "pausing",
+      "play",
+      "plugins",
+      "push-endpoints",
+      "quality",
+      "ran",
+      "removal",
+      "repair",
+      "replacement",
+      "reset",
+      "restore",
+      "seed",
+      "settings",
+      "space",
+      "stop-seeding",
+      "stored",
+      "substitution",
+      "trace",
+      "tuned",
+      "undo",
+      "uninstall",
+      "update",
+      "upgrade",
+      "watch",
+      "watched"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/jobs/{job}",
+    "body": false,
+    "kinds": [
+      "adoption",
+      "asked",
+      "backup",
+      "bandwidth",
+      "beside",
+      "config",
+      "credentials",
+      "doctor",
+      "ended",
+      "grant",
+      "handoff",
+      "hosting",
+      "household",
+      "import",
+      "invitation",
+      "job",
+      "lifecycle",
+      "notify-mine",
+      "pausing",
+      "play",
+      "plugins",
+      "push-endpoints",
+      "quality",
+      "ran",
+      "removal",
+      "repair",
+      "replacement",
+      "reset",
+      "restore",
+      "seed",
+      "settings",
+      "space",
+      "stop-seeding",
+      "stored",
+      "substitution",
+      "trace",
+      "tuned",
+      "undo",
+      "uninstall",
+      "update",
+      "upgrade",
+      "watch",
+      "watched"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/jobs/{job}/forget",
+    "body": false,
+    "kinds": [
+      "adoption",
+      "asked",
+      "backup",
+      "bandwidth",
+      "beside",
+      "config",
+      "credentials",
+      "doctor",
+      "ended",
+      "grant",
+      "handoff",
+      "hosting",
+      "household",
+      "import",
+      "invitation",
+      "job",
+      "lifecycle",
+      "notify-mine",
+      "pausing",
+      "play",
+      "plugins",
+      "push-endpoints",
+      "quality",
+      "ran",
+      "removal",
+      "repair",
+      "replacement",
+      "reset",
+      "restore",
+      "seed",
+      "settings",
+      "space",
+      "stop-seeding",
+      "stored",
+      "substitution",
+      "trace",
+      "tuned",
+      "undo",
+      "uninstall",
+      "update",
+      "upgrade",
+      "watch",
+      "watched"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/keys",
+    "body": false,
+    "kinds": [
+      "keys"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/keys",
+    "body": true,
+    "kinds": [
+      "minted-key"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/keys/claim",
+    "body": true,
+    "kinds": [
+      "minted-key"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/keys/{name}",
+    "body": true,
+    "kinds": [
+      "keys"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/logs",
+    "body": false,
+    "kinds": [
+      "job",
+      "log"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/migration",
+    "body": false,
+    "kinds": [
+      "migration"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/news",
+    "body": false,
+    "kinds": [
+      "news-items"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notify",
+    "body": false,
+    "kinds": [
+      "notify"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notify/events",
+    "body": true,
+    "kinds": [
+      "notify-heard"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notify/mine",
+    "body": false,
+    "kinds": [
+      "notify-mine"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/outbound",
+    "body": false,
+    "kinds": [
+      "outbound"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/playing",
+    "body": false,
+    "kinds": [
+      "playing"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/plugins",
+    "body": false,
+    "kinds": [
+      "plugins"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/plugins/catalogue",
+    "body": false,
+    "kinds": [
+      "plugin-catalogue"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/provenance",
+    "body": false,
+    "kinds": [
+      "provenance"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/push-endpoints",
+    "body": false,
+    "kinds": [
+      "push-endpoints"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/push-endpoints",
+    "body": true,
+    "kinds": [
+      "push-endpoint"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/push-endpoints/{name}",
+    "body": true,
+    "kinds": [
+      "push-endpoints"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/quality",
+    "body": false,
+    "kinds": [
+      "quality"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/queue",
+    "body": false,
+    "kinds": [
+      "queue"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/requests",
+    "body": false,
+    "kinds": [
+      "household"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/requests/{reference}/poster",
+    "body": false,
+    "kinds": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/served",
+    "body": false,
+    "kinds": [
+      "served"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/services",
+    "body": false,
+    "kinds": [
+      "status"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/session",
+    "body": true,
+    "kinds": [
+      "admission"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/session/code",
+    "body": true,
+    "kinds": [
+      "admission",
+      "sign-in-code"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/settings",
+    "body": false,
+    "kinds": [
+      "settings"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/settled",
+    "body": false,
+    "kinds": [
+      "settled"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/setup",
+    "body": false,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/setup/answer",
+    "body": true,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/setup/apply",
+    "body": false,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/setup/back",
+    "body": false,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/setup/next",
+    "body": false,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/setup/recover",
+    "body": true,
+    "kinds": [
+      "wizard"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/space",
+    "body": false,
+    "kinds": [
+      "space"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/stack",
+    "body": false,
+    "kinds": [
+      "stack"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/status",
+    "body": false,
+    "kinds": [
+      "status"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/storage",
+    "body": false,
+    "kinds": [
+      "doctor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/stored",
+    "body": false,
+    "kinds": [
+      "stored"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/stuck",
+    "body": false,
+    "kinds": [
+      "stuck"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/trace",
+    "body": false,
+    "kinds": [
+      "trace"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/uninstall",
+    "body": false,
+    "kinds": [
+      "uninstall"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/update",
+    "body": false,
+    "kinds": [
+      "self-update",
+      "update"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/version",
+    "body": false,
+    "kinds": [
+      "version"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/watcher",
+    "body": false,
+    "kinds": [
+      "watcher"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/watching",
+    "body": false,
+    "kinds": [
+      "part-way"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/wiring",
+    "body": false,
+    "kinds": [
+      "wiring"
+    ]
+  }
+]

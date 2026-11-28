@@ -9,15 +9,15 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use axum::{Extension, Json, Router};
+use axum::{Extension, Json};
 use lemonfiber_core::app::{dispatch, Command, Surfacing};
-use lemonfiber_core::notify::events::{Event, Telling};
+use lemonfiber_core::notify::events::{Event, Happened, Telling};
 
 use crate::guard::Arrived;
 use crate::read::went_wrong;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// Where a service tells the core what happened.
 pub const EVENTS: &str = "/api/notify/events";
@@ -30,9 +30,22 @@ pub(crate) fn body() -> (&'static str, schemars::Schema) {
     (EVENTS, schemars::schema_for!(Event))
 }
 
-/// The route.
-pub fn routes() -> Router<Serving> {
-    Router::new().route(EVENTS, post(told))
+/// The route, answering as the command it reaches does.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let telling = Telling {
+        presented: String::new(),
+        event: Event {
+            event: Happened::Imported,
+            reference: None,
+            name: String::new(),
+            reason: None,
+            cleared: false,
+        },
+        from: None,
+    };
+    let answered = Command::Surface(Surfacing::Told(telling)).answered_under();
+    Serves::new().post(EVENTS, told, Taking::Body, answered)
 }
 
 /// One event, taken where the key it came with is one the core handed a service.

@@ -23,14 +23,13 @@ use axum::body::Body;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
-use axum::routing::get;
-use axum::Router;
 use lemonfiber_core::app::{dispatch, Command, Fetching, Outcome, Surfacing};
 use lemonfiber_core::model::Octets;
 
 use crate::admission::Caller;
 use crate::read::table::{wanted, BUNDLE};
 use crate::router::Serving;
+use crate::routing::Serves;
 use crate::serve::{carrying, operator_only};
 
 use super::went_wrong;
@@ -42,8 +41,8 @@ use super::went_wrong;
 const KEEP_IT: &str = "attachment";
 
 /// The reads about the files lemonfiber keeps.
-pub(super) fn routes() -> Router<Serving> {
-    Router::new().route(BUNDLE, get(bundle))
+pub(super) fn routes() -> Serves<Serving> {
+    Serves::new().get(BUNDLE, bundle, &[])
 }
 
 /// One support bundle this run kept, handed over whole.

@@ -39,9 +39,8 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{header, HeaderMap};
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Extension, Json, Router};
-use lemonfiber_core::app::admitting::{Answer, Asked, Carried, Offered};
+use axum::{Extension, Json};
+use lemonfiber_core::app::admitting::{Answer, Asked, Carried, Coded, Offered};
 use lemonfiber_core::app::{dispatch, Command, Ctx, Outcome};
 use lemonfiber_core::ports::asking::Asking;
 use lemonfiber_error::Problem;
@@ -51,6 +50,7 @@ use crate::guard::{host_is_here, origin_is_here, Arrived, Binding, Token, TOKEN_
 use crate::read::carried_out;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 use coded::CODE;
 
 pub use caller::{Caller, Keyed, Knocking};
@@ -142,10 +142,21 @@ pub(crate) fn body() -> (&'static str, schemars::Schema) {
 /// Merged with the rest and under the same layer, so an endpoint added beside it is
 /// guarded by having been added. What the layer does differently for this one path
 /// is written where the layer is.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(SESSION, post(opening))
-        .route(CODE, post(coded::coded))
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let offered = Command::Admission(Asked::Password(Offered {
+        name: None,
+        claim: None,
+        peer: None,
+    }));
+    let coded = Command::Admission(Asked::Code(Coded {
+        session: None,
+        from: None,
+        waiting: None,
+    }));
+    Serves::new()
+        .post(SESSION, opening, Taking::Body, offered.answered_under())
+        .post(CODE, coded::coded, Taking::Body, coded.answered_under())
 }
 
 /// Whether a request says it came from where this server is listening.

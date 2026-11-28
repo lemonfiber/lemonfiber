@@ -4,8 +4,6 @@
 use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::routing::get;
-use axum::Router;
 use lemonfiber_core::app::{Ctx, ReadingLogs};
 use lemonfiber_core::logs::Line;
 use lemonfiber_core::model::kind::{Kind, JOB, LOG};
@@ -16,6 +14,7 @@ use crate::admission::Caller;
 use crate::read::table::{told, Asked, FOLLOW, FORM, LOGS, SERVICE, TAIL};
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::Serves;
 use crate::serve::operator_only;
 
 use super::{enveloped, went_wrong};
@@ -42,8 +41,8 @@ fn not_a_count() -> String {
 /// reading, the `job` the lines go on arriving under.
 pub(super) const ANSWERED_UNDER: &[Kind] = &[LOG, JOB];
 
-pub(super) fn routes() -> Router<Serving> {
-    Router::new().route(LOGS, get(log_lines))
+pub(super) fn routes() -> Serves<Serving> {
+    Serves::new().get(LOGS, log_lines, ANSWERED_UNDER)
 }
 
 /// What the services are saying, and — where it is asked for — what they say next.

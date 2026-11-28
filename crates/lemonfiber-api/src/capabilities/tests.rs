@@ -47,9 +47,58 @@ fn every_path() -> Vec<String> {
                 .chain(BESIDE.iter().map(|(read, _)| read))
                 .map(|read| (*read).to_owned()),
         )
+        .chain(REVOCATIONS.iter().map(|path| (*path).to_owned()))
         .collect();
     paths.sort();
     paths
+}
+
+/// The revocations the surface serves, each named by the path it is served at.
+const REVOCATIONS: [&str; 3] = [
+    crate::keys::A_KEY,
+    crate::device_keys::A_DEVICE_KEY,
+    crate::push_endpoints::A_PUSH_ENDPOINT,
+];
+
+/// A capability is named by a path alone, so a revocation must be served at a path no read
+/// or action is served at: were one path both, the two would be one capability and a client
+/// could not tell which it may use.
+#[test]
+fn no_revocation_shares_its_path_with_a_read_or_an_action() {
+    let every = every_path();
+    for revocation in REVOCATIONS {
+        let named = every.iter().filter(|path| *path == revocation).count();
+        assert_eq!(
+            named, 1,
+            "{revocation} is named by more than the revocation"
+        );
+        let served_otherwise = crate::router::served()
+            .into_iter()
+            .any(|route| route.path == revocation && route.method != axum::http::Method::DELETE);
+        assert!(
+            !served_otherwise,
+            "{revocation} is served at another method too"
+        );
+    }
+}
+
+/// Each revocation is offered exactly where its route would carry it out: every one to
+/// the operator, a member's own keys and phones to a member, and none to a key.
+#[test]
+fn each_revocation_is_offered_as_its_route_decides() {
+    use Standing::{Available, Unpermitted};
+    let offered = |caller: &Caller| {
+        let declared = declared(&reaching(None), caller);
+        REVOCATIONS.map(|path| declared.capabilities.get(path).copied())
+    };
+    assert_eq!(offered(&Caller::Operator), [Some(Available); 3]);
+    assert_eq!(
+        offered(&Caller::Member("ana".to_owned())),
+        [Some(Available), Some(Unpermitted), Some(Available)]
+    );
+    for scope in [Scope::Read, Scope::Act] {
+        assert_eq!(offered(&key(scope)), [Some(Unpermitted); 3]);
+    }
 }
 
 /// Every request the surface serves is declared, each under its own path, and a read
@@ -121,8 +170,10 @@ fn a_member_is_offered_what_the_core_gives_a_member() {
             "/api/held/{id}",
             "/api/held/{id}/backdrop",
             "/api/held/{id}/poster",
+            "/api/keys/{name}",
             "/api/notify/mine",
             "/api/playing",
+            "/api/push-endpoints/{name}",
             "/api/requests",
             "/api/requests/{reference}/poster",
             "/api/watching",

@@ -11,6 +11,7 @@ mod openapi;
 mod reads;
 mod refusals;
 mod released;
+mod routes;
 mod samples;
 mod split;
 mod surface;
@@ -262,7 +263,7 @@ fn every_file_is_reached_from_the_index() {
             reached.insert(path.to_owned());
         }
     };
-    ["key_callable", "reads", "household_words"]
+    ["key_callable", "reads", "routes", "household_words"]
         .iter()
         .filter_map(|key| index.get(key))
         .for_each(&mut named);

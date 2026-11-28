@@ -12,8 +12,6 @@ use axum::body::Body;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::Response;
-use axum::routing::get;
-use axum::Router;
 use lemonfiber_core::app::{
     dispatch, Command, Ctx, Fetching, Outcome, Surfacing, Viewing, Whom, Wishing,
 };
@@ -28,6 +26,7 @@ use crate::read::table::{
 };
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::Serves;
 use crate::serve::carrying;
 
 use super::went_wrong;
@@ -36,18 +35,20 @@ use super::went_wrong;
 const PRIVATE: &str = "private";
 
 /// The two pictures a title has.
-pub(super) fn routes() -> Router<Serving> {
-    Router::new()
-        .route(
+pub(super) fn routes() -> Serves<Serving> {
+    Serves::new()
+        .get(
             POSTER,
-            get(|state, caller, id, query| pictured(state, caller, id, query, Picture::Poster)),
+            |state, caller, id, query| pictured(state, caller, id, query, Picture::Poster),
+            &[],
         )
-        .route(
+        .get(
             BACKDROP,
-            get(|state, caller, id, query| pictured(state, caller, id, query, Picture::Backdrop)),
+            |state, caller, id, query| pictured(state, caller, id, query, Picture::Backdrop),
+            &[],
         )
-        .route(ASKABLE_POSTER, get(found))
-        .route(REQUEST_POSTER, get(kept))
+        .get(ASKABLE_POSTER, found, &[])
+        .get(REQUEST_POSTER, kept, &[])
 }
 
 /// The poster of a title a member's search found, fetched by the core for that member.

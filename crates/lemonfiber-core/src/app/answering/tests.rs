@@ -1,6 +1,7 @@
 use crate::app::command::{
     Asking, Diagnosing, Keeping, Linking, MigrateAction, Queueing, Settling, Tracing, Whom, Wishing,
 };
+use crate::app::setup::SetupAction;
 use crate::app::{authoring, plugins, Command, Surfacing};
 use crate::model::kind::{self, Kind};
 
@@ -249,6 +250,66 @@ fn authoring() -> Vec<(Command, Kind)> {
 #[test]
 fn each_reading_answers_with_its_own_kind() {
     for (command, expected) in reading().into_iter().chain(dispatched()).chain(authoring()) {
+        assert_eq!(
+            command.answered_under(),
+            &[expected],
+            "{} answered under the wrong kind",
+            command.asked().named
+        );
+    }
+}
+
+/// What the routes keeping keys, device keys and push endpoints, and the one asking where
+/// setup stands, answer under: the kind their outcome is written under.
+#[test]
+fn each_keeping_answers_with_its_own_kind() {
+    use crate::keys::run::Asked as Keyed;
+    use crate::keys::Minter;
+    let keeping = [
+        (Command::Setup(SetupAction::Where), kind::WIZARD),
+        (
+            Command::Keys(Keyed::List {
+                by: Minter::Operator,
+            }),
+            kind::KEYS,
+        ),
+        (
+            Command::Keys(Keyed::Mint {
+                name: "ha".to_owned(),
+                scope: "read".to_owned(),
+                purpose: "other".to_owned(),
+                by: Minter::Operator,
+                claim: false,
+                proving: None,
+            }),
+            kind::MINTED_KEY,
+        ),
+        (
+            Command::Keys(Keyed::Collect {
+                claim: "claim".to_owned(),
+                from: None,
+            }),
+            kind::MINTED_KEY,
+        ),
+        (
+            Command::DeviceKeys(crate::device_keys::run::Asked::List),
+            kind::DEVICE_KEYS,
+        ),
+        (
+            Command::DeviceKeys(crate::device_keys::run::Asked::Register {
+                name: "phone".to_owned(),
+                public_key: "key".to_owned(),
+                attestation: None,
+                from: None,
+            }),
+            kind::DEVICE_KEY,
+        ),
+        (
+            Command::PushEndpoints(crate::push::run::Asked::List { owner: None }),
+            kind::PUSH_ENDPOINTS,
+        ),
+    ];
+    for (command, expected) in keeping {
         assert_eq!(
             command.answered_under(),
             &[expected],

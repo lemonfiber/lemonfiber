@@ -3,9 +3,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::Router;
-use lemonfiber_core::model::kind::{ENDED, JOB};
+use lemonfiber_core::model::kind::{Kind, ENDED, JOB};
 use lemonfiber_core::model::Envelope;
 
 use super::ended::Ended;
@@ -15,13 +13,25 @@ use crate::admission::Caller;
 use crate::read::enveloped;
 use crate::refusal::Refusal;
 use crate::router::Serving;
+use crate::routing::{Serves, Taking};
 
 /// What can be asked about work already begun, and the two things that can be done
-/// to it.
-pub fn routes() -> Router<Serving> {
-    Router::new()
-        .route(A_JOB, get(became).delete(released))
-        .route(FORGET, post(forgotten))
+/// to it, each answering with where the work stands: still going, what its command came
+/// to, or how it ended.
+#[must_use]
+pub fn routes() -> Serves<Serving> {
+    let standing = standing();
+    Serves::new()
+        .get(A_JOB, became, &standing)
+        .delete(A_JOB, released, Taking::Nothing, &standing)
+        .post(FORGET, forgotten, Taking::Nothing, &standing)
+}
+
+/// Every kind where a piece of work stands may be said under.
+fn standing() -> Vec<Kind> {
+    let mut kinds = crate::actions::answered_under();
+    kinds.push(ENDED);
+    kinds
 }
 
 /// What became of the work one name stands for.

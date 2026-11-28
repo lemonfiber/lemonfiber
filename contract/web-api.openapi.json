@@ -24541,6 +24541,19 @@
         "title": "DeviceKeyRegistering",
         "type": "object"
       },
+      "body-device-keys-name": {
+        "additionalProperties": false,
+        "description": "The body a revocation takes.",
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Whether to answer with what revoking would come to, and revoke nothing.",
+            "type": "boolean"
+          }
+        },
+        "title": "Revoking",
+        "type": "object"
+      },
       "body-keys": {
         "additionalProperties": false,
         "description": "What a mint is asked with.",
@@ -24618,6 +24631,19 @@
         "title": "KeyCollecting",
         "type": "object"
       },
+      "body-keys-name": {
+        "additionalProperties": false,
+        "description": "The body a revocation takes.",
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Whether to answer with what revoking would come to, and revoke nothing.",
+            "type": "boolean"
+          }
+        },
+        "title": "Revoking",
+        "type": "object"
+      },
       "body-notify-events": {
         "additionalProperties": false,
         "description": "What happened, as a service tells it.",
@@ -24687,6 +24713,19 @@
           "auth"
         ],
         "title": "PushEndpointRegistering",
+        "type": "object"
+      },
+      "body-push-endpoints-name": {
+        "additionalProperties": false,
+        "description": "The body a revocation takes.",
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "description": "Whether to answer with what revoking would come to, and revoke nothing.",
+            "type": "boolean"
+          }
+        },
+        "title": "Revoking",
         "type": "object"
       },
       "body-session": {
@@ -34363,6 +34402,33 @@
         }
       }
     },
+    "/api/capabilities": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-capabilities"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/catalogue": {
       "get": {
         "parameters": [],
@@ -34577,7 +34643,8 @@
       }
     },
     "/api/device-keys": {
-      "post": {
+      "get": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -34593,7 +34660,124 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-device-keys"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      },
+      "post": {
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-device-keys"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-device-key"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/device-keys/{name}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-device-keys-name"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-device-keys"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/device-keys/{name}/challenge": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-device-challenge"
                 }
               }
             },
@@ -35202,12 +35386,152 @@
     },
     "/api/jobs/{job}": {
       "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/kind-adoption"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-asked"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-backup"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-bandwidth"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-beside"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-credentials"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-doctor"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ended"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-grant"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-handoff"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-hosting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-household"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-import"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-invitation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-job"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-lifecycle"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-notify-mine"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-pausing"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-play"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-plugins"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-push-endpoints"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-quality"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ran"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-removal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-repair"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-replacement"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-reset"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-restore"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-seed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-settings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-space"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stop-seeding"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stored"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-substitution"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-trace"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-tuned"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-undo"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-uninstall"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-update"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-upgrade"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watch"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watched"
+                    }
+                  ]
                 }
               }
             },
@@ -35236,12 +35560,152 @@
         }
       },
       "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/kind-adoption"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-asked"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-backup"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-bandwidth"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-beside"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-credentials"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-doctor"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ended"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-grant"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-handoff"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-hosting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-household"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-import"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-invitation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-job"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-lifecycle"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-notify-mine"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-pausing"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-play"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-plugins"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-push-endpoints"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-quality"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ran"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-removal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-repair"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-replacement"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-reset"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-restore"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-seed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-settings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-space"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stop-seeding"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stored"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-substitution"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-trace"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-tuned"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-undo"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-uninstall"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-update"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-upgrade"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watch"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watched"
+                    }
+                  ]
                 }
               }
             },
@@ -35268,36 +35732,156 @@
             "description": "Refused."
           }
         }
-      },
-      "parameters": [
-        {
-          "in": "path",
-          "name": "job",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ]
+      }
     },
     "/api/jobs/{job}/forget": {
-      "parameters": [
-        {
-          "in": "path",
-          "name": "job",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/kind-adoption"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-asked"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-backup"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-bandwidth"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-beside"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-credentials"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-doctor"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ended"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-grant"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-handoff"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-hosting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-household"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-import"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-invitation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-job"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-lifecycle"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-notify-mine"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-pausing"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-play"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-plugins"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-push-endpoints"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-quality"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-ran"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-removal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-repair"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-replacement"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-reset"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-restore"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-seed"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-settings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-space"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stop-seeding"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-stored"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-substitution"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-trace"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-tuned"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-undo"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-uninstall"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-update"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-upgrade"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watch"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-watched"
+                    }
+                  ]
                 }
               }
             },
@@ -35327,7 +35911,8 @@
       }
     },
     "/api/keys": {
-      "post": {
+      "get": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -35343,7 +35928,42 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-keys"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      },
+      "post": {
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-keys"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-minted-key"
                 }
               }
             },
@@ -35364,6 +35984,7 @@
     },
     "/api/keys/claim": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -35379,7 +36000,53 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-minted-key"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/keys/{name}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-keys-name"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-keys"
                 }
               }
             },
@@ -35550,6 +36217,7 @@
     },
     "/api/notify/events": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -35565,7 +36233,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-notify-heard"
                 }
               }
             },
@@ -35763,7 +36431,8 @@
       }
     },
     "/api/push-endpoints": {
-      "post": {
+      "get": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -35779,7 +36448,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-push-endpoints"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      },
+      "post": {
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-push-endpoints"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-push-endpoint"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/push-endpoints/{name}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/body-push-endpoints-name"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-push-endpoints"
                 }
               }
             },
@@ -36005,6 +36755,7 @@
     },
     "/api/session": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -36020,7 +36771,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-admission"
                 }
               }
             },
@@ -36041,6 +36792,7 @@
     },
     "/api/session/code": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -36056,7 +36808,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/kind-admission"
+                    },
+                    {
+                      "$ref": "#/components/schemas/kind-sign-in-code"
+                    }
+                  ]
                 }
               }
             },
@@ -36129,8 +36888,36 @@
         }
       }
     },
+    "/api/setup": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-wizard"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
     "/api/setup/answer": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -36146,7 +36933,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-wizard"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/setup/apply": {
+      "post": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-wizard"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/setup/back": {
+      "post": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-wizard"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-error"
+                }
+              }
+            },
+            "description": "Refused."
+          }
+        }
+      }
+    },
+    "/api/setup/next": {
+      "post": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/kind-wizard"
                 }
               }
             },
@@ -36167,6 +37035,7 @@
     },
     "/api/setup/recover": {
       "post": {
+        "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -36182,7 +37051,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelope"
+                  "$ref": "#/components/schemas/kind-wizard"
                 }
               }
             },
