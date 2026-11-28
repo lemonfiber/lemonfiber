@@ -10,6 +10,7 @@
 pub mod core;
 mod fixture;
 mod http;
+mod hydra;
 mod member;
 pub mod serving;
 mod site;
@@ -109,8 +110,12 @@ const GRABBED: [&str; 6] = [
 /// How often a wait looks again.
 const LOOKING: Duration = Duration::from_secs(15);
 
-/// The size of a film's or a series' release, which its curator takes.
-const VIDEO: u64 = 1_073_741_824;
+/// The size of a film's release, which its curator takes.
+const FILM: u64 = 1_073_741_824;
+
+/// The size of a season's release, above the least its curator takes for a 1080p Blu-ray of
+/// ten hour-long episodes.
+const SEASON: u64 = 4_294_967_296;
 
 /// The size of an album's release, which its curator takes.
 const ALBUM: u64 = 314_572_800;
@@ -168,7 +173,7 @@ pub const ASKED: [Asked; 4] = [
         traced: "Big Buck Bunny",
         release: "Big.Buck.Bunny.2008.1080p.BluRay.x264-LEMONFIBER",
         category: "2000",
-        size: VIDEO,
+        size: FILM,
     },
     Asked {
         media: "tv",
@@ -179,7 +184,7 @@ pub const ASKED: [Asked; 4] = [
         traced: "Game of Thrones",
         release: "Game.of.Thrones.S01.1080p.BluRay.x264-LEMONFIBER",
         category: "5000",
-        size: VIDEO,
+        size: SEASON,
     },
     Asked {
         media: "music",
@@ -294,14 +299,15 @@ fn container(service: &str) -> String {
     format!("lemonfiber-{service}-1")
 }
 
-/// The gateway of the network the indexer's container sits on, which reaches this machine.
-fn gateway() -> Option<String> {
+/// The gateway of the network the container of the indexer `searching` sits on, which
+/// reaches this machine.
+fn gateway(searching: &str) -> Option<String> {
     let output = std::process::Command::new("docker")
         .args([
             "inspect",
             "--format",
             "{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}",
-            &container(INDEXER),
+            &container(searching),
         ])
         .output()
         .ok()?;
@@ -609,23 +615,26 @@ pub fn run(
     ) else {
         return;
     };
-    let Some((key, port)) = indexer(&core) else {
-        return;
-    };
-    let gateway = gateway();
+    let searching = substitution
+        .filter(|one| one.plugin == hydra::PLUGIN)
+        .map_or(INDEXER, |_| hydra::PLUGIN);
+    let gateway = gateway(searching);
     assert!(
         gateway.is_some(),
-        "no gateway reaches this machine from {INDEXER}"
+        "no gateway reaches this machine from {searching}"
     );
     let Some(gateway) = gateway else {
         return;
     };
-    let added = site_added(
-        &key,
-        port,
-        &format!("http://{gateway}:{}", site.port),
-        (downloads, &[]),
-    );
+    let at = format!("http://{gateway}:{}", site.port);
+    let added = if searching == hydra::PLUGIN {
+        hydra::site_added(&core, &at, site::KEY)
+    } else {
+        let Some((key, port)) = indexer(&core) else {
+            return;
+        };
+        site_added(&key, port, &at, (downloads, &[])).map(|_| ())
+    };
     assert!(added.is_ok(), "{added:?}");
     step(&core.run(&["seed"], ""), "seed after the indexer");
 

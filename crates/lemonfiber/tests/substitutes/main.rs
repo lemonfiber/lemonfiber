@@ -19,7 +19,10 @@ const ARM: &str = "SUBSTITUTE_ARM";
 const TREE: &str = "SUBSTITUTE_TREE";
 
 /// The capabilities a substitute proves.
-const NAMED: [&str; 4] = [SERVES, "indexer.search", CURATES, live::IDENTIFIES];
+const NAMED: [&str; 4] = [SERVES, SEARCHES, CURATES, live::IDENTIFIES];
+
+/// The capability an indexer fills.
+const SEARCHES: &str = lemonfiber_contract::capabilities::indexer::search::CAPABILITY;
 
 /// The further capabilities an arm proves, each as those [`NAMED`] are proved.
 const FURTHER: [&str; 1] = [SOLVES];
@@ -112,14 +115,93 @@ impl Substitute {
     }
 }
 
-/// The arm the job runs, the substitute it pins where that proves one of `capabilities`,
-/// and the household request run for its media type, or nothing where the job runs no
-/// such arm.
+/// Each test that runs an arm, by what the arm stands in for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Runner {
+    /// A curator the bundle pins, through its own media's household request.
+    Curator,
+    /// A curator standing in for the bundle's.
+    Curating,
+    /// A media server standing in, its upstream claimed.
+    Serving,
+    /// A media server standing in whose upstream is claimed against an account outside the
+    /// house, run unclaimed.
+    ServingUnclaimed,
+    /// An identity source standing in.
+    Identifying,
+    /// A challenge solver standing in.
+    Solving,
+    /// A download client standing in.
+    Downloading,
+    /// An indexer standing in.
+    Searching,
+}
+
+/// Each runner, with the test it is.
+const RUNNERS: [(Runner, &str); 8] = [
+    (
+        Runner::Curator,
+        "a_curator_arm_carries_a_household_request_to_a_grab_and_undoes_it",
+    ),
+    (
+        Runner::Curating,
+        "a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it",
+    ),
+    (
+        Runner::Serving,
+        "a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furnished_and_undoes_it",
+    ),
+    (
+        Runner::ServingUnclaimed,
+        "a_media_server_claimed_outside_the_house_is_installed_unclaimed_and_read_as_held_by_nobody",
+    ),
+    (
+        Runner::Identifying,
+        "an_identity_source_standing_in_holds_the_member_whose_request_reaches_a_grab_and_undoes_it",
+    ),
+    (
+        Runner::Solving,
+        "a_solver_standing_in_is_told_to_the_indexer_and_fetches_only_pages_outside",
+    ),
+    (
+        Runner::Downloading,
+        "a_download_client_standing_in_takes_a_household_requests_grab_and_is_paused_and_resumed",
+    ),
+    (
+        Runner::Searching,
+        "an_indexer_standing_in_carries_a_household_request_to_a_grab_and_undoes_it",
+    ),
+];
+
+impl Substitute {
+    /// The test that runs it, or nothing where no test does.
+    fn runner(&self) -> Option<Runner> {
+        match self.capability.as_str() {
+            SERVES if self.claimed => Some(Runner::Serving),
+            SERVES => Some(Runner::ServingUnclaimed),
+            CURATES => Some(Runner::Curating),
+            live::IDENTIFIES => Some(Runner::Identifying),
+            SOLVES => Some(Runner::Solving),
+            SEARCHES => Some(Runner::Searching),
+            downloading
+                if DOWNLOADS
+                    .iter()
+                    .any(|(capability, _)| *capability == downloading) =>
+            {
+                Some(Runner::Downloading)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// The arm the job runs and the substitute it pins, where `runner` runs it, or nothing
+/// where the job runs no such arm.
 ///
 /// # Panics
 ///
-/// Where the file does not read, or no household request is run for the arm's media type.
-fn standing_in(capabilities: &[&str]) -> Option<(String, Substitute, &'static live::Asked)> {
+/// Where the file does not read.
+fn ran_by(runner: Runner) -> Option<(String, Substitute)> {
     let arm = std::env::var(ARM).ok()?;
     let pinned = read::<Pinned>(&root().join("substitutes.toml"));
     assert!(pinned.is_ok(), "{pinned:?}");
@@ -127,7 +209,18 @@ fn standing_in(capabilities: &[&str]) -> Option<(String, Substitute, &'static li
         .ok()?
         .substitute
         .into_iter()
-        .find(|one| one.arm == arm && capabilities.contains(&one.capability.as_str()))?;
+        .find(|one| one.arm == arm && one.runner() == Some(runner))?;
+    Some((arm, one))
+}
+
+/// The arm the job runs and the substitute it pins, where `runner` runs it, and the
+/// household request run for its media type, or nothing where the job runs no such arm.
+///
+/// # Panics
+///
+/// Where the file does not read, or no household request is run for the arm's media type.
+fn standing_in(runner: Runner) -> Option<(String, Substitute, &'static live::Asked)> {
+    let (arm, one) = ran_by(runner)?;
     let asked = live::ASKED
         .iter()
         .find(|asked| Some(asked.media) == one.media_type.as_deref());
@@ -434,35 +527,26 @@ fn settings_of(plugin: &str) -> Result<Vec<(String, String)>, String> {
 
 #[test]
 fn a_curator_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
-    let Some((arm, one, asked)) = standing_in(&[CURATES]) else {
+    let Some((arm, one, asked)) = standing_in(Runner::Curating) else {
         return;
     };
-    let settings = match settings_of(&one.plugin) {
-        Ok(settings) => settings,
-        Err(why) => {
-            println!("{arm} does not run: {why}");
-            return;
-        }
+    let settings = settings_of(&one.plugin);
+    assert!(settings.is_ok(), "{arm} cannot run: {settings:?}");
+    let Ok(settings) = settings else {
+        return;
     };
     let substitution = one.substitution(settings);
     live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
 }
 
-/// The media-serving arm the job runs, where its substitute's upstream is run `claimed`,
-/// with the forms its stack is started with.
+/// The media-serving arm the job runs, where `runner` runs it, with the forms its stack is
+/// started with.
 ///
 /// # Panics
 ///
 /// Where the file does not read, or the arm names no media type.
-fn serving(claimed: bool) -> Option<(String, Substitute, &'static [&'static str])> {
-    let arm = std::env::var(ARM).ok()?;
-    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    assert!(pinned.is_ok(), "{pinned:?}");
-    let one = pinned
-        .ok()?
-        .substitute
-        .into_iter()
-        .find(|one| one.arm == arm && one.capability == SERVES && one.claimed == claimed)?;
+fn serving(runner: Runner) -> Option<(String, Substitute, &'static [&'static str])> {
+    let (arm, one) = ran_by(runner)?;
     assert!(one.media_type.is_some(), "{one:?}");
     let forms = live::ASKED
         .iter()
@@ -474,7 +558,7 @@ fn serving(claimed: bool) -> Option<(String, Substitute, &'static [&'static str]
 #[test]
 fn a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furnished_and_undoes_it(
 ) {
-    let Some((arm, one, forms)) = serving(true) else {
+    let Some((arm, one, forms)) = serving(Runner::Serving) else {
         return;
     };
     let Some(media) = one.media_type.as_deref() else {
@@ -485,7 +569,7 @@ fn a_media_server_standing_in_holds_a_title_written_into_the_library_it_was_furn
 
 #[test]
 fn a_media_server_claimed_outside_the_house_is_installed_unclaimed_and_read_as_held_by_nobody() {
-    let Some((arm, _, forms)) = serving(false) else {
+    let Some((arm, _, forms)) = serving(Runner::ServingUnclaimed) else {
         return;
     };
     let tree = std::env::var(TREE);
@@ -498,7 +582,7 @@ fn a_media_server_claimed_outside_the_house_is_installed_unclaimed_and_read_as_h
 
 #[test]
 fn an_identity_source_standing_in_holds_the_member_whose_request_reaches_a_grab_and_undoes_it() {
-    let Some((arm, one, asked)) = standing_in(&[live::IDENTIFIES]) else {
+    let Some((arm, one, asked)) = standing_in(Runner::Identifying) else {
         return;
     };
     let substitution = one.substitution(Vec::new());
@@ -507,19 +591,7 @@ fn an_identity_source_standing_in_holds_the_member_whose_request_reaches_a_grab_
 
 #[test]
 fn a_solver_standing_in_is_told_to_the_indexer_and_fetches_only_pages_outside() {
-    let Ok(arm) = std::env::var(ARM) else {
-        return;
-    };
-    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
-    assert!(pinned.is_ok(), "{pinned:?}");
-    let Ok(pinned) = pinned else {
-        return;
-    };
-    let Some(one) = pinned
-        .substitute
-        .iter()
-        .find(|one| one.arm == arm && one.capability == SOLVES)
-    else {
+    let Some((arm, one)) = ran_by(Runner::Solving) else {
         return;
     };
     live::solving::run(&scratch(&arm), &one.substitution(Vec::new()));
@@ -534,7 +606,7 @@ fn scratch(arm: &str) -> PathBuf {
 
 #[test]
 fn a_download_client_standing_in_takes_a_household_requests_grab_and_is_paused_and_resumed() {
-    let Some((arm, one, asked)) = standing_in(&DOWNLOADS.map(|(capability, _)| capability)) else {
+    let Some((arm, one, asked)) = standing_in(Runner::Downloading) else {
         return;
     };
     let downloads = DOWNLOADS
@@ -547,4 +619,49 @@ fn a_download_client_standing_in_takes_a_household_requests_grab_and_is_paused_a
     };
     let substitution = one.substitution(Vec::new());
     live::run(&scratch(&arm), asked, downloads, Some(&substitution));
+}
+
+#[test]
+fn an_indexer_standing_in_carries_a_household_request_to_a_grab_and_undoes_it() {
+    let Some((arm, one, asked)) = standing_in(Runner::Searching) else {
+        return;
+    };
+    let substitution = one.substitution(Vec::new());
+    live::run(&scratch(&arm), asked, &live::USENET, Some(&substitution));
+}
+
+/// The body of the test `name` in this file, up to the next test, or nothing where it has
+/// none.
+fn body_of<'a>(written: &'a str, name: &str) -> Option<&'a str> {
+    let (_, from) = written.split_once(&format!("fn {name}("))?;
+    Some(from.split("#[test]").next().unwrap_or(from))
+}
+
+#[test]
+fn every_arm_the_workflow_runs_is_run_by_a_test_that_takes_it() {
+    let pinned = read::<Pinned>(&root().join("substitutes.toml"));
+    let written = std::fs::read_to_string(root().join(file!()));
+    assert!(pinned.is_ok() && written.is_ok(), "{pinned:?} {written:?}");
+    let (Ok(pinned), Ok(written)) = (pinned, written) else {
+        return;
+    };
+    let unrun: Vec<&str> = pinned
+        .substitute
+        .iter()
+        .filter(|one| one.runner().is_none())
+        .map(|one| one.arm.as_str())
+        .collect();
+    assert!(unrun.is_empty(), "no test runs {unrun:?}");
+    for (runner, name) in RUNNERS {
+        let taking = body_of(&written, name);
+        let selected = if runner == Runner::Curator {
+            "pinned.curator".to_owned()
+        } else {
+            format!("(Runner::{runner:?})")
+        };
+        assert!(
+            taking.is_some_and(|body| body.contains(selected.as_str())),
+            "{runner:?}: no test {name} takes its arm by {selected}"
+        );
+    }
 }

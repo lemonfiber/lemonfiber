@@ -73,7 +73,7 @@ arm           = "indexer-search"
 capability    = "indexer.search"
 plugin        = "nzbhydra2"
 origin        = "https://github.com/lemonfiber/plugin-nzbhydra2"
-revision      = "8bcefe043e070ce27aaa77ea85f80997c149bb60"
+revision      = "c9793f121624f9f81f4b49045945002b534b7513"
 stands_in_for = "prowlarr"
 media_type    = "tv"
 claimed       = true
@@ -171,14 +171,14 @@ claimed       = true
 arm        = "curator-radarr"
 plugin     = "radarr"
 origin     = "https://github.com/lemonfiber/plugin-radarr"
-revision   = "dacc9623b99ab0b6a41dd17afb0b5fe4083fca30"
+revision   = "254dcb49f42f1a78bc113b85c2f59bdf8221fffc"
 media_type = "movies"
 
 [[curator]]
 arm        = "curator-lidarr"
 plugin     = "lidarr"
 origin     = "https://github.com/lemonfiber/plugin-lidarr"
-revision   = "694659a7ed118c81f6e225cee2d48e4957616155"
+revision   = "2ab8afc04e6c01293e8ec61d09360d5f470bd99d"
 media_type = "music"
 
 [[curator]]

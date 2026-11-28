@@ -386,11 +386,13 @@ pub(super) fn curators_adapter<'a>(fillers: &'a Fillers, filler: &'a Filler) -> 
 ///
 /// Except where the filler reaches the asker itself: it asks for something the asker
 /// fills, so the two are connected from the filler's end, by the pass that answers that
-/// ask, and saying the pair is reached by nothing would be wrong about it.
+/// ask, and saying the pair is reached by nothing would be wrong about it. A pair whose
+/// every pairing from the filler's end comes to nothing as well is reported all the same.
 pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
-    pairings(fillers)
+    let paired = pairings(fillers);
+    paired
         .iter()
-        .filter(|pairing| !from_its_end(fillers, pairing))
+        .filter(|pairing| !made_from_its_end(fillers, &paired, pairing))
         .filter_map(|pairing| {
             let why = *pairing.made.as_ref().err()?;
             Some(Wiring::settled(
@@ -401,6 +403,18 @@ pub(super) fn unmatched(fillers: &Fillers) -> Vec<Wiring> {
             ))
         })
         .collect()
+}
+
+/// Whether the pair `pairing` names is connected from the filler's end: it asks for
+/// something the asker fills, and either nothing in `paired` pairs the two from that end,
+/// so another pass answers the ask, or something there comes to a connection.
+fn made_from_its_end(fillers: &Fillers, paired: &[Pairing<'_>], pairing: &Pairing<'_>) -> bool {
+    let mut reverse = paired
+        .iter()
+        .filter(|other| other.asker.id == pairing.filler.id && other.filler.id == pairing.asker.id)
+        .peekable();
+    from_its_end(fillers, pairing)
+        && (reverse.peek().is_none() || reverse.any(|other| other.made.is_ok()))
 }
 
 /// Whether the filler asks for something the asker fills, itself or through the adapter
