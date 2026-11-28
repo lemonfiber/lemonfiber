@@ -533,7 +533,7 @@
       "oneOf": [
         {"description": "During an install and an update, after the plugin's proofs and the stack's checks\nhold and before the install is recorded. What a recipe that says nothing does,\nbecause a first-run flow is what a recipe is for.", "type": "string", "const": "install"},
         {"description": "Only when the operator asks for it by name, with approvals of its own.", "type": "string", "const": "demand"},
-        {"description": "Once the part its plugin claims over `owner.claim@1` answers that it is\nlemonfiber's, under the approvals of the plugin's last install or update, until it\nhas held once. It asks the operator for nothing.", "type": "string", "const": "claim"}
+        {"description": "Once the part a service of its own plugin claims over `owner.claim@1` answers that\nit is lemonfiber's, under the approvals of the plugin's last install or update,\nuntil a run of it has held and been recorded. It asks the operator for nothing, and\na plugin none of whose services speaks `owner.claim@1` declares none. It may run\nmore than once, where a run held while the record of what lemonfiber last wrote\ncould not be read, so each of its steps holds against a part it furnished already.", "type": "string", "const": "claim"}
       ]
     },
     "PluginRecipeRetry": {

@@ -425,3 +425,26 @@ fn a_claim_recipe_asking_the_operator_for_an_input_is_refused_naming_it() {
         "an install recipe may ask: {installing:?}"
     );
 }
+
+/// A recipe that runs on claim waits for a part a service of its own plugin claims, so one
+/// in a plugin none of whose services speaks `owner.claim@1` is refused naming it, under a
+/// code of its own.
+#[test]
+fn a_claim_recipe_in_a_plugin_none_of_whose_services_claims_is_refused_naming_it() {
+    let text = WHOLE.replace(r#"on    = "install""#, r#"on    = "claim""#);
+    let claiming = said(&text);
+    assert!(
+        names(
+            &claiming,
+            &["recipe adopt-existing-library.on", "owner.claim@1"]
+        ),
+        "got: {claiming:?}"
+    );
+    assert!(Manifest::from_toml(&text).is_ok_and(|manifest| super::claims_for_nobody(&manifest)));
+    let installing = said(WHOLE);
+    assert!(
+        !names(&installing, &["owner.claim@1"]),
+        "an install recipe waits on nothing: {installing:?}"
+    );
+    assert!(Manifest::from_toml(WHOLE).is_ok_and(|manifest| !super::claims_for_nobody(&manifest)));
+}

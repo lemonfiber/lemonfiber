@@ -490,4 +490,18 @@ codes! {
             names the variable its own setting was kept under.",
         household: fault,
     }
+    /// Raised when a recipe runs on claim in a plugin none of whose services speaks
+    /// `owner.claim@1`; the manifest's every other fault is listed beside it.
+    UNCLAIMED_RECIPE = "PLUGIN-53" {
+        severity: Error,
+        status: 400,
+        since: "0.18.0",
+        meaning: "A recipe of the plugin runs once a part it claims is lemonfiber's, and none of \
+            its services claims a part, so the recipe would never run. The manifest is refused \
+            whole — nothing was installed or written — and the message names the recipe and \
+            lists every other violation beside it.",
+        remedy: "Take it up with whoever published the plugin: a recipe that runs on claim \
+            belongs to a plugin whose adapter speaks owner.claim@1.",
+        household: fault,
+    }
 }

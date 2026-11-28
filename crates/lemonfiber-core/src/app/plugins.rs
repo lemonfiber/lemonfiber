@@ -200,7 +200,7 @@ pub(super) enum Errand<'a> {
 
 use crate::error::codes::plugin::UNREADABLE;
 
-use crate::error::codes::plugin::{HEADER_NAMED, PATH_NOT_PLAIN, REFUSED};
+use crate::error::codes::plugin::{HEADER_NAMED, PATH_NOT_PLAIN, REFUSED, UNCLAIMED_RECIPE};
 
 /// Whether a manifest has a fault refused with a code of its own.
 type Singling = fn(&lemonfiber_plugin::Manifest) -> bool;
@@ -208,14 +208,15 @@ type Singling = fn(&lemonfiber_plugin::Manifest) -> bool;
 /// The faults of a manifest that are refused with a code of their own, the first that
 /// holds deciding the code, and every other manifest refused with [`REFUSED`].
 ///
-/// A path that could be read as another host comes first: of the two it is the one
-/// that would send a call somewhere its destination does not name.
-const SINGLED_OUT: [(Singling, crate::error::Code); 2] = [
+/// A path that could be read as another host comes first: of them it is the one that
+/// would send a call somewhere its destination does not name.
+const SINGLED_OUT: [(Singling, crate::error::Code); 3] = [
     (lemonfiber_plugin::names_a_path_not_plain, PATH_NOT_PLAIN),
     (
         lemonfiber_plugin::names_a_header_by_substitution,
         HEADER_NAMED,
     ),
+    (lemonfiber_plugin::claims_for_nobody, UNCLAIMED_RECIPE),
 ];
 
 use crate::error::codes::plugin::UNRECORDED;

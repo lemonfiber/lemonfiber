@@ -86,9 +86,12 @@ pub enum On {
     Install,
     /// Only when the operator asks for it by name, with approvals of its own.
     Demand,
-    /// Once the part its plugin claims over `owner.claim@1` answers that it is
-    /// lemonfiber's, under the approvals of the plugin's last install or update, until it
-    /// has held once. It asks the operator for nothing.
+    /// Once the part a service of its own plugin claims over `owner.claim@1` answers that
+    /// it is lemonfiber's, under the approvals of the plugin's last install or update,
+    /// until a run of it has held and been recorded. It asks the operator for nothing, and
+    /// a plugin none of whose services speaks `owner.claim@1` declares none. It may run
+    /// more than once, where a run held while the record of what lemonfiber last wrote
+    /// could not be read, so each of its steps holds against a part it furnished already.
     Claim,
 }
 

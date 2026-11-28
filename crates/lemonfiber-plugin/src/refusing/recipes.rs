@@ -18,8 +18,11 @@
 
 use std::collections::BTreeSet;
 
+use lemonfiber_contract::capabilities::owner::claim;
+use lemonfiber_contract::spoken;
+
 use crate::addressing::{named, placed, PARAMETERS, QUERY, VALUED};
-use crate::schema::{Manifest, Recipe, Step, RUN};
+use crate::schema::{Manifest, On, Recipe, Step, RUN};
 use crate::Violation;
 
 // Guards that look back, retries within the published bounds, and captures that read
@@ -58,11 +61,35 @@ pub(super) fn declared(manifest: &Manifest, found: &mut Vec<Violation>) {
                 message: "is declared twice, so naming one of them names both".to_owned(),
             });
         }
+        if recipe.on == On::Claim && !claims(manifest) {
+            found.push(Violation {
+                location: format!("{at}.on"),
+                message: "runs on claim, and none of this plugin's services speaks \
+                          owner.claim@1, so nothing would ever make it run"
+                    .to_owned(),
+            });
+        }
         whither::inputs(manifest, recipe, &at, found);
         flows(manifest, recipe, &at, found);
         paired(manifest, recipe, &at, found);
         bounds::waiting(recipe, &at, found);
     }
+}
+
+/// Whether any recipe of this manifest runs on claim while none of its services claims a
+/// part, which is refused with a code of its own.
+#[must_use]
+pub fn claims_for_nobody(manifest: &Manifest) -> bool {
+    !claims(manifest) && manifest.recipes.iter().any(|recipe| recipe.on == On::Claim)
+}
+
+/// Whether a service of this manifest speaks `owner.claim@1`, which a claim recipe waits on.
+fn claims(manifest: &Manifest) -> bool {
+    let claim = spoken(claim::CAPABILITY, claim::MAJOR);
+    manifest
+        .services
+        .iter()
+        .any(|service| service.speaks.contains(&claim))
 }
 
 /// Whether a destination a manifest names is a host outside the stack, which a value
